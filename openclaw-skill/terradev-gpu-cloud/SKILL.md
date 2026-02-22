@@ -1,6 +1,6 @@
 ---
 name: terradev-gpu-cloud
-description: Cross-cloud GPU provisioning, K8s cluster creation, and inference overflow. Get real-time pricing across 11+ cloud providers, provision the cheapest GPUs in seconds, spin up production K8s clusters, and burst to cloud when your local GPU maxes out. BYOAPI — your keys never leave your machine.
+description: Cross-cloud GPU provisioning with NUMA-aligned topology optimization, K8s cluster creation, and inference overflow. Get real-time pricing across 11+ cloud providers, provision the cheapest GPUs in seconds, spin up production K8s clusters with automatic GPU-NIC pairing, and burst to cloud when your local GPU maxes out. BYOAPI — your keys never leave your machine.
 version: 1.0.0
 license: MIT
 metadata:
@@ -91,7 +91,9 @@ terradev k8s info <CLUSTER_NAME>
 terradev k8s destroy <CLUSTER_NAME>
 ```
 
-Features generated automatically:
+Topology optimization (automatic — no manual kubelet configuration required):
+- NUMA alignment: the GPU and its network card are placed behind the same PCIe switch, eliminating cross-socket latency
+- GPU-NIC pairing optimized at provisioning time for maximum inter-node bandwidth
 - Karpenter NodeClass for spot-first GPU scheduling
 - KEDA autoscaling triggers at 90% GPU utilization
 - CNI-first addon ordering (handles the EKS v21 race condition)
