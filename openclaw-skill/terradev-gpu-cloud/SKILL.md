@@ -8,9 +8,32 @@ metadata:
     requires:
       env:
         - TERRADEV_RUNPOD_KEY
+        - TERRADEV_VASTAI_KEY
+        - TERRADEV_AWS_ACCESS_KEY_ID
+        - TERRADEV_AWS_SECRET_ACCESS_KEY
+        - TERRADEV_AWS_DEFAULT_REGION
+        - TERRADEV_GCP_PROJECT_ID
+        - TERRADEV_GCP_CREDENTIALS_PATH
+        - TERRADEV_AZURE_SUBSCRIPTION_ID
+        - TERRADEV_AZURE_CLIENT_ID
+        - TERRADEV_AZURE_CLIENT_SECRET
+        - TERRADEV_AZURE_TENANT_ID
+        - TERRADEV_ORACLE_USER_OCID
+        - TERRADEV_ORACLE_FINGERPRINT
+        - TERRADEV_ORACLE_PRIVATE_KEY_PATH
+        - TERRADEV_ORACLE_TENANCY_OCID
+        - TERRADEV_ORACLE_REGION
+        - TERRADEV_LAMBDA_API_KEY
+        - TERRADEV_COREWEAVE_API_KEY
+        - TERRADEV_CRUSOE_API_KEY
+        - TERRADEV_TENSORDOCK_API_KEY
+        - HF_TOKEN
       bins:
         - terradev
         - python3
+      optionalBins:
+        - kubectl
+        - docker
       anyBins:
         - kubectl
         - docker
@@ -21,6 +44,10 @@ metadata:
       - kind: uv
         package: terradev-cli
         bins: [terradev]
+      - kind: uv
+        package: "terradev-cli[all]"
+        bins: [terradev]
+        note: "Optional: Install with all cloud provider SDKs"
 ---
 
 # Terradev GPU Cloud — Cross-Cloud GPU Provisioning for OpenClaw
@@ -28,6 +55,41 @@ metadata:
 You are a cloud GPU provisioning agent powered by Terradev CLI. You help users find the cheapest GPUs across 11+ cloud providers, provision instances, create Kubernetes clusters, deploy inference endpoints, and manage cloud compute — all from natural language.
 
 **BYOAPI**: All API keys stay on the user's machine. Credentials are never proxied through third parties.
+
+## Credential Requirements
+
+### Minimum Setup (RunPod only)
+```bash
+export TERRADEV_RUNPOD_KEY=your_runpod_api_key
+```
+
+### Full Multi-Cloud Setup (Optional)
+```bash
+# AWS
+export TERRADEV_AWS_ACCESS_KEY_ID=your_key
+export TERRADEV_AWS_SECRET_ACCESS_KEY=your_secret
+export TERRADEV_AWS_DEFAULT_REGION=us-east-1
+
+# GCP
+export TERRADEV_GCP_PROJECT_ID=your_project
+export TERRADEV_GCP_CREDENTIALS_PATH=/path/to/service-account.json
+
+# Azure
+export TERRADEV_AZURE_SUBSCRIPTION_ID=your_sub
+export TERRADEV_AZURE_CLIENT_ID=your_client
+export TERRADEV_AZURE_CLIENT_SECRET=your_secret
+export TERRADEV_AZURE_TENANT_ID=your_tenant
+
+# Additional providers (optional)
+export TERRADEV_VASTAI_KEY=your_key
+export TERRADEV_ORACLE_USER_OCID=your_ocid
+# ... etc for other providers
+```
+
+### Optional Dependencies
+- **kubectl**: Required only for Kubernetes cluster commands
+- **docker**: Required only for local container operations
+- **Cloud SDKs**: Auto-installed with `terradev-cli[all]`
 
 ## What You Can Do
 
