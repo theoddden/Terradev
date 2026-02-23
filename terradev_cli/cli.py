@@ -17,13 +17,12 @@ import subprocess
 import time
 import sys
 
-# Import telemetry - DISABLED TO PREVENT HANG
-# try:
-#     from core.telemetry import get_mandatory_telemetry
-#     _telemetry = get_mandatory_telemetry()
-# except Exception:
-#     _telemetry = None
-_telemetry = None
+# Import telemetry - MANDATORY FOR USAGE TRACKING
+try:
+    from terradev_cli.core.telemetry import get_mandatory_telemetry
+    _telemetry = get_mandatory_telemetry()
+except Exception:
+    _telemetry = None
 
 # Import Kubernetes wrapper
 try:
@@ -699,7 +698,7 @@ def run_interactive_onboarding(api: TerradevAPI):
     print("="*70 + "\n")
 
 @click.group()
-@click.version_option(version="3.1.5", prog_name="Terradev CLI")
+@click.version_option(version="3.1.6", prog_name="Terradev CLI")
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
 @click.option('--skip-onboarding', is_flag=True, help='Skip first-time setup')
