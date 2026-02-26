@@ -1,4 +1,4 @@
-# Terradev CLI v3.1.7
+# Terradev CLI v3.1.8
 
 BYOAPI: Cross-cloud GPU provisioning and cost optimization platform with GitOps automation, *for stateless workloads*.
 
@@ -90,6 +90,38 @@ terradev hf-space my-embeddings --model-id sentence-transformers/all-MiniLM-L6-v
 # Image Model Template (T4 GPU)
 terradev hf-space my-image --model-id runwayml/stable-diffusion-v1-5 --template image
 ```
+
+## MoE Cluster Templates (NEW in v3.1.8)
+
+Production-ready cluster configs optimized for Mixture-of-Experts models — the dominant architecture for every major 2026 release (GLM-5, Qwen 3.5, Mistral Large 3, DeepSeek V4, Llama 5).
+
+```bash
+# Deploy any MoE model with one command
+terradev provision --task clusters/moe-template/task.yaml \
+  --set model_id=zai-org/GLM-5-FP8 --set tp_size=8
+
+# Or Qwen 3.5 flagship
+terradev provision --task clusters/moe-template/task.yaml \
+  --set model_id=Qwen/Qwen3.5-397B-A17B
+
+# Kubernetes
+kubectl apply -f clusters/moe-template/k8s/
+
+# Helm
+helm upgrade --install moe-inf ./helm/terradev \
+  -f clusters/moe-template/helm/values-moe.yaml \
+  --set model.id=zai-org/GLM-5-FP8
+```
+
+### MoE Template Features
+- **Any MoE Model**: Parameterized for GLM-5, Qwen 3.5, Mistral Large 3, DeepSeek V4, Llama 5
+- **NVLink Topology**: Enforced single-node TP with NUMA alignment
+- **vLLM + SGLang**: Both serving backends supported
+- **FP8 Quantization**: Half the VRAM of BF16 on H100/H200
+- **GPU-Aware Autoscaling**: HPA on DCGM metrics and vLLM queue depth
+- **Multi-Cloud**: RunPod, Vast.ai, Lambda, AWS, CoreWeave
+
+See [`clusters/moe-template/`](clusters/moe-template/) for full docs and [`clusters/glm-5/`](clusters/glm-5/) for a model-specific example.
 
 ## Installation
 

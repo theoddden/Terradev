@@ -1,4 +1,4 @@
-# Terradev CLI v3.1.7
+# Terradev CLI v3.1.8
 
 BYOAPI, cross-cloud GPU provisioning and cost optimization platform with GitOps automation.
 
@@ -56,6 +56,25 @@ terradev hf-space my-embeddings --model-id sentence-transformers/all-MiniLM-L6-v
 # Image Model Template (T4 GPU)
 terradev hf-space my-image --model-id runwayml/stable-diffusion-v1-5 --template image
 ```
+
+## MoE Cluster Templates (NEW in v3.1.8)
+
+Deploy any Mixture-of-Experts model with production-ready infrastructure — one command for GLM-5, Qwen 3.5, Mistral Large 3, DeepSeek V4, Llama 5.
+
+```bash
+# Deploy any MoE model
+terradev provision --task clusters/moe-template/task.yaml \
+  --set model_id=zai-org/GLM-5-FP8 --set tp_size=8
+
+# Smaller MoE on fewer GPUs
+terradev provision --task clusters/moe-template/task.yaml \
+  --set model_id=Qwen/Qwen3.5-122B-A10B --set tp_size=4 --set gpu_count=4
+```
+
+- **Parameterized**: model_id, tp_size, gpu_count, backend, precision — all configurable
+- **Terraform + K8s + Helm**: Full stack included
+- **NVLink + NUMA**: Topology-aware GPU placement enforced
+- **FP8 + vLLM/SGLang**: Both backends, speculative decoding ready
 
 ## Installation
 

@@ -1,0 +1,143 @@
+# Helm Values — MoE Model Inference Template
+# Usage:
+#   helm upgrade --install moe-inf ./helm/terradev -f clusters/moe-template/helm/values-moe.yaml
+#   helm upgrade --install moe-inf ./helm/terradev -f clusters/moe-template/helm/values-moe.yaml \
+#     --set model.id=Qwen/Qwen3.5-397B-A17B --set model.name=qwen3.5
+
+replicaCount: 1
+
+image:
+  repository: vllm/vllm-openai
+  tag: nightly
+  pullPolicy: Always
+
+nameOverride: moe-vllm
+fullnameOverride: moe-inference
+
+# ─── Model Configuration (CHANGE THESE) ──────────────────────────────────────
+model:
+  id: zai-org/GLM-5-FP8           # HuggingFace model ID
+  name: moe-model                  # Served model name
+  cachePath: /models/weights
+  downloadOnInit: true
+  precision: fp8                   # fp8, bf16, fp16
+
+# ─── Serving Configuration ───────────────────────────────────────────────────
+serving:
+  backend: vllm                    # vllm or sglang
+  port: 8000
+  host: "0.0.0.0"
+
+  vllm:
+    tensorParallelSize: 8          # Must match gpu.count
+    gpuMemoryUtilization: 0.85
+    maxModelLen: 32768
+    dtype: auto
+    trustRemoteCode: true
+    enableAutoToolChoice: true
+
+  sglang:
+    tpSize: 8
+    memFractionStatic: 0.85
+    trustRemoteCode: true
+
+# ─── GPU Configuration ───────────────────────────────────────────────────────
+gpu:
+  type: H100_SXM
+  count: 8                         # 1, 2, 4, or 8 — must match serving.*.tensorParallelSize
+  memoryGb: 80
+  requireNvlink: true
+
+resources:
+  requests:
+    nvidia.com/gpu: "8"
+    cpu: "64"
+    memory: "256Gi"
+  limits:
+    nvidia.com/gpu: "8"
+    cpu: "96"
+    memory: "512Gi"
+
+nodeSelector:
+  nvidia.com/gpu.product: NVIDIA-H100-80GB-HBM3
+
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  - key: dedicated
+    operator: Equal
+    value: gpu-inference
+    effect: NoSchedule
+
+env:
+  CUDA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+  NCCL_P2P_DISABLE: "0"
+  NCCL_IB_DISABLE: "0"
+  NCCL_SOCKET_IFNAME: "eth0"
+  VLLM_ATTENTION_BACKEND: "FLASH_ATTN"
+  TRANSFORMERS_CACHE: "/models/cache"
+
+secrets:
+  hfToken: ""  # --set secrets.hfToken=hf_xxx
+
+# ─── Storage ─────────────────────────────────────────────────────────────────
+persistence:
+  modelCache:
+    enabled: true
+    size: 500Gi                    # Adjust per model size
+    storageClass: nvme-ssd
+    mountPath: /models
+  sharedMemory:
+    enabled: true
+    size: 32Gi                     # NCCL shared memory for MoE TP
+    mountPath: /dev/shm
+
+# ─── Networking ──────────────────────────────────────────────────────────────
+service:
+  type: LoadBalancer
+  port: 8000
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+
+# ─── Health Checks ───────────────────────────────────────────────────────────
+probes:
+  startup:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 30
+  liveness:
+    enabled: true
+    path: /health
+    periodSeconds: 15
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /health
+    periodSeconds: 5
+    failureThreshold: 2
+
+# ─── Autoscaling ─────────────────────────────────────────────────────────────
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 4
+  targetGPUUtilization: 80
+  targetQueueDepth: 10
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# ─── Monitoring ──────────────────────────────────────────────────────────────
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    path: /metrics
+
+strategy:
+  type: Recreate

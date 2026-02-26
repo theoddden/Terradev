@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: moe-inference
+  labels:
+    app.kubernetes.io/name: moe-inference
+    app.kubernetes.io/component: inference
+    app.kubernetes.io/managed-by: terradev
+    terradev.io/arch: moe

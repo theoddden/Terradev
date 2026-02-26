@@ -1,0 +1,194 @@
+# MoE Model Inference Deployment — Parameterized Template
+# Works with any MoE model via environment variable overrides
+#
+# Customize via kustomize or envsubst:
+#   export MODEL_ID=zai-org/GLM-5-FP8 MODEL_NAME=glm-5-fp8 TP_SIZE=8 GPU_COUNT=8
+#   envsubst < deployment.yaml | kubectl apply -f -
+#
+# Or edit the env values directly below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: moe-vllm
+  namespace: moe-inference
+  labels:
+    app.kubernetes.io/name: moe-inference
+    app.kubernetes.io/component: vllm-serving
+    app.kubernetes.io/managed-by: terradev
+    terradev.io/arch: moe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: moe-inference
+      app.kubernetes.io/component: vllm-serving
+  strategy:
+    type: Recreate  # GPU workloads cannot do rolling updates
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: moe-inference
+        app.kubernetes.io/component: vllm-serving
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Require NVLink-connected multi-GPU node
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-H100-80GB-HBM3
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: dedicated
+          operator: Equal
+          value: gpu-inference
+          effect: NoSchedule
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: moe-inference
+
+      # Init container — download model weights to shared PVC
+      initContainers:
+        - name: model-downloader
+          image: python:3.11-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              pip install -q huggingface-hub
+              python3 -c "
+              from huggingface_hub import snapshot_download
+              import os
+              model_id = os.environ.get('MODEL_ID', 'zai-org/GLM-5-FP8')
+              token = os.environ.get('HF_TOKEN', '')
+              if os.path.exists('/models/weights/config.json'):
+                  print('Model weights already cached, skipping download')
+              else:
+                  print(f'Downloading {model_id}...')
+                  snapshot_download(
+                      model_id,
+                      local_dir='/models/weights',
+                      token=token if token else None,
+                      max_workers=8
+                  )
+                  print('Model download complete')
+              "
+          env:
+            - name: MODEL_ID
+              value: "zai-org/GLM-5-FP8"  # CHANGE: set your model ID
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: moe-secrets
+                  key: hf-token
+                  optional: true
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+
+      containers:
+        - name: vllm-server
+          image: vllm/vllm-openai:nightly
+          command: ["vllm", "serve", "/models/weights"]
+          args:
+            - --tensor-parallel-size=8          # CHANGE: match your GPU count
+            - --gpu-memory-utilization=0.85
+            - --max-model-len=32768
+            - --dtype=auto
+            - --trust-remote-code
+            - --enable-auto-tool-choice
+            - --served-model-name=moe-model     # CHANGE: set your model name
+            - --host=0.0.0.0
+            - --port=8000
+          env:
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0,1,2,3,4,5,6,7"          # CHANGE: adjust for GPU count
+            - name: NCCL_P2P_DISABLE
+              value: "0"
+            - name: NCCL_IB_DISABLE
+              value: "0"
+            - name: NCCL_SOCKET_IFNAME
+              value: "eth0"
+            - name: VLLM_ATTENTION_BACKEND
+              value: "FLASH_ATTN"
+            - name: TRANSFORMERS_CACHE
+              value: "/models/cache"
+            - name: HF_HOME
+              value: "/models/cache"
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          # Startup probe — MoE model loading takes 2-5 min
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              nvidia.com/gpu: "8"               # CHANGE: match your GPU count
+              cpu: "64"
+              memory: "256Gi"
+            limits:
+              nvidia.com/gpu: "8"               # CHANGE: match your GPU count
+              cpu: "96"
+              memory: "512Gi"
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+            - name: dshm
+              mountPath: /dev/shm
+
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: moe-model-cache
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Gi  # NCCL shared memory for MoE TP communication
+
+      terminationGracePeriodSeconds: 60
+      restartPolicy: Always
+---
+# Secret for HuggingFace token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: moe-secrets
+  namespace: moe-inference
+type: Opaque
+data:
+  # Base64-encode your HF_TOKEN: echo -n "hf_xxx" | base64
+  hf-token: ""
