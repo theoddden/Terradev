@@ -1,4 +1,4 @@
-# Terradev CLI v3.1.6
+# Terradev CLI v3.1.7
 
 BYOAPI, cross-cloud GPU provisioning and cost optimization platform with GitOps automation.
 
