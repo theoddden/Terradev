@@ -1861,8 +1861,12 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             ('oracle', api.get_oracle_quotes), ('crusoe', api.get_crusoe_quotes),
         ]
         for pname, fn in provider_list:
+            if fn is None:
+                continue
             if not providers or pname in providers:
                 tasks.append(fn(gpu_type))
+        if not tasks:
+            return []
         results = await asyncio.gather(*tasks, return_exceptions=True)
         out = []
         for r in results:
@@ -2465,13 +2469,18 @@ def execute(instance_id, command, async_exec):
 @click.option('--format', '-f', type=click.Choice(['table', 'json']), default='table', help='Output format')
 def analytics(days, format):
     """Show cost analytics from the cost tracking database."""
-    print("Cost Analytics Dashboard")
-    print("=" * 50)
-    print(f"Analysis Period: Last {days} days\n")
 
     try:
         from terradev_cli.core.cost_tracker import get_spend_summary, get_daily_spend
         summary = get_spend_summary(days)
+
+        if format == 'json':
+            print(json.dumps(summary, indent=2, default=str))
+            return
+
+        print("Cost Analytics Dashboard")
+        print("=" * 50)
+        print(f"Analysis Period: Last {days} days\n")
 
         total_cost = summary.get('total_provision_cost', 0)
         total_provisions = summary.get('total_provisions', 0)
@@ -2502,16 +2511,14 @@ def analytics(days, format):
         except Exception:
             pass
 
-        if format == 'json':
-            print(json.dumps(summary, indent=2, default=str))
-
     except Exception as e:
         # Fallback to local usage file
         api = TerradevAPI()
         total_cost = sum(inst.get('price', 0) * 24 for inst in api.usage.get('instances_created', []))
         print(f"Estimated Cost: ${total_cost:.2f} (from local tracking)")
         print(f"Instances: {len(api.usage.get('instances_created', []))}")
-        print(f"WARNING: Cost DB unavailable: {e}")
+        print(f"WARNING: Cost DB unavailable: {e}", file=sys.stderr)
+        sys.exit(1)
 
 @cli.command()
 def optimize():
@@ -2635,7 +2642,8 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
             print(_json.dumps(dashboard, indent=2))
             print("\nImport this JSON into Grafana → Dashboards → Import")
         except Exception as e:
-            print(f"Error generating dashboard: {e}")
+            print(f"Error generating dashboard: {e}", file=sys.stderr)
+            sys.exit(1)
         return
 
     if export_scrape_config:
@@ -2712,7 +2720,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
 @cli.command()
 def cleanup():
     """Clean up unused resources and temporary files"""
-    print("Cleaning Cleaning up unused resources...")
+    print("Cleaning up unused resources...")
     
     api = TerradevAPI()
     
@@ -2778,16 +2786,16 @@ def job(job_file, optimize):
 @click.option('--max-cost', type=float, help='Max cost per request')
 def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
     """Deploy and manage inference endpoints"""
-    print(f"Deploying Deploying inference for model: {model}")
+    print(f"Deploying inference for model: {model}")
     
     if type:
-        print(f"Plan Model type: {type}")
+        print(f"Model type: {type}")
     if provider:
-        print(f"Provider Provider: {provider}")
+        print(f"Provider: {provider}")
     if gpu_type:
-        print(f"GPU GPU type: {gpu_type}")
+        print(f"GPU type: {gpu_type}")
     if region:
-        print(f"Region Region: {region}")
+        print(f"Region: {region}")
     if max_latency:
         print(f"Max latency: {max_latency}ms")
     if max_cost:
@@ -2858,11 +2866,11 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
     print(f"\nBest option: {best_quote['provider']}")
     print(f"Price: ${best_quote['price']}/request")
     print(f"Latency: {best_quote['latency']}ms")
-    print(f"GPU GPU: {best_quote['gpu_type']}")
+    print(f"GPU: {best_quote['gpu_type']}")
     
     # Deploy to optimal provider via real API
     pname = best_quote['provider']
-    print(f"\nDeploying Deploying to {pname}...")
+    print(f"\nDeploying to {pname}...")
 
     async def _deploy_inference():
         from terradev_cli.providers.provider_factory import ProviderFactory
@@ -2927,15 +2935,16 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
 @click.option('--max-workers', type=int, default=5, help='Maximum workers')
 @click.option('--idle-timeout', type=int, default=300, help='Idle timeout in seconds')
 @click.option('--cost-optimize', is_flag=True, help='Enable cost optimization')
-def infer_deploy(model_path, name, provider, gpu_type, min_workers, max_workers, idle_timeout, cost_optimize):
+@click.option('--dry-run', is_flag=True, help='Show deployment plan without deploying')
+def infer_deploy(model_path, name, provider, gpu_type, min_workers, max_workers, idle_timeout, cost_optimize, dry_run):
     """Deploy inference endpoint"""
-    print(f"Deploying Deploying inference endpoint: {name}")
-    print(f"Path Model path: {model_path}")
+    print(f"Deploying inference endpoint: {name}")
+    print(f"Model path: {model_path}")
     
     if provider:
-        print(f"Provider Provider: {provider}")
+        print(f"Provider: {provider}")
     if gpu_type:
-        print(f"GPU GPU type: {gpu_type}")
+        print(f"GPU type: {gpu_type}")
     
     print(f"Workers: {min_workers}-{max_workers}")
     print(f"Idle timeout: {idle_timeout}s")
@@ -2974,10 +2983,14 @@ def infer_deploy(model_path, name, provider, gpu_type, min_workers, max_workers,
         return
 
     pname = best['provider']
-    print(f"Provider Selected provider: {pname} (${best['price']:.2f}/hr)")
+    print(f"Selected provider: {pname} (${best['price']:.2f}/hr)")
+
+    if dry_run:
+        print("\n🔍 Dry run — deployment plan shown above. No resources provisioned.")
+        return
 
     # Provision the instance
-    print(f"Deploying Deploying endpoint...")
+    print(f"Deploying endpoint...")
     async def _provision():
         from terradev_cli.providers.provider_factory import ProviderFactory
         factory = ProviderFactory()
@@ -3397,7 +3410,9 @@ def infer_status(check):
         from terradev_cli.core.inference_router import InferenceRouter
     except ImportError:
         print("❌ Inference router module not available.")
-        return
+        print("   This may require Research+ or Enterprise tier.")
+        print("   Run: terradev upgrade")
+        sys.exit(1)
 
     router = InferenceRouter()
 
@@ -3458,19 +3473,19 @@ def infer_failover(dry_run):
         print(f"❌ Inference failover requires Research+ or Enterprise tier.")
         print(f"   Current tier: {api.tier['name']}")
         print(f"   Run: terradev upgrade")
-        return
+        sys.exit(1)
 
     try:
         from terradev_cli.core.inference_router import InferenceRouter
     except ImportError:
         print("❌ Inference router module not available.")
-        return
+        sys.exit(1)
 
     router = InferenceRouter()
 
     if not router.endpoints:
         print("📭 No inference endpoints registered.")
-        return
+        sys.exit(1)
 
     print("🔍 Running health checks on all inference endpoints...")
     probes = asyncio.run(router.check_all_endpoints())
@@ -3527,13 +3542,14 @@ def infer_route(model, strategy, measure):
     if 'all' not in tier_features and 'inference' not in tier_features:
         print(f"❌ Inference routing requires Research+ or Enterprise tier.")
         print(f"   Run: terradev upgrade")
-        return
+        sys.exit(1)
 
     try:
         from terradev_cli.core.inference_router import InferenceRouter
     except ImportError:
         print("❌ Inference router module not available.")
-        return
+        print("   Run: terradev upgrade")
+        sys.exit(1)
 
     router = InferenceRouter()
 
@@ -3792,7 +3808,7 @@ def k8s_create(cluster_name, gpu, count, max_price, multi_cloud, prefer_spot, aw
     """Create multi-cloud Kubernetes GPU cluster"""
     if not TerraformWrapper:
         print("❌ Kubernetes wrapper not available")
-        return
+        sys.exit(1)
     
     if _telemetry:
         _telemetry.log_action('k8s_cluster_create', {
@@ -3875,7 +3891,7 @@ def k8s_list():
     """List all Kubernetes clusters"""
     if not TerraformWrapper:
         print("❌ Kubernetes wrapper not available")
-        return
+        sys.exit(1)
     
     wrapper = TerraformWrapper()
     clusters = wrapper.list_clusters()
@@ -3983,11 +3999,14 @@ def k8s_info(cluster_name):
 @click.option('--dry-run', is_flag=True, help='Show recommendation without deploying')
 def smart_deploy(option, gpu_count, memory, storage, hours, workload, budget, region, dry_run):
     """Smart deployment with automatic optimization"""
+    try:
+        from terradev_cli.core.deployment_router import SmartDeploymentRouter
+    except ImportError:
+        print("❌ Smart deployment module not available. Install terradev_cli package.")
+        sys.exit(1)
     import asyncio
     
     async def _smart_deploy():
-        from terradev_cli.core.deployment_router import SmartDeploymentRouter
-        
         router = SmartDeploymentRouter()
         user_request = {
             'gpu_type': 'A100',  # Default, will be overridden by recommendations
@@ -4016,97 +4035,7 @@ def smart_deploy(option, gpu_count, memory, storage, hours, workload, budget, re
                 return
             
             chosen = recommendations[option]
-            print(f"Deploying Deploying option {option}: {chosen.provider} {chosen.instance_type}")
-            print(f"   Type: {chosen.type.value}")
-            print(f"   Cost: ${chosen.price_per_hour:.2f}/hr")
-            print(f"   Setup time: {chosen.setup_time_minutes} minutes")
-            print(f"   Confidence: {chosen.confidence:.1%}")
-            
-            if dry_run:
-                print("🔍 Dry run - not actually deploying")
-                return
-            
-            # Execute deployment
-            try:
-                result = await router.execute_deployment(chosen, router.requirements_analyzer.analyze(user_request))
-                print(f"✅ Deployment started: {result['deployment_id']}")
-                print(f"   Status: {result['status']}")
-                print(f"   Estimated ready: {result['estimated_ready_time']}")
-            except Exception as e:
-                print(f"❌ Deployment failed: {e}")
-        else:
-            # Show all recommendations
-            print(f"\n🎯 Smart Deployment Recommendations:")
-            print("=" * 60)
-            
-            for i, rec in enumerate(recommendations[:5]):
-                print(f"\n{i}. {rec.provider} {rec.instance_type}")
-                print(f"   Type: {rec.type.value}")
-                print(f"   Cost: ${rec.price_per_hour:.2f}/hr (total: ${rec.estimated_total_cost:.2f})")
-                print(f"   Setup: {rec.setup_time_minutes} minutes")
-                print(f"   Confidence: {rec.confidence:.1%}")
-                print(f"   Risk: {rec.risk_score:.1%}")
-                
-                print(f"   Pros:")
-                for pro in rec.pros[:3]:
-                    print(f"     • {pro}")
-                
-                if len(rec.cons) > 0:
-                    print(f"   Cons:")
-                    for con in rec.cons[:2]:
-                        print(f"     • {con}")
-                
-                print(f"   Deploy with: terradev smart-deploy --option {i}")
-    
-    asyncio.run(_smart_deploy())
-
-
-@cli.command()
-@click.option('--option', '-o', type=int, help='Deployment option index from smart-deploy')
-@click.option('--gpu-count', '-g', type=int, default=1, help='Number of GPUs')
-@click.option('--memory', '-m', type=int, help='Memory in GB')
-@click.option('--storage', '-s', type=int, help='Storage in GB')
-@click.option('--hours', type=float, default=1.0, help='Estimated runtime in hours')
-@click.option('--workload', default='training', help='Workload type (training, inference, cost-optimized, high-performance)')
-@click.option('--budget', type=float, help='Budget constraint ($/hr)')
-@click.option('--region', help='Preferred region')
-@click.option('--dry-run', is_flag=True, help='Show recommendation without deploying')
-def smart_deploy(option, gpu_count, memory, storage, hours, workload, budget, region, dry_run):
-    """Smart deployment with automatic optimization"""
-    import asyncio
-    
-    async def _smart_deploy():
-        from terradev_cli.core.deployment_router import SmartDeploymentRouter
-        
-        router = SmartDeploymentRouter()
-        user_request = {
-            'gpu_type': 'A100',  # Default, will be overridden by recommendations
-            'gpu_count': gpu_count,
-            'memory_gb': memory or 16,
-            'storage_gb': storage or 100,
-            'estimated_hours': hours,
-            'workload_type': workload,
-            'budget': budget,
-            'region': region
-        }
-        
-        print("🧠 Analyzing deployment options...")
-        
-        # Get recommendations
-        recommendations = await router.recommend_deployments(user_request)
-        
-        if not recommendations:
-            print("❌ No deployment options available")
-            return
-        
-        if option is not None:
-            # Deploy specific option
-            if option >= len(recommendations):
-                print(f"❌ Invalid option. Available options: 0-{len(recommendations)-1}")
-                return
-            
-            chosen = recommendations[option]
-            print(f"Deploying Deploying option {option}: {chosen.provider} {chosen.instance_type}")
+            print(f"Deploying option {option}: {chosen.provider} {chosen.instance_type}")
             print(f"   Type: {chosen.type.value}")
             print(f"   Cost: ${chosen.price_per_hour:.2f}/hr")
             print(f"   Setup time: {chosen.setup_time_minutes} minutes")
@@ -4158,10 +4087,14 @@ def smart_deploy(option, gpu_count, memory, storage, hours, workload, budget, re
 @click.option('--trends', is_flag=True, help='Show price trends')
 def price_discovery(gpu_type, region, hours, trends):
     """Enhanced price discovery with capacity and confidence scoring"""
+    try:
+        from terradev_cli.core.price_discovery import PriceDiscoveryEngine
+    except ImportError:
+        print("❌ Price discovery module not available. Install terradev_cli package.")
+        sys.exit(1)
     import asyncio
     
     async def _price_discovery():
-        from terradev_cli.core.price_discovery import PriceDiscoveryEngine
         
         engine = PriceDiscoveryEngine()
         
@@ -4338,7 +4271,7 @@ def percentiles(gpu_type, provider, spot, window):
         from terradev_cli.core.price_intelligence import compute_percentiles
     except ImportError:
         print("❌ Price intelligence module not available")
-        return
+        sys.exit(1)
 
     data = compute_percentiles(gpu_type, provider=provider, spot=spot, hours=window)
     providers = data.get("providers", {})
@@ -4380,7 +4313,7 @@ def availability(gpu_type, window):
         from terradev_cli.core.price_intelligence import get_availability, get_availability_summary
     except ImportError:
         print("❌ Price intelligence module not available")
-        return
+        sys.exit(1)
 
     if gpu_type:
         data = get_availability(gpu_type, hours=window)
@@ -4432,7 +4365,7 @@ def reliability(provider, window, ranking):
         from terradev_cli.core.price_intelligence import get_provider_reliability, get_provider_ranking
     except ImportError:
         print("❌ Price intelligence module not available")
-        return
+        sys.exit(1)
 
     if ranking:
         ranked = get_provider_ranking()
@@ -4961,7 +4894,7 @@ def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph)
                 print("❌ Workflow name required for deployment")
                 return
             
-            print(f"Deploying Deploying workflow: {name}")
+            print(f"Deploying workflow: {name}")
             # This would integrate with LangGraph's deployment APIs
             print(f"✅ Workflow deployed: {name}")
             print(f"   Access at: https://smith.langchain.com/deployments/{name}")
@@ -5724,7 +5657,11 @@ def rollback(job_version, cache_dir):
 @click.option('--cache-dir', default='./manifests', help='Manifest cache directory')
 def manifests(job, cache_dir):
     """List cached manifests and versions"""
-    from terradev_cli.core.manifest_cache import ManifestCache
+    try:
+        from terradev_cli.core.manifest_cache import ManifestCache
+    except ImportError:
+        print("❌ Manifest cache module not available. Install terradev_cli package.")
+        sys.exit(1)
     
     cache = ManifestCache(cache_dir)
     
@@ -5761,7 +5698,7 @@ def manifests(job, cache_dir):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# HuggingFace Spaces One-Click Deployment — Q1 2026 +$5M Opportunity
+# HuggingFace Spaces One-Click Deployment
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @cli.command('hf-space')
@@ -5780,7 +5717,7 @@ def manifests(job, cache_dir):
 @click.option('--env', '-e', multiple=True, help='Environment variables KEY=VALUE')
 @click.option('--secret', '-s', multiple=True, help='Secrets KEY=VALUE')
 def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret):
-    """One-click HuggingFace Spaces deployment - Q1 2026 +$5M opportunity"""
+    """One-click HuggingFace Spaces deployment"""
     import asyncio
     
     async def _hf_space():
@@ -5837,7 +5774,7 @@ def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret
                 secrets=secrets if secrets else None
             )
         
-        print(f"Deploying Deploying {model_id} to HuggingFace Spaces...")
+        print(f"Deploying {model_id} to HuggingFace Spaces...")
         print(f"   Space: {space_name}")
         print(f"   Hardware: {hardware}")
         print(f"   SDK: {sdk}")
@@ -5868,7 +5805,7 @@ def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret
               default='billing_optimized', help='Scaling policy')
 def orchestrator_start(gpu_id, memory_gb, policy):
     """Start the model orchestrator for multi-model inference"""
-    from .core.model_orchestrator import ModelOrchestrator, ScalingPolicy
+    from terradev_cli.core.model_orchestrator import ModelOrchestrator, ScalingPolicy
     
     policy_map = {
         'billing_optimized': ScalingPolicy.BILLING_OPTIMIZED,
@@ -5911,7 +5848,7 @@ def orchestrator_start(gpu_id, memory_gb, policy):
 @click.option('--tags', help='Comma-separated tags for model categorization')
 def orchestrator_register(model_id, model_path, framework, priority, tags):
     """Register a model with the orchestrator"""
-    from .core.model_orchestrator import ModelOrchestrator
+    from terradev_cli.core.model_orchestrator import ModelOrchestrator
     
     orchestrator = ModelOrchestrator()
     tag_set = set(tags.split(',')) if tags else None
@@ -5935,7 +5872,7 @@ def orchestrator_register(model_id, model_path, framework, priority, tags):
 @click.option('--force', is_flag=True, help='Force loading even if memory is full')
 def orchestrator_load(model_id, force):
     """Load a model into GPU memory"""
-    from .core.model_orchestrator import ModelOrchestrator
+    from terradev_cli.core.model_orchestrator import ModelOrchestrator
     
     orchestrator = ModelOrchestrator()
     
@@ -5957,7 +5894,7 @@ def orchestrator_load(model_id, force):
 @click.argument('model-id')
 def orchestrator_evict(model_id):
     """Evict a model from GPU memory"""
-    from .core.model_orchestrator import ModelOrchestrator
+    from terradev_cli.core.model_orchestrator import ModelOrchestrator
     
     orchestrator = ModelOrchestrator()
     
@@ -5974,7 +5911,7 @@ def orchestrator_evict(model_id):
 @click.option('--model-id', help='Get details for specific model')
 def orchestrator_status(model_id):
     """Get orchestrator and model status"""
-    from .core.model_orchestrator import ModelOrchestrator
+    from terradev_cli.core.model_orchestrator import ModelOrchestrator
     
     orchestrator = ModelOrchestrator()
     
@@ -6017,7 +5954,7 @@ def orchestrator_status(model_id):
 @click.argument('model-id')
 def orchestrator_infer(model_id):
     """Test inference with a model"""
-    from .core.model_orchestrator import ModelOrchestrator
+    from terradev_cli.core.model_orchestrator import ModelOrchestrator
     
     orchestrator = ModelOrchestrator()
     
@@ -6038,7 +5975,7 @@ def orchestrator_infer(model_id):
 @click.option('--min-warm', default=3, help='Minimum models to keep warm')
 def warm_pool_start(strategy, max_warm, min_warm):
     """Start the warm pool manager for intelligent pre-warming"""
-    from .core.warm_pool_manager import WarmPoolManager, WarmPoolConfig, WarmStrategy
+    from terradev_cli.core.warm_pool_manager import WarmPoolManager, WarmPoolConfig, WarmStrategy
     
     strategy_map = {
         'traffic_based': WarmStrategy.TRAFFIC_BASED,
@@ -6082,7 +6019,7 @@ def warm_pool_start(strategy, max_warm, min_warm):
 @click.option('--priority', default=0, help='Model priority for warming')
 def warm_pool_register(model_id, priority):
     """Register a model with the warm pool manager"""
-    from .core.warm_pool_manager import WarmPoolManager, WarmPoolConfig
+    from terradev_cli.core.warm_pool_manager import WarmPoolManager, WarmPoolConfig
     
     warm_pool = WarmPoolManager(WarmPoolConfig())
     warm_pool.register_model(model_id, priority)
@@ -6093,7 +6030,7 @@ def warm_pool_register(model_id, priority):
 @cli.command()
 def warm_pool_status():
     """Get warm pool manager status"""
-    from .core.warm_pool_manager import WarmPoolManager, WarmPoolConfig
+    from terradev_cli.core.warm_pool_manager import WarmPoolManager, WarmPoolConfig
     
     warm_pool = WarmPoolManager(WarmPoolConfig())
     status = warm_pool.get_status()
@@ -6118,7 +6055,7 @@ def warm_pool_status():
 @click.option('--cost-per-gb', default=0.10, help='Cost per GB per hour in USD')
 def cost_scaler_start(strategy, budget, cost_per_gb):
     """Start the cost-aware scaling manager"""
-    from .core.cost_scaler import CostScaler, CostConfig, CostStrategy
+    from terradev_cli.core.cost_scaler import CostScaler, CostConfig, CostStrategy
     
     strategy_map = {
         'minimize_cost': CostStrategy.MINIMIZE_COST,
@@ -6160,7 +6097,7 @@ def cost_scaler_start(strategy, budget, cost_per_gb):
 @cli.command()
 def cost_scaler_status():
     """Get cost scaler status and recommendations"""
-    from .core.cost_scaler import CostScaler, CostConfig
+    from terradev_cli.core.cost_scaler import CostScaler, CostConfig
     
     cost_scaler = CostScaler(CostConfig())
     status = cost_scaler.get_status()
@@ -6192,7 +6129,7 @@ def cost_scaler_status():
 @click.argument('model-id')
 def cost_scaler_model_details(model_id):
     """Get cost details for a specific model"""
-    from .core.cost_scaler import CostScaler, CostConfig
+    from terradev_cli.core.cost_scaler import CostScaler, CostConfig
     
     cost_scaler = CostScaler(CostConfig())
     details = cost_scaler.get_model_cost_details(model_id)
@@ -6226,7 +6163,7 @@ def gitops():
 @click.option('--prune/--no-prune', default=True, help='Enable resource pruning')
 def init(provider, repository, tool, cluster, git_url, git_token, namespace, auto_sync, prune):
     """Initialize GitOps repository and structure"""
-    from .core.gitops_manager import GitOpsManager, GitOpsConfig, GitProvider, GitOpsTool
+    from terradev_cli.core.gitops_manager import GitOpsManager, GitOpsConfig, GitProvider, GitOpsTool
     
     provider_map = {
         'github': GitProvider.GITHUB,
@@ -6279,7 +6216,7 @@ def init(provider, repository, tool, cluster, git_url, git_token, namespace, aut
 @click.option('--namespace', default='gitops-system', help='Namespace for GitOps tools')
 def bootstrap(tool, cluster, namespace):
     """Bootstrap GitOps tool on the cluster"""
-    from .core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
+    from terradev_cli.core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
     
     # This is a simplified bootstrap - in practice, you'd load config from previous init
     config = GitOpsConfig(
@@ -6311,7 +6248,7 @@ def bootstrap(tool, cluster, namespace):
 @click.option('--tool', type=click.Choice(['argocd', 'flux']), default='argocd', help='GitOps tool')
 def sync(cluster, environment, tool):
     """Sync cluster with Git repository"""
-    from .core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
+    from terradev_cli.core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
     
     # This is a simplified sync - in practice, you'd load config from previous init
     config = GitOpsConfig(
@@ -6342,7 +6279,7 @@ def sync(cluster, environment, tool):
 @click.option('--environment', default='prod', help='Environment to validate')
 def validate(dry_run, cluster, environment):
     """Validate GitOps configuration"""
-    from .core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
+    from terradev_cli.core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
     
     # This is a simplified validation - in practice, you'd load config from previous init
     config = GitOpsConfig(
@@ -6444,7 +6381,7 @@ def deploy(model, image, gpu_type, gpu_memory, max_concurrency, framework, opena
     with open(config_file) as f:
         config = json.load(f)
     
-    from .providers.inferx_provider import InferXProvider
+    from terradev_cli.providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6499,7 +6436,7 @@ def status(model_id):
     with open(config_file) as f:
         config = json.load(f)
     
-    from .providers.inferx_provider import InferXProvider
+    from terradev_cli.providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6535,7 +6472,7 @@ def delete(model_id):
     with open(config_file) as f:
         config = json.load(f)
     
-    from .providers.inferx_provider import InferXProvider
+    from terradev_cli.providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6569,7 +6506,7 @@ def list():
     with open(config_file) as f:
         config = json.load(f)
     
-    from .providers.inferx_provider import InferXProvider
+    from terradev_cli.providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6611,7 +6548,7 @@ def usage():
     with open(config_file) as f:
         config = json.load(f)
     
-    from .providers.inferx_provider import InferXProvider
+    from terradev_cli.providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6649,7 +6586,7 @@ def quote(gpu_type, region):
     with open(config_file) as f:
         config = json.load(f)
     
-    from .providers.inferx_provider import InferXProvider
+    from terradev_cli.providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6692,7 +6629,7 @@ def optimize(cluster_config, usage_metrics, tier, output, implement):
     """Analyze and optimize InferX costs with AI-powered recommendations"""
     import json
     from pathlib import Path
-    from .cost_optimizer import InferXCostOptimizer, CostTier
+    from terradev_cli.cost_optimizer import InferXCostOptimizer, CostTier
     
     optimizer = InferXCostOptimizer()
     target_tier = CostTier(tier)
