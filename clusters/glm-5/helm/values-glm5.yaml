@@ -1,0 +1,141 @@
+# Helm Values Override for GLM-5 Inference
+# Usage: helm upgrade --install glm5 ./helm/terradev -f clusters/glm-5/helm/values-glm5.yaml
+
+replicaCount: 1
+
+image:
+  repository: vllm/vllm-openai
+  tag: nightly
+  pullPolicy: Always
+
+nameOverride: glm5-vllm
+fullnameOverride: glm5-inference
+
+model:
+  id: zai-org/GLM-5-FP8
+  name: glm-5-fp8
+  cachePath: /models/GLM-5-FP8
+  downloadOnInit: true
+
+serving:
+  backend: vllm
+  port: 8000
+  host: "0.0.0.0"
+
+  vllm:
+    tensorParallelSize: 8
+    gpuMemoryUtilization: 0.85
+    maxModelLen: 32768
+    dtype: auto
+    trustRemoteCode: true
+    speculativeMethod: mtp
+    speculativeTokens: 1
+    toolCallParser: glm47
+    reasoningParser: glm45
+    enableAutoToolChoice: true
+
+  sglang:
+    tpSize: 8
+    memFractionStatic: 0.85
+    speculativeAlgorithm: EAGLE
+    speculativeNumSteps: 3
+    speculativeEagleTopk: 1
+    speculativeNumDraftTokens: 4
+    toolCallParser: glm47
+    reasoningParser: glm45
+
+gpu:
+  type: H100_SXM
+  count: 8
+  memoryGb: 80
+  requireNvlink: true
+
+resources:
+  requests:
+    nvidia.com/gpu: "8"
+    cpu: "64"
+    memory: "256Gi"
+  limits:
+    nvidia.com/gpu: "8"
+    cpu: "96"
+    memory: "512Gi"
+
+nodeSelector:
+  nvidia.com/gpu.product: NVIDIA-H100-80GB-HBM3
+  nvidia.com/gpu.count: "8"
+
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  - key: dedicated
+    operator: Equal
+    value: gpu-inference
+    effect: NoSchedule
+
+env:
+  CUDA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+  NCCL_P2P_DISABLE: "0"
+  NCCL_IB_DISABLE: "0"
+  NCCL_SOCKET_IFNAME: "eth0"
+  VLLM_ATTENTION_BACKEND: "FLASH_ATTN"
+  TRANSFORMERS_CACHE: "/models/cache"
+
+secrets:
+  hfToken: ""  # Set via --set secrets.hfToken=hf_xxx
+
+persistence:
+  modelCache:
+    enabled: true
+    size: 500Gi
+    storageClass: nvme-ssd
+    mountPath: /models
+  sharedMemory:
+    enabled: true
+    size: 32Gi
+    mountPath: /dev/shm
+
+service:
+  type: LoadBalancer
+  port: 8000
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+
+probes:
+  startup:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 30
+  liveness:
+    enabled: true
+    path: /health
+    periodSeconds: 15
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /health
+    periodSeconds: 5
+    failureThreshold: 2
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 4
+  targetGPUUtilization: 80
+  targetQueueDepth: 10
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    path: /metrics
+
+strategy:
+  type: Recreate  # GPU workloads require recreate strategy

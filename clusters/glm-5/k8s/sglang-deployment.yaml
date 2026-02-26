@@ -1,0 +1,168 @@
+# GLM-5 SGLang Serving Deployment
+# 744B MoE model with TP=8 across 8× H100 SXM GPUs
+# EAGLE speculative decoding for high-throughput batch inference
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glm5-sglang
+  namespace: glm-5-inference
+  labels:
+    app.kubernetes.io/name: glm-5
+    app.kubernetes.io/component: sglang-serving
+    app.kubernetes.io/managed-by: terradev
+spec:
+  replicas: 0  # Scale to 1 to enable SGLang backend (default: vLLM)
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: glm-5
+      app.kubernetes.io/component: sglang-serving
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: glm-5
+        app.kubernetes.io/component: sglang-serving
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-H100-80GB-HBM3
+        nvidia.com/gpu.count: "8"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: dedicated
+          operator: Equal
+          value: gpu-inference
+          effect: NoSchedule
+
+      initContainers:
+        - name: model-downloader
+          image: python:3.11-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              pip install -q huggingface-hub
+              python3 -c "
+              from huggingface_hub import snapshot_download
+              import os
+              token = os.environ.get('HF_TOKEN', '')
+              if os.path.exists('/models/GLM-5-FP8/config.json'):
+                  print('✅ Model weights already cached')
+              else:
+                  print('📦 Downloading GLM-5-FP8 weights...')
+                  snapshot_download(
+                      'zai-org/GLM-5-FP8',
+                      local_dir='/models/GLM-5-FP8',
+                      token=token if token else None,
+                      max_workers=8
+                  )
+                  print('✅ Download complete')
+              "
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: glm5-secrets
+                  key: hf-token
+                  optional: true
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+
+      containers:
+        - name: sglang-server
+          image: lmsysorg/sglang:glm5-hopper
+          command:
+            - python3
+            - -m
+            - sglang.launch_server
+          args:
+            - --model-path=/models/GLM-5-FP8
+            - --tp-size=8
+            - --tool-call-parser=glm47
+            - --reasoning-parser=glm45
+            - --speculative-algorithm=EAGLE
+            - --speculative-num-steps=3
+            - --speculative-eagle-topk=1
+            - --speculative-num-draft-tokens=4
+            - --mem-fraction-static=0.85
+            - --served-model-name=glm-5-fp8
+            - --host=0.0.0.0
+            - --port=8000
+            - --trust-remote-code
+          env:
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0,1,2,3,4,5,6,7"
+            - name: NCCL_P2P_DISABLE
+              value: "0"
+            - name: NCCL_IB_DISABLE
+              value: "0"
+            - name: NCCL_SOCKET_IFNAME
+              value: "eth0"
+            - name: TRANSFORMERS_CACHE
+              value: "/models/cache"
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              nvidia.com/gpu: "8"
+              cpu: "64"
+              memory: "256Gi"
+            limits:
+              nvidia.com/gpu: "8"
+              cpu: "96"
+              memory: "512Gi"
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+            - name: dshm
+              mountPath: /dev/shm
+
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: glm5-model-cache
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Gi
+
+      terminationGracePeriodSeconds: 60
+      restartPolicy: Always

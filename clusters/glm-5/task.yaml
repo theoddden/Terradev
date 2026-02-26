@@ -1,0 +1,81 @@
+# Terradev Task YAML — GLM-5 Inference Deployment
+# 744B MoE (40B active), FP8 quantized, TP=8
+# Usage: terradev provision --task clusters/glm-5/task.yaml
+
+name: glm-5-inference
+model: zai-org/GLM-5-FP8
+
+resources:
+  accelerators: H100:8
+  cloud: any  # runpod, vastai, lambda, aws, coreweave
+  instance_type: any
+  use_spot: false  # inference endpoints need stability
+  cpu: 96
+  memory: 512+
+  disk_size: 500  # model weights + KV cache
+
+workdir: ~/glm-5-workspace
+
+setup: |
+  # Pull vLLM nightly with GLM-5 support
+  docker pull vllm/vllm-openai:nightly
+
+  # Or install from pip
+  pip install -U vllm --pre \
+    --index-url https://pypi.org/simple \
+    --extra-index-url https://wheels.vllm.ai/nightly
+
+  # Upgrade transformers for GLM-5 architecture
+  pip install git+https://github.com/huggingface/transformers.git
+  pip install accelerate>=1.10.1
+
+  # Pre-download model weights to local cache
+  python -c "
+  from huggingface_hub import snapshot_download
+  snapshot_download('zai-org/GLM-5-FP8', local_dir='/models/GLM-5-FP8')
+  "
+
+run: |
+  echo "🚀 Starting GLM-5 inference endpoint via Terradev"
+  echo "Provider: $TERRADEV_PROVIDER"
+  echo "GPU Type: $TERRADEV_GPU_TYPE"
+  echo "Region: $TERRADEV_REGION"
+
+  vllm serve zai-org/GLM-5-FP8 \
+    --tensor-parallel-size 8 \
+    --gpu-memory-utilization 0.85 \
+    --speculative-config.method mtp \
+    --speculative-config.num_speculative_tokens 1 \
+    --tool-call-parser glm47 \
+    --reasoning-parser glm45 \
+    --enable-auto-tool-choice \
+    --served-model-name glm-5-fp8 \
+    --host 0.0.0.0 \
+    --port 8000
+
+envs:
+  TERRADEV_PROVIDER: ""
+  TERRADEV_GPU_TYPE: ""
+  TERRADEV_REGION: ""
+  TERRADEV_DEPLOYMENT_ID: ""
+  HF_TOKEN: ""
+  CUDA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+  NCCL_P2P_DISABLE: "0"
+  NCCL_IB_DISABLE: "0"
+  VLLM_ATTENTION_BACKEND: "FLASH_ATTN"
+
+service:
+  port: 8000
+  readiness_probe:
+    path: /health
+    initial_delay_seconds: 120
+    period_seconds: 10
+  replicas: 1
+
+# Terradev-specific scheduling hints
+scheduling:
+  prefer_nvlink: true
+  min_gpu_memory_gb: 80
+  min_nvlink_bandwidth_gbps: 450
+  prefer_same_switch: true  # NUMA-aligned TP
+  topology: single_node     # all 8 GPUs on one node
