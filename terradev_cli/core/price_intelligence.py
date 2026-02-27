@@ -131,22 +131,42 @@ def _ensure_price_schema(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_availability_series
             ON availability_log (gpu_type, provider, region, ts);
 
-        -- Provider events (maintenance, outages, etc.)
+        -- Provider events (maintenance, outages, reliability metrics)
         CREATE TABLE IF NOT EXISTS provider_events (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             ts              TEXT    NOT NULL DEFAULT (datetime('now')),
             provider        TEXT    NOT NULL,
-            event_type      TEXT    NOT NULL,  -- 'maintenance', 'outage', 'price_change', 'capacity'
-            severity        TEXT    NOT NULL,  -- 'low', 'medium', 'high', 'critical'
-            title           TEXT    NOT NULL,
+            event_type      TEXT    NOT NULL,  -- 'maintenance', 'outage', 'price_change', 'capacity', 'quote', 'provision', 'execute', 'manage', 'terminate'
+            severity        TEXT,              -- 'low', 'medium', 'high', 'critical' (infrastructure events)
+            title           TEXT,              -- infrastructure events
             description     TEXT,
-            affected_regions TEXT,  -- JSON array of regions
-            resolved_ts     TEXT
+            affected_regions TEXT,             -- JSON array of regions (infrastructure events)
+            resolved_ts     TEXT,              -- infrastructure events
+            gpu_type        TEXT    NOT NULL DEFAULT '',   -- reliability metrics
+            region          TEXT    NOT NULL DEFAULT '',   -- reliability metrics
+            success         INTEGER,           -- reliability metrics (1=ok, 0=fail)
+            latency_ms      REAL,              -- reliability metrics
+            error           TEXT               -- reliability metrics
         );
 
         CREATE INDEX IF NOT EXISTS idx_events_provider
             ON provider_events (provider, ts);
     """)
+    conn.commit()
+
+    # Migrate existing DBs: add reliability columns if missing
+    cursor = conn.execute("PRAGMA table_info(provider_events)")
+    existing_cols = {row[1] for row in cursor.fetchall()}
+    _new_cols = [
+        ("gpu_type",   "TEXT NOT NULL DEFAULT ''"),
+        ("region",     "TEXT NOT NULL DEFAULT ''"),
+        ("success",    "INTEGER"),
+        ("latency_ms", "REAL"),
+        ("error",      "TEXT"),
+    ]
+    for col_name, col_def in _new_cols:
+        if col_name not in existing_cols:
+            conn.execute(f"ALTER TABLE provider_events ADD COLUMN {col_name} {col_def}")
     conn.commit()
 
 

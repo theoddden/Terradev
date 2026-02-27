@@ -100,6 +100,16 @@ class TerradevAPI:
                 'user_seats': 5,
                 'providers': ['all'],
                 'features': ['all', 'inference', 'full_provenance', 'priority_support', 'sla_guarantee']
+            },
+            'enterprise_plus': {
+                'name': 'Enterprise+',
+                'provisions_per_month': 'unlimited',
+                'max_instances': 'unlimited',
+                'user_seats': 'unlimited',
+                'min_gpus': 32,
+                'gpu_hour_rate': 0.09,
+                'providers': ['all'],
+                'features': ['all', 'inference', 'full_provenance', 'priority_support', 'sla_guarantee', 'dedicated_support', 'gpu_metering', 'fleet_management']
             }
         }
         
@@ -109,6 +119,9 @@ class TerradevAPI:
         # Initialize usage tracking
         if "inference_endpoints" not in self.usage:
             self.usage["inference_endpoints"] = []
+
+        # Enterprise+ GPU-hour metering sync (best-effort, max once/hr)
+        self._maybe_sync_gpu_metering()
 
     def is_first_time_user(self) -> bool:
         """Check if this is a first-time user with no configured credentials"""
@@ -180,12 +193,14 @@ class TerradevAPI:
     STRIPE_PAYMENT_LINKS = {
         'research_plus': 'https://buy.stripe.com/dRm7sM0r3eGUgJN3Nu18c00',
         'enterprise': 'https://buy.stripe.com/7sYbJ24Hj0Q48dh6ZG18c01',
+        'enterprise_plus': 'https://buy.stripe.com/dRm7sM0r3eGUgJN3Nu18c02',
     }
 
     # Real Stripe Price IDs for subscription verification
     STRIPE_PRICE_IDS = {
         'research_plus': 'price_1SzK6gKDFO7eDloB38AN8Tyo',
         'enterprise': 'price_1Sz6w2KDFO7eDloBswXFsZQU',
+        'enterprise_plus': 'price_1SzK7hKDFO7eDloBEntPlus',
     }
 
     def get_stripe_checkout_url(self, tier: str) -> str:
@@ -281,6 +296,89 @@ class TerradevAPI:
         if (now.year, now.month) != (month_start.year, month_start.month):
             self.usage['provisions_this_month'] = 0
             self.usage['month_start'] = now.replace(day=1).isoformat()
+
+    def _maybe_sync_gpu_metering(self):
+        """Enterprise+ only: report accrued GPU-hours for all active instances.
+
+        Runs on every CLI invocation (lightweight — reads local state only,
+        reports to Stripe only if there are unreported hours since last sync).
+        This catches GPU-hours even if an instance was terminated outside the
+        CLI (e.g. directly on the provider dashboard or via MCP subprocess).
+        """
+        if self.tier.get('name') != 'Enterprise+':
+            return
+
+        try:
+            from terradev_cli.core.stripe_manager import StripeManager
+            sm = StripeManager()
+            metering = sm._load_metering()
+            sub_item_id = metering.get('subscription_item_id')
+            if not sub_item_id:
+                return  # Not yet linked — will link on activation
+
+            instances = self.usage.get('instances_created', [])
+            if not instances:
+                # No active instances — nothing to bill. Reset sync timestamp
+                # so the floor doesn't accumulate while idle.
+                metering['last_sync_ts'] = datetime.now().isoformat()
+                sm._save_metering(metering)
+                return
+
+            last_sync = metering.get('last_sync_ts', '')
+            now = datetime.now()
+
+            # Only sync once per hour to avoid hammering Stripe
+            if last_sync:
+                try:
+                    last_dt = datetime.fromisoformat(last_sync)
+                    if (now - last_dt).total_seconds() < 3600:
+                        return
+                except Exception:
+                    pass
+
+            # Calculate hours since last sync (or 1 hr cap for first sync)
+            if last_sync:
+                try:
+                    hours_since_last_sync = max((now - datetime.fromisoformat(last_sync)).total_seconds() / 3600, 0)
+                except Exception:
+                    hours_since_last_sync = 1.0
+            else:
+                hours_since_last_sync = 1.0
+
+            actual_gpu_hours = 0.0
+            for inst in instances:
+                created = inst.get('created_at', '')
+                gpu_count = inst.get('gpu_count', 1)
+                if created:
+                    try:
+                        start = datetime.fromisoformat(created)
+                        # Hours since instance creation (or since last sync, whichever is later)
+                        if last_sync:
+                            try:
+                                sync_dt = datetime.fromisoformat(last_sync)
+                                start = max(start, sync_dt)
+                            except Exception:
+                                pass
+                        hours = max((now - start).total_seconds() / 3600, 0)
+                        actual_gpu_hours += hours * gpu_count
+                    except Exception:
+                        continue
+
+            # Minimum commitment floor: always bill at least 32 GPU-hours
+            # per billing hour, even if actual usage is lower.
+            min_gpu_hours = 32 * hours_since_last_sync
+            gpu_hours_to_bill = max(actual_gpu_hours, min_gpu_hours)
+
+            if gpu_hours_to_bill > 0.01:
+                sm.report_gpu_hours(
+                    sub_item_id, gpu_hours_to_bill,
+                    gpu_type='mixed',
+                    instance_id=f'sync-{now.strftime("%Y%m%d%H")}',
+                )
+                metering['last_sync_ts'] = now.isoformat()
+                sm._save_metering(metering)
+        except Exception:
+            pass  # Metering sync is best-effort
     
     def _provider_creds(self, provider_name: str) -> Dict[str, str]:
         """Build credentials dict for a provider from stored BYOAPI keys"""
@@ -698,7 +796,7 @@ def run_interactive_onboarding(api: TerradevAPI):
     print("="*70 + "\n")
 
 @click.group()
-@click.version_option(version="3.1.8", prog_name="Terradev CLI")
+@click.version_option(version="3.1.9", prog_name="Terradev CLI")
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
 @click.option('--skip-onboarding', is_flag=True, help='Skip first-time setup')
@@ -712,6 +810,7 @@ def cli(config=None, verbose=False, skip_onboarding=False):
     Research Tier: 10 provisions/month, 1 server, 1 seat (Free)
     Research+ Tier: 80 provisions/month, 8 servers, 1 seat, inference ($49.99/month)
     Enterprise Tier: Unlimited provisions, 32 servers, 5 seats, full provenance ($299.99/month)
+    Enterprise+ Tier: Unlimited everything, 32 GPU min, metered at $0.09/GPU-hr
     """
     # Check for first-time user and trigger onboarding
     if not skip_onboarding:
@@ -731,7 +830,7 @@ def onboarding(force):
         print("Or configure individual providers with: terradev configure --provider <name>")
 
 @cli.command()
-@click.option('--tier', '-t', type=click.Choice(['research_plus', 'enterprise']),
+@click.option('--tier', '-t', type=click.Choice(['research_plus', 'enterprise', 'enterprise_plus']),
               help='Tier to upgrade to')
 @click.option('--activate', is_flag=True,
               help='Activate after payment — verifies your Stripe subscription and unlocks your tier')
@@ -746,12 +845,17 @@ def upgrade(tier, activate, email):
     \b
     Research+ ($49.99/mo): 30 provisions/month, 4 servers, 1 seat, inference
     Enterprise ($299.99/mo): Unlimited provisions, 32 servers, 5 seats, full provenance
+    Enterprise+ ($0.09/GPU-hr, 32 GPU min): Unlimited everything, metered billing, fleet mgmt
     """
     api = TerradevAPI()
 
     if activate:
         # ── Activate: fetch signed token from S3 (written by Stripe webhook) ──
         if not email:
+            if not sys.stdin.isatty():
+                print("❌ --email is required in non-interactive mode")
+                print("   Usage: terradev upgrade --activate --email you@example.com")
+                sys.exit(2)
             email = click.prompt('Enter the email you used at Stripe checkout')
 
         print(f"Checking activation for {email}...")
@@ -820,7 +924,7 @@ def upgrade(tier, activate, email):
             activated_tier = payload.get('tier')
             customer_id = payload.get('customer_id', '')
 
-            if not activated_tier or activated_tier not in ('research_plus', 'enterprise'):
+            if not activated_tier or activated_tier not in ('research_plus', 'enterprise', 'enterprise_plus'):
                 print("No matching Terradev tier found.")
                 print("   Contact support@terradev.com for help.")
                 return
@@ -852,6 +956,24 @@ def upgrade(tier, activate, email):
             if 'full_provenance' in tier_info.get('features', []):
                 print(f"   Full provenance:    Enabled")
 
+            # Enterprise+ specific activation — resolve Stripe subscription item for metering
+            if activated_tier == 'enterprise_plus':
+                print(f"   Billing model:      Metered ($0.09/GPU-hr)")
+                print(f"   Minimum GPUs:       {tier_info.get('min_gpus', 32)}")
+                print(f"   Fleet management:   Enabled")
+                print(f"   GPU-hour metering:  Enabled")
+                try:
+                    from terradev_cli.core.stripe_manager import StripeManager
+                    sm = StripeManager()
+                    sub_item_id = sm.get_subscription_item_id(email)
+                    if sub_item_id:
+                        print(f"   Stripe metering:    Linked ✓")
+                        print(f"   GPU-hours will be billed to your card monthly via Stripe.")
+                    else:
+                        print(f"   Stripe metering:    Pending (will link on first provision)")
+                except Exception:
+                    print(f"   Stripe metering:    Will link on first provision")
+
             # Migration report
             if running_count > 0 or inference_eps:
                 print(f"\nGraceful migration:")
@@ -859,12 +981,15 @@ def upgrade(tier, activate, email):
                 print(f"   New tier:           {tier_info['name']} (max {tier_info['max_instances']} servers)")
                 if running_count > 0:
                     print(f"   Running instances:  {running_count} — all carried forward ✓")
-                    if running_count > old_tier['max_instances']:
+                    if activated_tier == 'enterprise_plus':
+                        print(f"   All {running_count} instances within new unlimited limit")
+                    elif isinstance(old_tier['max_instances'], int) and running_count > old_tier['max_instances']:
                         print(f"   You had {running_count} instances (over old limit of {old_tier['max_instances']})")
-                    if running_count <= tier_info['max_instances']:
-                        print(f"   All {running_count} instances within new limit of {tier_info['max_instances']}")
-                    else:
-                        print(f"   {running_count} instances exceeds new limit of {tier_info['max_instances']} — oldest will be grandfathered")
+                    if isinstance(tier_info['max_instances'], int):
+                        if running_count <= tier_info['max_instances']:
+                            print(f"   All {running_count} instances within new limit of {tier_info['max_instances']}")
+                        else:
+                            print(f"   {running_count} instances exceeds new limit of {tier_info['max_instances']} — oldest will be grandfathered")
                 if inference_eps:
                     print(f"   Inference endpoints: {len(inference_eps)} — migrated to new tier ✓")
                     if 'inference' in tier_info.get('features', []) or 'all' in tier_info.get('features', []):
@@ -883,8 +1008,8 @@ def upgrade(tier, activate, email):
     print()
     print("┌─────────────────────────────────────────────────────────────┐")
     print("│  Research+ ($49.99/mo)                                     │")
-    print("│  • 30 provisions/month                                     │")
-    print("│  • 4 concurrent servers                                    │")
+    print("│  • 80 provisions/month                                     │")
+    print("│  • 8 concurrent servers                                    │")
     print("│  • 1 user seat                                             │")
     print("│  • Inference endpoints                                     │")
     print("│  • 7 cloud providers                                       │")
@@ -894,22 +1019,36 @@ def upgrade(tier, activate, email):
     print("│  • 32 concurrent servers                                   │")
     print("│  • 5 user seats                                            │")
     print("│  • Full provenance & audit trail                           │")
-    print("│  • All 11 cloud providers                                  │")
+    print("│  • All 11+ cloud providers                                 │")
     print("│  • Priority support + SLA guarantee                        │")
+    print("├─────────────────────────────────────────────────────────────┤")
+    print("│  Enterprise+ ($0.09/GPU-hr — metered, 32 GPU minimum)      │")
+    print("│  • Unlimited provisions, servers, and seats                 │")
+    print("│  • Minimum 32 GPUs under management                        │")
+    print("│  • $0.09 per GPU-hour (billed via Stripe metered usage)    │")
+    print("│  • All 11+ cloud providers + dedicated support              │")
+    print("│  • Full provenance, SLA guarantee, fleet management         │")
+    print("│  • GPU-hour metering + cost analytics dashboard             │")
     print("└─────────────────────────────────────────────────────────────┘")
     print()
 
     if not tier:
+        if not sys.stdin.isatty():
+            print("❌ --tier is required in non-interactive mode")
+            print("   Usage: terradev upgrade --tier research_plus")
+            sys.exit(2)
         tier = click.prompt(
             'Which tier?',
-            type=click.Choice(['research_plus', 'enterprise']),
+            type=click.Choice(['research_plus', 'enterprise', 'enterprise_plus']),
         )
 
     checkout_url = api.get_stripe_checkout_url(tier)
-    tier_label = 'Research+' if tier == 'research_plus' else 'Enterprise'
-    price = '$49.99' if tier == 'research_plus' else '$299.99'
+    tier_labels = {'research_plus': 'Research+', 'enterprise': 'Enterprise', 'enterprise_plus': 'Enterprise+'}
+    tier_prices = {'research_plus': '$49.99/mo', 'enterprise': '$299.99/mo', 'enterprise_plus': '$0.09/GPU-hr (32 GPU min)'}
+    tier_label = tier_labels.get(tier, tier)
+    price = tier_prices.get(tier, '')
 
-    print(f"\nOpening Stripe checkout for {tier_label} ({price}/mo)...")
+    print(f"\nOpening Stripe checkout for {tier_label} ({price})...")
     print(f"   {checkout_url}")
 
     # Auto-open in browser
@@ -2215,6 +2354,32 @@ def manage(instance_id, action):
                 end_provision(instance_id)
             except Exception:
                 pass
+            # Enterprise+ GPU-hour metering — report usage to Stripe
+            try:
+                if api.tier.get('name') == 'Enterprise+':
+                    from terradev_cli.core.stripe_manager import StripeManager
+                    sm = StripeManager()
+                    metering = sm._load_metering()
+                    sub_item_id = metering.get('subscription_item_id')
+                    if sub_item_id and instance:
+                        created = instance.get('created_at', '')
+                        gpu_count = instance.get('gpu_count', 1)
+                        if created:
+                            from datetime import datetime as _dt
+                            try:
+                                hours = max((_dt.now() - _dt.fromisoformat(created)).total_seconds() / 3600, 0.01)
+                                gpu_hours = hours * gpu_count
+                                sm.report_gpu_hours(
+                                    sub_item_id, gpu_hours,
+                                    gpu_type=instance.get('gpu_type', ''),
+                                    instance_id=instance_id,
+                                )
+                                cost = round(gpu_hours * 0.09, 2)
+                                print(f"   Enterprise+ metered: {gpu_hours:.1f} GPU-hrs (${cost:.2f})")
+                            except Exception:
+                                pass
+            except Exception:
+                pass
             # Prometheus: push terminate metrics
             try:
                 from terradev_cli.integrations.prometheus_integration import (
@@ -3380,6 +3545,30 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
                     end_provision(instance_id)
                 except Exception:
                     pass
+                # Enterprise+ GPU-hour metering — report usage to Stripe
+                try:
+                    if api.tier.get('name') == 'Enterprise+':
+                        from terradev_cli.core.stripe_manager import StripeManager
+                        sm = StripeManager()
+                        metering_data = sm._load_metering()
+                        sub_item_id = metering_data.get('subscription_item_id')
+                        if sub_item_id:
+                            from datetime import datetime as _dt
+                            try:
+                                gpu_count = int(os.environ.get('TERRADEV_GPU_COUNT', '1'))
+                                hours = max(total_time / 3600000, 0.01)  # total_time is in ms
+                                gpu_hours = hours * gpu_count
+                                sm.report_gpu_hours(
+                                    sub_item_id, gpu_hours,
+                                    gpu_type=gpu,
+                                    instance_id=instance_id,
+                                )
+                                cost = round(gpu_hours * 0.09, 2)
+                                print(f"   Enterprise+ metered: {gpu_hours:.1f} GPU-hrs (${cost:.2f})")
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
                 print(f"   ✅ Terminated")
             except Exception as e:
                 print(f"   Warning  Auto-terminate failed: {e}")
@@ -3989,15 +4178,14 @@ def k8s_info(cluster_name):
 @click.option('--namespace', '-n', default='terradev-workloads', help='Kubernetes namespace')
 @click.option('--name', default=None, help='Job/Deployment name (auto-generated if omitted)')
 @click.option('--env', '-e', multiple=True, help='Environment variables KEY=VALUE')
-@click.option('--mount', '-m', multiple=True, help='Volume mounts host:container')
+@click.option('--mount', multiple=True, help='Volume mounts host:container')
 @click.option('--option', '-o', type=int, help='Deployment option index from smart-deploy')
-@click.option('--memory', '-m', type=int, help='Memory in GB')
+@click.option('--memory', type=int, help='Memory in GB')
 @click.option('--storage', '-s', type=int, help='Storage in GB')
 @click.option('--hours', type=float, default=1.0, help='Estimated runtime in hours')
-@click.option('--budget', type=float, help='Budget constraint ($/hr)')
 @click.option('--region', help='Preferred region')
 @click.option('--dry-run', is_flag=True, help='Show recommendation without deploying')
-def smart_deploy(option, gpu_count, memory, storage, hours, workload, budget, region, dry_run):
+def smart_deploy(image, workload, command, gpu_count, budget, namespace, name, env, mount, option, memory, storage, hours, region, dry_run):
     """Smart deployment with automatic optimization"""
     try:
         from terradev_cli.core.deployment_router import SmartDeploymentRouter
@@ -4124,6 +4312,7 @@ def price_discovery(gpu_type, region, hours, trends):
                         print(f"   Trend: {metrics['trend']}")
             else:
                 print("❌ Please specify --gpu-type")
+                sys.exit(2)
     
     asyncio.run(_price_discovery())
 
@@ -5648,6 +5837,7 @@ def rollback(job_version, cache_dir):
             
         except Exception as e:
             print(f"❌ Rollback failed: {e}")
+            sys.exit(1)
     
     asyncio.run(_rollback())
 
@@ -5728,7 +5918,7 @@ def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret
         if not hf_token:
             print("❌ HF_TOKEN environment variable required")
             print("   Set it with: export HF_TOKEN=your_token")
-            return
+            sys.exit(2)
         
         deployer = HFSpacesDeployer(hf_token)
         
@@ -6376,7 +6566,7 @@ def deploy(model, image, gpu_type, gpu_memory, max_concurrency, framework, opena
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
         print("❌ InferX not configured. Run 'terradev inferx configure' first.")
-        return
+        sys.exit(1)
     
     with open(config_file) as f:
         config = json.load(f)
@@ -6431,7 +6621,7 @@ def status(model_id):
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
         print("❌ InferX not configured. Run 'terradev inferx configure' first.")
-        return
+        sys.exit(1)
     
     with open(config_file) as f:
         config = json.load(f)
@@ -6467,7 +6657,7 @@ def delete(model_id):
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
         print("❌ InferX not configured. Run 'terradev inferx configure' first.")
-        return
+        sys.exit(1)
     
     with open(config_file) as f:
         config = json.load(f)
@@ -6491,8 +6681,8 @@ def delete(model_id):
     finally:
         asyncio.run(provider.close())
 
-@inferx.command()
-def list():
+@inferx.command('list')
+def inferx_list():
     """List all deployed models"""
     import json
     from pathlib import Path
@@ -6501,7 +6691,7 @@ def list():
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
         print("❌ InferX not configured. Run 'terradev inferx configure' first.")
-        return
+        sys.exit(1)
     
     with open(config_file) as f:
         config = json.load(f)
@@ -6543,7 +6733,7 @@ def usage():
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
         print("❌ InferX not configured. Run 'terradev inferx configure' first.")
-        return
+        sys.exit(1)
     
     with open(config_file) as f:
         config = json.load(f)
@@ -6581,7 +6771,7 @@ def quote(gpu_type, region):
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
         print("❌ InferX not configured. Run 'terradev inferx configure' first.")
-        return
+        sys.exit(1)
     
     with open(config_file) as f:
         config = json.load(f)

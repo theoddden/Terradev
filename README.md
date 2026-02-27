@@ -1,4 +1,4 @@
-# Terradev CLI v3.1.8
+# Terradev CLI v3.1.9
 
 BYOAPI: Cross-cloud GPU provisioning and cost optimization platform with GitOps automation, *for stateless workloads*.
 
@@ -305,14 +305,20 @@ Terradev facilitates connections to your existing tools via BYOAPI — your keys
 
 ## Pricing Tiers
 
-| Feature | Research (Free) | Research+ ($49.99/mo) | Enterprise ($299.99/mo) |
-|----------|------------------|------------------------|------------------------|
-| Max concurrent instances | 1 | 8 | 32 |
-| Provisions/month | 10 | 100 | Unlimited |
-| Providers | All 11 | All 11 | All 11 + priority |
-| Cost tracking | Yes | Yes | Yes |
-| Dataset staging | Yes | Yes | Yes |
-| Egress optimization | Basic | Full | Full + custom routes |
+| Feature | Research (Free) | Research+ ($49.99/mo) | Enterprise ($299.99/mo) | Enterprise+ ($0.09/GPU-hr) |
+|----------|------------------|------------------------|------------------------|---------------------------|
+| Max concurrent instances | 1 | 8 | 32 | Unlimited |
+| Provisions/month | 10 | 100 | Unlimited | Unlimited |
+| User seats | 1 | 1 | 5 | Unlimited |
+| Providers | All 11 | All 11 | All 11 + priority | All 11+ + dedicated support |
+| Cost tracking | Yes | Yes | Yes | Yes + fleet dashboard |
+| Dataset staging | Yes | Yes | Yes | Yes |
+| Egress optimization | Basic | Full | Full + custom routes | Full + custom routes |
+| GPU-hour metering | - | - | - | $0.09/GPU-hr (32 GPU min) |
+| Fleet management | - | - | - | Yes |
+| SLA guarantee | - | - | Yes | Yes |
+
+> **Enterprise+**: Metered billing at **$0.09 per GPU-hour** with a **minimum commitment of 32 GPUs**. You always pay for at least 32 GPU-hours per hour ($2.88/hr floor) whether you use them or not — same model as AWS Reserved Instances. Billed monthly to your card via Stripe. Run `terradev upgrade -t enterprise_plus` to get started.
 
 ## Integrations
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "3.1.8"
+version = "3.1.9"
 description = "Cross-cloud GPU provisioning with GitOps automation and HuggingFace Spaces deployment"
 readme = "README.md"
 license = {text = "BUSL-1.1"}
@@ -105,6 +105,7 @@ dependencies = [
     "pandas>=1.0.0",
     "numpy>=1.0.0",
     "huggingface-hub>=0.19.0",
+    "stripe>=7.0.0",
 ]
 
 [project.optional-dependencies]

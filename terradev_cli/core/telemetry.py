@@ -4,6 +4,7 @@ MANDATORY Terradev Telemetry & License Server Integration
 Cannot be opted out - baked into CLI core for compliance and business intelligence
 """
 
+import atexit
 import json
 import time
 import hashlib
@@ -44,10 +45,19 @@ class MandatoryTelemetryClient:
         self._telemetry_thread = None
         self._stop_telemetry = threading.Event()
         
+        # Register atexit handler to prevent segfault on interpreter shutdown
+        atexit.register(self._shutdown)
+        
         # Start mandatory telemetry collection
         self._start_mandatory_telemetry()
         
         logger.debug("MandatoryTelemetryClient initialized successfully")
+    
+    def _shutdown(self):
+        """Clean shutdown — signal daemon threads to stop and give them time to finish."""
+        self._stop_telemetry.set()
+        if self._telemetry_thread is not None and self._telemetry_thread.is_alive():
+            self._telemetry_thread.join(timeout=2)
     
     def _generate_immutable_id(self) -> str:
         """Generate immutable machine fingerprint that cannot be changed"""
@@ -208,7 +218,7 @@ class MandatoryTelemetryClient:
             response = requests.post(
                 f"{url}/log-usage",
                 json=enhanced_payload,
-                timeout=10,
+                timeout=3,
                 headers={'User-Agent': f'Terradev-CLI/{self._get_cli_version()}'}
             )
             
@@ -265,7 +275,7 @@ class MandatoryTelemetryClient:
             response = requests.post(
                 f"{self.base_url}/check-license",
                 json=payload,
-                timeout=10
+                timeout=3
             )
             
             if response.status_code == 200:
@@ -404,7 +414,7 @@ class MandatoryTelemetryClient:
             response = requests.post(
                 f"{self.base_url}/check-license",
                 json=payload,
-                timeout=5
+                timeout=3
             )
             
             if response.status_code == 200:
@@ -414,7 +424,7 @@ class MandatoryTelemetryClient:
                 response = requests.post(
                     f"{self.fallback_url}/check-license",
                     json=payload,
-                    timeout=5
+                    timeout=3
                 )
                 if response.status_code == 200:
                     return response.json()

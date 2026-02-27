@@ -21,17 +21,20 @@ class TierType(Enum):
     RESEARCH = "research"
     RESEARCH_PLUS = "research_plus"
     ENTERPRISE = "enterprise"
+    ENTERPRISE_PLUS = "enterprise_plus"
 
 
 @dataclass
 class TierLimits:
     """Feature limits per tier"""
 
-    max_instances: int
+    max_instances: int  # -1 = unlimited
     max_parallel_queries: int
     providers_allowed: List[str]
     features_enabled: List[str]
     enterprise_features: bool
+    gpu_hour_rate: float = 0.0  # $0.00 = flat-rate tier
+    min_gpus: int = 0  # Minimum GPUs required (Enterprise+ = 32)
 
 
 class TierManager:
@@ -87,6 +90,41 @@ class TierManager:
                 "full_provenance",
             ],
             enterprise_features=True,
+        ),
+        TierType.ENTERPRISE_PLUS: TierLimits(
+            max_instances=-1,  # Unlimited
+            max_parallel_queries=100,
+            providers_allowed=[
+                "aws",
+                "gcp",
+                "azure",
+                "runpod",
+                "vastai",
+                "tensordock",
+                "oracle",
+                "coreweave",
+                "lambda_labs",
+                "crusoe",
+                "baseten",
+                "huggingface",
+            ],
+            features_enabled=[
+                "quote",
+                "provision",
+                "status",
+                "analytics",
+                "optimize",
+                "cleanup",
+                "manage",
+                "inference",
+                "full_provenance",
+                "fleet_management",
+                "gpu_metering",
+                "dedicated_support",
+            ],
+            enterprise_features=True,
+            gpu_hour_rate=0.09,
+            min_gpus=32,
         ),
     }
 
@@ -157,6 +195,8 @@ class TierManager:
         """Check if instance count is within tier limits"""
         tier = self.get_current_tier()
         limits = self.TIER_LIMITS[tier]
+        if limits.max_instances == -1:  # Unlimited (Enterprise+)
+            return True
         current_count = self.tier_config.get("instance_count", 0)
         return (current_count + requested_instances) <= limits.max_instances
 
@@ -244,14 +284,14 @@ def require_tier(min_tier: TierType):
             current_tier = tier_manager.get_current_tier()
 
             # Check tier hierarchy
-            tier_hierarchy = {TierType.RESEARCH: 0, TierType.RESEARCH_PLUS: 1, TierType.ENTERPRISE: 2}
+            tier_hierarchy = {TierType.RESEARCH: 0, TierType.RESEARCH_PLUS: 1, TierType.ENTERPRISE: 2, TierType.ENTERPRISE_PLUS: 3}
 
             if tier_hierarchy[current_tier] < tier_hierarchy[min_tier]:
                 print(
                     f"❌ This feature requires {min_tier.value.title()} tier or higher."
                 )
                 print(f"📊 Current tier: {current_tier.value.title()}")
-                print("💡 Upgrade with: terradev upgrade --tier research_plus|enterprise")
+                print("💡 Upgrade with: terradev upgrade --tier research_plus|enterprise|enterprise_plus")
                 return
 
             return func(ctx, *args, **kwargs)

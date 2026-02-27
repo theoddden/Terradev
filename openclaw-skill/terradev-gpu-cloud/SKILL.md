@@ -1,6 +1,6 @@
 ---
 name: terradev-gpu-cloud
-description: Cross-cloud GPU provisioning with NUMA-aligned topology optimization, K8s cluster creation, and inference overflow. Get real-time pricing across 11+ cloud providers, provision the cheapest GPUs in seconds, spin up production K8s clusters with automatic GPU-NIC pairing, and burst to cloud when your local GPU maxes out. BYOAPI — your keys never leave your machine.
+description: Cross-cloud GPU provisioning with NUMA-aligned topology optimization, K8s cluster creation, and inference overflow. Get real-time pricing across 11+ cloud providers, provision the cheapest GPUs in seconds, spin up production K8s clusters with automatic GPU-NIC pairing, and burst to cloud when your local GPU maxes out. BYOAPI -- your keys never leave your machine.
 version: 1.0.0
 license: MIT
 metadata:
@@ -34,18 +34,15 @@ metadata:
       optionalBins:
         - kubectl
         - docker
-      anyBins:
-        - kubectl
-        - docker
     primaryEnv: TERRADEV_RUNPOD_KEY
-    emoji: "🚀"
+    emoji: rocket
     homepage: https://github.com/theoddden/Terradev
     install:
       - kind: uv
         package: terradev-cli
         bins: [terradev]
       - kind: uv
-        package: "terradev-cli[all]"
+        package: terradev-cli[all]
         bins: [terradev]
         note: "Optional: Install with all cloud provider SDKs"
 ---
@@ -279,6 +276,17 @@ Supported providers: RunPod, Vast.ai, AWS, GCP, Azure, Lambda Labs, CoreWeave, T
 4. **Price Awareness**: Always quote before provisioning so the user sees costs upfront.
 5. **Safety**: Never auto-provision without user confirmation. Always show the plan first.
 6. **Local First**: If the user has local GPU capacity, suggest using it before cloud overflow.
+
+## Pricing Tiers
+
+| Tier | Price | Instances | Seats |
+|------|-------|-----------|-------|
+| **Research** (Free) | $0 | 1 | 1 |
+| **Research+** | $49.99/mo | 8 | 1 |
+| **Enterprise** | $299.99/mo | 32 | 5 |
+| **Enterprise+** | $0.09/GPU-hr (32 GPU min) | Unlimited | Unlimited |
+
+Enterprise+ is metered billing at $0.09 per GPU-hour with a minimum of 32 GPUs under management. Includes dedicated support, fleet management, and GPU-hour metering dashboard. Upgrade with `terradev upgrade -t enterprise_plus`.
 
 ## Pricing Context
 
