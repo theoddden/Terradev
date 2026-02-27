@@ -53,6 +53,194 @@ class GPUDevice:
     vram_total_mb: int = 0
     vram_used_mb: int = 0
     utilization_pct: int = 0
+    xcd_count: int = 0              # intra-GPU NUMA domains (MI300X=8, H200=1)
+    gpu_arch: str = ""              # e.g. "mi300x", "h100", "h200"
+
+
+class IntraGPUNUMALocality(Enum):
+    """Intra-GPU NUMA locality levels (arXiv:2511.02132, Nov 2025).
+
+    AMD MI300X has 8 XCDs (Accelerated Compute Dies), each with its own
+    L2 cache. Attention kernels that account for XCD boundaries see L2
+    cache hit rates jump from 43% to 92%.
+
+    NVIDIA H200 has unified HBM3e but distinct memory controller domains.
+    """
+    SAME_XCD = "same_xcd"       # Same XCD / L2 domain — optimal (92% L2 hit)
+    ADJACENT_XCD = "adj_xcd"    # Adjacent XCD pair sharing interconnect
+    REMOTE_XCD = "remote_xcd"   # Cross-XCD — worst intra-GPU locality (43% L2 hit)
+    UNIFIED = "unified"         # No intra-GPU NUMA (single die / unified L2)
+
+
+@dataclass
+class XCDDomain:
+    """Models a single XCD (Accelerated Compute Die) within a GPU.
+
+    MI300X: 8 XCDs, each with 16 CUs, 4 MB L2, sharing 16 GB HBM3
+    H200:   1 unified die (no intra-GPU NUMA), 80 SM, 50 MB L2
+    """
+    xcd_id: int
+    gpu_index: int
+    compute_units: int = 0      # CUs (AMD) or SMs (NVIDIA)
+    l2_cache_mb: float = 0.0
+    hbm_slice_gb: float = 0.0   # HBM3 slice attached to this XCD
+    adjacent_xcds: List[int] = field(default_factory=list)
+
+
+@dataclass
+class IntraGPUTopology:
+    """Full intra-GPU NUMA topology for a single GPU.
+
+    References:
+      - arXiv:2511.02132 "Optimizing Attention on GPUs by Exploiting
+        GPU Architectural NUMA" (Nov 2025)
+      - AMD AITER library for XCD-aware attention kernels
+    """
+    gpu_index: int
+    gpu_arch: str                           # "mi300x", "h200", "h100", etc.
+    xcd_count: int
+    xcds: List[XCDDomain] = field(default_factory=list)
+    total_l2_mb: float = 0.0
+    total_hbm_gb: float = 0.0
+    has_intra_numa: bool = False            # True if XCD count > 1
+
+    def classify_xcd_locality(self, xcd_a: int, xcd_b: int) -> IntraGPUNUMALocality:
+        """Classify intra-GPU locality between two XCDs."""
+        if not self.has_intra_numa:
+            return IntraGPUNUMALocality.UNIFIED
+        if xcd_a == xcd_b:
+            return IntraGPUNUMALocality.SAME_XCD
+        # Check adjacency
+        for xcd in self.xcds:
+            if xcd.xcd_id == xcd_a and xcd_b in xcd.adjacent_xcds:
+                return IntraGPUNUMALocality.ADJACENT_XCD
+        return IntraGPUNUMALocality.REMOTE_XCD
+
+
+# ── Known GPU architectures with intra-GPU NUMA ──
+
+_GPU_ARCH_DB: Dict[str, Dict[str, Any]] = {
+    "mi300x": {
+        "xcd_count": 8,
+        "cus_per_xcd": 16,
+        "l2_per_xcd_mb": 4.0,
+        "hbm_per_xcd_gb": 24.0,  # 192 GB / 8 XCDs
+        "total_hbm_gb": 192.0,
+        "total_l2_mb": 32.0,
+        "adjacency": {
+            0: [1, 4], 1: [0, 2, 5], 2: [1, 3, 6], 3: [2, 7],
+            4: [0, 5], 5: [1, 4, 6], 6: [2, 5, 7], 7: [3, 6],
+        },
+    },
+    "mi300a": {
+        "xcd_count": 6,
+        "cus_per_xcd": 16,
+        "l2_per_xcd_mb": 4.0,
+        "hbm_per_xcd_gb": 21.33,  # 128 GB / 6 XCDs
+        "total_hbm_gb": 128.0,
+        "total_l2_mb": 24.0,
+        "adjacency": {
+            0: [1, 3], 1: [0, 2, 4], 2: [1, 5],
+            3: [0, 4], 4: [1, 3, 5], 5: [2, 4],
+        },
+    },
+    "h200": {
+        "xcd_count": 1,
+        "cus_per_xcd": 132,  # SMs
+        "l2_per_xcd_mb": 50.0,
+        "hbm_per_xcd_gb": 141.0,
+        "total_hbm_gb": 141.0,
+        "total_l2_mb": 50.0,
+        "adjacency": {},
+    },
+    "h100": {
+        "xcd_count": 1,
+        "cus_per_xcd": 132,
+        "l2_per_xcd_mb": 50.0,
+        "hbm_per_xcd_gb": 80.0,
+        "total_hbm_gb": 80.0,
+        "total_l2_mb": 50.0,
+        "adjacency": {},
+    },
+}
+
+
+def detect_gpu_arch(gpu_name: str) -> str:
+    """Heuristic: map GPU name string to architecture key."""
+    name_lower = gpu_name.lower()
+    if "mi300x" in name_lower or "instinct mi300x" in name_lower:
+        return "mi300x"
+    if "mi300a" in name_lower or "instinct mi300a" in name_lower:
+        return "mi300a"
+    if "h200" in name_lower:
+        return "h200"
+    if "h100" in name_lower:
+        return "h100"
+    if "a100" in name_lower:
+        return "a100"
+    return "unknown"
+
+
+def build_intra_gpu_topology(gpu: GPUDevice) -> IntraGPUTopology:
+    """Build the intra-GPU NUMA topology for a GPU based on its architecture."""
+    arch = gpu.gpu_arch or detect_gpu_arch(gpu.name)
+    arch_info = _GPU_ARCH_DB.get(arch)
+
+    if not arch_info:
+        return IntraGPUTopology(
+            gpu_index=gpu.index, gpu_arch=arch, xcd_count=1, has_intra_numa=False,
+        )
+
+    xcd_count = arch_info["xcd_count"]
+    adjacency = arch_info.get("adjacency", {})
+    xcds = []
+    for i in range(xcd_count):
+        xcds.append(XCDDomain(
+            xcd_id=i,
+            gpu_index=gpu.index,
+            compute_units=arch_info["cus_per_xcd"],
+            l2_cache_mb=arch_info["l2_per_xcd_mb"],
+            hbm_slice_gb=arch_info["hbm_per_xcd_gb"],
+            adjacent_xcds=adjacency.get(i, []),
+        ))
+
+    return IntraGPUTopology(
+        gpu_index=gpu.index,
+        gpu_arch=arch,
+        xcd_count=xcd_count,
+        xcds=xcds,
+        total_l2_mb=arch_info["total_l2_mb"],
+        total_hbm_gb=arch_info["total_hbm_gb"],
+        has_intra_numa=xcd_count > 1,
+    )
+
+
+def generate_xcd_aware_env(topo: IntraGPUTopology) -> Dict[str, str]:
+    """Generate XCD-aware environment variables for attention kernels.
+
+    For MI300X: enables AMD AITER library's XCD-aware flash attention.
+    For NVIDIA: no-op (unified L2, no intra-GPU NUMA).
+    """
+    env: Dict[str, str] = {}
+
+    if not topo.has_intra_numa:
+        return env
+
+    if topo.gpu_arch in ("mi300x", "mi300a"):
+        # AMD AITER: XCD-aware attention kernel configuration
+        env["AITER_XCD_COUNT"] = str(topo.xcd_count)
+        env["AITER_XCD_AWARE_ATTENTION"] = "1"
+        env["AITER_L2_PARTITION"] = "1"  # partition L2 by XCD
+        env["AITER_KV_CACHE_XCD_PIN"] = "1"  # pin KV cache slices to XCDs
+        # NCCL intra-GPU P2P: prefer adjacent XCDs
+        env["NCCL_INTRA_GPU_NUMA"] = "1"
+        env["HIP_VISIBLE_DEVICES_XCD_MASK"] = ",".join(
+            str(x.xcd_id) for x in topo.xcds
+        )
+        # CK (Composable Kernel) tuning for MI300X
+        env["CK_BLOCK_MAPPING_POLICY"] = "xcd_aware"
+
+    return env
 
 
 @dataclass
@@ -449,8 +637,11 @@ class RDMAConfigurator:
         }
 
     @staticmethod
-    def generate_nccl_env(pair: GPUNICPair) -> Dict[str, str]:
-        """Generate NCCL environment variables for optimal GPU-NIC pairing"""
+    def generate_nccl_env(pair: GPUNICPair, gpu: Optional[GPUDevice] = None) -> Dict[str, str]:
+        """Generate NCCL environment variables for optimal GPU-NIC pairing.
+
+        If gpu is provided, also generates XCD-aware env vars for MI300X.
+        """
         env = {
             "NCCL_IB_HCA": pair.nic.name,
             "NCCL_SOCKET_IFNAME": pair.nic.name,
@@ -464,6 +655,13 @@ class RDMAConfigurator:
         }
         if pair.locality == PCIeLocality.PIX:
             env["NCCL_TOPO_DUMP_FILE"] = "/tmp/nccl_topo.xml"
+
+        # XCD-aware env vars for intra-GPU NUMA
+        if gpu:
+            intra_topo = build_intra_gpu_topology(gpu)
+            xcd_env = generate_xcd_aware_env(intra_topo)
+            env.update(xcd_env)
+
         return env
 
 

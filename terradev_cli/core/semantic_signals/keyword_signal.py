@@ -118,6 +118,8 @@ class KeywordSignal(BaseSignal):
     @staticmethod
     def _get_content(query: Dict[str, Any]) -> str:
         """Extract text content from query dict"""
+        if "__content__" in query:
+            return query["__content__"]
         if "content" in query:
             return query["content"]
         if "messages" in query:

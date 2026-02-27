@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Base signal interface for the VSR signal extraction layer.
+Base signal interface for the Terradev semantic signal extraction layer.
 
 Each signal extracts routing-relevant information from a raw query,
 reducing H(M | signals) toward zero per the entropy-collapse model.
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class SignalType(Enum):
-    """Signal categories matching the VSR paper's thirteen signal types"""
+    """Signal categories for semantic routing signal extraction"""
     KEYWORD = "keyword"
     MODALITY = "modality"
     COMPLEXITY = "complexity"

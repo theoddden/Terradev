@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "3.1.9"
+version = "3.2.0"
 description = "Cross-cloud GPU provisioning with GitOps automation and HuggingFace Spaces deployment"
 readme = "README.md"
 license = {text = "BUSL-1.1"}
@@ -70,7 +70,17 @@ keywords = [
     "vllm",
     "ollama",
     "dvc",
-    "data-version-control"
+    "data-version-control",
+    "numa",
+    "disaggregated-inference",
+    "moe",
+    "mixture-of-experts",
+    "qwen",
+    "distserve",
+    "xcd",
+    "mi300x",
+    "h200",
+    "prefill-decode"
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -160,4 +170,5 @@ terradev_cli = [
     "templates/*.yaml",
     "templates/*.json",
     "config/*.json",
+    "core/semantic_signals/*.yaml",
 ]

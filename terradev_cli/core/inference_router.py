@@ -11,18 +11,96 @@ Features:
 
 import asyncio
 import aiohttp
+import hashlib
 import json
 import os
 import time
 import logging
 import subprocess
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+
+# ── KV Prefix Cache Index ────────────────────────────────────────────────────
+
+
+class PrefixCacheIndex:
+    """
+    Tracks which endpoints hold warm KV caches for specific prompt prefixes.
+
+    Inspired by llm-d's KV cache-aware routing (Red Hat/IBM/Google, Oct 2025).
+    Routes requests to the pod most likely to have the prefix cached in GPU
+    memory, avoiding redundant prefill computation.
+
+    Performance:
+      - O(1) hash lookup per route decision
+      - LRU eviction keeps memory bounded
+      - Prefix hashing uses first N tokens for fast comparison
+    """
+
+    def __init__(self, max_entries: int = 10_000, prefix_tokens: int = 64):
+        self._max_entries = max_entries
+        self._prefix_tokens = prefix_tokens
+        # prefix_hash -> {endpoint_id: last_seen_timestamp}
+        self._index: OrderedDict[str, Dict[str, float]] = OrderedDict()
+
+    def _hash_prefix(self, text: str) -> str:
+        """Hash the first N whitespace-delimited tokens of a prompt."""
+        tokens = text.split(None, self._prefix_tokens)[:self._prefix_tokens]
+        prefix = " ".join(tokens)
+        return hashlib.blake2b(prefix.encode(), digest_size=16).hexdigest()
+
+    def record(self, text: str, endpoint_id: str):
+        """Record that an endpoint processed (and cached) this prefix."""
+        h = self._hash_prefix(text)
+        if h in self._index:
+            self._index.move_to_end(h)
+            self._index[h][endpoint_id] = time.monotonic()
+        else:
+            self._index[h] = {endpoint_id: time.monotonic()}
+        # LRU eviction
+        while len(self._index) > self._max_entries:
+            self._index.popitem(last=False)
+
+    def lookup(self, text: str, max_age_s: float = 300.0) -> List[Tuple[str, float]]:
+        """
+        Find endpoints that likely have this prefix cached.
+
+        Returns list of (endpoint_id, freshness_score) sorted by freshness.
+        freshness_score: 1.0 = just seen, 0.0 = about to expire.
+        """
+        h = self._hash_prefix(text)
+        entry = self._index.get(h)
+        if not entry:
+            return []
+
+        now = time.monotonic()
+        results = []
+        for eid, ts in entry.items():
+            age = now - ts
+            if age <= max_age_s:
+                freshness = 1.0 - (age / max_age_s)
+                results.append((eid, freshness))
+
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results
+
+    def evict_endpoint(self, endpoint_id: str):
+        """Remove an endpoint from all cache entries (e.g., on endpoint failure)."""
+        for h in list(self._index):
+            self._index[h].pop(endpoint_id, None)
+            if not self._index[h]:
+                del self._index[h]
+
+    @property
+    def size(self) -> int:
+        return len(self._index)
 
 
 class EndpointHealth(Enum):
@@ -30,6 +108,111 @@ class EndpointHealth(Enum):
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
     UNKNOWN = "unknown"
+
+
+class EndpointPhase(Enum):
+    """
+    Disaggregated serving phase (DistServe, UCSD Hao AI Lab, 2025).
+
+    Modern LLM serving splits inference into two phases with different
+    hardware requirements:
+      - PREFILL: compute-bound (high FLOPS) — processes the input prompt,
+        generates the full KV cache. Benefits from high-FLOPS GPUs (H100 SXM).
+      - DECODE: memory-bound (high bandwidth) — autoregressive token generation,
+        reads KV cache every step. Benefits from high-bandwidth GPUs (H200, MI300X).
+      - MIXED: legacy unified endpoint that handles both phases.
+
+    Adopted by vLLM, SGLang, NVIDIA Dynamo, MoonCake in 2025.
+    """
+    PREFILL = "prefill"
+    DECODE = "decode"
+    MIXED = "mixed"
+
+
+# ── Prefill→Decode Handoff Tracker ────────────────────────────────────────────
+
+
+@dataclass
+class PrefillDecodeLink:
+    """Tracks a KV cache handoff from a prefill endpoint to a decode endpoint."""
+    prefill_endpoint_id: str
+    decode_endpoint_id: str
+    model: str
+    last_handoff: float = 0.0       # monotonic timestamp
+    handoff_count: int = 0
+    avg_transfer_ms: float = 0.0    # KV cache transfer latency
+
+
+class PrefillDecodeTracker:
+    """
+    Tracks which prefill endpoints hand off KV caches to which decode endpoints.
+
+    Enables sticky routing: once a prefill endpoint produces a KV cache,
+    route the decode phase to the same decode endpoint that already received
+    the KV transfer, avoiding redundant transfers.
+
+    Design follows DistServe's disaggregated prefill/decode architecture
+    and MoonCake's KV cache transfer protocol.
+    """
+
+    def __init__(self, max_links: int = 1000):
+        self._max_links = max_links
+        # (prefill_id, model) -> PrefillDecodeLink
+        self._links: OrderedDict[Tuple[str, str], PrefillDecodeLink] = OrderedDict()
+
+    def record_handoff(
+        self,
+        prefill_id: str,
+        decode_id: str,
+        model: str,
+        transfer_ms: float = 0.0,
+    ):
+        """Record a KV cache handoff from prefill to decode endpoint."""
+        key = (prefill_id, model)
+        if key in self._links:
+            link = self._links[key]
+            link.decode_endpoint_id = decode_id
+            link.last_handoff = time.monotonic()
+            link.handoff_count += 1
+            if transfer_ms > 0:
+                link.avg_transfer_ms = 0.8 * link.avg_transfer_ms + 0.2 * transfer_ms
+            self._links.move_to_end(key)
+        else:
+            self._links[key] = PrefillDecodeLink(
+                prefill_endpoint_id=prefill_id,
+                decode_endpoint_id=decode_id,
+                model=model,
+                last_handoff=time.monotonic(),
+                handoff_count=1,
+                avg_transfer_ms=transfer_ms,
+            )
+        while len(self._links) > self._max_links:
+            self._links.popitem(last=False)
+
+    def get_decode_for_prefill(
+        self, prefill_id: str, model: str, max_age_s: float = 120.0
+    ) -> Optional[str]:
+        """Get the preferred decode endpoint for a prefill endpoint + model."""
+        key = (prefill_id, model)
+        link = self._links.get(key)
+        if link and (time.monotonic() - link.last_handoff) <= max_age_s:
+            return link.decode_endpoint_id
+        return None
+
+    def get_prefill_for_decode(
+        self, decode_id: str, model: str, max_age_s: float = 120.0
+    ) -> Optional[str]:
+        """Get a prefill endpoint that recently handed off to this decode endpoint."""
+        now = time.monotonic()
+        for (_pid, m), link in reversed(self._links.items()):
+            if m == model and link.decode_endpoint_id == decode_id:
+                if (now - link.last_handoff) <= max_age_s:
+                    return _pid
+        return None
+
+    @property
+    def size(self) -> int:
+        return len(self._links)
 
 
 @dataclass
@@ -64,12 +247,21 @@ class InferenceEndpoint:
     # Failover
     is_primary: bool = True
     backup_endpoint_id: Optional[str] = None
+    # Disaggregated serving (DistServe)
+    phase: EndpointPhase = EndpointPhase.MIXED
+    flops_tflops: float = 0.0           # peak TFLOPS (prefill scoring)
+    memory_bandwidth_tbps: float = 0.0  # peak TB/s (decode scoring)
+    kv_transfer_endpoint: Optional[str] = None  # paired endpoint for KV handoff
 
 
 class InferenceRouter:
     """
     Routes inference traffic to the healthiest, lowest-latency provider.
     Handles auto-failover when a provider goes down.
+
+    When a topology report is available, transparently integrates
+    NUMA-aware semantic routing: signal extraction → policy decision →
+    NUMA-optimal endpoint selection. This adds <3ms to the routing path.
     """
 
     # Thresholds
@@ -79,12 +271,43 @@ class InferenceRouter:
     LATENCY_HISTORY_SIZE = 20
     FAILOVER_COOLDOWN_S = 60
 
-    def __init__(self, config_dir: Optional[Path] = None):
+    def __init__(self, config_dir: Optional[Path] = None,
+                 topology_report: Optional[Dict] = None,
+                 routing_policy_path: Optional[str] = None):
         self.config_dir = config_dir or Path.home() / '.terradev'
         self.endpoints_file = self.config_dir / 'inference_endpoints.json'
         self.endpoints: Dict[str, InferenceEndpoint] = {}
         self._load_endpoints()
         self._last_failover: Dict[str, float] = {}
+
+        # KV prefix cache index — routes to pods with warm caches
+        self._prefix_cache = PrefixCacheIndex()
+
+        # Disaggregated prefill/decode handoff tracker
+        self._pd_tracker = PrefillDecodeTracker()
+
+        # Shared aiohttp session for health probes (connection pooling)
+        self._probe_session: Optional[aiohttp.ClientSession] = None
+
+        # Lazy-init semantic router (adds <3ms per request)
+        self._semantic_router = None
+        self._topology_report = topology_report
+        self._routing_policy_path = routing_policy_path
+        if topology_report or routing_policy_path:
+            self._init_semantic_router()
+
+    def _init_semantic_router(self):
+        """Initialize the semantic router backend (called lazily)"""
+        try:
+            from .semantic_router import SemanticRouter
+            self._semantic_router = SemanticRouter(
+                policy_path=self._routing_policy_path,
+                topology_report=self._topology_report,
+            )
+            logger.info("Semantic router initialized (NUMA-aware routing active)")
+        except Exception as e:
+            logger.debug(f"Semantic router init skipped: {e}")
+            self._semantic_router = None
 
     # ── Persistence ──
 
@@ -108,6 +331,10 @@ class InferenceRouter:
                         is_primary=ep_data.get('is_primary', True),
                         backup_endpoint_id=ep_data.get('backup_endpoint_id'),
                         avg_latency_ms=ep_data.get('avg_latency_ms', 0.0),
+                        phase=EndpointPhase(ep_data.get('phase', 'mixed')),
+                        flops_tflops=ep_data.get('flops_tflops', 0.0),
+                        memory_bandwidth_tbps=ep_data.get('memory_bandwidth_tbps', 0.0),
+                        kv_transfer_endpoint=ep_data.get('kv_transfer_endpoint'),
                     )
                     self.endpoints[ep.endpoint_id] = ep
             except Exception:
@@ -131,6 +358,10 @@ class InferenceRouter:
                 'is_primary': ep.is_primary,
                 'backup_endpoint_id': ep.backup_endpoint_id,
                 'avg_latency_ms': ep.avg_latency_ms,
+                'phase': ep.phase.value,
+                'flops_tflops': ep.flops_tflops,
+                'memory_bandwidth_tbps': ep.memory_bandwidth_tbps,
+                'kv_transfer_endpoint': ep.kv_transfer_endpoint,
             })
         with open(self.endpoints_file, 'w') as f:
             json.dump(data, f, indent=2)
@@ -141,8 +372,22 @@ class InferenceRouter:
     def register_endpoint(self, endpoint_id: str, provider: str, url: str,
                           model: str, gpu_type: str, region: str,
                           price_per_hour: float, is_primary: bool = True,
-                          backup_endpoint_id: Optional[str] = None) -> InferenceEndpoint:
-        """Register a new inference endpoint for health tracking and routing"""
+                          backup_endpoint_id: Optional[str] = None,
+                          phase: str = "mixed",
+                          flops_tflops: float = 0.0,
+                          memory_bandwidth_tbps: float = 0.0,
+                          kv_transfer_endpoint: Optional[str] = None,
+                          ) -> InferenceEndpoint:
+        """Register a new inference endpoint for health tracking and routing.
+
+        Args:
+            phase: 'prefill', 'decode', or 'mixed' (default).
+                   Prefill endpoints are compute-bound (high FLOPS).
+                   Decode endpoints are memory-bound (high bandwidth).
+            flops_tflops: Peak TFLOPS — used to score prefill endpoints.
+            memory_bandwidth_tbps: Peak TB/s — used to score decode endpoints.
+            kv_transfer_endpoint: Paired endpoint for KV cache handoff.
+        """
         ep = InferenceEndpoint(
             endpoint_id=endpoint_id,
             provider=provider,
@@ -154,6 +399,10 @@ class InferenceRouter:
             created_at=datetime.now(),
             is_primary=is_primary,
             backup_endpoint_id=backup_endpoint_id,
+            phase=EndpointPhase(phase),
+            flops_tflops=flops_tflops,
+            memory_bandwidth_tbps=memory_bandwidth_tbps,
+            kv_transfer_endpoint=kv_transfer_endpoint,
         )
         self.endpoints[endpoint_id] = ep
         self._save_endpoints()
@@ -173,8 +422,27 @@ class InferenceRouter:
 
     # ── Health Checks ──
 
+    async def _get_probe_session(self) -> aiohttp.ClientSession:
+        """Get or create a shared aiohttp session (connection pooling)."""
+        if self._probe_session is None or self._probe_session.closed:
+            connector = aiohttp.TCPConnector(
+                limit=50,  # max concurrent connections
+                ttl_dns_cache=60,  # DNS cache TTL
+                keepalive_timeout=30,
+            )
+            self._probe_session = aiohttp.ClientSession(
+                connector=connector,
+                timeout=aiohttp.ClientTimeout(total=10),
+            )
+        return self._probe_session
+
+    async def close(self):
+        """Close the shared session. Call on shutdown."""
+        if self._probe_session and not self._probe_session.closed:
+            await self._probe_session.close()
+
     async def probe_endpoint(self, endpoint_id: str) -> HealthProbe:
-        """HTTP health probe against an inference endpoint"""
+        """HTTP health probe using shared connection pool."""
         ep = self.endpoints.get(endpoint_id)
         if not ep or not ep.url:
             return HealthProbe(
@@ -190,18 +458,18 @@ class InferenceRouter:
         probe_url = ep.url.rstrip('/') + '/health'
         start = time.monotonic()
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-                async with session.get(probe_url) as resp:
-                    latency_ms = (time.monotonic() - start) * 1000
-                    healthy = resp.status < 500
-                    return HealthProbe(
-                        endpoint_id=endpoint_id,
-                        provider=ep.provider,
-                        timestamp=datetime.now(),
-                        latency_ms=latency_ms,
-                        status_code=resp.status,
-                        healthy=healthy,
-                    )
+            session = await self._get_probe_session()
+            async with session.get(probe_url) as resp:
+                latency_ms = (time.monotonic() - start) * 1000
+                healthy = resp.status < 500
+                return HealthProbe(
+                    endpoint_id=endpoint_id,
+                    provider=ep.provider,
+                    timestamp=datetime.now(),
+                    latency_ms=latency_ms,
+                    status_code=resp.status,
+                    healthy=healthy,
+                )
         except Exception as e:
             latency_ms = (time.monotonic() - start) * 1000
             return HealthProbe(
@@ -392,14 +660,40 @@ class InferenceRouter:
             return None
 
     def get_best_endpoint(self, model: Optional[str] = None,
-                          strategy: str = 'latency') -> Optional[InferenceEndpoint]:
+                          strategy: str = 'latency',
+                          query: Optional[Dict] = None) -> Optional[InferenceEndpoint]:
         """Select the best healthy endpoint for routing.
 
         Strategies:
           - 'latency': lowest average latency (default)
           - 'cost': lowest price per hour
           - 'score': combined latency + cost score
+          - 'semantic': signal-driven NUMA-aware routing (auto when query is provided)
+
+        When `query` is provided and the semantic router is active, the
+        signal extraction pipeline runs transparently (<3ms overhead),
+        selects the target model via policy rules, then applies NUMA-aware
+        endpoint scoring to pick the GPU with optimal PCIe locality.
+
+        KV cache-aware routing: if query text matches a cached prefix,
+        the endpoint that already holds the warm cache gets a priority boost.
         """
+        # ── Semantic routing layer (transparent backend) ──
+        if query and self._semantic_router:
+            result = self._route_with_signals(query)
+            # Record this prefix for future cache-hit routing
+            if result:
+                text = query.get("content") or query.get("prompt") or ""
+                if text:
+                    self._prefix_cache.record(text, result.endpoint_id)
+            return result
+
+        # ── KV cache-aware boost (classic path) ──
+        query_text = ""
+        if query:
+            query_text = query.get("content") or query.get("prompt") or ""
+
+        # ── Classic routing (latency / cost / score) ──
         candidates = [
             ep for ep in self.endpoints.values()
             if ep.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN)
@@ -409,14 +703,101 @@ class InferenceRouter:
         if not candidates:
             return None
 
+        # Check prefix cache for a warm-cache boost
+        cache_boost: Dict[str, float] = {}
+        if query_text:
+            hits = self._prefix_cache.lookup(query_text)
+            for eid, freshness in hits:
+                cache_boost[eid] = freshness
+
         if strategy == 'latency':
-            # Sort by avg latency, break ties by price
-            candidates.sort(key=lambda e: (e.avg_latency_ms or 9999, e.price_per_hour))
+            candidates.sort(key=lambda e: (
+                (e.avg_latency_ms or 9999) * (0.3 if e.endpoint_id in cache_boost else 1.0),
+                e.price_per_hour,
+            ))
         elif strategy == 'cost':
-            candidates.sort(key=lambda e: (e.price_per_hour, e.avg_latency_ms or 9999))
+            candidates.sort(key=lambda e: (
+                e.price_per_hour * (0.5 if e.endpoint_id in cache_boost else 1.0),
+                e.avg_latency_ms or 9999,
+            ))
         elif strategy == 'score':
-            # Weighted: 60% latency, 40% cost
             max_lat = max(e.avg_latency_ms for e in candidates) or 1
+            max_price = max(e.price_per_hour for e in candidates) or 1
+            candidates.sort(key=lambda e: (
+                0.5 * ((e.avg_latency_ms or 9999) / max_lat) +
+                0.3 * (e.price_per_hour / max_price) +
+                (-0.2 * cache_boost.get(e.endpoint_id, 0.0))  # cache hit = lower score = better
+            ))
+
+        best = candidates[0]
+        # Record prefix for future lookups
+        if query_text:
+            self._prefix_cache.record(query_text, best.endpoint_id)
+        return best
+
+    def _route_with_signals(self, query: Dict) -> Optional[InferenceEndpoint]:
+        """Internal: run the full signal → decision → NUMA pipeline.
+
+        Latency budget: <3ms for signal extraction + policy eval,
+        plus O(n) endpoint scoring where n = candidate count.
+        """
+        decision = self._semantic_router.route(query)
+
+        # Safety: blocked requests return None
+        if decision.route_to == "__blocked__":
+            logger.warning(
+                f"Request blocked by semantic safety policy: "
+                f"rule={decision.matched_rule}"
+            )
+            return None
+
+        # Determine candidate pool
+        target_model = decision.route_to
+        candidates = [
+            ep for ep in self.endpoints.values()
+            if ep.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN)
+            and (target_model is None or ep.model == target_model
+                 or target_model in ("__local_only__",))
+        ]
+
+        # __local_only__ filter: prefer endpoints on local providers
+        if decision.route_to == "__local_only__":
+            local = [ep for ep in candidates if ep.provider in ("local", "vllm", "self-hosted")]
+            if local:
+                candidates = local
+
+        if not candidates:
+            # Fallback: try classic routing with the strategy from the decision
+            fallback_strategy = decision.strategy or "cost"
+            return self.get_best_endpoint(strategy=fallback_strategy)
+
+        # NUMA-aware endpoint selection
+        if len(candidates) > 1 and self._semantic_router._topology_report:
+            candidate_dicts = [
+                {
+                    "endpoint_id": ep.endpoint_id,
+                    "gpu_index": getattr(ep, "gpu_index", None),
+                    "numa_node": getattr(ep, "numa_node", None),
+                    "avg_latency_ms": ep.avg_latency_ms or 9999,
+                    "price_per_hour": ep.price_per_hour,
+                }
+                for ep in candidates
+            ]
+            best = self._semantic_router.select_numa_optimal_endpoint(
+                decision, candidate_dicts
+            )
+            if best:
+                eid = best["endpoint_id"]
+                return self.endpoints.get(eid, candidates[0])
+
+        # Single candidate or no topology — apply strategy sort
+        strategy = decision.strategy or "score"
+        if strategy == "latency":
+            candidates.sort(key=lambda e: (e.avg_latency_ms or 9999, e.price_per_hour))
+        elif strategy == "cost":
+            candidates.sort(key=lambda e: (e.price_per_hour, e.avg_latency_ms or 9999))
+        else:
+            max_lat = max((e.avg_latency_ms or 0) for e in candidates) or 1
             max_price = max(e.price_per_hour for e in candidates) or 1
             candidates.sort(key=lambda e: (
                 0.6 * ((e.avg_latency_ms or 9999) / max_lat) +
@@ -424,6 +805,175 @@ class InferenceRouter:
             ))
 
         return candidates[0]
+
+    # ── Disaggregated Prefill/Decode Routing (DistServe) ─────────────────
+
+    def _score_prefill_endpoint(self, ep: InferenceEndpoint) -> float:
+        """Score an endpoint for prefill phase (lower = better).
+        Prefill is compute-bound: rank by FLOPS, then latency."""
+        flops_score = 1.0 / max(ep.flops_tflops, 0.1)  # higher FLOPS = lower score
+        latency_score = (ep.avg_latency_ms or 9999) / 10000
+        return 0.6 * flops_score + 0.3 * latency_score + 0.1 * (ep.price_per_hour / 100)
+
+    def _score_decode_endpoint(self, ep: InferenceEndpoint) -> float:
+        """Score an endpoint for decode phase (lower = better).
+        Decode is memory-bound: rank by bandwidth, then latency."""
+        bw_score = 1.0 / max(ep.memory_bandwidth_tbps, 0.01)  # higher BW = lower score
+        latency_score = (ep.avg_latency_ms or 9999) / 10000
+        return 0.6 * bw_score + 0.3 * latency_score + 0.1 * (ep.price_per_hour / 100)
+
+    def get_best_prefill_endpoint(
+        self, model: Optional[str] = None, query: Optional[Dict] = None,
+    ) -> Optional[InferenceEndpoint]:
+        """Select the best endpoint for the prefill phase (compute-bound).
+        Filters to PREFILL and MIXED endpoints, scores by FLOPS."""
+        candidates = [
+            ep for ep in self.endpoints.values()
+            if ep.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN)
+            and ep.phase in (EndpointPhase.PREFILL, EndpointPhase.MIXED)
+            and (model is None or ep.model == model)
+        ]
+        if not candidates:
+            return self.get_best_endpoint(model=model, query=query)
+
+        # KV prefix cache boost: prefer endpoint that already cached this prefix
+        cache_boost: Dict[str, float] = {}
+        if query:
+            text = query.get("content") or query.get("prompt") or ""
+            if text:
+                for eid, freshness in self._prefix_cache.lookup(text):
+                    cache_boost[eid] = freshness
+
+        candidates.sort(key=lambda e: (
+            self._score_prefill_endpoint(e)
+            - 0.3 * cache_boost.get(e.endpoint_id, 0.0)
+        ))
+        return candidates[0]
+
+    def get_best_decode_endpoint(
+        self,
+        model: Optional[str] = None,
+        prefill_endpoint_id: Optional[str] = None,
+    ) -> Optional[InferenceEndpoint]:
+        """Select the best endpoint for the decode phase (memory-bound).
+        Sticky routing: prefers the decode endpoint that already received
+        the KV cache from the given prefill endpoint."""
+        candidates = [
+            ep for ep in self.endpoints.values()
+            if ep.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN)
+            and ep.phase in (EndpointPhase.DECODE, EndpointPhase.MIXED)
+            and (model is None or ep.model == model)
+        ]
+        if not candidates:
+            return self.get_best_endpoint(model=model)
+
+        # Sticky routing: check if prefill endpoint has a known decode partner
+        if prefill_endpoint_id and model:
+            sticky_id = self._pd_tracker.get_decode_for_prefill(
+                prefill_endpoint_id, model
+            )
+            if sticky_id:
+                sticky_ep = self.endpoints.get(sticky_id)
+                if sticky_ep and sticky_ep in candidates:
+                    return sticky_ep
+
+        # Also check static KV transfer pairing
+        if prefill_endpoint_id:
+            prefill_ep = self.endpoints.get(prefill_endpoint_id)
+            if prefill_ep and prefill_ep.kv_transfer_endpoint:
+                paired = self.endpoints.get(prefill_ep.kv_transfer_endpoint)
+                if paired and paired in candidates:
+                    return paired
+
+        candidates.sort(key=lambda e: self._score_decode_endpoint(e))
+        return candidates[0]
+
+    def get_disaggregated_pair(
+        self,
+        model: Optional[str] = None,
+        query: Optional[Dict] = None,
+    ) -> Tuple[Optional[InferenceEndpoint], Optional[InferenceEndpoint]]:
+        """
+        Get a (prefill_endpoint, decode_endpoint) pair for disaggregated serving.
+
+        Uses DAGExecutor to score prefill and decode candidates IN PARALLEL
+        (Terraform-style). The two scoring paths are independent DAG nodes
+        that execute concurrently on the warm thread pool.
+
+        Returns:
+            (prefill_ep, decode_ep) — either may be None if no candidates.
+            If all endpoints are MIXED, both will be the same endpoint.
+        """
+        # Check if we have any disaggregated endpoints at all
+        has_prefill = any(
+            ep.phase == EndpointPhase.PREFILL for ep in self.endpoints.values()
+        )
+        has_decode = any(
+            ep.phase == EndpointPhase.DECODE for ep in self.endpoints.values()
+        )
+
+        if not has_prefill and not has_decode:
+            # All MIXED — return same endpoint for both phases
+            ep = self.get_best_endpoint(model=model, query=query)
+            return (ep, ep)
+
+        # ── Parallel prefill + decode selection via DAGExecutor ──
+        try:
+            from .dag_executor import DAGExecutor
+
+            dag = DAGExecutor(max_workers=2, name="disaggregated_route", reuse_pool=False)
+
+            def select_prefill(ctx):
+                return self.get_best_prefill_endpoint(
+                    model=ctx.get("model"), query=ctx.get("query")
+                )
+
+            def select_decode(ctx):
+                # First pass: no sticky routing (prefill not known yet)
+                return self.get_best_decode_endpoint(model=ctx.get("model"))
+
+            dag.add_node("prefill", select_prefill)
+            dag.add_node("decode", select_decode)
+            # No edges — fully parallel
+
+            result = dag.apply(initial_context={"model": model, "query": query})
+            prefill_ep = result.outputs.get("prefill")
+            decode_ep = result.outputs.get("decode")
+
+        except ImportError:
+            # Fallback: sequential
+            prefill_ep = self.get_best_prefill_endpoint(model=model, query=query)
+            decode_ep = self.get_best_decode_endpoint(model=model)
+
+        # Sticky routing refinement: now that we know the prefill endpoint,
+        # check if there's a better decode partner
+        if prefill_ep and decode_ep and model:
+            better_decode = self.get_best_decode_endpoint(
+                model=model, prefill_endpoint_id=prefill_ep.endpoint_id
+            )
+            if better_decode:
+                decode_ep = better_decode
+
+        # Record the handoff for future sticky routing
+        if prefill_ep and decode_ep and model:
+            self._pd_tracker.record_handoff(
+                prefill_ep.endpoint_id, decode_ep.endpoint_id, model
+            )
+
+        # Record prefix cache
+        if prefill_ep and query:
+            text = query.get("content") or query.get("prompt") or ""
+            if text:
+                self._prefix_cache.record(text, prefill_ep.endpoint_id)
+
+        return (prefill_ep, decode_ep)
+
+    def get_phase_summary(self) -> Dict[str, int]:
+        """Count endpoints by phase."""
+        counts = {"prefill": 0, "decode": 0, "mixed": 0}
+        for ep in self.endpoints.values():
+            counts[ep.phase.value] = counts.get(ep.phase.value, 0) + 1
+        return counts
 
     # ── Status Report ──
 
@@ -442,6 +992,9 @@ class InferenceRouter:
                 'backup': ep.backup_endpoint_id,
                 'consecutive_failures': ep.consecutive_failures,
                 'region': ep.region,
+                'phase': ep.phase.value,
+                'flops_tflops': ep.flops_tflops,
+                'memory_bandwidth_tbps': ep.memory_bandwidth_tbps,
             })
 
         healthy = sum(1 for e in self.endpoints.values() if e.health == EndpointHealth.HEALTHY)

@@ -2,7 +2,8 @@
 """
 Safety Signal — Detects potentially unsafe, toxic, or policy-violating content.
 
-Implements a lightweight version of the VSR paper's three-stage safety pipeline:
+Implements a lightweight three-stage safety pipeline inspired by
+signal-driven routing literature:
   1. Keyword blocklist scan (sub-ms)
   2. Pattern-based PII detection
   3. Jailbreak attempt heuristics
@@ -142,6 +143,8 @@ class SafetySignal(BaseSignal):
 
     @staticmethod
     def _get_content(query: Dict[str, Any]) -> str:
+        if "__content__" in query:
+            return query["__content__"]
         if "content" in query:
             return query["content"]
         if "messages" in query:

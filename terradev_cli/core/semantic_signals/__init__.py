@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Semantic Signal Extraction for vLLM Semantic Router Integration
+Terradev Semantic Signal Extraction Layer
 
-Implements the signal extraction layer from the VSR paper:
+Implements a signal extraction layer for query-level routing decisions:
 - Sub-millisecond heuristic signals (keyword, modality, language)
-- Lightweight neural classifier signals (complexity, domain, safety)
+- Lightweight classifier signals (complexity, domain, safety)
 - Composable signal orchestration via SignalOrchestrator
 
-Reference: vLLM Semantic Router: Signal Driven Decision Routing
-           for Mixture-of-Modality Models (Feb 2026)
+Inspired by signal-driven routing concepts from the academic literature.
+This is an independent, clean-room implementation.
 """
 
 from .base_signal import BaseSignal, SignalResult, SignalType
