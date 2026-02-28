@@ -2101,6 +2101,15 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
 
     group_id = f"pg_{int(time.time())}_{uuid.uuid4().hex[:8]}"
 
+    # ── Generate per-provision SSH keypair ──
+    _provision_ssh_pubkey = ""
+    try:
+        from terradev_cli.core.ssh_key_manager import generate_provision_keypair
+        _ssh_priv_path, _provision_ssh_pubkey = generate_provision_keypair(group_id)
+        print(f"   SSH keypair generated for {group_id} (Ed25519, encrypted at rest)")
+    except Exception as _ssh_err:
+        print(f"   Warning: SSH key generation failed ({_ssh_err}) — manual --ssh-key needed for train")
+
     async def _provision_all():
         from terradev_cli.providers.provider_factory import ProviderFactory
         factory = ProviderFactory()
@@ -2224,6 +2233,17 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             pass  # Telemetry is best-effort
 
     api.save_usage()
+
+    # Store SSH key path in cost DB for this provision group
+    if _provision_ssh_pubkey and succeeded:
+        try:
+            from terradev_cli.core.cost_tracker import set_ssh_key_path
+            from terradev_cli.core.ssh_key_manager import get_provision_ssh_key_path as _get_ssh_path
+            ssh_path = _get_ssh_path(group_id)
+            if ssh_path:
+                set_ssh_key_path(group_id, ssh_path)
+        except Exception:
+            pass
 
     # Silent: governance audit log for every provision
     try:
@@ -6898,7 +6918,7 @@ def optimize(cluster_config, usage_metrics, tier, output, implement):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _resolve_provision_nodes(provision_group: str, fmt: str = "text") -> list:
+def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
     """Resolve provisioned instance IDs to node IPs for the train command.
 
     Looks up the parallel provision group in the cost DB, then resolves
@@ -6907,15 +6927,18 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text") -> list:
       2. Provider status API (async, parallel across all instances)
       3. instance_id as-is fallback (some providers use IP-based IDs)
 
-    Returns list of IP strings, or empty list on failure.
+    Returns (node_ips: list[str], ssh_key_path: str | None).
+    node_ips is empty on failure.  ssh_key_path is the decrypted temp key
+    if an encrypted per-provision key was generated during provision.
     """
     try:
         from terradev_cli.core.cost_tracker import (
             get_active_instances, get_latest_parallel_group, set_instance_ip,
+            get_provision_ssh_key_path as _db_ssh_path,
         )
     except ImportError:
         print("ERROR: Cost tracker not available")
-        return []
+        return [], None
 
     # Resolve "latest" to actual group ID
     group_id = provision_group
@@ -6923,14 +6946,14 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text") -> list:
         group_id = get_latest_parallel_group()
         if not group_id:
             print("ERROR: No previous provision groups found. Run 'terradev provision' first.")
-            return []
+            return [], None
         if fmt != "json":
             print(f"  Resolved 'latest' -> {group_id}")
 
     instances = get_active_instances(parallel_group=group_id)
     if not instances:
         print(f"ERROR: No active instances in provision group {group_id}")
-        return []
+        return [], None
 
     node_ips = []
     unresolved = []
@@ -6987,15 +7010,28 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text") -> list:
     if fmt != "json":
         print(f"  Nodes from provision group {group_id}: {node_ips}")
 
-    return node_ips
+    # ── Auto-resolve SSH key from provision group ──
+    resolved_ssh_key = None
+    try:
+        if _db_ssh_path(group_id):
+            from terradev_cli.core.ssh_key_manager import decrypt_private_key
+            resolved_ssh_key = decrypt_private_key(group_id)
+            if resolved_ssh_key and fmt != "json":
+                print(f"  SSH key auto-resolved from provision group (ephemeral decrypt)")
+    except Exception:
+        pass  # Fall back to manual --ssh-key
+
+    return node_ips, resolved_ssh_key
 
 @cli.command()
 @click.option('--nodes', '-n', multiple=True, help='Node IPs (multiple allowed, empty = localhost)')
 @click.option('--ssh-user', default='root', help='SSH user (default: root)')
 @click.option('--ssh-key', default='', help='SSH key path')
+@click.option('--from-provision', 'provision_group', default='',
+              help='Use nodes from a provision group. "latest" = most recent.')
 @click.option('--quick', is_flag=True, help='Quick GPU-only check (skip storage/NCCL)')
 @click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
-def preflight(nodes, ssh_user, ssh_key, quick, fmt):
+def preflight(nodes, ssh_user, ssh_key, provision_group, quick, fmt):
     """Run preflight hardware validation on GPU nodes.
 
     Checks: GPU health (DCGM), NVLink, RDMA, storage I/O, NCCL.
@@ -7004,15 +7040,26 @@ def preflight(nodes, ssh_user, ssh_key, quick, fmt):
     Examples:
         terradev preflight
         terradev preflight -n 10.0.0.1 -n 10.0.0.2 --quick
+        terradev preflight --from-provision latest
         terradev preflight -f json
     """
     from terradev_cli.core.preflight_validator import PreflightValidator
 
-    node_list = list(nodes) if nodes else [None]
+    node_list = list(nodes) if nodes else []
+    resolved_ssh_key = ssh_key
+    if provision_group and not node_list:
+        node_list, auto_ssh = _resolve_provision_nodes(provision_group, fmt)
+        if not node_list:
+            sys.exit(1)
+        if auto_ssh and not ssh_key:
+            resolved_ssh_key = auto_ssh
+    if not node_list:
+        node_list = [None]
+
     validator = PreflightValidator(
         nodes=node_list,
         ssh_user=ssh_user,
-        ssh_key=ssh_key or None,
+        ssh_key=resolved_ssh_key or None,
     )
 
     report = validator.run_quick() if quick else validator.run_all()
@@ -7072,8 +7119,9 @@ def train(config_path, script, framework, backend, nodes, provision_group,
 
     # ── Resolve nodes from provision group if specified ──
     resolved_nodes = list(nodes)
+    resolved_ssh_key = ""
     if provision_group and not resolved_nodes:
-        resolved_nodes = _resolve_provision_nodes(provision_group, fmt)
+        resolved_nodes, resolved_ssh_key = _resolve_provision_nodes(provision_group, fmt)
         if not resolved_nodes:
             sys.exit(1)
 
@@ -7081,6 +7129,8 @@ def train(config_path, script, framework, backend, nodes, provision_group,
         config = TrainingConfig.from_yaml(config_path)
         if resolved_nodes and not config.nodes:
             config.nodes = resolved_nodes
+        if resolved_ssh_key and not config.ssh_key:
+            config.ssh_key = resolved_ssh_key
     else:
         if not script:
             print("ERROR: Either --config or --script is required")
@@ -7095,6 +7145,7 @@ def train(config_path, script, framework, backend, nodes, provision_group,
             pp_size=pp,
             total_steps=total_steps,
             script_args=list(script_args),
+            ssh_key=resolved_ssh_key or "",
         )
 
     orch = TrainingOrchestrator()
@@ -7124,13 +7175,15 @@ def train(config_path, script, framework, backend, nodes, provision_group,
 @click.option('--nodes', '-n', multiple=True, help='Node IPs')
 @click.option('--ssh-user', default='root', help='SSH user')
 @click.option('--ssh-key', default='', help='SSH key path')
+@click.option('--from-provision', 'provision_group', default='',
+              help='Use nodes from a provision group. "latest" = most recent.')
 @click.option('--log-path', '-l', default='', help='Training log file to parse')
 @click.option('--interval', '-i', default=10.0, help='Snapshot interval in seconds')
 @click.option('--count', default=0, help='Number of snapshots (0 = continuous)')
 @click.option('--prometheus', default='', help='Prometheus endpoint (optional)')
 @click.option('--cost-rate', default=0.0, help='Cost per GPU-hour in USD')
 @click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
-def monitor(job_id, nodes, ssh_user, ssh_key, log_path, interval, count,
+def monitor(job_id, nodes, ssh_user, ssh_key, provision_group, log_path, interval, count,
             prometheus, cost_rate, fmt):
     """Monitor GPU utilization, training metrics, and cost.
 
@@ -7139,16 +7192,27 @@ def monitor(job_id, nodes, ssh_user, ssh_key, log_path, interval, count,
 
     Examples:
         terradev monitor -n 10.0.0.1 -n 10.0.0.2 -l /tmp/train.log
+        terradev monitor --from-provision latest --cost-rate 3.50
         terradev monitor --prometheus http://localhost:9090 -f json
         terradev monitor -j job-abc123 --interval 5 --count 10
     """
     from terradev_cli.core.training_monitor import TrainingMonitor
 
-    node_list = list(nodes) if nodes else [None]
+    node_list = list(nodes) if nodes else []
+    resolved_ssh_key = ssh_key
+    if provision_group and not node_list:
+        node_list, auto_ssh = _resolve_provision_nodes(provision_group, fmt)
+        if not node_list:
+            sys.exit(1)
+        if auto_ssh and not ssh_key:
+            resolved_ssh_key = auto_ssh
+    if not node_list:
+        node_list = [None]
+
     mon = TrainingMonitor(
         nodes=node_list,
         ssh_user=ssh_user,
-        ssh_key=ssh_key or None,
+        ssh_key=resolved_ssh_key or None,
         log_path=log_path,
         cost_per_gpu_hour=cost_rate,
         prometheus_endpoint=prometheus,

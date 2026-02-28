@@ -53,9 +53,20 @@ def _ensure_schema(conn: sqlite3.Connection):
             parallel_group  TEXT,
             end_ts          TEXT,
             total_cost      REAL    NOT NULL DEFAULT 0.0,
-            ip_address      TEXT    DEFAULT ''
+            ip_address      TEXT    DEFAULT '',
+            ssh_key_path    TEXT    DEFAULT ''
         );
 
+        -- Migration: add ssh_key_path if missing (existing DBs)
+        -- SQLite ignores ALTER TABLE errors for duplicate columns via pragma
+    """)
+    # Safe migration for existing DBs
+    try:
+        conn.execute("ALTER TABLE provisions ADD COLUMN ssh_key_path TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    conn.executescript("""
         CREATE TABLE IF NOT EXISTS egress (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             ts           TEXT    NOT NULL DEFAULT (datetime('now')),
@@ -279,6 +290,28 @@ def set_instance_ip(instance_id: str, ip_address: str):
     )
     conn.commit()
     conn.close()
+
+
+def set_ssh_key_path(parallel_group: str, ssh_key_path: str):
+    """Store the encrypted SSH key path for all instances in a provision group."""
+    conn = _conn()
+    conn.execute(
+        "UPDATE provisions SET ssh_key_path = ? WHERE parallel_group = ?",
+        (ssh_key_path, parallel_group),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_provision_ssh_key_path(parallel_group: str) -> Optional[str]:
+    """Get the SSH key path stored for a provision group."""
+    conn = _conn()
+    row = conn.execute(
+        "SELECT ssh_key_path FROM provisions WHERE parallel_group = ? AND ssh_key_path != '' LIMIT 1",
+        (parallel_group,),
+    ).fetchone()
+    conn.close()
+    return row["ssh_key_path"] if row else None
 
 
 def get_active_instances(parallel_group: Optional[str] = None) -> List[Dict[str, Any]]:

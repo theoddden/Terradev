@@ -12,12 +12,17 @@ Disallow: /logs/
 Disallow: /.git/
 Disallow: /node_modules/
 Disallow: /__pycache__/
+Disallow: /dist/
+Disallow: /build/
 Disallow: *.pyc
 Disallow: *.pyo
 Disallow: *.pyd
+Disallow: *.egg-info
 
 # Allow important content
 Allow: /README.md
 Allow: /LICENSE
 Allow: /docs/
 Allow: /terradev_cli/
+Allow: /tests/
+Allow: /.github/

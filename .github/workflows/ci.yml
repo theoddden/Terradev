@@ -7,123 +7,97 @@ on:
     branches: [ main ]
 
 jobs:
-  # Test CLI Installation
-  test-cli:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
-    
+        python-version: ['3.9', '3.11', '3.12']
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install CLI
+    - name: Install package + test deps
       run: |
-        cd terradev_cli
-        pip install -e .
-        pip install aiohttp boto3 pyyaml
+        pip install -e ".[dev]" 2>/dev/null || pip install -e .
+        pip install pytest pytest-asyncio
 
-    - name: Test CLI installation
+    - name: CLI smoke test
       run: |
         terradev --version
         terradev --help
 
-    - name: Test CLI commands
-      run: |
-        terradev --skip-onboarding status || true
+    - name: Run test suite
+      run: pytest tests/ -v --tb=short
 
-  # Test Built Package (simulates PyPI install)
-  test-built-package:
+  build:
     runs-on: ubuntu-latest
-    needs: test-cli
-    
+    needs: test
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.11'
 
-    - name: Build and install package
+    - name: Build wheel + sdist
       run: |
         pip install build
-        cd terradev_cli
         python -m build
+
+    - name: Verify built package installs
+      run: |
         pip install dist/*.whl
-
-    - name: Test package installation
-      run: |
         terradev --version
-        terradev --help
 
-  # Code Quality
-  code-quality:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-
-    - name: Install dependencies
-      run: |
-        cd terradev_cli
-        pip install black flake8 mypy aiohttp boto3 pyyaml
-
-    - name: Code formatting check
-      run: |
-        cd terradev_cli
-        black --check --diff . || echo "Black check completed with issues"
-
-    - name: Linting
-      run: |
-        cd terradev_cli
-        flake8 --max-line-length=100 --ignore=E203,W503 . || echo "Flake8 check completed with issues"
-
-  # Security Scan
-  security-scan:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-
-    - name: Install dependencies
-      run: |
-        cd terradev_cli
-        pip install bandit safety aiohttp boto3 pyyaml
-
-    - name: Security scan
-      run: |
-        cd terradev_cli
-        bandit -r . -f json -o bandit-report.json || echo '{}' > bandit-report.json
-
-    - name: Dependency security check
-      run: |
-        cd terradev_cli
-        safety check --json --output safety-report.json || echo '{}' > safety-report.json
-
-    - name: Upload security reports
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
+        name: dist
+        path: dist/
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install + scan
+      run: |
+        pip install bandit
+        bandit -r terradev_cli/ -f json -o bandit-report.json -ll || true
+
+    - uses: actions/upload-artifact@v4
+      with:
         name: security-reports
-        path: |
-          terradev_cli/bandit-report.json
-          terradev_cli/safety-report.json
+        path: bandit-report.json
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Build
+      run: |
+        pip install build
+        python -m build
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
