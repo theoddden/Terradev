@@ -52,7 +52,8 @@ def _ensure_schema(conn: sqlite3.Connection):
             status          TEXT    NOT NULL DEFAULT 'provisioning',
             parallel_group  TEXT,
             end_ts          TEXT,
-            total_cost      REAL    NOT NULL DEFAULT 0.0
+            total_cost      REAL    NOT NULL DEFAULT 0.0,
+            ip_address      TEXT    DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS egress (
@@ -267,3 +268,41 @@ def get_parallel_group_summary(group_id: str) -> List[Dict[str, Any]]:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def set_instance_ip(instance_id: str, ip_address: str):
+    """Store resolved IP for a provisioned instance."""
+    conn = _conn()
+    conn.execute(
+        "UPDATE provisions SET ip_address = ? WHERE instance_id = ?",
+        (ip_address, instance_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_active_instances(parallel_group: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Get active (non-terminated) instances, optionally filtered by group."""
+    conn = _conn()
+    if parallel_group:
+        rows = conn.execute(
+            "SELECT * FROM provisions WHERE parallel_group = ? AND status = 'active' ORDER BY ts",
+            (parallel_group,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM provisions WHERE status = 'active' ORDER BY ts DESC",
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_latest_parallel_group() -> Optional[str]:
+    """Get the most recent parallel group ID."""
+    conn = _conn()
+    row = conn.execute(
+        "SELECT parallel_group FROM provisions WHERE parallel_group IS NOT NULL "
+        "ORDER BY ts DESC LIMIT 1",
+    ).fetchone()
+    conn.close()
+    return row["parallel_group"] if row else None

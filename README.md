@@ -1,4 +1,4 @@
-# Terradev CLI v3.3.0
+# Terradev CLI v3.4.0
 
 **Compare GPU prices across 15 clouds. Provision the cheapest one in one command.**
 
@@ -126,6 +126,32 @@ helm upgrade --install moe-inf ./helm/terradev \
 - **Multi-Cloud**: RunPod, Vast.ai, Lambda, AWS, CoreWeave
 
 See [`clusters/moe-template/`](clusters/moe-template/) for full docs and [`clusters/glm-5/`](clusters/glm-5/) for a model-specific example.
+
+## Production Resilience + Training Pipeline (NEW in v3.4.0)
+
+v3.4.0 makes Terradev production-ready in **any environment** — including sandboxed runtimes like Claude Code — by eliminating hard-crash import failures and adding a complete training orchestration pipeline.
+
+### v3.4.0 Features
+
+- **Lazy Provider Loading**: `ProviderFactory` no longer eagerly imports all cloud SDKs. Each provider is loaded on first use — missing `boto3` won't crash the CLI if you're only using RunPod.
+- **Graceful Dependency Fallbacks**: `stripe`, `numpy`, `boto3` wrapped in `try/except` with clear error messages. The CLI boots and runs every local command even with zero optional deps installed.
+- **stdlib NumPy Shim**: `price_discovery` and `cost_optimizer` fall back to Python's `statistics` module when NumPy is absent.
+- **Training Orchestrator**: DAG-parallel training launch across multi-node GPU clusters via `torchrun`, `deepspeed`, `accelerate`, or `megatron`.
+- **Training Monitor**: Real-time GPU utilization, memory, temperature, and cost tracking per node.
+- **Checkpoint Manager**: DAG-parallel shard writes with manifest assembly, remote upload, and state DB tracking.
+- **Preflight Validator**: Pre-launch checks for GPU availability, NCCL, RDMA, and driver versions across all nodes.
+- **Job State Manager**: SQLite-backed job lifecycle (created → running → completed/failed) with checkpoint history.
+- **Provision-to-Train Bridge**: `terradev train --from-provision latest` resolves IPs from your last `provision` command automatically.
+- **294 Tests Passing**: Comprehensive test suite covering core modules, provider contracts, and CLI smoke tests.
+
+```bash
+# Full training pipeline
+terradev provision -g H100 -n 4 --parallel 6      # Provision 4x H100s
+terradev train --script train.py --from-provision latest  # Launch on provisioned nodes
+terradev train-status                                # Check all training jobs
+terradev checkpoint list --job my-job               # List checkpoints
+terradev monitor --job my-job                       # Live GPU metrics
+```
 
 ## Ray Serve LLM + Expert Parallelism (NEW in v3.3.0)
 
@@ -267,6 +293,7 @@ Terradev never touches, stores, or proxies your cloud credentials through a thir
 
 ## CLI Commands
 
+### Provisioning & Management
 | Command | Description |
 |---------|-------------|
 | `terradev configure` | Set up API credentials for any provider |
@@ -279,12 +306,35 @@ Terradev never touches, stores, or proxies your cloud credentials through a thir
 | `terradev analytics` | Cost analytics with daily spend trends |
 | `terradev optimize` | Find cheaper alternatives for running instances |
 | `terradev run` | Provision + deploy Docker container + execute in one command |
-| `terradev hf-space` | **NEW:** One-click HuggingFace Spaces deployment |
-| `terradev inferx` | **NEW:** InferX serverless inference platform - <2s cold starts |
-| `terradev up` | **NEW:** Manifest cache + drift detection |
-| `terradev rollback` | **NEW:** Versioned rollback to any deployment |
-| `terradev manifests` | **NEW:** List cached deployment manifests |
+
+### Training Pipeline (v3.4.0)
+| Command | Description |
+|---------|-------------|
+| `terradev train` | Launch distributed training (torchrun/deepspeed/accelerate/megatron) |
+| `terradev train --from-provision` | Auto-resolve nodes from last provision command |
+| `terradev train-status` | List all training jobs and their state |
+| `terradev monitor` | Real-time GPU metrics, utilization, cost tracking |
+| `terradev checkpoint list` | List checkpoints for a training job |
+| `terradev checkpoint save` | Manually trigger a checkpoint save |
+| `terradev preflight` | Validate GPU, NCCL, RDMA, drivers before training |
+
+### Inference & Deployment
+| Command | Description |
+|---------|-------------|
+| `terradev hf-space` | One-click HuggingFace Spaces deployment |
+| `terradev inferx` | InferX serverless inference platform - <2s cold starts |
+| `terradev infer-status` | Inference endpoint health and latency |
+| `terradev infer-failover` | Auto-failover between inference endpoints |
+
+### GitOps & Infrastructure
+| Command | Description |
+|---------|-------------|
+| `terradev up` | Manifest cache + drift detection |
+| `terradev rollback` | Versioned rollback to any deployment |
+| `terradev manifests` | List cached deployment manifests |
+| `terradev gitops` | ArgoCD/Flux CD GitOps repository management |
 | `terradev integrations` | Show status of W&B, Prometheus, and infra hooks |
+| `terradev price-discovery` | Enhanced price analytics with confidence scoring |
 
 ### HF Spaces Commands (NEW!)
 ```bash

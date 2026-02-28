@@ -11,7 +11,6 @@ import logging
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
-import numpy as np
 from enum import Enum
 
 logger = logging.getLogger(__name__)

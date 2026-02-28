@@ -7,12 +7,29 @@ Uses real price tick data instead of mock data
 import asyncio
 import aiohttp
 import json
+import logging
 import sqlite3
-import numpy as np
+import statistics
+try:
+    import numpy as np
+except ImportError:
+    # Lightweight fallback — only std/mean/min/max are used in this module
+    class _NpShim:
+        @staticmethod
+        def mean(x): return statistics.mean(x)
+        @staticmethod
+        def std(x): return statistics.pstdev(x)
+        @staticmethod
+        def min(x): return min(x)
+        @staticmethod
+        def max(x): return max(x)
+    np = _NpShim()
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class PriceInfo:
@@ -149,11 +166,8 @@ class PriceDiscoveryEngine:
             return "Unknown"
             
         except Exception as e:
-            print(f"Error checking capacity: {e}")
-            # Fallback to simple capacity check
-            import random
-            available = random.choice([True, True, True, False])  # 75% availability
-            return "Available" if available else "Limited"
+            logger.debug(f"Error checking capacity: {e}")
+            return "Unknown"
     
     async def _calculate_confidence_from_real_data(self, price_data: Dict) -> float:
         """Calculate confidence based on real price tick data"""
@@ -199,32 +213,39 @@ class PriceDiscoveryEngine:
             price_series = get_price_series(gpu_type=gpu_type, hours=hours)
             
             # Group by provider
-            trends = {}
+            by_provider: Dict[str, list] = {}
             for tick in price_series:
                 provider = tick['provider']
-                if provider not in trends:
-                    trends[provider] = []
-                trends[provider].append({
+                if provider not in by_provider:
+                    by_provider[provider] = []
+                by_provider[provider].append({
                     'price': tick['price_hr'],
                     'timestamp': tick['ts']
                 })
             
             # Calculate trend metrics
-            for provider in trends:
-                prices = [p['price'] for p in trends[provider]]
+            trends = {}
+            for provider, ticks in by_provider.items():
+                prices = [p['price'] for p in ticks]
                 if len(prices) >= 2:
-                    trends[provider]['metrics'] = {
-                        'avg_price': np.mean(prices),
-                        'min_price': np.min(prices),
-                        'max_price': np.max(prices),
-                        'volatility': np.std(prices),
-                        'trend': 'up' if prices[-1] > prices[0] else 'down',
-                        'data_points': len(prices)
+                    trends[provider] = {
+                        'ticks': ticks,
+                        'metrics': {
+                            'avg_price': float(np.mean(prices)),
+                            'min_price': float(np.min(prices)),
+                            'max_price': float(np.max(prices)),
+                            'volatility': float(np.std(prices)),
+                            'trend': 'up' if prices[-1] > prices[0] else 'down',
+                            'data_points': len(prices),
+                        }
                     }
                 else:
-                    trends[provider]['metrics'] = {
-                        'data_points': len(prices),
-                        'note': 'Insufficient data'
+                    trends[provider] = {
+                        'ticks': ticks,
+                        'metrics': {
+                            'data_points': len(prices),
+                            'note': 'Insufficient data',
+                        }
                     }
             
             return trends

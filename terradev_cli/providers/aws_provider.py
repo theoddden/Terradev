@@ -9,8 +9,14 @@ import logging
 import os
 from typing import Dict, List, Any, Optional
 from datetime import datetime
-import boto3
-from botocore.exceptions import ClientError, NoCredentialsError
+
+try:
+    import boto3
+    from botocore.exceptions import ClientError, NoCredentialsError
+except ImportError:
+    boto3 = None
+    ClientError = Exception
+    NoCredentialsError = Exception
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +29,13 @@ class AWSProvider(BaseProvider):
     def __init__(self, credentials: Dict[str, str]):
         super().__init__(credentials)
         self.name = "aws"
+
+        if boto3 is None:
+            logger.warning("boto3 not installed — AWS provider unavailable. "
+                           "Install with: pip install boto3")
+            self.ec2_client = None
+            self.ec2_resource = None
+            return
 
         # Initialize AWS clients
         try:

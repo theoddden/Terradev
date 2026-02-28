@@ -8,7 +8,20 @@ import asyncio
 import aiohttp
 import json
 import sqlite3
-import numpy as np
+import statistics
+try:
+    import numpy as np
+except ImportError:
+    class _NpShim:
+        @staticmethod
+        def mean(x): return statistics.mean(x)
+        @staticmethod
+        def std(x): return statistics.pstdev(x)
+        @staticmethod
+        def min(x): return min(x)
+        @staticmethod
+        def max(x): return max(x)
+    np = _NpShim()
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass

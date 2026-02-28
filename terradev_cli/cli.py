@@ -6893,5 +6893,465 @@ def optimize(cluster_config, usage_metrics, tier, output, implement):
         # Implementation logic would go here
         print(f"✅ Optimizations implemented successfully!")
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Training Pipeline — preflight / train / monitor / checkpoint / train-status
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _resolve_provision_nodes(provision_group: str, fmt: str = "text") -> list:
+    """Resolve provisioned instance IDs to node IPs for the train command.
+
+    Looks up the parallel provision group in the cost DB, then resolves
+    each instance to an IP via:
+      1. Cached ip_address column (if previously resolved)
+      2. Provider status API (async, parallel across all instances)
+      3. instance_id as-is fallback (some providers use IP-based IDs)
+
+    Returns list of IP strings, or empty list on failure.
+    """
+    try:
+        from terradev_cli.core.cost_tracker import (
+            get_active_instances, get_latest_parallel_group, set_instance_ip,
+        )
+    except ImportError:
+        print("ERROR: Cost tracker not available")
+        return []
+
+    # Resolve "latest" to actual group ID
+    group_id = provision_group
+    if group_id == "latest":
+        group_id = get_latest_parallel_group()
+        if not group_id:
+            print("ERROR: No previous provision groups found. Run 'terradev provision' first.")
+            return []
+        if fmt != "json":
+            print(f"  Resolved 'latest' -> {group_id}")
+
+    instances = get_active_instances(parallel_group=group_id)
+    if not instances:
+        print(f"ERROR: No active instances in provision group {group_id}")
+        return []
+
+    node_ips = []
+    unresolved = []
+
+    for inst in instances:
+        ip = inst.get("ip_address", "").strip()
+        if ip:
+            node_ips.append(ip)
+        else:
+            unresolved.append(inst)
+
+    # Resolve remaining IPs via provider APIs
+    if unresolved:
+        if fmt != "json":
+            print(f"  Resolving IPs for {len(unresolved)} instance(s)...")
+
+        api = TerradevAPI()
+
+        async def _resolve_ips():
+            from terradev_cli.providers.provider_factory import ProviderFactory
+            factory = ProviderFactory()
+            results = {}
+
+            async def _get_ip(inst):
+                pname = inst["provider"].lower().replace(" ", "_")
+                creds = api._provider_creds(pname)
+                try:
+                    provider = factory.create_provider(pname, creds)
+                    status = await provider.get_instance_status(inst["instance_id"])
+                    # Providers return IP in different fields
+                    ip = (status.get("ip") or status.get("public_ip") or
+                          status.get("ip_address") or status.get("host") or
+                          inst["instance_id"])
+                    results[inst["instance_id"]] = ip
+                except Exception:
+                    # Fallback: use instance_id (some providers like RunPod
+                    # use IDs that double as SSH hostnames)
+                    results[inst["instance_id"]] = inst["instance_id"]
+
+            await asyncio.gather(*[_get_ip(i) for i in unresolved])
+            return results
+
+        resolved = asyncio.run(_resolve_ips())
+
+        for inst in unresolved:
+            ip = resolved.get(inst["instance_id"], inst["instance_id"])
+            node_ips.append(ip)
+            # Cache for next time
+            try:
+                set_instance_ip(inst["instance_id"], ip)
+            except Exception:
+                pass
+
+    if fmt != "json":
+        print(f"  Nodes from provision group {group_id}: {node_ips}")
+
+    return node_ips
+
+@cli.command()
+@click.option('--nodes', '-n', multiple=True, help='Node IPs (multiple allowed, empty = localhost)')
+@click.option('--ssh-user', default='root', help='SSH user (default: root)')
+@click.option('--ssh-key', default='', help='SSH key path')
+@click.option('--quick', is_flag=True, help='Quick GPU-only check (skip storage/NCCL)')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def preflight(nodes, ssh_user, ssh_key, quick, fmt):
+    """Run preflight hardware validation on GPU nodes.
+
+    Checks: GPU health (DCGM), NVLink, RDMA, storage I/O, NCCL.
+    All checks run in parallel via DAGExecutor.
+
+    Examples:
+        terradev preflight
+        terradev preflight -n 10.0.0.1 -n 10.0.0.2 --quick
+        terradev preflight -f json
+    """
+    from terradev_cli.core.preflight_validator import PreflightValidator
+
+    node_list = list(nodes) if nodes else [None]
+    validator = PreflightValidator(
+        nodes=node_list,
+        ssh_user=ssh_user,
+        ssh_key=ssh_key or None,
+    )
+
+    report = validator.run_quick() if quick else validator.run_all()
+    summary = report.summary()
+
+    if fmt == 'json':
+        print(json.dumps(summary, indent=2, default=str))
+    else:
+        passed = summary.get("passed", False)
+        status_icon = "PASS" if passed else "FAIL"
+        print(f"\nPreflight: {status_icon}")
+        print(f"  Nodes: {summary.get('nodes_checked', 0)}")
+        print(f"  Checks passed: {summary.get('checks_passed', 0)}/{summary.get('total_checks', 0)}")
+        if summary.get("failures"):
+            print(f"  Failures:")
+            for f in summary["failures"]:
+                print(f"    - {f}")
+        print()
+
+
+@cli.command()
+@click.option('--config', '-c', 'config_path', type=click.Path(exists=True), help='YAML config file')
+@click.option('--script', '-s', help='Training script path')
+@click.option('--framework', type=click.Choice(['torchrun', 'deepspeed', 'accelerate', 'megatron']),
+              default='torchrun', help='Framework (default: torchrun)')
+@click.option('--backend', type=click.Choice(['native', 'ray']), default='native',
+              help='Launch backend (default: native, ray = optional)')
+@click.option('--nodes', '-n', multiple=True, help='Node IPs')
+@click.option('--from-provision', 'provision_group', default='',
+              help='Use nodes from a provision group (pg_xxx). "latest" = most recent.')
+@click.option('--gpus-per-node', default=8, help='GPUs per node (default: 8)')
+@click.option('--tp', default=1, help='Tensor parallel size')
+@click.option('--pp', default=1, help='Pipeline parallel size')
+@click.option('--total-steps', default=0, help='Total training steps (for ETA)')
+@click.option('--skip-preflight', is_flag=True, help='Skip preflight checks')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+@click.argument('script_args', nargs=-1, type=click.UNPROCESSED)
+def train(config_path, script, framework, backend, nodes, provision_group,
+          gpus_per_node, tp, pp, total_steps, skip_preflight, fmt, script_args):
+    """Launch a distributed training job.
+
+    Zero external dependencies by default — delegates to torchrun/deepspeed.
+    Set --backend ray to use Ray when available (auto-fallback to native).
+
+    Use --from-provision to automatically use nodes from a previous provision:
+        terradev provision -g H100 -n 4
+        terradev train -s train.py --from-provision latest
+
+    Examples:
+        terradev train -s train.py --framework torchrun --gpus-per-node 8
+        terradev train -c job.yaml
+        terradev train -s train.py -n 10.0.0.1 -n 10.0.0.2 --tp 2 -- --lr 1e-4
+        terradev train -s train.py --from-provision pg_1709123456_abc12345
+        terradev train -s train.py --from-provision latest
+    """
+    from terradev_cli.core.training_orchestrator import TrainingOrchestrator, TrainingConfig
+
+    # ── Resolve nodes from provision group if specified ──
+    resolved_nodes = list(nodes)
+    if provision_group and not resolved_nodes:
+        resolved_nodes = _resolve_provision_nodes(provision_group, fmt)
+        if not resolved_nodes:
+            sys.exit(1)
+
+    if config_path:
+        config = TrainingConfig.from_yaml(config_path)
+        if resolved_nodes and not config.nodes:
+            config.nodes = resolved_nodes
+    else:
+        if not script:
+            print("ERROR: Either --config or --script is required")
+            sys.exit(1)
+        config = TrainingConfig(
+            script=script,
+            framework=framework,
+            backend=backend,
+            nodes=resolved_nodes,
+            gpus_per_node=gpus_per_node,
+            tp_size=tp,
+            pp_size=pp,
+            total_steps=total_steps,
+            script_args=list(script_args),
+        )
+
+    orch = TrainingOrchestrator()
+    result = orch.launch(config, skip_preflight=skip_preflight)
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        status = result.get("status", "unknown")
+        print(f"\nTraining Job: {result.get('job_id', 'N/A')}")
+        print(f"  Status: {status}")
+        print(f"  Framework: {result.get('framework')}")
+        print(f"  Backend: {result.get('backend', 'native')}")
+        print(f"  GPUs: {result.get('total_gpus', 0)}")
+        print(f"  Nodes: {result.get('nodes', [])}")
+        if result.get('pid'):
+            print(f"  PID: {result['pid']}")
+        if result.get('master_addr'):
+            print(f"  Master: {result['master_addr']}")
+        if status == 'failed':
+            print(f"  Errors: {result.get('errors', '')}")
+        print()
+
+
+@cli.command()
+@click.option('--job-id', '-j', default='', help='Job ID to monitor')
+@click.option('--nodes', '-n', multiple=True, help='Node IPs')
+@click.option('--ssh-user', default='root', help='SSH user')
+@click.option('--ssh-key', default='', help='SSH key path')
+@click.option('--log-path', '-l', default='', help='Training log file to parse')
+@click.option('--interval', '-i', default=10.0, help='Snapshot interval in seconds')
+@click.option('--count', default=0, help='Number of snapshots (0 = continuous)')
+@click.option('--prometheus', default='', help='Prometheus endpoint (optional)')
+@click.option('--cost-rate', default=0.0, help='Cost per GPU-hour in USD')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def monitor(job_id, nodes, ssh_user, ssh_key, log_path, interval, count,
+            prometheus, cost_rate, fmt):
+    """Monitor GPU utilization, training metrics, and cost.
+
+    Default: nvidia-smi (zero deps). Optional Prometheus/DCGM-exporter hook.
+    Includes straggler detection for multi-node clusters.
+
+    Examples:
+        terradev monitor -n 10.0.0.1 -n 10.0.0.2 -l /tmp/train.log
+        terradev monitor --prometheus http://localhost:9090 -f json
+        terradev monitor -j job-abc123 --interval 5 --count 10
+    """
+    from terradev_cli.core.training_monitor import TrainingMonitor
+
+    node_list = list(nodes) if nodes else [None]
+    mon = TrainingMonitor(
+        nodes=node_list,
+        ssh_user=ssh_user,
+        ssh_key=ssh_key or None,
+        log_path=log_path,
+        cost_per_gpu_hour=cost_rate,
+        prometheus_endpoint=prometheus,
+    )
+
+    if fmt == 'json':
+        if count == 1 or count == 0:
+            snap = mon.snapshot(job_id)
+            print(json.dumps(snap.to_dict(), indent=2, default=str))
+        else:
+            snaps = mon.continuous(job_id, interval_s=interval, max_snapshots=count)
+            print(json.dumps([s.to_dict() for s in snaps], indent=2, default=str))
+    else:
+        if count == 1:
+            snap = mon.snapshot(job_id)
+            mon._print_snapshot(snap)
+        else:
+            mon.continuous(job_id, interval_s=interval, max_snapshots=count)
+
+
+@cli.command()
+@click.argument('action', type=click.Choice(['list', 'restore', 'promote', 'delete']))
+@click.option('--job-id', '-j', required=True, help='Job ID')
+@click.option('--step', type=int, default=None, help='Checkpoint step')
+@click.option('--checkpoint-id', default='', help='Checkpoint ID')
+@click.option('--dest', default='', help='Destination path (for promote)')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def checkpoint(action, job_id, step, checkpoint_id, dest, fmt):
+    """Manage distributed checkpoints.
+
+    Local filesystem by default. Supports manifest-based atomic commits,
+    parallel shard verification, and retention policies.
+
+    Examples:
+        terradev checkpoint list -j job-abc123
+        terradev checkpoint restore -j job-abc123
+        terradev checkpoint restore -j job-abc123 --step 5000
+        terradev checkpoint promote -j job-abc123 --checkpoint-id ckpt-xyz --dest /models/final
+        terradev checkpoint delete -j job-abc123 --checkpoint-id ckpt-xyz
+    """
+    from terradev_cli.core.checkpoint_manager import CheckpointManager
+
+    mgr = CheckpointManager()
+
+    if action == 'list':
+        ckpts = mgr.list(job_id)
+        if fmt == 'json':
+            print(json.dumps(ckpts, indent=2, default=str))
+        else:
+            if not ckpts:
+                print(f"No checkpoints for job {job_id}")
+            else:
+                print(f"\nCheckpoints for {job_id}:")
+                for c in ckpts:
+                    sid = c.get('checkpoint_id', c.get('id', 'N/A'))
+                    print(f"  step={c.get('step', '?'):>8}  "
+                          f"id={sid}  "
+                          f"shards={c.get('shard_count', '?')}  "
+                          f"size={c.get('total_size_bytes', 0) / (1024**3):.2f}GB")
+                print()
+
+    elif action == 'restore':
+        try:
+            manifest = mgr.restore(job_id, step=step,
+                                   checkpoint_id=checkpoint_id or None)
+            result = manifest.to_dict()
+            if fmt == 'json':
+                print(json.dumps(result, indent=2, default=str))
+            else:
+                print(f"\nRestored: {result['checkpoint_id']} step={result['step']}")
+                print(f"  Shards: {result['shard_count']}")
+                print(f"  Size: {result['total_size_bytes'] / (1024**3):.2f}GB")
+                print()
+        except (FileNotFoundError, RuntimeError) as e:
+            print(f"ERROR: {e}")
+            sys.exit(1)
+
+    elif action == 'promote':
+        result = mgr.promote(job_id, checkpoint_id, dest_path=dest)
+        print(f"Promoted: {result}")
+
+    elif action == 'delete':
+        if not checkpoint_id:
+            print("ERROR: --checkpoint-id required for delete")
+            sys.exit(1)
+        mgr.delete(job_id, checkpoint_id)
+        print(f"Deleted: {checkpoint_id}")
+
+
+@cli.command('train-status')
+@click.option('--job-id', '-j', default='', help='Job ID (empty = all running)')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def train_status(job_id, fmt):
+    """Show training job status, GPU-hours, cost, and ETA.
+
+    Queries the local SQLite job database — no external services needed.
+
+    Examples:
+        terradev train-status
+        terradev train-status -j job-abc123
+        terradev train-status -f json
+    """
+    from terradev_cli.core.job_state_manager import JobStateManager
+
+    sm = JobStateManager()
+
+    if job_id:
+        result = sm.job_metrics(job_id)
+        if fmt == 'json':
+            print(json.dumps(result, indent=2, default=str))
+        else:
+            if 'error' in result:
+                print(f"ERROR: {result['error']}")
+                sys.exit(1)
+            print(f"\nJob: {result['id']}")
+            print(f"  Name: {result['name']}")
+            print(f"  Status: {result['status']}")
+            print(f"  Framework: {result['framework']}")
+            print(f"  Progress: {result.get('current_step', 0)}/{result.get('total_steps', 0)} "
+                  f"({result.get('progress_pct', 0)}%)")
+            print(f"  Elapsed: {result.get('elapsed_hours', 0):.1f}h")
+            print(f"  GPU-hours: {result.get('gpu_hours', 0):.1f}")
+            eta = result.get('eta_hours')
+            print(f"  ETA: {eta:.1f}h" if eta is not None else "  ETA: N/A")
+            print(f"  Cost: ${result.get('cost_usd', 0):.2f}")
+            print(f"  Efficiency: {result.get('efficiency_steps_per_gpuh', 0):.1f} steps/GPU-h")
+            if result.get('last_checkpoint_id'):
+                print(f"  Last checkpoint: {result['last_checkpoint_id']}")
+            if result.get('error_message'):
+                print(f"  Error: {result['error_message']}")
+            print()
+    else:
+        running = sm.running_jobs_summary()
+        total = sm.total_cost()
+        if fmt == 'json':
+            print(json.dumps({"running": running, "total_cost": total}, indent=2, default=str))
+        else:
+            if not running:
+                print("\nNo running training jobs.")
+            else:
+                print(f"\nRunning jobs ({len(running)}):")
+                for j in running:
+                    eta = j.get('eta_hours')
+                    eta_str = f"ETA {eta:.1f}h" if eta is not None else ""
+                    print(f"  {j['id']}  {j['name']}  {j['framework']}  "
+                          f"{j.get('current_step', 0)}/{j.get('total_steps', 0)}  "
+                          f"{j.get('elapsed_hours', 0):.1f}h  "
+                          f"${j.get('cost_usd', 0):.2f}  {eta_str}")
+            print(f"\nTotal cost across all jobs: ${total:.2f}\n")
+
+
+@cli.command('train-stop')
+@click.option('--job-id', '-j', required=True, help='Job ID to stop')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def train_stop(job_id, fmt):
+    """Stop a running training job.
+
+    Kills training processes on all nodes in parallel.
+
+    Examples:
+        terradev train-stop -j job-abc123
+    """
+    from terradev_cli.core.training_orchestrator import TrainingOrchestrator
+
+    orch = TrainingOrchestrator()
+    result = orch.stop(job_id)
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        print(f"Job {job_id}: {result.get('status', 'unknown')}")
+
+
+@cli.command('train-resume')
+@click.option('--job-id', '-j', required=True, help='Job ID to resume')
+@click.option('--checkpoint-id', default='', help='Checkpoint to resume from (default: latest)')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def train_resume(job_id, checkpoint_id, fmt):
+    """Resume a training job from checkpoint.
+
+    Rebuilds config from job state and resumes with topology validation.
+
+    Examples:
+        terradev train-resume -j job-abc123
+        terradev train-resume -j job-abc123 --checkpoint-id ckpt-xyz
+    """
+    from terradev_cli.core.training_orchestrator import TrainingOrchestrator
+
+    orch = TrainingOrchestrator()
+    result = orch.resume(job_id, checkpoint_id=checkpoint_id or None)
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        status = result.get("status", "unknown")
+        print(f"\nResumed Job: {result.get('job_id', job_id)}")
+        print(f"  Status: {status}")
+        if result.get('pid'):
+            print(f"  PID: {result['pid']}")
+        if status == 'failed':
+            print(f"  Error: {result.get('errors', result.get('error', ''))}")
+        print()
+
+
 if __name__ == '__main__':
     cli()

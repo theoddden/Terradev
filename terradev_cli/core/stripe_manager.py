@@ -8,7 +8,10 @@ and Enterprise+ metered GPU-hour billing.
 import os
 import json
 import math
-import stripe
+try:
+    import stripe
+except ImportError:
+    stripe = None
 from typing import Dict, Optional, Any, List
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +28,15 @@ class StripeManager:
     """Manages Stripe integration for Terradev CLI"""
     
     def __init__(self):
+        if stripe is None:
+            logger.warning("stripe package not installed — billing features unavailable. "
+                           "Install with: pip install stripe")
+            self.demo_mode = True
+            self.publishable_key = ""
+            self.secret_key = None
+            self._metering_file = Path.home() / '.terradev' / 'gpu_metering.json'
+            return
+
         # Keys loaded from environment — never hardcoded
         self.publishable_key = os.getenv(
             'STRIPE_PUBLISHABLE_KEY',
