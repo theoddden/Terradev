@@ -154,9 +154,9 @@ dev = [
 [project.urls]
 Homepage = "https://terradev.cloud"
 Documentation = "https://docs.terradev.com"
-Repository = "https://github.com/terradev/terradev"
-"Bug Tracker" = "https://github.com/terradev/terradev/issues"
-Changelog = "https://github.com/terradev/terradev/blob/main/CHANGELOG.md"
+Repository = "https://github.com/theoddden/Terradev"
+"Bug Tracker" = "https://github.com/theoddden/Terradev/issues"
+Changelog = "https://github.com/theoddden/Terradev/blob/main/CHANGELOG.md"
 Analytics = "https://api.terradev.cloud/dashboard"
 
 [project.scripts]

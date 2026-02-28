@@ -3,7 +3,7 @@
 **Compare GPU prices across 15 clouds. Provision the cheapest one in one command.**
 
 <p align="center">
-  <img src="demo/terradev-demo.gif" alt="Terradev CLI Demo" width="800">
+  <img src="https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif" alt="Terradev CLI Demo" width="800">
 </p>
 
 ## Why Terradev?
