@@ -1,4 +1,4 @@
-# Terradev CLI v3.2.0
+# Terradev CLI v3.2.1
 
 **Compare GPU prices across 15 clouds. Provision the cheapest one in one command.**
 
