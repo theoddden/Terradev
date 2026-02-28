@@ -813,7 +813,7 @@ def cli(config=None, verbose=False, skip_onboarding=False):
     Enterprise+ Tier: Unlimited everything, 32 GPU min, metered at $0.09/GPU-hr
     """
     # Check for first-time user and trigger onboarding
-    if not skip_onboarding:
+    if not skip_onboarding and not os.environ.get("TERRADEV_SKIP_ONBOARDING"):
         api = TerradevAPI()
         if api.is_first_time_user():
             run_interactive_onboarding(api)

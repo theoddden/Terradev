@@ -26,6 +26,12 @@ from click.testing import CliRunner
 from terradev_cli.cli import cli
 
 
+@pytest.fixture(autouse=True)
+def _skip_onboarding(monkeypatch):
+    """Prevent the onboarding wizard from intercepting commands in CI."""
+    monkeypatch.setenv("TERRADEV_SKIP_ONBOARDING", "1")
+
+
 @pytest.fixture
 def runner():
     return CliRunner()
