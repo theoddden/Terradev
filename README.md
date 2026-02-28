@@ -1,12 +1,16 @@
-# Terradev CLI v3.1.10
+# Terradev CLI v3.2.0
 
-BYOAPI: Cross-cloud GPU provisioning and cost optimization platform with GitOps automation, *for stateless workloads*.
+**Compare GPU prices across 15 clouds. Provision the cheapest one in one command.**
+
+<p align="center">
+  <img src="demo/terradev-demo.gif" alt="Terradev CLI Demo" width="800">
+</p>
 
 ## Why Terradev?
 
-Developers overpay by only accessing single-cloud workflows or using sequential provisioning with inefficient egress + rate-limiting.
+Developers overpay by only accessing single-cloud workflows, hopping across switches out of NUMA alignment, or using sequential provisioning with inefficient egress + rate-limiting.
 
-Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys 3-5x faster than sequential provisioning.
+Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys faster and cheaper than sequential provisioning.
 
 ## GitOps Automation
 
@@ -91,7 +95,7 @@ terradev hf-space my-embeddings --model-id sentence-transformers/all-MiniLM-L6-v
 terradev hf-space my-image --model-id runwayml/stable-diffusion-v1-5 --template image
 ```
 
-## MoE Cluster Templates (NEW in v3.1.8)
+## MoE Cluster Templates (NEW in v3.2.0)
 
 Production-ready cluster configs optimized for Mixture-of-Experts models — the dominant architecture for every major 2026 release (GLM-5, Qwen 3.5, Mistral Large 3, DeepSeek V4, Llama 5).
 
@@ -348,9 +352,9 @@ terradev run --gpu A100 --image pytorch/pytorch:latest -c "python train.py"
 terradev run --gpu H100 --image vllm/vllm-openai:latest --keep-alive --port 8000
 ```
 
-## GPU Topology Optimization (v3.1)
+## GPU Topology Optimization (v3.2)
 
-Terradev v3.1 automatically optimizes GPU infrastructure topology — NUMA alignment, PCIe switch pairing, SR-IOV, RDMA, and kubelet Topology Manager configuration. **You never configure any of this.** It's applied automatically when you create clusters or provision GPU nodes.
+Terradev v3.2 automatically optimizes GPU infrastructure topology — NUMA alignment, PCIe switch pairing, SR-IOV, RDMA, and kubelet Topology Manager configuration. **You never configure any of this.** It's applied automatically when you create clusters or provision GPU nodes.
 
 ### What happens behind the scenes
 
