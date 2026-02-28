@@ -132,6 +132,33 @@ class EndpointPhase(Enum):
 # ── Prefill→Decode Handoff Tracker ────────────────────────────────────────────
 
 
+class KVConnectorType(Enum):
+    """KV cache transfer connector types for disaggregated serving."""
+    NIXL = "NixlConnector"           # NVIDIA NIXL: zero-copy GPU-GPU via RDMA/NVLink
+    LMCACHE = "LMCacheConnector"     # LMCache: CPU-mediated transfer (wider compat)
+    MOONCAKE = "MooncakeConnector"   # MoonCake: distributed KV store
+    UNKNOWN = "unknown"
+
+
+@dataclass
+class KVConnectorConfig:
+    """Configuration for KV cache transfer between prefill and decode endpoints.
+
+    NIXL (NVIDIA Inference eXtension Library) enables zero-copy GPU-to-GPU
+    KV cache transfer over RDMA or NVLink, avoiding CPU bounce buffers.
+    This is critical for disaggregated MoE serving where KV caches can be
+    several GB per request at long context lengths.
+    """
+    connector_type: KVConnectorType = KVConnectorType.NIXL
+    buffer_size_bytes: int = 5_368_709_120   # 5GB default NIXL buffer
+    rdma_enabled: bool = True
+    rdma_device: str = ""                    # e.g. "mlx5_0" for ConnectX-7
+    nvlink_direct: bool = False              # True if prefill/decode on same node
+    max_inflight_transfers: int = 16         # Concurrent KV transfer limit
+    compression_enabled: bool = False        # KV cache compression (lossy)
+    prefetch_enabled: bool = True            # Speculative KV prefetch
+
+
 @dataclass
 class PrefillDecodeLink:
     """Tracks a KV cache handoff from a prefill endpoint to a decode endpoint."""
@@ -141,6 +168,10 @@ class PrefillDecodeLink:
     last_handoff: float = 0.0       # monotonic timestamp
     handoff_count: int = 0
     avg_transfer_ms: float = 0.0    # KV cache transfer latency
+    # NIXL KV connector tracking
+    kv_connector: KVConnectorType = KVConnectorType.UNKNOWN
+    kv_transfer_bytes: int = 0      # Avg KV cache size transferred
+    rdma_active: bool = False       # Whether RDMA was used for last transfer
 
 
 class PrefillDecodeTracker:
@@ -153,12 +184,25 @@ class PrefillDecodeTracker:
 
     Design follows DistServe's disaggregated prefill/decode architecture
     and MoonCake's KV cache transfer protocol.
+
+    KV Connector Integration:
+      When NIXL is configured, the tracker records which connector type was
+      used for each handoff. This enables transport-aware routing:
+      - NIXL (RDMA): ~0.5ms transfer for 1GB KV cache (preferred)
+      - NIXL (NVLink): ~0.2ms transfer for same-node pairs
+      - LMCache (CPU): ~5ms transfer (fallback)
+      The router uses this to prefer pairs with established RDMA connections.
     """
 
-    def __init__(self, max_links: int = 1000):
+    def __init__(
+        self,
+        max_links: int = 1000,
+        default_connector_config: Optional[KVConnectorConfig] = None,
+    ):
         self._max_links = max_links
         # (prefill_id, model) -> PrefillDecodeLink
         self._links: OrderedDict[Tuple[str, str], PrefillDecodeLink] = OrderedDict()
+        self.connector_config = default_connector_config or KVConnectorConfig()
 
     def record_handoff(
         self,
@@ -166,9 +210,25 @@ class PrefillDecodeTracker:
         decode_id: str,
         model: str,
         transfer_ms: float = 0.0,
+        kv_connector: Optional[str] = None,
+        kv_transfer_bytes: int = 0,
+        rdma_active: bool = False,
     ):
-        """Record a KV cache handoff from prefill to decode endpoint."""
+        """Record a KV cache handoff from prefill to decode endpoint.
+
+        Args:
+            kv_connector: Connector type used ('NixlConnector', 'LMCacheConnector', etc.)
+            kv_transfer_bytes: Size of KV cache transferred in bytes.
+            rdma_active: Whether RDMA was used for this transfer.
+        """
         key = (prefill_id, model)
+
+        # Resolve connector type
+        try:
+            conn_type = KVConnectorType(kv_connector) if kv_connector else self.connector_config.connector_type
+        except ValueError:
+            conn_type = KVConnectorType.UNKNOWN
+
         if key in self._links:
             link = self._links[key]
             link.decode_endpoint_id = decode_id
@@ -176,6 +236,10 @@ class PrefillDecodeTracker:
             link.handoff_count += 1
             if transfer_ms > 0:
                 link.avg_transfer_ms = 0.8 * link.avg_transfer_ms + 0.2 * transfer_ms
+            link.kv_connector = conn_type
+            if kv_transfer_bytes > 0:
+                link.kv_transfer_bytes = kv_transfer_bytes
+            link.rdma_active = rdma_active
             self._links.move_to_end(key)
         else:
             self._links[key] = PrefillDecodeLink(
@@ -185,6 +249,9 @@ class PrefillDecodeTracker:
                 last_handoff=time.monotonic(),
                 handoff_count=1,
                 avg_transfer_ms=transfer_ms,
+                kv_connector=conn_type,
+                kv_transfer_bytes=kv_transfer_bytes,
+                rdma_active=rdma_active,
             )
         while len(self._links) > self._max_links:
             self._links.popitem(last=False)
@@ -209,6 +276,95 @@ class PrefillDecodeTracker:
                 if (now - link.last_handoff) <= max_age_s:
                     return _pid
         return None
+
+    def get_link_details(
+        self, prefill_id: str, model: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Get detailed link info including KV connector state."""
+        key = (prefill_id, model)
+        link = self._links.get(key)
+        if not link:
+            return None
+        return {
+            "prefill_endpoint_id": link.prefill_endpoint_id,
+            "decode_endpoint_id": link.decode_endpoint_id,
+            "model": link.model,
+            "handoff_count": link.handoff_count,
+            "avg_transfer_ms": link.avg_transfer_ms,
+            "kv_connector": link.kv_connector.value,
+            "kv_transfer_bytes": link.kv_transfer_bytes,
+            "rdma_active": link.rdma_active,
+            "age_s": time.monotonic() - link.last_handoff,
+        }
+
+    def get_best_decode_by_transport(
+        self, model: str, max_age_s: float = 120.0,
+    ) -> Optional[str]:
+        """Find the decode endpoint with the best KV transport (lowest transfer latency).
+
+        Prefers NIXL with RDMA > NIXL without RDMA > LMCache.
+        """
+        now = time.monotonic()
+        best_decode = None
+        best_score = -1.0
+
+        for (_pid, m), link in self._links.items():
+            if m != model or (now - link.last_handoff) > max_age_s:
+                continue
+
+            # Score: NIXL+RDMA=3, NIXL=2, LMCache=1, Unknown=0
+            score = 0.0
+            if link.kv_connector == KVConnectorType.NIXL:
+                score = 3.0 if link.rdma_active else 2.0
+            elif link.kv_connector == KVConnectorType.LMCACHE:
+                score = 1.0
+            elif link.kv_connector == KVConnectorType.MOONCAKE:
+                score = 1.5
+
+            # Bonus for low transfer latency
+            if link.avg_transfer_ms > 0:
+                latency_bonus = max(0, 1.0 - (link.avg_transfer_ms / 10.0))  # <10ms is good
+                score += latency_bonus
+
+            if score > best_score:
+                best_score = score
+                best_decode = link.decode_endpoint_id
+
+        return best_decode
+
+    def get_connector_summary(self) -> Dict[str, Any]:
+        """Get summary of KV connector usage across all active links."""
+        connector_counts: Dict[str, int] = {}
+        rdma_count = 0
+        total_transfer_bytes = 0
+        total_links = 0
+        avg_latencies: List[float] = []
+
+        now = time.monotonic()
+        for link in self._links.values():
+            if (now - link.last_handoff) > 300:  # Skip stale links
+                continue
+            total_links += 1
+            ct = link.kv_connector.value
+            connector_counts[ct] = connector_counts.get(ct, 0) + 1
+            if link.rdma_active:
+                rdma_count += 1
+            total_transfer_bytes += link.kv_transfer_bytes
+            if link.avg_transfer_ms > 0:
+                avg_latencies.append(link.avg_transfer_ms)
+
+        return {
+            "total_active_links": total_links,
+            "connector_types": connector_counts,
+            "rdma_active_count": rdma_count,
+            "total_transfer_bytes": total_transfer_bytes,
+            "avg_transfer_ms": (
+                sum(avg_latencies) / len(avg_latencies) if avg_latencies else 0.0
+            ),
+            "default_connector": self.connector_config.connector_type.value,
+            "default_buffer_size": self.connector_config.buffer_size_bytes,
+            "rdma_enabled": self.connector_config.rdma_enabled,
+        }
 
     @property
     def size(self) -> int:
@@ -252,6 +408,13 @@ class InferenceEndpoint:
     flops_tflops: float = 0.0           # peak TFLOPS (prefill scoring)
     memory_bandwidth_tbps: float = 0.0  # peak TB/s (decode scoring)
     kv_transfer_endpoint: Optional[str] = None  # paired endpoint for KV handoff
+    # MoE Expert Parallelism topology
+    ep_group_id: Optional[str] = None        # EP group this endpoint belongs to
+    ep_rank: int = 0                          # Rank within the EP group
+    expert_range: Tuple[int, int] = (0, 0)   # (start, end) expert indices on this rank
+    nvlink_domain: Optional[str] = None       # NVLink domain ID for intra-group comms
+    dp_size: int = 1                          # Total DP/EP ranks in the group
+    tp_size: int = 1                          # TP degree per EP rank
 
 
 class InferenceRouter:
@@ -377,6 +540,12 @@ class InferenceRouter:
                           flops_tflops: float = 0.0,
                           memory_bandwidth_tbps: float = 0.0,
                           kv_transfer_endpoint: Optional[str] = None,
+                          ep_group_id: Optional[str] = None,
+                          ep_rank: int = 0,
+                          expert_range: Tuple[int, int] = (0, 0),
+                          nvlink_domain: Optional[str] = None,
+                          dp_size: int = 1,
+                          tp_size: int = 1,
                           ) -> InferenceEndpoint:
         """Register a new inference endpoint for health tracking and routing.
 
@@ -387,6 +556,13 @@ class InferenceRouter:
             flops_tflops: Peak TFLOPS — used to score prefill endpoints.
             memory_bandwidth_tbps: Peak TB/s — used to score decode endpoints.
             kv_transfer_endpoint: Paired endpoint for KV cache handoff.
+            ep_group_id: EP group identifier (endpoints in the same group
+                         share expert routing via all-to-all communication).
+            ep_rank: This endpoint's rank within its EP group.
+            expert_range: (start, end) expert indices hosted on this rank.
+            nvlink_domain: NVLink domain ID for intra-group communication.
+            dp_size: Total number of DP/EP ranks in the group.
+            tp_size: Tensor parallelism degree per EP rank.
         """
         ep = InferenceEndpoint(
             endpoint_id=endpoint_id,
@@ -403,6 +579,12 @@ class InferenceRouter:
             flops_tflops=flops_tflops,
             memory_bandwidth_tbps=memory_bandwidth_tbps,
             kv_transfer_endpoint=kv_transfer_endpoint,
+            ep_group_id=ep_group_id,
+            ep_rank=ep_rank,
+            expert_range=expert_range,
+            nvlink_domain=nvlink_domain,
+            dp_size=dp_size,
+            tp_size=tp_size,
         )
         self.endpoints[endpoint_id] = ep
         self._save_endpoints()
@@ -974,6 +1156,128 @@ class InferenceRouter:
         for ep in self.endpoints.values():
             counts[ep.phase.value] = counts.get(ep.phase.value, 0) + 1
         return counts
+
+    # ── MoE EP Group Routing ──
+
+    def get_ep_group_endpoints(self, ep_group_id: str) -> List[InferenceEndpoint]:
+        """Get all endpoints in an EP group, sorted by rank."""
+        eps = [
+            ep for ep in self.endpoints.values()
+            if ep.ep_group_id == ep_group_id
+        ]
+        eps.sort(key=lambda e: e.ep_rank)
+        return eps
+
+    def get_ep_group_for_model(self, model: str) -> Optional[str]:
+        """Find the EP group serving a given model."""
+        for ep in self.endpoints.values():
+            if ep.model == model and ep.ep_group_id:
+                return ep.ep_group_id
+        return None
+
+    def get_ep_group_health(self, ep_group_id: str) -> Dict[str, Any]:
+        """Get health summary for an EP group.
+
+        An EP group is only fully healthy if ALL ranks are healthy,
+        because expert routing requires all-to-all communication
+        across all ranks.
+        """
+        eps = self.get_ep_group_endpoints(ep_group_id)
+        if not eps:
+            return {"status": "unknown", "reason": "No endpoints in group"}
+
+        healthy = [e for e in eps if e.health == EndpointHealth.HEALTHY]
+        unhealthy = [e for e in eps if e.health == EndpointHealth.UNHEALTHY]
+
+        if len(healthy) == len(eps):
+            status = "healthy"
+        elif unhealthy:
+            status = "degraded" if len(unhealthy) < len(eps) else "unhealthy"
+        else:
+            status = "unknown"
+
+        # Collect expert coverage
+        covered_experts = set()
+        for ep in healthy:
+            if ep.expert_range != (0, 0):
+                covered_experts.update(range(ep.expert_range[0], ep.expert_range[1]))
+
+        total_experts = 0
+        for ep in eps:
+            if ep.expert_range != (0, 0):
+                total_experts = max(total_experts, ep.expert_range[1])
+
+        return {
+            "ep_group_id": ep_group_id,
+            "status": status,
+            "total_ranks": len(eps),
+            "healthy_ranks": len(healthy),
+            "unhealthy_ranks": len(unhealthy),
+            "total_experts": total_experts,
+            "covered_experts": len(covered_experts),
+            "expert_coverage_pct": (
+                (len(covered_experts) / total_experts * 100)
+                if total_experts > 0 else 0.0
+            ),
+            "nvlink_domain": eps[0].nvlink_domain if eps else None,
+            "dp_size": eps[0].dp_size if eps else 0,
+            "tp_size": eps[0].tp_size if eps else 0,
+        }
+
+    def route_to_ep_rank_for_experts(
+        self, model: str, expert_ids: Optional[List[int]] = None,
+    ) -> Optional[InferenceEndpoint]:
+        """Route to the EP rank most likely to hold the needed experts.
+
+        When the router knows which experts a request will activate
+        (e.g., from a routing predictor or historical pattern), it can
+        send the request directly to the rank hosting those experts.
+        This minimizes cross-rank all-to-all traffic.
+
+        Falls back to the standard routing if expert_ids are unknown.
+        """
+        group_id = self.get_ep_group_for_model(model)
+        if not group_id or not expert_ids:
+            return self.get_best_endpoint(model=model)
+
+        eps = self.get_ep_group_endpoints(group_id)
+        healthy_eps = [
+            ep for ep in eps
+            if ep.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN)
+            and ep.expert_range != (0, 0)
+        ]
+        if not healthy_eps:
+            return self.get_best_endpoint(model=model)
+
+        # Score each rank by how many of the target experts it hosts
+        best_ep = None
+        best_overlap = -1
+        for ep in healthy_eps:
+            start, end = ep.expert_range
+            hosted = set(range(start, end))
+            overlap = len(hosted.intersection(expert_ids))
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_ep = ep
+
+        return best_ep or healthy_eps[0]
+
+    def get_ep_topology_summary(self) -> Dict[str, Any]:
+        """Get a summary of all EP groups and their topology."""
+        groups: Dict[str, List[InferenceEndpoint]] = {}
+        for ep in self.endpoints.values():
+            if ep.ep_group_id:
+                groups.setdefault(ep.ep_group_id, []).append(ep)
+
+        summary = []
+        for gid, eps in groups.items():
+            health = self.get_ep_group_health(gid)
+            summary.append(health)
+
+        return {
+            "total_ep_groups": len(groups),
+            "groups": summary,
+        }
 
     # ── Status Report ──
 

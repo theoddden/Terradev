@@ -43,12 +43,30 @@ class ScalingPolicy(Enum):
 
 
 @dataclass
+class MoEProfile:
+    """MoE-specific model characteristics for memory and parallelism planning"""
+    is_moe: bool = False
+    total_params_b: float = 0.0       # Total parameters (e.g., 744B for GLM-5)
+    active_params_b: float = 0.0      # Active parameters per token (e.g., 40B)
+    num_experts: int = 0              # Total expert count
+    experts_per_token: int = 0        # Top-K routing
+    total_weight_gb: float = 0.0      # Full model weight footprint
+    active_memory_gb: float = 0.0     # Memory during inference (active experts + KV cache)
+    shared_weight_gb: float = 0.0     # Non-expert weights (always replicated across ranks)
+    tp_size: int = 1                  # Tensor parallelism degree per EP rank
+    dp_size: int = 1                  # Data parallelism / EP degree
+    enable_expert_parallel: bool = False
+    enable_eplb: bool = False
+    enable_dbo: bool = False
+
+
+@dataclass
 class ModelMetrics:
     """Performance metrics for a model"""
     model_id: str
     load_time_s: float = 0.0          # Time to load from cold to warm
     warmup_time_s: float = 0.0        # Time to warm up CUDA kernels
-    memory_gb: float = 0.0            # VRAM usage when loaded
+    memory_gb: float = 0.0            # VRAM usage when loaded (per-GPU for EP models)
     last_request: Optional[datetime] = None
     requests_per_hour: float = 0.0    # Recent request rate
     avg_latency_ms: float = 0.0
@@ -64,6 +82,7 @@ class ModelInstance:
     gpu_id: int
     state: ModelState = ModelState.COLD
     metrics: ModelMetrics = field(default_factory=lambda: ModelMetrics(model_id=""))
+    moe_profile: MoEProfile = field(default_factory=MoEProfile)
     created_at: datetime = field(default_factory=datetime.now)
     last_accessed: datetime = field(default_factory=datetime.now)
     load_start_time: Optional[datetime] = None
@@ -167,15 +186,21 @@ class ModelOrchestrator:
     # ── Model Registration ──
     
     def register_model(self, model_id: str, model_path: str, framework: str,
-                      priority: int = 0, tags: Optional[Set[str]] = None) -> ModelInstance:
-        """Register a new model for orchestration"""
+                      priority: int = 0, tags: Optional[Set[str]] = None,
+                      moe_profile: Optional[MoEProfile] = None) -> ModelInstance:
+        """Register a new model for orchestration.
+
+        For MoE models, pass an ``MoEProfile`` to enable EP-aware memory
+        estimation and parallelism planning.
+        """
         instance = ModelInstance(
             model_id=model_id,
             model_path=model_path,
             framework=framework,
             gpu_id=self.gpu_id,
             priority=priority,
-            tags=tags or set()
+            tags=tags or set(),
+            moe_profile=moe_profile or MoEProfile(),
         )
         
         # Load historical metrics if available
@@ -343,14 +368,48 @@ class ModelOrchestrator:
         return (self.used_memory_gb + estimated_memory) <= self.memory_threshold_gb
     
     def _estimate_model_memory(self, instance: ModelInstance) -> float:
-        """Estimate model memory usage based on framework and model size"""
-        # Simple heuristics - could be more sophisticated
+        """Estimate per-GPU memory usage, MoE-aware.
+
+        For MoE models with Expert Parallelism (EP), memory per GPU is:
+          weight_per_gpu = (expert_weights / dp_size) + shared_weights
+          active_memory  = weight_per_gpu + kv_cache_per_gpu
+
+        This is fundamentally different from dense models where weight_per_gpu
+        = total_weights / tp_size.  The distinction matters because MoE total
+        weight >> active memory (e.g., 744B total but only 40B active).
+        """
+        moe = instance.moe_profile
+
+        if moe.is_moe and moe.total_weight_gb > 0:
+            dp = max(moe.dp_size, 1)
+            tp = max(moe.tp_size, 1)
+
+            if moe.enable_expert_parallel:
+                # EP: experts distributed, shared weights replicated
+                expert_weight_gb = moe.total_weight_gb - moe.shared_weight_gb
+                weight_per_gpu = (expert_weight_gb / dp) + (moe.shared_weight_gb / tp)
+            else:
+                # Pure TP: all weights sharded equally
+                weight_per_gpu = moe.total_weight_gb / (tp * dp)
+
+            # KV cache overhead estimate: ~15% of GPU mem for 32k context
+            kv_cache_gb = self.total_memory_gb * 0.15
+            per_gpu = weight_per_gpu + kv_cache_gb
+            logger.debug(
+                f"MoE memory estimate for {instance.model_id}: "
+                f"weight/gpu={weight_per_gpu:.1f}GB, kv={kv_cache_gb:.1f}GB, "
+                f"total/gpu={per_gpu:.1f}GB (EP={moe.enable_expert_parallel}, "
+                f"TP={tp}, DP={dp})"
+            )
+            return per_gpu
+
+        # Dense model fallback
         if instance.framework == "vllm":
-            return 15.0  # VLLM models typically use 15GB+
+            return 15.0
         elif instance.framework == "sglang":
-            return 12.0  # SGLang models
+            return 12.0
         else:
-            return 10.0  # Default PyTorch estimate
+            return 10.0
     
     async def _make_room_for_model(self, target_instance: ModelInstance):
         """Evict models to make room for a new model"""

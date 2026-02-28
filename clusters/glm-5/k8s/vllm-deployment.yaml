@@ -101,8 +101,12 @@ spec:
             - serve
             - /models/GLM-5-FP8
           args:
-            - --tensor-parallel-size=8
+            - --tensor-parallel-size=1
+            - --data-parallel-size=8
             - --gpu-memory-utilization=0.85
+            - --enable-expert-parallel
+            - --enable-eplb
+            - --enable-dbo
             - --speculative-config.method=mtp
             - --speculative-config.num_speculative_tokens=1
             - --tool-call-parser=glm47
@@ -125,6 +129,10 @@ spec:
               value: "eth0"
             - name: VLLM_ATTENTION_BACKEND
               value: "FLASH_ATTN"
+            - name: VLLM_USE_DEEP_GEMM
+              value: "1"
+            - name: VLLM_ALL2ALL_BACKEND
+              value: "deepep_low_latency"
             - name: TRANSFORMERS_CACHE
               value: "/models/cache"
             - name: HF_HOME

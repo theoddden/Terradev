@@ -32,9 +32,17 @@ provider "terradev" {
 locals {
   cuda_devices = join(",", [for i in range(var.gpu_count) : tostring(i)])
 
-  vllm_command = join(" ", [
+  # EP flags conditionally appended
+  ep_flags = var.enable_expert_parallel ? join(" ", compact([
+    "--enable-expert-parallel",
+    var.enable_eplb ? "--enable-eplb" : "",
+    var.enable_dbo ? "--enable-dbo" : "",
+  ])) : ""
+
+  vllm_command = join(" ", compact([
     "vllm serve /models/weights",
     "--tensor-parallel-size ${var.tp_size}",
+    "--data-parallel-size ${var.dp_size}",
     "--gpu-memory-utilization ${var.gpu_memory_utilization}",
     "--max-model-len ${var.max_model_len}",
     "--dtype ${var.precision == "fp8" ? "auto" : var.precision}",
@@ -43,18 +51,21 @@ locals {
     "--served-model-name ${var.model_name}",
     "--host 0.0.0.0",
     "--port 8000",
-  ])
+    local.ep_flags,
+  ]))
 
-  sglang_command = join(" ", [
+  sglang_command = join(" ", compact([
     "python3 -m sglang.launch_server",
     "--model-path /models/weights",
     "--tp-size ${var.tp_size}",
+    "--dp-size ${var.dp_size}",
     "--mem-fraction-static ${var.gpu_memory_utilization}",
     "--trust-remote-code",
     "--served-model-name ${var.model_name}",
     "--host 0.0.0.0",
     "--port 8000",
-  ])
+    local.ep_flags,
+  ]))
 
   serve_command = var.serving_backend == "vllm" ? local.vllm_command : local.sglang_command
 
@@ -99,6 +110,8 @@ resource "terradev_gpu_node" "moe_serving" {
       NCCL_P2P_DISABLE       = "0"
       NCCL_IB_DISABLE        = "0"
       VLLM_ATTENTION_BACKEND = "FLASH_ATTN"
+      VLLM_USE_DEEP_GEMM    = "1"
+      VLLM_ALL2ALL_BACKEND   = var.enable_expert_parallel ? "deepep_low_latency" : ""
       TRANSFORMERS_CACHE     = "/models/cache"
       MODEL_ID               = var.model_id
       MODEL_NAME             = var.model_name

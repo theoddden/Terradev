@@ -1,4 +1,4 @@
-# Terradev CLI v3.2.1
+# Terradev CLI v3.3.0
 
 **Compare GPU prices across 15 clouds. Provision the cheapest one in one command.**
 
@@ -126,6 +126,48 @@ helm upgrade --install moe-inf ./helm/terradev \
 - **Multi-Cloud**: RunPod, Vast.ai, Lambda, AWS, CoreWeave
 
 See [`clusters/moe-template/`](clusters/moe-template/) for full docs and [`clusters/glm-5/`](clusters/glm-5/) for a model-specific example.
+
+## Ray Serve LLM + Expert Parallelism (NEW in v3.3.0)
+
+v3.3.0 adds first-class support for **Wide Expert Parallelism (EP)**, **disaggregated Prefill/Decode serving**, and **NIXL KV cache transfer** — the production stack for serving 600B+ MoE models at scale.
+
+```bash
+# Deploy GLM-5 with Wide-EP across 32 GPUs (TP=1, DP=32)
+terradev ml ray --deploy-wide-ep \
+  --model zai-org/GLM-5-FP8 \
+  --tp-size 1 --dp-size 32
+
+# Disaggregated Prefill/Decode with NIXL KV transfer
+terradev ml ray --deploy-pd \
+  --model zai-org/GLM-5-FP8 \
+  --prefill-tp 8 --decode-tp 1 --decode-dp 24
+
+# SGLang serving with EP + EPLB + DBO
+terradev ml sglang --start --instance-ip <IP> \
+  --model zai-org/GLM-5-FP8 \
+  --tp-size 1 --dp-size 8 \
+  --enable-expert-parallel --enable-eplb --enable-dbo
+```
+
+### v3.3.0 Features
+- **Ray Serve LLM Integration**: `build_dp_deployment` and `build_pd_openai_app` for Wide-EP and disaggregated P/D serving via Ray Serve
+- **Expert Parallelism (EP)**: Distribute MoE experts across GPUs — serve 744B models on 8 GPUs where pure TP would OOM
+- **Expert Parallel Load Balancer (EPLB)**: Runtime expert rebalancing based on actual token routing patterns
+- **Dual-Batch Overlap (DBO)**: Overlap compute with all-to-all communication for higher throughput
+- **DeepEP + DeepGEMM**: Environment variables auto-configured for optimized MoE kernels
+- **NIXL KV Connector**: Zero-copy GPU-to-GPU KV cache transfer over RDMA/NVLink for disaggregated serving
+- **MoE-Aware Orchestrator**: Memory estimation uses weight vs active parameter distinction (744B total, 40B active)
+- **EP Group Routing**: Inference router tracks expert ranges per rank and routes to the GPU hosting target experts
+- **SGLang Lifecycle**: Real SSH/systemd server management matching vLLM — `start_server`, `stop_server`, `install_on_instance`
+- **Transport-Aware P/D Routing**: Prefers NIXL+RDMA > NIXL > LMCache for KV cache handoff scoring
+
+### MoE Memory Model
+
+| Model | Total Params | Active Params | FP8 Weight | Per-GPU (EP=8) |
+|-------|-------------|---------------|------------|----------------|
+| GLM-5 | 744B | 40B | ~380GB | ~55GB |
+| DeepSeek V3 | 671B | 37B | ~340GB | ~50GB |
+| Qwen 3.5 | 397B | 17B | ~200GB | ~32GB |
 
 ## Installation
 
@@ -352,7 +394,7 @@ terradev run --gpu A100 --image pytorch/pytorch:latest -c "python train.py"
 terradev run --gpu H100 --image vllm/vllm-openai:latest --keep-alive --port 8000
 ```
 
-## GPU Topology Optimization (v3.2)
+## GPU Topology Optimization (v3.2 / v3.3)
 
 Terradev v3.2 automatically optimizes GPU infrastructure topology — NUMA alignment, PCIe switch pairing, SR-IOV, RDMA, and kubelet Topology Manager configuration. **You never configure any of this.** It's applied automatically when you create clusters or provision GPU nodes.
 

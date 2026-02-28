@@ -104,13 +104,17 @@ spec:
           image: vllm/vllm-openai:nightly
           command: ["vllm", "serve", "/models/weights"]
           args:
-            - --tensor-parallel-size=8          # CHANGE: match your GPU count
+            - --tensor-parallel-size=1           # TP=1 per DP rank (EP handles expert distribution)
+            - --data-parallel-size=8             # CHANGE: match your GPU count
             - --gpu-memory-utilization=0.85
             - --max-model-len=32768
             - --dtype=auto
             - --trust-remote-code
             - --enable-auto-tool-choice
-            - --served-model-name=moe-model     # CHANGE: set your model name
+            - --enable-expert-parallel           # MoE: distribute experts across DP ranks
+            - --enable-eplb                      # Runtime expert load balancing
+            - --enable-dbo                       # Dual-batch overlap for all-to-all/compute overlap
+            - --served-model-name=moe-model      # CHANGE: set your model name
             - --host=0.0.0.0
             - --port=8000
           env:
@@ -124,6 +128,10 @@ spec:
               value: "eth0"
             - name: VLLM_ATTENTION_BACKEND
               value: "FLASH_ATTN"
+            - name: VLLM_USE_DEEP_GEMM
+              value: "1"                        # DeepGEMM for MoE expert computation
+            - name: VLLM_ALL2ALL_BACKEND
+              value: "deepep_low_latency"        # DeepEP all-to-all for expert routing
             - name: TRANSFORMERS_CACHE
               value: "/models/cache"
             - name: HF_HOME

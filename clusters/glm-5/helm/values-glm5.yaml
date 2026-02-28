@@ -22,8 +22,16 @@ serving:
   port: 8000
   host: "0.0.0.0"
 
+  # MoE Expert Parallelism (EP)
+  expertParallel:
+    enabled: true
+    dataParallelSize: 8
+    enableEplb: true
+    enableDbo: true
+    all2allBackend: "deepep_low_latency"
+
   vllm:
-    tensorParallelSize: 8
+    tensorParallelSize: 1            # TP=1 per DP rank (EP handles expert distribution)
     gpuMemoryUtilization: 0.85
     maxModelLen: 32768
     dtype: auto
@@ -35,7 +43,8 @@ serving:
     enableAutoToolChoice: true
 
   sglang:
-    tpSize: 8
+    tpSize: 1                        # TP=1 per DP rank
+    dpSize: 8
     memFractionStatic: 0.85
     speculativeAlgorithm: EAGLE
     speculativeNumSteps: 3
@@ -79,6 +88,8 @@ env:
   NCCL_IB_DISABLE: "0"
   NCCL_SOCKET_IFNAME: "eth0"
   VLLM_ATTENTION_BACKEND: "FLASH_ATTN"
+  VLLM_USE_DEEP_GEMM: "1"
+  VLLM_ALL2ALL_BACKEND: "deepep_low_latency"
   TRANSFORMERS_CACHE: "/models/cache"
 
 secrets:

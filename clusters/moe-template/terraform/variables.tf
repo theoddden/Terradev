@@ -49,9 +49,33 @@ variable "gpu_count" {
 }
 
 variable "tp_size" {
-  description = "Tensor parallelism degree (must equal gpu_count)"
+  description = "Tensor parallelism degree per DP rank (1 for pure EP, gpu_count for pure TP)"
+  type        = number
+  default     = 1
+}
+
+variable "dp_size" {
+  description = "Data parallelism degree (number of EP ranks). Typically equals gpu_count / tp_size."
   type        = number
   default     = 8
+}
+
+variable "enable_expert_parallel" {
+  description = "Enable Expert Parallelism — distributes MoE experts across DP ranks instead of replicating"
+  type        = bool
+  default     = true
+}
+
+variable "enable_eplb" {
+  description = "Enable Expert Parallel Load Balancer — runtime expert rebalancing based on token routing"
+  type        = bool
+  default     = true
+}
+
+variable "enable_dbo" {
+  description = "Enable Dual-Batch Overlap — overlaps compute with MoE all-to-all collectives"
+  type        = bool
+  default     = true
 }
 
 variable "num_replicas" {

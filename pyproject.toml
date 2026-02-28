@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "3.2.1"
+version = "3.3.0"
 description = "Cross-cloud GPU provisioning with GitOps automation and HuggingFace Spaces deployment"
 readme = "README.md"
 license = {text = "BUSL-1.1"}

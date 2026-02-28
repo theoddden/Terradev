@@ -91,7 +91,11 @@ spec:
             - sglang.launch_server
           args:
             - --model-path=/models/GLM-5-FP8
-            - --tp-size=8
+            - --tp-size=1
+            - --dp-size=8
+            - --enable-expert-parallel
+            - --enable-eplb
+            - --enable-dbo
             - --tool-call-parser=glm47
             - --reasoning-parser=glm45
             - --speculative-algorithm=EAGLE
@@ -112,6 +116,10 @@ spec:
               value: "0"
             - name: NCCL_SOCKET_IFNAME
               value: "eth0"
+            - name: VLLM_USE_DEEP_GEMM
+              value: "1"
+            - name: VLLM_ALL2ALL_BACKEND
+              value: "deepep_low_latency"
             - name: TRANSFORMERS_CACHE
               value: "/models/cache"
           ports:

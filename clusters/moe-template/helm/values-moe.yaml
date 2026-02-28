@@ -28,6 +28,14 @@ serving:
   port: 8000
   host: "0.0.0.0"
 
+  # MoE Expert Parallelism (EP) — distributes experts across DP ranks
+  expertParallel:
+    enabled: true
+    dataParallelSize: 8
+    enableEplb: true          # Expert Parallel Load Balancer — runtime rebalancing
+    enableDbo: true            # Dual-Batch Overlap — overlap compute with all-to-all
+    all2allBackend: "deepep_low_latency"  # DeepEP optimized all-to-all kernel
+
   vllm:
     tensorParallelSize: 8          # Must match gpu.count
     gpuMemoryUtilization: 0.85
@@ -76,6 +84,8 @@ env:
   NCCL_IB_DISABLE: "0"
   NCCL_SOCKET_IFNAME: "eth0"
   VLLM_ATTENTION_BACKEND: "FLASH_ATTN"
+  VLLM_USE_DEEP_GEMM: "1"
+  VLLM_ALL2ALL_BACKEND: "deepep_low_latency"
   TRANSFORMERS_CACHE: "/models/cache"
 
 secrets:
