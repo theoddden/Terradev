@@ -125,6 +125,12 @@ spec:
             - --speculative-config.method=mtp        # MTP speculative decoding (up to 2.8x speed)
             - --speculative-config.num_speculative_tokens=1
             - --enable-sleep-mode                    # Auto-sleep on idle (18-200x faster than restart)
+            # ── LMCache Distributed KV Cache (Terradev extension) ───────
+            - --lmcache-enable                       # Enable distributed KV cache sharing
+            - --lmcache-backend=redis                # Redis backend for multi-instance sharing
+            - --lmcache-redis-url=redis://lmcache-redis:6379  # Redis service endpoint
+            - --lmcache-chunk-size=256                # Chunk size for cache distribution
+            - --lmcache-pipelined-backend             # Pipelined backend for better performance
             # ── Multi-LoRA (uncomment + add your adapters) ────────────
             # - --enable-lora
             # - --max-loras=8
@@ -276,3 +282,71 @@ data:
 #             limits:
 #               cpu: "2"
 #               memory: "1Gi"
+---
+# LMCache Redis Cluster for Distributed KV Cache
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: lmcache-redis
+  namespace: moe-inference
+  labels:
+    app: lmcache-redis
+    component: kv-cache
+spec:
+  serviceName: lmcache-redis
+  replicas: 3
+  selector:
+    matchLabels:
+      app: lmcache-redis
+  template:
+    metadata:
+      labels:
+        app: lmcache-redis
+        component: kv-cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: "1"
+              memory: "16Gi"
+            limits:
+              cpu: "2"
+              memory: "20Gi"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          command:
+            - redis-server
+            - --appendonly=yes
+            - --maxmemory=14gb
+            - --maxmemory-policy=allkeys-lru
+      volumes:
+        - name: redis-data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 32Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lmcache-redis
+  namespace: moe-inference
+  labels:
+    app: lmcache-redis
+    component: kv-cache
+spec:
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis
+  selector:
+    app: lmcache-redis

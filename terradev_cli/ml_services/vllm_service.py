@@ -63,6 +63,20 @@ class VLLMConfig:
     router_port: int = 8080
     router_session_key: str = "x-session-id"
 
+    # ── LMCache Integration (Distributed KV Cache) ───────────────────────
+    enable_lmcache: bool = False
+    lmcache_backend: str = "redis"  # redis, s3, disk, cpu
+    lmcache_remote_url: Optional[str] = None  # Redis, S3, etc.
+    lmcache_chunk_size: int = 256
+    lmcache_pipelined: bool = False
+    lmcache_serde: str = "torch"  # torch, cachegen
+    lmcache_local_device: Optional[str] = None
+    lmcache_redis_cluster: bool = False
+    lmcache_redis_password: Optional[str] = None
+    lmcache_s3_bucket: Optional[str] = None
+    lmcache_s3_region: str = "us-east-1"
+    lmcache_disk_path: str = "/tmp/lmcache"
+
 
 class VLLMService:
     """vLLM integration service for LLM inference"""
@@ -463,6 +477,29 @@ systemctl daemon-reload
                 args.extend(["--speculative-disable-by-batch-size",
                              str(self.config.speculative_disable_by_batch_size)])
 
+        # ── LMCache Integration ───────────────────────────────────────────
+        if self.config.enable_lmcache:
+            from .lmcache_service import LMCacheService, LMCacheConfig
+            
+            lmcache_config = LMCacheConfig(
+                enabled=True,
+                backend=self.config.lmcache_backend,
+                remote_url=self.config.lmcache_remote_url or "redis://localhost:6379",
+                chunk_size=self.config.lmcache_chunk_size,
+                pipelined=self.config.lmcache_pipelined,
+                serde=self.config.lmcache_serde,
+                local_device=self.config.lmcache_local_device,
+                redis_cluster=self.config.lmcache_redis_cluster,
+                redis_password=self.config.lmcache_redis_password,
+                s3_bucket=self.config.lmcache_s3_bucket,
+                s3_region=self.config.lmcache_s3_region,
+                disk_path=self.config.lmcache_disk_path,
+                enable_pipelined_backend=self.config.lmcache_pipelined
+            )
+            
+            lmcache_service = LMCacheService(lmcache_config)
+            args.extend(lmcache_service.generate_vllm_args())
+
         return args
 
     # ═══════════════════════════════════════════════════════════════════
@@ -606,8 +643,7 @@ systemctl daemon-reload
     def get_deployment_script(self, instance_ip: str, ssh_user: str = "root", ssh_key: Optional[str] = None) -> str:
         """Generate deployment script for vLLM"""
         serve_args = self._build_server_args()
-        exec_line = " \\
-    ".join(serve_args)
+        exec_line = " \\\n    ".join(serve_args)
 
         env_lines = ""
         if self.config.enable_sleep_mode:

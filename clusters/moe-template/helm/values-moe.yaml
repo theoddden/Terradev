@@ -75,6 +75,23 @@ serving:
     method: "mtp"
     numTokens: 1
 
+  # ── LMCache Distributed KV Cache (Terradev extension) ─────────────────────
+  # Enables KV cache sharing across multiple vLLM instances for 3-10x TTFT reduction
+  lmcache:
+    enabled: true                  # Enable distributed KV cache sharing
+    backend: "redis"                # redis, s3, disk, cpu
+    redisUrl: "redis://lmcache-redis:6379"  # Redis service endpoint
+    chunkSize: 256                 # Chunk size for cache distribution
+    pipelined: true                # Pipelined backend for better performance
+    serde: "torch"                  # Serialization format (torch, cachegen)
+    
+    # Redis cluster configuration
+    redisCluster:
+      enabled: true                # Deploy Redis cluster
+      replicas: 3                   # Number of Redis nodes
+      memoryPerNode: "16Gi"        # Memory per Redis node
+      storagePerNode: "32Gi"       # Storage per Redis node
+
   # ── vLLM Router (P/D-aware load balancer) ──────────────────────────────────
   # Consistent hashing maximises KV cache reuse.  Native P/D disaggregation.
   # Deploy when running >1 replica or using prefill/decode disaggregation.

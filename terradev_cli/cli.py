@@ -4020,7 +4020,6 @@ def _kubectl_apply(manifest_dict: Dict[str, Any], dry_run: bool = False) -> bool
             os.unlink(f.name)
 
 
-@click.group('k8s')
 def k8s():
     """Kubernetes cluster management with multi-cloud GPU nodes"""
     pass
@@ -5380,9 +5379,9 @@ def kserve(test):
 @click.option('--test', is_flag=True, help='Test connection to the service')
 @click.option('--list-projects', is_flag=True, help='List all projects')
 @click.option('--create-project', help='Create a new project')
-@click.option('--export', help='Export runs data (json/csv)')
+@click.option('--export', type=click.Choice(['json', 'csv']), help='Export runs data')
 def langsmith(test, list_projects, create_project, export):
-    """LangSmith tracing and evaluation"""
+    """LangSmith experiment tracking and monitoring"""
     try:
         from terradev_cli.ml_services.langsmith_service import create_langsmith_service_from_credentials, get_langsmith_setup_instructions
         
@@ -7536,6 +7535,7 @@ def lora_remove_cmd(endpoint, name, api_key):
         print(f"✅ Adapter '{name}' unloaded")
     else:
         print(f"ERROR: {result.get('error')}")
+
 
 
 if __name__ == '__main__':
