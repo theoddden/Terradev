@@ -1,4 +1,4 @@
-# Terradev CLI v3.5.1
+# Terradev CLI v3.5.2
 
 **Compare GPU prices across 19 clouds. Provision the cheapest one in one command.**
 
@@ -125,7 +125,7 @@ helm upgrade --install moe-inf ./helm/terradev \
 - **GPU-Aware Autoscaling**: HPA on DCGM metrics and vLLM queue depth
 - **Multi-Cloud**: RunPod, Vast.ai, Lambda, AWS, CoreWeave
 
-### Auto-Applied Cost Optimizations (v3.5.1)
+### Auto-Applied Cost Optimizations (v3.5.2)
 
 Every MoE deployment automatically includes vLLM optimizations that reduce your inference costs — no configuration needed:
 
