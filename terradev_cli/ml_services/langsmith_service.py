@@ -1,16 +1,37 @@
 #!/usr/bin/env python3
 """
 LangSmith Service Integration for Terradev
-Manages LangSmith tracing and evaluation workflows
+Manages LangSmith tracing and evaluation workflows.
+
+Terradev-specific features:
+  - _request() with exponential backoff retry (3 attempts, jitter)
+  - inject_terradev_metadata() — auto-inject GPU provision metadata into run metadata
+  - correlate_runs_with_gpu_metrics() — join LangSmith runs with cost_tracking.db
+    to compute cost-per-run, GPU utilization per run, and provider breakdown
 """
 
+import logging
 import os
 import json
 import asyncio
+import random
+import sqlite3
 import aiohttp
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# cost_tracking.db for GPU-correlated tracing
+_COST_DB = Path.home() / ".terradev" / "cost_tracking.db"
+
+# Retry defaults
+_MAX_RETRIES = 3
+_BACKOFF_BASE = 0.5     # seconds
+_BACKOFF_MAX = 10.0     # cap
+_RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
 
 
 @dataclass
@@ -30,40 +51,88 @@ class LangSmithService:
         self.session: Optional[aiohttp.ClientSession] = None
         
     async def __aenter__(self):
-        headers = {"Authorization": f"Bearer {self.config.api_key}"}
-        self.session = aiohttp.ClientSession(headers=headers)
+        self._ensure_session()
         return self
         
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
-    
+            self.session = None
+
+    # ── Session & request helpers ────────────────────────────────────
+
+    def _ensure_session(self) -> aiohttp.ClientSession:
+        """Lazily create the aiohttp session once."""
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession(
+                headers={"Authorization": f"Bearer {self.config.api_key}"}
+            )
+        return self.session
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Optional[Dict] = None,
+        json_body: Optional[Any] = None,
+        timeout: float = 30,
+        retries: int = _MAX_RETRIES,
+    ) -> Any:
+        """HTTP request with exponential backoff and jitter.
+
+        Retries on 429 / 5xx.  Returns parsed JSON on success,
+        raises on non-retryable errors.
+        """
+        session = self._ensure_session()
+        url = f"{self.config.endpoint}{path}"
+        last_exc: Optional[Exception] = None
+
+        for attempt in range(retries):
+            try:
+                async with session.request(
+                    method, url,
+                    params=params,
+                    json=json_body,
+                    timeout=aiohttp.ClientTimeout(total=timeout),
+                ) as resp:
+                    if resp.status in (200, 201):
+                        return await resp.json()
+                    if resp.status in _RETRYABLE_STATUSES and attempt < retries - 1:
+                        wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
+                        logger.warning(
+                            "LangSmith %s %s → %d, retrying in %.1fs (attempt %d/%d)",
+                            method.upper(), path, resp.status, wait, attempt + 1, retries,
+                        )
+                        await asyncio.sleep(wait)
+                        continue
+                    error_text = await resp.text()
+                    raise Exception(f"LangSmith API {resp.status}: {error_text}")
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                last_exc = e
+                if attempt < retries - 1:
+                    wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
+                    logger.warning(
+                        "LangSmith %s %s network error: %s, retrying in %.1fs",
+                        method.upper(), path, e, wait,
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                raise
+        raise last_exc or Exception("Request failed after retries")
+
+    # ── Core API methods ─────────────────────────────────────────────
+
     async def test_connection(self) -> Dict[str, Any]:
         """Test LangSmith connection and get workspace info"""
         try:
-            if not self.session:
-                self.session = aiohttp.ClientSession(
-                    headers={"Authorization": f"Bearer {self.config.api_key}"}
-                )
-            
-            # Test API access
-            url = f"{self.config.endpoint}/v1/sessions"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return {
-                        "status": "connected",
-                        "workspace_id": self.config.workspace_id,
-                        "endpoint": self.config.endpoint,
-                        "sessions_count": len(data.get("sessions", []))
-                    }
-                else:
-                    error_text = await response.text()
-                    return {
-                        "status": "failed",
-                        "error": f"API request failed: {response.status} - {error_text}"
-                    }
-                    
+            data = await self._request("GET", "/v1/sessions", timeout=10)
+            return {
+                "status": "connected",
+                "workspace_id": self.config.workspace_id,
+                "endpoint": self.config.endpoint,
+                "sessions_count": len(data.get("sessions", []))
+            }
         except Exception as e:
             return {
                 "status": "failed",
@@ -72,136 +141,41 @@ class LangSmithService:
     
     async def list_projects(self) -> List[Dict[str, Any]]:
         """List all projects in the workspace"""
-        try:
-            if not self.session:
-                self.session = aiohttp.ClientSession(
-                    headers={"Authorization": f"Bearer {self.config.api_key}"}
-                )
-            
-            url = f"{self.config.endpoint}/v1/projects"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data.get("projects", [])
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to list projects: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to list projects: {e}")
+        data = await self._request("GET", "/v1/projects")
+        return data.get("projects", [])
     
     async def create_project(self, name: str, description: str = "") -> Dict[str, Any]:
         """Create a new LangSmith project"""
-        try:
-            if not self.session:
-                self.session = aiohttp.ClientSession(
-                    headers={"Authorization": f"Bearer {self.config.api_key}"}
-                )
-            
-            url = f"{self.config.endpoint}/v1/projects"
-            payload = {
-                "name": name,
-                "description": description
-            }
-            
-            async with self.session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                if response.status == 200 or response.status == 201:
-                    return await response.json()
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to create project: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to create project {name}: {e}")
+        return await self._request("POST", "/v1/projects", json_body={
+            "name": name,
+            "description": description,
+        })
     
     async def list_runs(self, project_name: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
         """List runs in a project or workspace"""
-        try:
-            if not self.session:
-                self.session = aiohttp.ClientSession(
-                    headers={"Authorization": f"Bearer {self.config.api_key}"}
-                )
-            
-            params = {"limit": limit}
-            if project_name:
-                params["project_name"] = project_name
-            elif self.config.project_name:
-                params["project_name"] = self.config.project_name
-            
-            url = f"{self.config.endpoint}/v1/runs"
-            async with self.session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data.get("runs", [])
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to list runs: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to list runs: {e}")
+        params: Dict[str, Any] = {"limit": limit}
+        if project_name:
+            params["project_name"] = project_name
+        elif self.config.project_name:
+            params["project_name"] = self.config.project_name
+        data = await self._request("GET", "/v1/runs", params=params)
+        return data.get("runs", [])
     
     async def get_run_details(self, run_id: str) -> Dict[str, Any]:
         """Get detailed information about a specific run"""
-        try:
-            if not self.session:
-                self.session = aiohttp.ClientSession(
-                    headers={"Authorization": f"Bearer {self.config.api_key}"}
-                )
-            
-            url = f"{self.config.endpoint}/v1/runs/{run_id}"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to get run details: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to get run details for {run_id}: {e}")
+        return await self._request("GET", f"/v1/runs/{run_id}")
     
     async def create_dataset(self, name: str, description: str = "") -> Dict[str, Any]:
         """Create a new dataset for evaluation"""
-        try:
-            if not self.session:
-                self.session = aiohttp.ClientSession(
-                    headers={"Authorization": f"Bearer {self.config.api_key}"}
-                )
-            
-            url = f"{self.config.endpoint}/v1/datasets"
-            payload = {
-                "name": name,
-                "description": description
-            }
-            
-            async with self.session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                if response.status == 200 or response.status == 201:
-                    return await response.json()
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to create dataset: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to create dataset {name}: {e}")
+        return await self._request("POST", "/v1/datasets", json_body={
+            "name": name,
+            "description": description,
+        })
     
     async def list_datasets(self) -> List[Dict[str, Any]]:
         """List all datasets in the workspace"""
-        try:
-            if not self.session:
-                self.session = aiohttp.ClientSession(
-                    headers={"Authorization": f"Bearer {self.config.api_key}"}
-                )
-            
-            url = f"{self.config.endpoint}/v1/datasets"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data.get("datasets", [])
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to list datasets: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to list datasets: {e}")
+        data = await self._request("GET", "/v1/datasets")
+        return data.get("datasets", [])
     
     def get_tracing_config(self) -> Dict[str, str]:
         """Get environment variables for LangSmith tracing"""
@@ -218,6 +192,184 @@ class LangSmithService:
             
         return config
     
+    # ── Terradev-specific: GPU-correlated tracing ──────────────────────
+
+    async def inject_terradev_metadata(
+        self,
+        run_id: str,
+        instance_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Auto-inject Terradev provision metadata into a LangSmith run.
+
+        Pulls the active (or specified) provision from cost_tracking.db and
+        patches the run's metadata with GPU type, provider, cost/hr, region,
+        and instance ID — so every LangSmith trace is correlated with the
+        infrastructure that produced it.
+        """
+        metadata = self._get_provision_metadata(instance_id)
+        if not metadata:
+            return {"status": "skipped", "reason": "No active Terradev provisions found"}
+
+        # Patch the run's extra/metadata via the LangSmith update-run endpoint
+        patch_body = {
+            "extra": {
+                "terradev": metadata,
+            },
+            "tags": [
+                f"gpu:{metadata.get('gpu_type', 'unknown')}",
+                f"provider:{metadata.get('provider', 'unknown')}",
+                "terradev-managed",
+            ],
+        }
+        result = await self._request("PATCH", f"/v1/runs/{run_id}", json_body=patch_body)
+        return {
+            "status": "injected",
+            "run_id": run_id,
+            "terradev_metadata": metadata,
+            "response": result,
+        }
+
+    async def correlate_runs_with_gpu_metrics(
+        self,
+        project_name: Optional[str] = None,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        """Join LangSmith runs with Terradev's cost_tracking.db.
+
+        For each run, computes:
+          - cost_per_run: estimated GPU cost during that run's wall-clock time
+          - gpu_type, provider, region from the provision that was active
+          - total_runs, total_cost, cost breakdown by provider
+
+        Returns a summary dict suitable for dashboards or CLI output.
+        """
+        runs = await self.list_runs(project_name=project_name, limit=limit)
+        provisions = self._get_all_provisions()
+
+        correlated = []
+        total_cost = 0.0
+        provider_costs: Dict[str, float] = {}
+
+        for run in runs:
+            start = run.get("start_time") or run.get("start_dt")
+            end = run.get("end_time") or run.get("end_dt")
+            if not start or not end:
+                correlated.append({**run, "terradev_cost": None, "terradev_provision": None})
+                continue
+
+            # Find the provision that was active during this run
+            matched_prov = None
+            for prov in provisions:
+                prov_start = prov.get("ts", "")
+                prov_end = prov.get("end_ts") or "9999-12-31"
+                if prov_start <= start and prov_end >= end:
+                    matched_prov = prov
+                    break
+
+            if matched_prov:
+                # Estimate cost: price_hr * (run duration in hours)
+                try:
+                    from datetime import datetime as _dt
+                    t0 = _dt.fromisoformat(start.replace("Z", "+00:00"))
+                    t1 = _dt.fromisoformat(end.replace("Z", "+00:00"))
+                    hours = (t1 - t0).total_seconds() / 3600
+                    run_cost = round(matched_prov.get("price_hr", 0) * hours, 6)
+                except Exception:
+                    hours = 0
+                    run_cost = 0.0
+
+                total_cost += run_cost
+                prov_name = matched_prov.get("provider", "unknown")
+                provider_costs[prov_name] = provider_costs.get(prov_name, 0) + run_cost
+
+                correlated.append({
+                    "run_id": run.get("id"),
+                    "run_name": run.get("name"),
+                    "start_time": start,
+                    "end_time": end,
+                    "duration_hrs": round(hours, 4),
+                    "terradev_cost": run_cost,
+                    "terradev_provision": {
+                        "instance_id": matched_prov.get("instance_id"),
+                        "provider": prov_name,
+                        "gpu_type": matched_prov.get("gpu_type"),
+                        "region": matched_prov.get("region"),
+                        "price_hr": matched_prov.get("price_hr"),
+                    },
+                })
+            else:
+                correlated.append({
+                    "run_id": run.get("id"),
+                    "run_name": run.get("name"),
+                    "start_time": start,
+                    "end_time": end,
+                    "terradev_cost": None,
+                    "terradev_provision": None,
+                })
+
+        return {
+            "total_runs": len(correlated),
+            "correlated_runs": sum(1 for r in correlated if r.get("terradev_cost") is not None),
+            "total_gpu_cost": round(total_cost, 4),
+            "cost_by_provider": provider_costs,
+            "runs": correlated,
+        }
+
+    # ── Private helpers for cost_tracking.db queries ─────────────────
+
+    @staticmethod
+    def _get_provision_metadata(instance_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Query cost_tracking.db for a provision's metadata."""
+        if not _COST_DB.exists():
+            return None
+        try:
+            conn = sqlite3.connect(str(_COST_DB))
+            conn.row_factory = sqlite3.Row
+            if instance_id:
+                row = conn.execute(
+                    "SELECT * FROM provisions WHERE instance_id = ? ORDER BY ts DESC LIMIT 1",
+                    (instance_id,),
+                ).fetchone()
+            else:
+                # Most recent active provision
+                row = conn.execute(
+                    "SELECT * FROM provisions WHERE status IN ('provisioning', 'running') "
+                    "ORDER BY ts DESC LIMIT 1"
+                ).fetchone()
+            conn.close()
+            if row:
+                return {
+                    "instance_id": row["instance_id"],
+                    "provider": row["provider"],
+                    "gpu_type": row["gpu_type"],
+                    "region": row["region"],
+                    "price_hr": row["price_hr"],
+                    "spot": bool(row["spot"]),
+                    "status": row["status"],
+                }
+        except Exception as e:
+            logger.debug("Failed to read provision metadata: %s", e)
+        return None
+
+    @staticmethod
+    def _get_all_provisions() -> List[Dict[str, Any]]:
+        """Get all provisions from cost_tracking.db for correlation."""
+        if not _COST_DB.exists():
+            return []
+        try:
+            conn = sqlite3.connect(str(_COST_DB))
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM provisions ORDER BY ts DESC"
+            ).fetchall()
+            conn.close()
+            return [dict(r) for r in rows]
+        except Exception as e:
+            logger.debug("Failed to read provisions: %s", e)
+            return []
+
+    # ── Existing export method ───────────────────────────────────────
+
     async def export_runs(self, project_name: Optional[str] = None, format: str = "json") -> str:
         """Export runs data"""
         try:

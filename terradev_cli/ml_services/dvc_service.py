@@ -319,6 +319,130 @@ class DVCService:
         except Exception as e:
             raise Exception(f"Failed to cleanup cache: {e}")
     
+    # ── Terradev-specific: checkpoint integration ──────────────────
+
+    async def dvc_diff(self, rev_a: str = "HEAD", rev_b: Optional[str] = None) -> Dict[str, Any]:
+        """Show what changed between two DVC revisions (e.g. training checkpoints).
+
+        If rev_b is None, diffs rev_a against the current workspace.
+        Useful for comparing two checkpoint epochs to see which data/model
+        artifacts changed.
+        """
+        cmd = ["dvc", "diff", rev_a]
+        if rev_b:
+            cmd.append(rev_b)
+        cmd.append("--json")
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=str(self.repo_path),
+        )
+
+        if result.returncode == 0:
+            try:
+                diff_data = json.loads(result.stdout)
+            except json.JSONDecodeError:
+                diff_data = {"raw": result.stdout.strip()}
+            return {
+                "status": "ok",
+                "rev_a": rev_a,
+                "rev_b": rev_b or "workspace",
+                "diff": diff_data,
+            }
+        else:
+            # dvc diff may return non-zero if no DVC files changed — check stderr
+            if "no changes" in (result.stderr + result.stdout).lower():
+                return {
+                    "status": "ok",
+                    "rev_a": rev_a,
+                    "rev_b": rev_b or "workspace",
+                    "diff": {"added": [], "deleted": [], "modified": [], "renamed": []},
+                }
+            raise Exception(f"dvc diff failed: {result.stderr}")
+
+    async def stage_from_checkpoint(
+        self,
+        checkpoint_path: str,
+        *,
+        remote_name: Optional[str] = None,
+        commit_message: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Atomic checkpoint-to-DVC pipeline: add + push + optional git commit.
+
+        Combines the typical post-training workflow into one call:
+          1. dvc add <checkpoint_path>
+          2. dvc push (to configured or specified remote)
+          3. git add + git commit (optional, if commit_message is provided)
+
+        This ensures the checkpoint artifact is versioned and pushed
+        to remote storage in a single idempotent operation.
+        """
+        results: Dict[str, Any] = {
+            "checkpoint_path": checkpoint_path,
+            "steps": [],
+        }
+
+        # Step 1: DVC add
+        add_result = await self.add_data(checkpoint_path)
+        results["steps"].append({"action": "dvc_add", **add_result})
+
+        # Step 2: DVC push
+        push_targets = [f"{checkpoint_path}.dvc"] if not checkpoint_path.endswith(".dvc") else [checkpoint_path]
+        try:
+            # If a specific remote is requested, configure it for this push
+            push_cmd = ["dvc", "push"]
+            if remote_name:
+                push_cmd.extend(["-r", remote_name])
+            push_cmd.extend(push_targets)
+
+            push_proc = subprocess.run(
+                push_cmd,
+                capture_output=True,
+                text=True,
+                timeout=600,
+                cwd=str(self.repo_path),
+            )
+            if push_proc.returncode == 0:
+                push_info = {"status": "pushed", "targets": push_targets, "output": push_proc.stdout}
+            else:
+                push_info = {"status": "push_failed", "error": push_proc.stderr}
+            results["steps"].append({"action": "dvc_push", **push_info})
+        except Exception as e:
+            results["steps"].append({"action": "dvc_push", "status": "error", "error": str(e)})
+
+        # Step 3: Git commit (optional)
+        if commit_message:
+            try:
+                # Stage the .dvc file and .gitignore changes
+                git_add = subprocess.run(
+                    ["git", "add", f"{checkpoint_path}.dvc", ".gitignore"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    cwd=str(self.repo_path),
+                )
+                git_commit = subprocess.run(
+                    ["git", "commit", "-m", commit_message],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    cwd=str(self.repo_path),
+                )
+                if git_commit.returncode == 0:
+                    results["steps"].append({"action": "git_commit", "status": "committed", "message": commit_message})
+                else:
+                    results["steps"].append({"action": "git_commit", "status": "failed", "error": git_commit.stderr})
+            except Exception as e:
+                results["steps"].append({"action": "git_commit", "status": "error", "error": str(e)})
+
+        # Summarize
+        all_ok = all(s.get("status") not in ("push_failed", "failed", "error") for s in results["steps"])
+        results["status"] = "completed" if all_ok else "partial_failure"
+        return results
+
     def get_environment_config(self) -> Dict[str, str]:
         """Get environment variables for DVC"""
         config = {}
