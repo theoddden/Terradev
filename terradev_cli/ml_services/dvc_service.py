@@ -56,12 +56,12 @@ class DVCService:
                 }
             
             # Check if we're in a DVC repository
-            os.chdir(self.repo_path)
             result = subprocess.run(
                 ["dvc", "status"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                cwd=str(self.repo_path),
             )
             
             if result.returncode == 0:
@@ -91,13 +91,11 @@ class DVCService:
     async def init_repo(self, force: bool = False) -> Dict[str, Any]:
         """Initialize a DVC repository"""
         try:
-            os.chdir(self.repo_path)
-            
             cmd = ["dvc", "init"]
             if force:
                 cmd.append("--force")
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=str(self.repo_path))
             
             if result.returncode == 0:
                 return {
@@ -114,13 +112,11 @@ class DVCService:
     async def add_remote(self, name: str, url: str, remote_type: str = None) -> Dict[str, Any]:
         """Add a remote storage location"""
         try:
-            os.chdir(self.repo_path)
-            
             cmd = ["dvc", "remote", "add", "-d", name, url]
             if remote_type:
                 cmd.extend(["--type", remote_type])
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=str(self.repo_path))
             
             if result.returncode == 0:
                 return {
@@ -139,13 +135,12 @@ class DVCService:
     async def list_remotes(self) -> List[Dict[str, Any]]:
         """List all configured remotes"""
         try:
-            os.chdir(self.repo_path)
-            
             result = subprocess.run(
                 ["dvc", "remote", "list"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                cwd=str(self.repo_path),
             )
             
             if result.returncode == 0:
@@ -168,13 +163,12 @@ class DVCService:
     async def add_data(self, data_path: str) -> Dict[str, Any]:
         """Add data file/directory to DVC tracking"""
         try:
-            os.chdir(self.repo_path)
-            
             result = subprocess.run(
                 ["dvc", "add", data_path],
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=60,
+                cwd=str(self.repo_path),
             )
             
             if result.returncode == 0:
@@ -192,13 +186,11 @@ class DVCService:
     async def push_data(self, targets: Optional[List[str]] = None) -> Dict[str, Any]:
         """Push data to remote storage"""
         try:
-            os.chdir(self.repo_path)
-            
             cmd = ["dvc", "push"]
             if targets:
                 cmd.extend(targets)
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=str(self.repo_path))
             
             if result.returncode == 0:
                 return {
@@ -215,13 +207,11 @@ class DVCService:
     async def pull_data(self, targets: Optional[List[str]] = None) -> Dict[str, Any]:
         """Pull data from remote storage"""
         try:
-            os.chdir(self.repo_path)
-            
             cmd = ["dvc", "pull"]
             if targets:
                 cmd.extend(targets)
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=str(self.repo_path))
             
             if result.returncode == 0:
                 return {
@@ -238,13 +228,12 @@ class DVCService:
     async def get_status(self) -> Dict[str, Any]:
         """Get DVC repository status"""
         try:
-            os.chdir(self.repo_path)
-            
             result = subprocess.run(
                 ["dvc", "status"],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
+                cwd=str(self.repo_path),
             )
             
             if result.returncode == 0:
@@ -271,8 +260,6 @@ class DVCService:
     async def list_tracked_files(self) -> List[Dict[str, Any]]:
         """List all DVC tracked files"""
         try:
-            os.chdir(self.repo_path)
-            
             # Read .dvc files to get tracked data
             dvc_files = list(self.repo_path.glob("**/*.dvc"))
             tracked_files = []
@@ -298,13 +285,12 @@ class DVCService:
     async def cleanup_cache(self) -> Dict[str, Any]:
         """Clean up DVC cache"""
         try:
-            os.chdir(self.repo_path)
-            
             result = subprocess.run(
                 ["dvc", "cache", "dir"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                cwd=str(self.repo_path),
             )
             
             if result.returncode == 0:
@@ -315,7 +301,8 @@ class DVCService:
                     ["dvc", "gc"],
                     capture_output=True,
                     text=True,
-                    timeout=60
+                    timeout=60,
+                    cwd=str(self.repo_path),
                 )
                 
                 if result.returncode == 0:

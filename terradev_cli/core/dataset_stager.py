@@ -10,6 +10,7 @@ and stages copies to target regions in parallel.
 import asyncio
 import gzip
 import hashlib
+import logging
 import math
 import os
 import shutil
@@ -17,6 +18,8 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 # Default chunk size: 512 MB
@@ -181,22 +184,65 @@ class DatasetStager:
             chunk_size=self.chunk_size,
         )
 
+    def plan_with_egress(
+        self,
+        dataset: str,
+        regions: List[str],
+        data_provider: str = "local",
+        data_region: str = "us-east-1",
+        compression: str = "auto",
+    ) -> Dict[str, Any]:
+        """
+        Build a staging plan enriched with egress cost optimization.
+
+        Uses the egress optimizer to find the cheapest transfer strategy,
+        including multi-hop relays through zero-egress providers.
+
+        Returns the staging plan dict plus egress routing information.
+        """
+        plan = self.plan(dataset, regions, compression)
+        plan_dict = plan.to_dict()
+
+        try:
+            from .egress_optimizer import optimize_staging_route
+            # Build target list from region strings
+            # Attempt to parse "provider:region" format, fallback to generic
+            targets = []
+            for r in regions:
+                if ":" in r:
+                    prov, reg = r.split(":", 1)
+                    targets.append({"provider": prov, "region": reg})
+                else:
+                    targets.append({"provider": "unknown", "region": r})
+
+            size_gb = plan.size_bytes / (1024 ** 3)
+            egress = optimize_staging_route(data_provider, data_region, targets, size_gb)
+            plan_dict["egress"] = egress
+        except Exception as e:
+            logger.debug("Egress optimization unavailable: %s", e)
+            plan_dict["egress"] = {"strategy": "direct", "error": str(e)}
+
+        return plan_dict
+
     async def stage(
         self,
         dataset: str,
         regions: List[str],
         compression: str = "auto",
         progress_callback=None,
+        data_provider: str = "local",
+        data_region: str = "us-east-1",
     ) -> Dict[str, Any]:
         """
         Execute the full staging pipeline:
         1. Detect / download dataset
-        2. Compress
-        3. Chunk
-        4. Upload chunks to each region in parallel
-        5. Verify checksums
+        2. Compute optimal egress route (multi-hop if cheaper)
+        3. Compress
+        4. Chunk
+        5. Upload chunks to each region in parallel
+        6. Verify checksums
 
-        Returns a summary dict.
+        Returns a summary dict with egress cost analysis.
         """
         t0 = time.monotonic()
         plan = self.plan(dataset, regions, compression)
@@ -266,6 +312,25 @@ class DatasetStager:
                 except OSError:
                     pass
 
+        # Compute egress cost analysis
+        egress_info = {}
+        try:
+            from .egress_optimizer import optimize_staging_route
+            targets = []
+            for r in regions:
+                if ":" in r:
+                    prov, reg = r.split(":", 1)
+                    targets.append({"provider": prov, "region": reg})
+                else:
+                    targets.append({"provider": "unknown", "region": r})
+            size_gb_actual = comp / (1024 ** 3)
+            egress_info = optimize_staging_route(
+                data_provider, data_region, targets, size_gb_actual
+            )
+        except Exception as e:
+            logger.debug("Egress optimization unavailable: %s", e)
+            egress_info = {"strategy": "direct", "error": str(e)}
+
         return {
             "dataset": dataset,
             "original_size": orig,
@@ -277,6 +342,7 @@ class DatasetStager:
             "regions": results_per_region,
             "total_elapsed_ms": round(total_elapsed, 1),
             "staged_at": self._staging_dir.as_posix(),
+            "egress": egress_info,
         }
 
     async def _upload_chunk(self, chunk_path: str, region: str, dataset_name: str) -> None:
