@@ -64,7 +64,7 @@ resource "terradev_gpu_node" "glm5_serving" {
       CUDA_VISIBLE_DEVICES    = "0,1,2,3,4,5,6,7"
       NCCL_P2P_DISABLE        = "0"
       NCCL_IB_DISABLE         = "0"
-      VLLM_ATTENTION_BACKEND  = "FLASH_ATTN"
+      VLLM_ATTENTION_BACKEND  = "FLASHINFER"
       TRANSFORMERS_CACHE      = "/models/cache"
     }
 

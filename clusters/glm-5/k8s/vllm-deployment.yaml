@@ -136,7 +136,7 @@ spec:
             - name: NCCL_SOCKET_IFNAME
               value: "eth0"
             - name: VLLM_ATTENTION_BACKEND
-              value: "FLASH_ATTN"
+              value: "FLASHINFER"
             - name: VLLM_USE_DEEP_GEMM
               value: "1"
             - name: VLLM_ALL2ALL_BACKEND

@@ -109,7 +109,7 @@ resource "terradev_gpu_node" "moe_serving" {
       CUDA_VISIBLE_DEVICES   = local.cuda_devices
       NCCL_P2P_DISABLE       = "0"
       NCCL_IB_DISABLE        = "0"
-      VLLM_ATTENTION_BACKEND = "FLASH_ATTN"
+      VLLM_ATTENTION_BACKEND = "FLASHINFER"
       VLLM_USE_DEEP_GEMM    = "1"
       VLLM_ALL2ALL_BACKEND   = var.enable_expert_parallel ? "deepep_low_latency" : ""
       TRANSFORMERS_CACHE     = "/models/cache"

@@ -131,6 +131,7 @@ Every MoE deployment automatically includes vLLM optimizations that reduce your 
 
 | Optimization | What it does | Impact |
 |---|---|---|
+| **FlashInfer Fused Attention** | Persistent kernel fuses RMSNorm + QKV + RoPE + attention — eliminates ~50% memory pipeline bubbles between kernel launches | ~1.7x memory bandwidth utilization |
 | **LMCache Distributed KV Cache** | Shares KV cache across vLLM instances via Redis — eliminates redundant prefill computation | 3-10x TTFT reduction |
 | **KV Cache Offloading** | Spills KV cache to CPU DRAM so the GPU never recomputes prefills | Up to 9x throughput |
 | **MTP Speculative Decoding** | Small draft predictions verified in batch by the full model | Up to 2.8x generation speed |

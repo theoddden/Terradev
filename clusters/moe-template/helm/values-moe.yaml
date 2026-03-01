@@ -64,6 +64,9 @@ serving:
 
   # ── Auto-applied cost optimizations (Terradev defaults) ─────────────────────
   # These are ON by default. Users don't configure them — they just save money.
+  flashinfer:
+    enabled: true                  # FlashInfer fused attention (~50% mem BW recovery)
+    backend: "FLASHINFER"          # FLASHINFER, FLASH_ATTN, XFORMERS
   sleepMode:
     enabled: true                  # 18-200x faster than restart on idle
     level: 1
@@ -151,7 +154,7 @@ env:
   NCCL_P2P_DISABLE: "0"
   NCCL_IB_DISABLE: "0"
   NCCL_SOCKET_IFNAME: "eth0"
-  VLLM_ATTENTION_BACKEND: "FLASH_ATTN"
+  VLLM_ATTENTION_BACKEND: "FLASHINFER"
   VLLM_USE_DEEP_GEMM: "1"
   VLLM_ALL2ALL_BACKEND: "deepep_low_latency"
   TRANSFORMERS_CACHE: "/models/cache"

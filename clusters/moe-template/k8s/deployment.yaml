@@ -121,6 +121,7 @@ spec:
             - --host=0.0.0.0
             - --port=8000
             # ── Auto-applied cost optimizations (Terradev defaults) ───
+            - --attention-backend=FLASHINFER          # FlashInfer fused attention (~50% mem BW recovery)
             - --kv-connector=offloading              # KV cache → CPU DRAM (up to 9x throughput)
             - --speculative-config.method=mtp        # MTP speculative decoding (up to 2.8x speed)
             - --speculative-config.num_speculative_tokens=1
@@ -146,7 +147,7 @@ spec:
             - name: NCCL_SOCKET_IFNAME
               value: "eth0"
             - name: VLLM_ATTENTION_BACKEND
-              value: "FLASH_ATTN"
+              value: "FLASHINFER"               # FlashInfer fused attention (megakernel phase 1)
             - name: VLLM_USE_DEEP_GEMM
               value: "1"                        # DeepGEMM for MoE expert computation
             - name: VLLM_ALL2ALL_BACKEND
