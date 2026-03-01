@@ -4020,6 +4020,7 @@ def _kubectl_apply(manifest_dict: Dict[str, Any], dry_run: bool = False) -> bool
             os.unlink(f.name)
 
 
+@click.group()
 def k8s():
     """Kubernetes cluster management with multi-cloud GPU nodes"""
     pass
