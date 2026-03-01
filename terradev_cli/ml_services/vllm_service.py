@@ -64,7 +64,7 @@ class VLLMConfig:
     router_session_key: str = "x-session-id"
 
     # ── LMCache Integration (Distributed KV Cache) ───────────────────────
-    enable_lmcache: bool = False
+    enable_lmcache: bool = True
     lmcache_backend: str = "redis"  # redis, s3, disk, cpu
     lmcache_remote_url: Optional[str] = None  # Redis, S3, etc.
     lmcache_chunk_size: int = 256

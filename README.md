@@ -1,4 +1,4 @@
-# Terradev CLI v3.5.0
+# Terradev CLI v3.5.1
 
 **Compare GPU prices across 19 clouds. Provision the cheapest one in one command.**
 
@@ -125,12 +125,13 @@ helm upgrade --install moe-inf ./helm/terradev \
 - **GPU-Aware Autoscaling**: HPA on DCGM metrics and vLLM queue depth
 - **Multi-Cloud**: RunPod, Vast.ai, Lambda, AWS, CoreWeave
 
-### Auto-Applied Cost Optimizations (v3.5.0)
+### Auto-Applied Cost Optimizations (v3.5.1)
 
 Every MoE deployment automatically includes vLLM optimizations that reduce your inference costs — no configuration needed:
 
 | Optimization | What it does | Impact |
 |---|---|---|
+| **LMCache Distributed KV Cache** | Shares KV cache across vLLM instances via Redis — eliminates redundant prefill computation | 3-10x TTFT reduction |
 | **KV Cache Offloading** | Spills KV cache to CPU DRAM so the GPU never recomputes prefills | Up to 9x throughput |
 | **MTP Speculative Decoding** | Small draft predictions verified in batch by the full model | Up to 2.8x generation speed |
 | **Sleep Mode** | Idle models hibernate to CPU RAM instead of holding GPU memory | 18-200x faster than cold restart |
