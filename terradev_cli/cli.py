@@ -422,6 +422,30 @@ class TerradevAPI:
             creds['access_key'] = self.credentials.get('crusoe_access_key', '')
             creds['secret_key'] = self.credentials.get('crusoe_secret_key', '')
             creds['project_id'] = self.credentials.get('crusoe_project_id', '')
+        elif provider_name == 'alibaba':
+            creds['access_key_id'] = self.credentials.get('alibaba_access_key_id', '')
+            creds['access_key_secret'] = self.credentials.get('alibaba_access_key_secret', '')
+            creds['region_id'] = self.credentials.get('alibaba_region_id', 'cn-beijing')
+            creds['security_group_id'] = self.credentials.get('alibaba_security_group_id', '')
+            creds['vswitch_id'] = self.credentials.get('alibaba_vswitch_id', '')
+        elif provider_name == 'ovhcloud':
+            creds['application_key'] = self.credentials.get('ovhcloud_application_key', '')
+            creds['application_secret'] = self.credentials.get('ovhcloud_application_secret', '')
+            creds['consumer_key'] = self.credentials.get('ovhcloud_consumer_key', '')
+            creds['project_id'] = self.credentials.get('ovhcloud_project_id', '')
+            creds['endpoint'] = self.credentials.get('ovhcloud_endpoint', 'ovh-eu')
+            creds['ssh_key_id'] = self.credentials.get('ovhcloud_ssh_key_id', '')
+        elif provider_name == 'fluidstack':
+            creds['api_key'] = self.credentials.get('fluidstack_api_key', '')
+            creds['ssh_key_name'] = self.credentials.get('fluidstack_ssh_key_name', '')
+        elif provider_name == 'hetzner':
+            creds['api_token'] = self.credentials.get('hetzner_api_token', '')
+            creds['robot_user'] = self.credentials.get('hetzner_robot_user', '')
+            creds['robot_password'] = self.credentials.get('hetzner_robot_password', '')
+        elif provider_name == 'siliconflow':
+            creds['api_key'] = self.credentials.get('siliconflow_api_key', '')
+            creds['region'] = self.credentials.get('siliconflow_region', 'global')
+            creds['default_model'] = self.credentials.get('siliconflow_default_model', '')
         # ML Services
         elif provider_name == 'kserve':
             creds['namespace'] = self.credentials.get('kserve_namespace', 'default')
@@ -7415,6 +7439,103 @@ def train_resume(job_id, checkpoint_id, fmt):
         if status == 'failed':
             print(f"  Error: {result.get('errors', result.get('error', ''))}")
         print()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Multi-LoRA Adapter Management (vLLM ≥0.15.0)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _parse_vllm_endpoint(endpoint: str):
+    """Parse 'http://host:port' into (host, port)."""
+    from urllib.parse import urlparse
+    p = urlparse(endpoint if '://' in endpoint else f'http://{endpoint}')
+    return p.hostname or '127.0.0.1', p.port or 8000
+
+
+@cli.group()
+def lora():
+    """Manage LoRA adapters on a running vLLM endpoint.
+
+    Serve N fine-tuned models on one base model, on one GPU.
+    """
+    pass
+
+
+@lora.command('list')
+@click.option('--endpoint', '-e', required=True, help='vLLM endpoint (e.g. http://10.0.0.1:8000)')
+@click.option('--api-key', help='vLLM API key')
+def lora_list_cmd(endpoint, api_key):
+    """List loaded LoRA adapters.
+
+    Examples:
+        terradev lora list -e http://10.0.0.1:8000
+    """
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+
+    host, port = _parse_vllm_endpoint(endpoint)
+    svc = VLLMService(VLLMConfig(model_name="", host=host, port=port, api_key=api_key))
+    result = asyncio.run(svc.lora_list())
+
+    if result['status'] != 'success':
+        print(f"ERROR: {result.get('error')}")
+        return
+
+    base = result.get('base_models', [])
+    adapters = result.get('lora_adapters', [])
+    print(f"Base models ({len(base)}):")
+    for m in base:
+        print(f"  {m.get('id', '?')}")
+    print(f"LoRA adapters ({len(adapters)}):")
+    if adapters:
+        for a in adapters:
+            print(f"  {a.get('id', '?')}  (parent: {a.get('parent', '-')})")
+    else:
+        print("  (none)")
+
+
+@lora.command('add')
+@click.option('--endpoint', '-e', required=True, help='vLLM endpoint')
+@click.option('--name', '-n', required=True, help='Adapter name (becomes the model name in API requests)')
+@click.option('--path', '-p', required=True, help='Path to adapter weights')
+@click.option('--api-key', help='vLLM API key')
+def lora_add_cmd(endpoint, name, path, api_key):
+    """Hot-load a LoRA adapter onto a running vLLM server.
+
+    Examples:
+        terradev lora add -e http://10.0.0.1:8000 -n customer-a -p /adapters/customer-a
+    """
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService, LoRAModule
+
+    host, port = _parse_vllm_endpoint(endpoint)
+    svc = VLLMService(VLLMConfig(model_name="", host=host, port=port, api_key=api_key))
+    result = asyncio.run(svc.lora_load(LoRAModule(name=name, path=path)))
+
+    if result['status'] == 'loaded':
+        print(f"✅ Adapter '{name}' loaded — use \"model\": \"{name}\" in requests")
+    else:
+        print(f"ERROR: {result.get('error')}")
+
+
+@lora.command('remove')
+@click.option('--endpoint', '-e', required=True, help='vLLM endpoint')
+@click.option('--name', '-n', required=True, help='Adapter name to unload')
+@click.option('--api-key', help='vLLM API key')
+def lora_remove_cmd(endpoint, name, api_key):
+    """Hot-unload a LoRA adapter.
+
+    Examples:
+        terradev lora remove -e http://10.0.0.1:8000 -n customer-a
+    """
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+
+    host, port = _parse_vllm_endpoint(endpoint)
+    svc = VLLMService(VLLMConfig(model_name="", host=host, port=port, api_key=api_key))
+    result = asyncio.run(svc.lora_unload(name))
+
+    if result['status'] == 'unloaded':
+        print(f"✅ Adapter '{name}' unloaded")
+    else:
+        print(f"ERROR: {result.get('error')}")
 
 
 if __name__ == '__main__':

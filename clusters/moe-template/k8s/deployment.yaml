@@ -1,6 +1,9 @@
 # MoE Model Inference Deployment — Parameterized Template
 # Works with any MoE model via environment variable overrides
 #
+# Includes: Multi-LoRA MoE, Sleep Mode, KV Cache Offloading,
+#           Speculative Decoding, and vLLM Router (v0.15.0+)
+#
 # Customize via kustomize or envsubst:
 #   export MODEL_ID=zai-org/GLM-5-FP8 MODEL_NAME=glm-5-fp8 TP_SIZE=8 GPU_COUNT=8
 #   envsubst < deployment.yaml | kubectl apply -f -
@@ -117,6 +120,16 @@ spec:
             - --served-model-name=moe-model      # CHANGE: set your model name
             - --host=0.0.0.0
             - --port=8000
+            # ── Auto-applied cost optimizations (Terradev defaults) ───
+            - --kv-connector=offloading              # KV cache → CPU DRAM (up to 9x throughput)
+            - --speculative-config.method=mtp        # MTP speculative decoding (up to 2.8x speed)
+            - --speculative-config.num_speculative_tokens=1
+            - --enable-sleep-mode                    # Auto-sleep on idle (18-200x faster than restart)
+            # ── Multi-LoRA (uncomment + add your adapters) ────────────
+            # - --enable-lora
+            # - --max-loras=8
+            # - --max-lora-rank=64
+            # - --lora-modules=customer-a=/adapters/customer-a
           env:
             - name: CUDA_VISIBLE_DEVICES
               value: "0,1,2,3,4,5,6,7"          # CHANGE: adjust for GPU count
@@ -132,6 +145,8 @@ spec:
               value: "1"                        # DeepGEMM for MoE expert computation
             - name: VLLM_ALL2ALL_BACKEND
               value: "deepep_low_latency"        # DeepEP all-to-all for expert routing
+            - name: VLLM_SERVER_DEV_MODE
+              value: "1"                          # Required for auto-sleep/wake
             - name: TRANSFORMERS_CACHE
               value: "/models/cache"
             - name: HF_HOME
@@ -177,6 +192,9 @@ spec:
               mountPath: /models
             - name: dshm
               mountPath: /dev/shm
+            # Uncomment for Multi-LoRA adapter storage:
+            # - name: lora-adapters
+            #   mountPath: /adapters
 
       volumes:
         - name: model-cache
@@ -186,6 +204,10 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 32Gi  # NCCL shared memory for MoE TP communication
+        # Uncomment for Multi-LoRA adapter storage:
+        # - name: lora-adapters
+        #   persistentVolumeClaim:
+        #     claimName: moe-lora-adapters
 
       terminationGracePeriodSeconds: 60
       restartPolicy: Always
@@ -200,3 +222,57 @@ type: Opaque
 data:
   # Base64-encode your HF_TOKEN: echo -n "hf_xxx" | base64
   hf-token: ""
+---
+# PVC for LoRA adapters (create only if using Multi-LoRA)
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: moe-lora-adapters
+#   namespace: moe-inference
+# spec:
+#   accessModes: [ReadWriteMany]  # RWX so adapters can be uploaded while serving
+#   storageClassName: efs-sc       # CHANGE: use your shared filesystem StorageClass
+#   resources:
+#     requests:
+#       storage: 50Gi
+---
+# vLLM Router — P/D-aware load balancer for multi-replica deployments
+# Consistent hashing maximises KV cache reuse across replicas.
+# Deploy only when running >1 replica or using P/D disaggregation.
+#
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: vllm-router
+#   namespace: moe-inference
+#   labels:
+#     app.kubernetes.io/name: moe-inference
+#     app.kubernetes.io/component: vllm-router
+# spec:
+#   replicas: 2
+#   selector:
+#     matchLabels:
+#       app.kubernetes.io/component: vllm-router
+#   template:
+#     metadata:
+#       labels:
+#         app.kubernetes.io/component: vllm-router
+#     spec:
+#       containers:
+#         - name: router
+#           image: vllm/vllm-router:latest
+#           args:
+#             - --port=8080
+#             - --service-discovery=k8s
+#             - --target-port=8000
+#             - --routing-policy=consistent_hash  # consistent_hash | power_of_two | round_robin
+#             - --session-key=x-session-id
+#           ports:
+#             - containerPort: 8080
+#           resources:
+#             requests:
+#               cpu: "1"
+#               memory: "512Mi"
+#             limits:
+#               cpu: "2"
+#               memory: "1Gi"

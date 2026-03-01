@@ -3,7 +3,7 @@ Terradev CLI - Cross-Cloud Compute Optimization Platform
 Parallel provisioning and orchestration for optimized compute costs
 """
 
-__version__ = "3.3.0"
+__version__ = "3.5.0"
 __author__ = "Terradev Team"
 __description__ = (
     "BYOAPI: A Terraform wrapper for GPU provisioning"

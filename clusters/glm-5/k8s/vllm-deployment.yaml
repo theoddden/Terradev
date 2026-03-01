@@ -118,6 +118,14 @@ spec:
             - --max-model-len=32768
             - --dtype=auto
             - --trust-remote-code
+            # ── Auto-applied cost optimizations (Terradev defaults) ───
+            - --kv-connector=offloading              # KV cache → CPU DRAM (up to 9x throughput)
+            - --enable-sleep-mode                    # Auto-sleep on idle (18-200x faster than restart)
+            # ── Multi-LoRA (uncomment + add your adapters) ────────────
+            # - --enable-lora
+            # - --max-loras=8
+            # - --max-lora-rank=64
+            # - --lora-modules=customer-a=/adapters/customer-a
           env:
             - name: CUDA_VISIBLE_DEVICES
               value: "0,1,2,3,4,5,6,7"
@@ -133,6 +141,8 @@ spec:
               value: "1"
             - name: VLLM_ALL2ALL_BACKEND
               value: "deepep_low_latency"
+            - name: VLLM_SERVER_DEV_MODE
+              value: "1"                          # Required for auto-sleep/wake
             - name: TRANSFORMERS_CACHE
               value: "/models/cache"
             - name: HF_HOME

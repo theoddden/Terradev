@@ -96,6 +96,40 @@ clusters/moe-template/
 | `num_replicas` | `1` | Serving replicas (each = full GPU node) |
 | `max_model_len` | `32768` | Maximum sequence length |
 
+## Auto-Applied Cost Optimizations
+
+Every deployment from this template automatically enables vLLM optimizations that reduce your inference costs — **no configuration needed**:
+
+| Optimization | Impact | How |
+|---|---|---|
+| KV Cache Offloading | Up to 9x throughput | `--kv-connector=offloading` — spills KV cache to CPU DRAM |
+| MTP Speculative Decoding | Up to 2.8x generation speed | `--speculative-config.method=mtp` — batch-verified draft tokens |
+| Sleep Mode | 18-200x faster than cold restart | `--enable-sleep-mode` — idle models hibernate to CPU RAM |
+| Expert Load Balancing | Eliminates GPU hotspots | `--enable-eplb` — runtime expert redistribution |
+| DeepEP + DeepGEMM | Lower per-token latency | Optimized MoE all-to-all and GEMM kernels |
+
+These are enabled by default in `k8s/deployment.yaml` and `helm/values-moe.yaml`. To disable any, comment out the relevant flag.
+
+## Multi-LoRA Serving
+
+Serve **N fine-tuned LoRA adapters on one base MoE model** using a single GPU set. Uses vLLM's `fused_moe_lora` kernel (454% higher output tokens/sec, 87% lower TTFT).
+
+```bash
+# Hot-load adapters onto a running endpoint
+terradev lora add -e http://<endpoint>:8000 -n customer-a -p /adapters/customer-a
+terradev lora add -e http://<endpoint>:8000 -n customer-b -p /adapters/customer-b
+
+# Use adapter name as the model in API requests
+curl http://<endpoint>:8000/v1/chat/completions \
+  -d '{"model": "customer-a", "messages": [{"role": "user", "content": "Hello"}]}'
+
+# Manage adapters
+terradev lora list   -e http://<endpoint>:8000
+terradev lora remove -e http://<endpoint>:8000 -n customer-b
+```
+
+To enable Multi-LoRA in the K8s template, uncomment the `--enable-lora` block in `deployment.yaml` and add your adapter volume mount.
+
 ## Provider Cost Estimates (8× H100 SXM)
 
 | Provider | Est. $/hr | Availability |

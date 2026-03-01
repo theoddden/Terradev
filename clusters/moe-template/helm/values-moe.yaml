@@ -44,6 +44,57 @@ serving:
     trustRemoteCode: true
     enableAutoToolChoice: true
 
+  # ── Multi-LoRA for MoE (vLLM ≥0.15.0) ─────────────────────────────────────
+  # Serve N fine-tuned LoRA adapters on one base MoE model.
+  # Uses fused_moe_lora kernel: 454% higher OTPS, 87% lower TTFT.
+  # Supported families: GPT-OSS, Qwen3-MoE, DeepSeek, Llama MoE.
+  lora:
+    enabled: false
+    maxLoras: 8                    # max concurrent adapters in GPU memory
+    maxLoraRank: 64                # LoRA rank (16-64 typical)
+    loraExtraVocabSize: 256
+    modules: []                    # [{name: "customer-a", path: "/adapters/customer-a"}]
+    tunedConfigDir: ""             # custom fused_moe_lora kernel tuning configs
+    # Adapter storage PVC (RWX for hot-upload while serving)
+    adapterStorage:
+      enabled: false
+      size: 50Gi
+      storageClass: efs-sc         # CHANGE: your shared filesystem StorageClass
+      mountPath: /adapters
+
+  # ── Auto-applied cost optimizations (Terradev defaults) ─────────────────────
+  # These are ON by default. Users don't configure them — they just save money.
+  sleepMode:
+    enabled: true                  # 18-200x faster than restart on idle
+    level: 1
+  kvOffloading:
+    enabled: true                  # KV cache → CPU DRAM (up to 9x throughput)
+    connector: "offloading"
+  speculative:
+    enabled: true                  # MTP speculative decoding (up to 2.8x speed)
+    method: "mtp"
+    numTokens: 1
+
+  # ── vLLM Router (P/D-aware load balancer) ──────────────────────────────────
+  # Consistent hashing maximises KV cache reuse.  Native P/D disaggregation.
+  # Deploy when running >1 replica or using prefill/decode disaggregation.
+  router:
+    enabled: false
+    replicas: 2
+    port: 8080
+    policy: "consistent_hash"      # consistent_hash | power_of_two | round_robin
+    sessionKey: "x-session-id"
+    image:
+      repository: vllm/vllm-router
+      tag: latest
+    resources:
+      requests:
+        cpu: "1"
+        memory: "512Mi"
+      limits:
+        cpu: "2"
+        memory: "1Gi"
+
   sglang:
     tpSize: 8
     memFractionStatic: 0.85
@@ -87,6 +138,7 @@ env:
   VLLM_USE_DEEP_GEMM: "1"
   VLLM_ALL2ALL_BACKEND: "deepep_low_latency"
   TRANSFORMERS_CACHE: "/models/cache"
+  VLLM_SERVER_DEV_MODE: "1"       # Required for auto-sleep/wake
 
 secrets:
   hfToken: ""  # --set secrets.hfToken=hf_xxx

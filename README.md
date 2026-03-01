@@ -1,6 +1,6 @@
-# Terradev CLI v3.4.0
+# Terradev CLI v3.5.0
 
-**Compare GPU prices across 15 clouds. Provision the cheapest one in one command.**
+**Compare GPU prices across 19 clouds. Provision the cheapest one in one command.**
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif" alt="Terradev CLI Demo" width="800">
@@ -124,6 +124,40 @@ helm upgrade --install moe-inf ./helm/terradev \
 - **FP8 Quantization**: Half the VRAM of BF16 on H100/H200
 - **GPU-Aware Autoscaling**: HPA on DCGM metrics and vLLM queue depth
 - **Multi-Cloud**: RunPod, Vast.ai, Lambda, AWS, CoreWeave
+
+### Auto-Applied Cost Optimizations (v3.5.0)
+
+Every MoE deployment automatically includes vLLM optimizations that reduce your inference costs — no configuration needed:
+
+| Optimization | What it does | Impact |
+|---|---|---|
+| **KV Cache Offloading** | Spills KV cache to CPU DRAM so the GPU never recomputes prefills | Up to 9x throughput |
+| **MTP Speculative Decoding** | Small draft predictions verified in batch by the full model | Up to 2.8x generation speed |
+| **Sleep Mode** | Idle models hibernate to CPU RAM instead of holding GPU memory | 18-200x faster than cold restart |
+| **Expert Parallel Load Balancer** | Rebalances MoE expert routing at runtime based on actual traffic | Eliminates GPU hotspots |
+| **DeepEP + DeepGEMM** | Optimized all-to-all and GEMM kernels for MoE expert computation | Lower per-token latency |
+
+### Multi-LoRA Serving (v3.5.0)
+
+Serve **N fine-tuned models on one base MoE model, on one GPU set**. Uses vLLM's `fused_moe_lora` kernel (454% higher output tokens/sec, 87% lower TTFT). Supported: GPT-OSS, Qwen3-MoE, DeepSeek, Llama MoE.
+
+```bash
+# Deploy base model normally — optimizations are automatic
+terradev provision --task clusters/moe-template/task.yaml \
+  --set model_id=Qwen/Qwen3.5-397B-A17B
+
+# Hot-load customer adapters onto the running endpoint
+terradev lora add -e http://<endpoint>:8000 -n customer-a -p /adapters/customer-a
+terradev lora add -e http://<endpoint>:8000 -n customer-b -p /adapters/customer-b
+
+# Each adapter is a model name in the OpenAI-compatible API
+curl http://<endpoint>:8000/v1/chat/completions \
+  -d '{"model": "customer-a", "messages": [...]}'
+
+# List / remove adapters
+terradev lora list -e http://<endpoint>:8000
+terradev lora remove -e http://<endpoint>:8000 -n customer-b
+```
 
 See [`clusters/moe-template/`](clusters/moe-template/) for full docs and [`clusters/glm-5/`](clusters/glm-5/) for a model-specific example.
 
@@ -325,6 +359,9 @@ Terradev never touches, stores, or proxies your cloud credentials through a thir
 | `terradev inferx` | InferX serverless inference platform - <2s cold starts |
 | `terradev infer-status` | Inference endpoint health and latency |
 | `terradev infer-failover` | Auto-failover between inference endpoints |
+| `terradev lora add` | Hot-load a LoRA adapter onto a running vLLM endpoint |
+| `terradev lora list` | List loaded LoRA adapters |
+| `terradev lora remove` | Hot-unload a LoRA adapter |
 
 ### GitOps & Infrastructure
 | Command | Description |
@@ -397,7 +434,7 @@ Terradev facilitates connections to your existing tools via BYOAPI — your keys
 | **Prometheus** | Pushes provision/terminate metrics to your Pushgateway | `terradev configure --provider prometheus --api-key PUSHGATEWAY_URL` |
 | **Grafana** | Exports a ready-to-import dashboard JSON | `terradev integrations --export-grafana` |
 
-> Prices queried in real-time from all 10+ providers. Actual savings vary by availability.
+> Prices queried in real-time from all 19 providers. Actual savings vary by availability.
 
 ## Pricing Tiers
 
@@ -406,7 +443,7 @@ Terradev facilitates connections to your existing tools via BYOAPI — your keys
 | Max concurrent instances | 1 | 8 | 32 | Unlimited |
 | Provisions/month | 10 | 100 | Unlimited | Unlimited |
 | User seats | 1 | 1 | 5 | Unlimited |
-| Providers | All 11 | All 11 | All 11 + priority | All 11+ + dedicated support |
+| Providers | All 19 | All 19 | All 19 + priority | All 19 + dedicated support |
 | Cost tracking | Yes | Yes | Yes | Yes + fleet dashboard |
 | Dataset staging | Yes | Yes | Yes | Yes |
 | Egress optimization | Basic | Full | Full + custom routes | Full + custom routes |
@@ -511,7 +548,7 @@ terradev k8s create my-cluster --gpu H100 --count 4 --multi-cloud
 ```
 
 **Features available through Claude Code:**
-- GPU price quotes across 11+ providers
+- GPU price quotes across 19 providers
 - Instance provisioning with cost optimization
 - Kubernetes cluster creation and management
 - Inference endpoint deployment (InferX)

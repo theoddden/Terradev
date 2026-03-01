@@ -10,13 +10,22 @@ import asyncio
 import aiohttp
 import subprocess
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
 @dataclass
+class LoRAModule:
+    """A single LoRA adapter definition"""
+    name: str
+    path: str
+    base_model_name: Optional[str] = None
+
+
+@dataclass
 class VLLMConfig:
-    """vLLM configuration"""
+    """vLLM configuration with Multi-LoRA, Sleep Mode, KV Offloading,
+    Speculative Decoding, and vLLM Router support (v0.15.0+)"""
     model_name: str
     host: str = "0.0.0.0"
     port: int = 8000
@@ -24,6 +33,35 @@ class VLLMConfig:
     gpu_memory_utilization: float = 0.9
     max_model_len: Optional[int] = None
     tensor_parallel_size: int = 1
+
+    # ── Multi-LoRA for MoE (vLLM ≥0.15.0) ──────────────────────────────
+    enable_lora: bool = False
+    lora_modules: Optional[List[LoRAModule]] = None
+    max_loras: int = 8
+    max_lora_rank: int = 64
+    lora_extra_vocab_size: int = 256
+    lora_tuned_config_dir: Optional[str] = None  # custom fused_moe_lora kernel configs
+
+    # ── Sleep Mode (zero-reload model switching) ────────────────────────
+    enable_sleep_mode: bool = False
+    sleep_level: int = 1  # 1 = offload to CPU RAM, 2 = discard weights
+    auto_sleep_idle_seconds: int = 300  # auto-sleep after N seconds idle
+
+    # ── KV Cache Offloading (vLLM ≥0.11.0) ─────────────────────────────
+    kv_connector: Optional[str] = None  # "offloading" for CPU DRAM offload
+    kv_connector_config: Optional[Dict[str, Any]] = None
+
+    # ── Speculative Decoding ────────────────────────────────────────────
+    speculative_method: Optional[str] = None  # "draft", "ngram", "mtp", "eagle", "medusa"
+    speculative_model: Optional[str] = None  # draft model name/path
+    num_speculative_tokens: int = 5
+    speculative_disable_by_batch_size: Optional[int] = None  # dynamic: disable at high QPS
+
+    # ── vLLM Router ─────────────────────────────────────────────────────
+    enable_router: bool = False
+    router_policy: str = "consistent_hash"  # consistent_hash, power_of_two, round_robin
+    router_port: int = 8080
+    router_session_key: str = "x-session-id"
 
 
 class VLLMService:
@@ -370,8 +408,211 @@ systemctl daemon-reload
             "codellama/CodeLlama-34b-hf"
         ]
     
+    def _build_server_args(self) -> List[str]:
+        """Build the full vLLM serve argument list from config.
+
+        Centralises flag generation so start_server, get_deployment_script,
+        and K8s/Helm templates all use the same logic.
+        """
+        args: List[str] = [
+            "vllm", "serve", self.config.model_name,
+            "--host", self.config.host,
+            "--port", str(self.config.port),
+            "--gpu-memory-utilization", str(self.config.gpu_memory_utilization),
+            "--tensor-parallel-size", str(self.config.tensor_parallel_size),
+        ]
+
+        if self.config.max_model_len:
+            args.extend(["--max-model-len", str(self.config.max_model_len)])
+        if self.config.api_key:
+            args.extend(["--api-key", self.config.api_key])
+
+        # ── Multi-LoRA ──────────────────────────────────────────────────
+        if self.config.enable_lora:
+            args.append("--enable-lora")
+            args.extend(["--max-loras", str(self.config.max_loras)])
+            args.extend(["--max-lora-rank", str(self.config.max_lora_rank)])
+            args.extend(["--lora-extra-vocab-size", str(self.config.lora_extra_vocab_size)])
+            if self.config.lora_modules:
+                for lm in self.config.lora_modules:
+                    args.extend(["--lora-modules", f"{lm.name}={lm.path}"])
+            if self.config.lora_tuned_config_dir:
+                args.extend(["--override-neuron-config", self.config.lora_tuned_config_dir])
+
+        # ── Sleep Mode ──────────────────────────────────────────────────
+        if self.config.enable_sleep_mode:
+            args.append("--enable-sleep-mode")
+
+        # ── KV Cache Offloading ─────────────────────────────────────────
+        if self.config.kv_connector:
+            args.extend(["--kv-connector", self.config.kv_connector])
+
+        # ── Speculative Decoding ────────────────────────────────────────
+        if self.config.speculative_method:
+            if self.config.speculative_method == "mtp":
+                args.extend(["--speculative-config.method=mtp"])
+                args.extend([f"--speculative-config.num_speculative_tokens={self.config.num_speculative_tokens}"])
+            elif self.config.speculative_method == "ngram":
+                args.extend(["--speculative-config.method=ngram"])
+                args.extend([f"--speculative-config.num_speculative_tokens={self.config.num_speculative_tokens}"])
+            elif self.config.speculative_method in ("draft", "eagle", "medusa"):
+                if self.config.speculative_model:
+                    args.extend(["--speculative-model", self.config.speculative_model])
+                args.extend(["--num-speculative-tokens", str(self.config.num_speculative_tokens)])
+            if self.config.speculative_disable_by_batch_size:
+                args.extend(["--speculative-disable-by-batch-size",
+                             str(self.config.speculative_disable_by_batch_size)])
+
+        return args
+
+    # ═══════════════════════════════════════════════════════════════════
+    # Multi-LoRA adapter management (hot-load / hot-unload)
+    # ═══════════════════════════════════════════════════════════════════
+
+    async def lora_list(self) -> Dict[str, Any]:
+        """List LoRA adapters currently loaded on the server."""
+        try:
+            if not self.session:
+                self.session = aiohttp.ClientSession()
+            url = f"{self.base_url}/models"
+            headers = {}
+            if self.config.api_key:
+                headers["Authorization"] = f"Bearer {self.config.api_key}"
+            async with self.session.get(url, headers=headers,
+                                        timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    models = data.get("data", [])
+                    base = [m for m in models if m.get("parent") is None]
+                    adapters = [m for m in models if m.get("parent") is not None]
+                    return {
+                        "status": "success",
+                        "base_models": base,
+                        "lora_adapters": adapters,
+                    }
+                return {"status": "failed", "error": f"HTTP {resp.status}"}
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
+    async def lora_load(self, adapter: LoRAModule) -> Dict[str, Any]:
+        """Hot-load a LoRA adapter onto the running server (POST /loras)."""
+        try:
+            if not self.session:
+                self.session = aiohttp.ClientSession()
+            url = f"http://{self.config.host}:{self.config.port}/v1/load_lora_adapter"
+            payload = {
+                "lora_name": adapter.name,
+                "lora_path": adapter.path,
+            }
+            headers = {}
+            if self.config.api_key:
+                headers["Authorization"] = f"Bearer {self.config.api_key}"
+            async with self.session.post(url, json=payload, headers=headers,
+                                         timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                if resp.status == 200:
+                    return {"status": "loaded", "adapter": adapter.name}
+                body = await resp.text()
+                return {"status": "failed", "error": f"HTTP {resp.status}: {body}"}
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
+    async def lora_unload(self, adapter_name: str) -> Dict[str, Any]:
+        """Hot-unload a LoRA adapter from the running server."""
+        try:
+            if not self.session:
+                self.session = aiohttp.ClientSession()
+            url = f"http://{self.config.host}:{self.config.port}/v1/unload_lora_adapter"
+            payload = {"lora_name": adapter_name}
+            headers = {}
+            if self.config.api_key:
+                headers["Authorization"] = f"Bearer {self.config.api_key}"
+            async with self.session.post(url, json=payload, headers=headers,
+                                         timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                if resp.status == 200:
+                    return {"status": "unloaded", "adapter": adapter_name}
+                body = await resp.text()
+                return {"status": "failed", "error": f"HTTP {resp.status}: {body}"}
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
+    # ═══════════════════════════════════════════════════════════════════
+    # Sleep Mode — zero-reload model switching
+    # ═══════════════════════════════════════════════════════════════════
+
+    async def sleep(self, level: Optional[int] = None) -> Dict[str, Any]:
+        """Put the vLLM server to sleep (offload or discard weights).
+
+        Level 1: offload weights to CPU RAM (fast wake ~0.1-6s)
+        Level 2: discard weights entirely (minimal RAM, needs reload_weights on wake)
+        """
+        lvl = level or self.config.sleep_level
+        try:
+            if not self.session:
+                self.session = aiohttp.ClientSession()
+            url = f"http://{self.config.host}:{self.config.port}/sleep?level={lvl}"
+            async with self.session.post(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                if resp.status == 200:
+                    return {"status": "sleeping", "level": lvl,
+                            "model": self.config.model_name}
+                body = await resp.text()
+                return {"status": "failed", "error": f"HTTP {resp.status}: {body}"}
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
+    async def wake(self) -> Dict[str, Any]:
+        """Wake a sleeping vLLM server.
+
+        For Level 2 sleep, also calls reload_weights and reset_prefix_cache.
+        """
+        try:
+            if not self.session:
+                self.session = aiohttp.ClientSession()
+            base = f"http://{self.config.host}:{self.config.port}"
+
+            # Wake up
+            async with self.session.post(f"{base}/wake_up",
+                                         timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    return {"status": "failed", "error": f"wake_up HTTP {resp.status}: {body}"}
+
+            # Level 2 requires reload_weights + reset_prefix_cache
+            if self.config.sleep_level == 2:
+                async with self.session.post(
+                    f"{base}/collective_rpc",
+                    json={"method": "reload_weights"},
+                    headers={"Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=120),
+                ) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        return {"status": "failed",
+                                "error": f"reload_weights HTTP {resp.status}: {body}"}
+
+                async with self.session.post(
+                    f"{base}/reset_prefix_cache",
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        return {"status": "failed",
+                                "error": f"reset_prefix_cache HTTP {resp.status}: {body}"}
+
+            return {"status": "awake", "model": self.config.model_name,
+                    "level": self.config.sleep_level}
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
     def get_deployment_script(self, instance_ip: str, ssh_user: str = "root", ssh_key: Optional[str] = None) -> str:
         """Generate deployment script for vLLM"""
+        serve_args = self._build_server_args()
+        exec_line = " \\
+    ".join(serve_args)
+
+        env_lines = ""
+        if self.config.enable_sleep_mode:
+            env_lines += "Environment=VLLM_SERVER_DEV_MODE=1\n"
+
         script = f"""
 #!/bin/bash
 # vLLM Deployment Script for Terradev
@@ -379,8 +620,8 @@ systemctl daemon-reload
 
 echo "🚀 Deploying vLLM for {self.config.model_name}..."
 
-# Install vLLM
-pip install vllm
+# Install vLLM ≥0.15.0 (Multi-LoRA MoE + Sleep Mode + KV Offloading)
+pip install 'vllm>=0.15.0'
 
 # Create systemd service
 cat > /etc/systemd/system/vllm.service << 'EOF'
@@ -392,14 +633,10 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root
-ExecStart=vllm serve {self.config.model_name} \\
-    --host {self.config.host} \\
-    --port {self.config.port} \\
-    --gpu-memory-utilization {self.config.gpu_memory_utilization} \\
-    --tensor-parallel-size {self.config.tensor_parallel_size}
+ExecStart={exec_line}
 Restart=always
 RestartSec=10
-
+{env_lines}
 [Install]
 WantedBy=multi-user.target
 EOF

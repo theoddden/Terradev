@@ -42,6 +42,11 @@ _PROVIDER_LOADERS = {
     "crusoe":       _lazy_import(".crusoe_provider.CrusoeProvider"),
     "hyperstack":   _lazy_import(".hyperstack_provider.HyperstackProvider"),
     "digitalocean": _lazy_import(".digitalocean_provider.DigitalOceanProvider"),
+    "alibaba":      _lazy_import(".alibaba_provider.AlibabaProvider"),
+    "ovhcloud":     _lazy_import(".ovhcloud_provider.OVHcloudProvider"),
+    "fluidstack":   _lazy_import(".fluidstack_provider.FluidStackProvider"),
+    "hetzner":      _lazy_import(".hetzner_provider.HetznerProvider"),
+    "siliconflow":  _lazy_import(".siliconflow_provider.SiliconFlowProvider"),
     "demo":         _lazy_import(".demo_mode.DemoModeProvider"),
 }
 
