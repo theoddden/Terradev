@@ -820,7 +820,7 @@ def run_interactive_onboarding(api: TerradevAPI):
     print("="*70 + "\n")
 
 @click.group()
-@click.version_option(version="3.5.3", prog_name="Terradev CLI")
+@click.version_option(version="3.5.4", prog_name="Terradev CLI")
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
 @click.option('--skip-onboarding', is_flag=True, help='Skip first-time setup')
