@@ -1,4 +1,4 @@
-# Terradev CLI v3.5.8
+# Terradev CLI v3.5.9
 
 **Compare GPU prices across 19 clouds. Provision the cheapest one in one command. Automatic vLLM optimization included.**
 
@@ -6,7 +6,7 @@
   <img src="https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif" alt="Terradev CLI Demo" width="800">
 </p>
 
-## 🚀 What's New in v3.5.8
+## 🚀 What's New in v3.5.9
 
 ### 🧠 Automatic vLLM Workload-Based Optimization
 The most advanced vLLM optimization system - automatically analyzes your workload patterns and optimizes the 6 critical knobs most teams never touch:
@@ -265,7 +265,7 @@ terradev ml sglang --start --instance-ip <IP> \
 ## Installation
 
 ```bash
-pip install terradev-cli==3.5.8
+pip install terradev-cli==3.5.9
 ```
 
 With vLLM optimization and HF Spaces support:
