@@ -112,8 +112,10 @@ class TerradevAPI:
                 'provisions_per_month': 'unlimited',
                 'max_instances': 'unlimited',
                 'user_seats': 'unlimited',
-                'min_gpus': 32,
+                'min_gpus_per_instance': 32,
                 'gpu_hour_rate': 0.09,
+                'billing_model': 'metered',
+                'billing_formula': 'max(gpu_count, 32) × hours_used × $0.09',
                 'providers': ['all'],
                 'features': ['all', 'inference', 'full_provenance', 'priority_support', 'sla_guarantee', 'dedicated_support', 'gpu_metering', 'fleet_management']
             }
@@ -310,12 +312,21 @@ class TerradevAPI:
         reports to Stripe only if there are unreported hours since last sync).
         This catches GPU-hours even if an instance was terminated outside the
         CLI (e.g. directly on the provider dashboard or via MCP subprocess).
+
+        Billing model (metered, per-instance):
+            billable_gpus = max(instance.gpu_count, 32)
+            billable_gpu_hours += billable_gpus × hours_running
+
+        Examples:
+          - 8 GPUs for 0.75 hrs  → max(8, 32) × 0.75  = 24 GPU-hrs
+          - 72 GPUs for 32 hrs   → max(72, 32) × 32    = 2,304 GPU-hrs
+          - 0 instances running  → $0 (no idle charge)
         """
         if self.tier.get('name') != 'Enterprise+':
             return
 
         try:
-            from core.stripe_manager import StripeManager
+            from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS
             sm = StripeManager()
             metering = sm._load_metering()
             sub_item_id = metering.get('subscription_item_id')
@@ -324,8 +335,7 @@ class TerradevAPI:
 
             instances = self.usage.get('instances_created', [])
             if not instances:
-                # No active instances — nothing to bill. Reset sync timestamp
-                # so the floor doesn't accumulate while idle.
+                # No active instances — nothing to bill.
                 metering['last_sync_ts'] = datetime.now().isoformat()
                 sm._save_metering(metering)
                 return
@@ -342,23 +352,16 @@ class TerradevAPI:
                 except Exception:
                     pass
 
-            # Calculate hours since last sync (or 1 hr cap for first sync)
-            if last_sync:
-                try:
-                    hours_since_last_sync = max((now - datetime.fromisoformat(last_sync)).total_seconds() / 3600, 0)
-                except Exception:
-                    hours_since_last_sync = 1.0
-            else:
-                hours_since_last_sync = 1.0
-
-            actual_gpu_hours = 0.0
+            billable_gpu_hours = 0.0
             for inst in instances:
                 created = inst.get('created_at', '')
                 gpu_count = inst.get('gpu_count', 1)
+                # 32-GPU floor per instance: you always pay for at least 32 GPUs
+                billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
                 if created:
                     try:
                         start = datetime.fromisoformat(created)
-                        # Hours since instance creation (or since last sync, whichever is later)
+                        # Only bill hours since last sync (avoid double-counting)
                         if last_sync:
                             try:
                                 sync_dt = datetime.fromisoformat(last_sync)
@@ -366,18 +369,13 @@ class TerradevAPI:
                             except Exception:
                                 pass
                         hours = max((now - start).total_seconds() / 3600, 0)
-                        actual_gpu_hours += hours * gpu_count
+                        billable_gpu_hours += hours * billable_gpus
                     except Exception:
                         continue
 
-            # Minimum commitment floor: always bill at least 32 GPU-hours
-            # per billing hour, even if actual usage is lower.
-            min_gpu_hours = 32 * hours_since_last_sync
-            gpu_hours_to_bill = max(actual_gpu_hours, min_gpu_hours)
-
-            if gpu_hours_to_bill > 0.01:
+            if billable_gpu_hours > 0.01:
                 sm.report_gpu_hours(
-                    sub_item_id, gpu_hours_to_bill,
+                    sub_item_id, billable_gpu_hours,
                     gpu_type='mixed',
                     instance_id=f'sync-{now.strftime("%Y%m%d%H")}',
                 )
@@ -2234,6 +2232,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             "region": r['region'], "spot": r['spot'],
             "parallel_group": group_id,
             "type": type or "training",
+            "gpu_count": count,
             "created_at": datetime.now().isoformat(),
         }
         if type == 'inference':
@@ -2404,28 +2403,41 @@ def manage(instance_id, action):
                 end_provision(instance_id)
             except Exception:
                 pass
-            # Enterprise+ GPU-hour metering — report usage to Stripe
+            # Enterprise+ GPU-hour metering — report final usage to Stripe
             try:
                 if api.tier.get('name') == 'Enterprise+':
-                    from core.stripe_manager import StripeManager
+                    from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS, ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS
                     sm = StripeManager()
                     metering = sm._load_metering()
                     sub_item_id = metering.get('subscription_item_id')
                     if sub_item_id and instance:
                         created = instance.get('created_at', '')
                         gpu_count = instance.get('gpu_count', 1)
+                        # 32-GPU floor: bill at least 32 GPUs per instance
+                        billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
                         if created:
                             from datetime import datetime as _dt
                             try:
-                                hours = max((_dt.now() - _dt.fromisoformat(created)).total_seconds() / 3600, 0.01)
-                                gpu_hours = hours * gpu_count
+                                # Bill from last sync (or creation) to now
+                                start = _dt.fromisoformat(created)
+                                last_sync = metering.get('last_sync_ts', '')
+                                if last_sync:
+                                    try:
+                                        start = max(start, _dt.fromisoformat(last_sync))
+                                    except Exception:
+                                        pass
+                                hours = max((_dt.now() - start).total_seconds() / 3600, 0.01)
+                                billable_gpu_hours = hours * billable_gpus
                                 sm.report_gpu_hours(
-                                    sub_item_id, gpu_hours,
+                                    sub_item_id, billable_gpu_hours,
                                     gpu_type=instance.get('gpu_type', ''),
                                     instance_id=instance_id,
                                 )
-                                cost = round(gpu_hours * 0.09, 2)
-                                print(f"   Enterprise+ metered: {gpu_hours:.1f} GPU-hrs (${cost:.2f})")
+                                rate = ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100
+                                cost = round(billable_gpu_hours * rate, 2)
+                                print(f"   Enterprise+ metered: {billable_gpu_hours:.1f} GPU-hrs @ ${rate}/hr = ${cost:.2f}")
+                                if gpu_count < ENTERPRISE_PLUS_MIN_GPUS:
+                                    print(f"   (32-GPU minimum applied: {gpu_count} → {billable_gpus} GPUs)")
                             except Exception:
                                 pass
             except Exception:
@@ -2950,6 +2962,43 @@ def cleanup():
     
     if old_instances:
         print(f"Found {len(old_instances)} old instances")
+
+        # Enterprise+ metering: report final GPU-hours for cleaned-up instances
+        if api.tier.get('name') == 'Enterprise+':
+            try:
+                from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS, ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS
+                sm = StripeManager()
+                metering = sm._load_metering()
+                sub_item_id = metering.get('subscription_item_id')
+                if sub_item_id:
+                    now = datetime.now()
+                    last_sync = metering.get('last_sync_ts', '')
+                    total_billable = 0.0
+                    for inst in old_instances:
+                        created = inst.get('created_at', '')
+                        gpu_count = inst.get('gpu_count', 1)
+                        billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
+                        if created:
+                            try:
+                                start = datetime.fromisoformat(created)
+                                if last_sync:
+                                    try:
+                                        start = max(start, datetime.fromisoformat(last_sync))
+                                    except Exception:
+                                        pass
+                                hours = max((now - start).total_seconds() / 3600, 0)
+                                total_billable += hours * billable_gpus
+                            except Exception:
+                                pass
+                    if total_billable > 0.01:
+                        sm.report_gpu_hours(sub_item_id, total_billable, gpu_type='mixed', instance_id='cleanup')
+                        rate = ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100
+                        print(f"   Enterprise+ metered: {total_billable:.1f} GPU-hrs @ ${rate}/hr = ${round(total_billable * rate, 2):.2f}")
+                        metering['last_sync_ts'] = now.isoformat()
+                        sm._save_metering(metering)
+            except Exception:
+                pass
+
         for inst in old_instances:
             print(f"   Removing {inst['id']} ({inst['provider']})")
         
@@ -3598,23 +3647,27 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
                 # Enterprise+ GPU-hour metering — report usage to Stripe
                 try:
                     if api.tier.get('name') == 'Enterprise+':
-                        from core.stripe_manager import StripeManager
+                        from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS, ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS
                         sm = StripeManager()
                         metering_data = sm._load_metering()
                         sub_item_id = metering_data.get('subscription_item_id')
                         if sub_item_id:
-                            from datetime import datetime as _dt
                             try:
                                 gpu_count = int(os.environ.get('TERRADEV_GPU_COUNT', '1'))
+                                # 32-GPU floor per instance
+                                billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
                                 hours = max(total_time / 3600000, 0.01)  # total_time is in ms
-                                gpu_hours = hours * gpu_count
+                                billable_gpu_hours = hours * billable_gpus
                                 sm.report_gpu_hours(
-                                    sub_item_id, gpu_hours,
+                                    sub_item_id, billable_gpu_hours,
                                     gpu_type=gpu,
                                     instance_id=instance_id,
                                 )
-                                cost = round(gpu_hours * 0.09, 2)
-                                print(f"   Enterprise+ metered: {gpu_hours:.1f} GPU-hrs (${cost:.2f})")
+                                rate = ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100
+                                cost = round(billable_gpu_hours * rate, 2)
+                                print(f"   Enterprise+ metered: {billable_gpu_hours:.1f} GPU-hrs @ ${rate}/hr = ${cost:.2f}")
+                                if gpu_count < ENTERPRISE_PLUS_MIN_GPUS:
+                                    print(f"   (32-GPU minimum applied: {gpu_count} → {billable_gpus} GPUs)")
                             except Exception:
                                 pass
                 except Exception:

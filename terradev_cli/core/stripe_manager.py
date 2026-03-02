@@ -134,14 +134,16 @@ class StripeManager:
         """Create a Stripe checkout session for Enterprise+ metered billing.
         
         Enterprise+ uses Stripe metered usage billing:
-        - $0.09 per GPU-hour, billed monthly
-        - Minimum 32 GPUs under management
+        - $0.09 × max(gpu_count, 32) × hours_used, billed monthly
+        - 32-GPU floor per instance (8 GPUs billed as 32, 72 billed as 72)
+        - Billed only for actual runtime — $0 when nothing is running
         - Card on file, invoiced at end of billing period
         """
         try:
             product = self._get_or_create_product('enterprise_plus', {
                 'name': 'Terradev Enterprise+',
-                'description': 'Metered GPU-hour billing — $0.09/GPU-hr, 32 GPU minimum. '
+                'description': 'Metered GPU-hour billing — $0.09 × max(gpu_count, 32) × hours_used. '
+                               '32-GPU floor per instance, billed only for actual runtime. '
                                'Unlimited provisions, servers, seats, dedicated support.',
             })
             
@@ -221,12 +223,13 @@ class StripeManager:
                          gpu_type: str = '', instance_id: str = '') -> Optional[Dict[str, Any]]:
         """Report GPU-hour usage to Stripe for metered billing.
         
-        Called when a provision ends (instance terminated) to report
-        the actual GPU-hours consumed.
+        Called periodically (sync) and at termination to report billable
+        GPU-hours.  Callers must apply the 32-GPU floor before calling:
+            billable_gpu_hours = max(gpu_count, 32) × hours
         
         Args:
             subscription_item_id: The Stripe subscription item ID
-            gpu_hours: Number of GPU-hours to bill (rounded up)
+            gpu_hours: Billable GPU-hours (already floored to 32-GPU min)
             gpu_type: GPU type for metadata
             instance_id: Instance ID for metadata
         """
@@ -336,7 +339,8 @@ class StripeManager:
             'estimated_cost_usd': total_cost,
             'rate_per_gpu_hour': ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100,
             'record_count': len(current_records),
-            'min_gpus': ENTERPRISE_PLUS_MIN_GPUS,
+            'min_gpus_per_instance': ENTERPRISE_PLUS_MIN_GPUS,
+            'billing_formula': 'max(gpu_count, 32) × hours_used × $0.09',
         }
 
     # ── Local metering persistence ───────────────────────────────────
