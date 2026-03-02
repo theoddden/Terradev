@@ -19,7 +19,7 @@ import sys
 
 # Import telemetry - MANDATORY FOR USAGE TRACKING
 try:
-    from terradev_cli.core.telemetry import get_mandatory_telemetry
+    from core.telemetry import get_mandatory_telemetry
     _telemetry = get_mandatory_telemetry()
 except Exception:
     _telemetry = None
@@ -309,7 +309,7 @@ class TerradevAPI:
             return
 
         try:
-            from terradev_cli.core.stripe_manager import StripeManager
+            from core.stripe_manager import StripeManager
             sm = StripeManager()
             metering = sm._load_metering()
             sub_item_id = metering.get('subscription_item_id')
@@ -517,7 +517,7 @@ class TerradevAPI:
     async def _get_provider_quotes(self, provider_name: str, gpu_type: str) -> List[Dict[str, Any]]:
         """Get quotes from a real provider via the BYOAPI provider layer"""
         try:
-            from terradev_cli.providers.provider_factory import ProviderFactory
+            from providers.provider_factory import ProviderFactory
             factory = ProviderFactory()
             creds = self._provider_creds(provider_name)
             provider = factory.create_provider(provider_name, creds)
@@ -820,7 +820,7 @@ def run_interactive_onboarding(api: TerradevAPI):
     print("="*70 + "\n")
 
 @click.group()
-@click.version_option(version="3.5.6", prog_name="Terradev CLI")
+@click.version_option(version="3.5.7", prog_name="Terradev CLI")
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
 @click.option('--skip-onboarding', is_flag=True, help='Skip first-time setup')
@@ -987,7 +987,7 @@ def upgrade(tier, activate, email):
                 print(f"   Fleet management:   Enabled")
                 print(f"   GPU-hour metering:  Enabled")
                 try:
-                    from terradev_cli.core.stripe_manager import StripeManager
+                    from core.stripe_manager import StripeManager
                     sm = StripeManager()
                     sub_item_id = sm.get_subscription_item_id(email)
                     if sub_item_id:
@@ -1082,7 +1082,7 @@ def upgrade(tier, activate, email):
         
         # Track Stripe checkout opened
         try:
-            from terradev_cli.core.telemetry import TelemetryClient
+            from core.telemetry import TelemetryClient
             telemetry = TelemetryClient()
             telemetry.log_usage("stripe_checkout_opened", {
                         "tier": api.tier["name"],
@@ -1139,7 +1139,7 @@ def configure(provider):
     
     if provider:
         # Configure specific provider
-        from terradev_cli.credential_prompt import prompt_for_credentials
+        from credential_prompt import prompt_for_credentials
         
         print(f"   Configure {provider.upper()} credentials")
         
@@ -1323,7 +1323,7 @@ def configure(provider):
         
     else:
         # Interactive configuration for all providers
-        from terradev_cli.credential_prompt import prompt_for_credentials
+        from credential_prompt import prompt_for_credentials
         configured_providers = prompt_for_credentials()
         
         if configured_providers:
@@ -1509,8 +1509,8 @@ def configure(provider):
     
     # Show integration status
     try:
-        from terradev_cli.integrations.wandb_integration import is_configured as wandb_ok
-        from terradev_cli.integrations.prometheus_integration import is_configured as prom_ok
+        from integrations.wandb_integration import is_configured as wandb_ok
+        from integrations.prometheus_integration import is_configured as prom_ok
         integrations = []
         if wandb_ok(api.credentials):
             integrations.append("W&B")
@@ -1884,7 +1884,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
                 stripe_session_id = session_match.group(1)
                 
             # Log Stripe checkout initiation
-            from terradev_cli.core.telemetry import TelemetryClient
+            from core.telemetry import TelemetryClient
             telemetry = TelemetryClient()
             telemetry.log_usage("stripe_checkout_initiated", {
                 "tier": api.tier["name"],
@@ -1900,7 +1900,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             pass  # Telemetry is best-effort        
         # Log paywall hit to telemetry for visibility
         try:
-            from terradev_cli.core.telemetry import TelemetryClient
+            from core.telemetry import TelemetryClient
             telemetry = TelemetryClient()
             telemetry.log_usage("paywall_hit", {
                 "tier": api.tier["name"],
@@ -1919,7 +1919,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
                 
                 # Track Stripe checkout opened
                 try:
-                    from terradev_cli.core.telemetry import TelemetryClient
+                    from core.telemetry import TelemetryClient
                     telemetry = TelemetryClient()
                     telemetry.log_usage("stripe_checkout_opened", {
                         "tier": api.tier["name"],
@@ -1958,7 +1958,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
                 stripe_session_id = session_match.group(1)
                 
             # Log Stripe checkout initiation
-            from terradev_cli.core.telemetry import TelemetryClient
+            from core.telemetry import TelemetryClient
             telemetry = TelemetryClient()
             telemetry.log_usage("stripe_checkout_initiated", {
                 "tier": api.tier["name"],
@@ -1974,7 +1974,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             pass  # Telemetry is best-effort        
         # Log paywall hit to telemetry for visibility
         try:
-            from terradev_cli.core.telemetry import TelemetryClient
+            from core.telemetry import TelemetryClient
             telemetry = TelemetryClient()
             telemetry.log_usage("paywall_hit", {
                 "tier": api.tier["name"],
@@ -1993,7 +1993,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
                 
                 # Track Stripe checkout opened
                 try:
-                    from terradev_cli.core.telemetry import TelemetryClient
+                    from core.telemetry import TelemetryClient
                     telemetry = TelemetryClient()
                     telemetry.log_usage("stripe_checkout_opened", {
                         "tier": api.tier["name"],
@@ -2046,7 +2046,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
 
     # Record to cost DB
     try:
-        from terradev_cli.core.cost_tracker import record_quotes
+        from core.cost_tracker import record_quotes
         record_quotes(all_quotes)
     except Exception:
         pass
@@ -2056,7 +2056,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
 
     # Silent: record price ticks for ML training data
     try:
-        from terradev_cli.core.price_intelligence import record_price_ticks_batch
+        from core.price_intelligence import record_price_ticks_batch
         ticks = [
             {
                 "gpu_type": q.get("gpu_type", gpu_type or ""),
@@ -2128,14 +2128,14 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     # ── Generate per-provision SSH keypair ──
     _provision_ssh_pubkey = ""
     try:
-        from terradev_cli.core.ssh_key_manager import generate_provision_keypair
+        from core.ssh_key_manager import generate_provision_keypair
         _ssh_priv_path, _provision_ssh_pubkey = generate_provision_keypair(group_id)
         print(f"   SSH keypair generated for {group_id} (Ed25519, encrypted at rest)")
     except Exception as _ssh_err:
         print(f"   Warning: SSH key generation failed ({_ssh_err}) — manual --ssh-key needed for train")
 
     async def _provision_all():
-        from terradev_cli.providers.provider_factory import ProviderFactory
+        from providers.provider_factory import ProviderFactory
         factory = ProviderFactory()
         sem = asyncio.Semaphore(parallel)
 
@@ -2182,7 +2182,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
 
     # Record provider reliability events for every provision attempt
     try:
-        from terradev_cli.core.price_intelligence import record_provider_event, record_availability
+        from core.price_intelligence import record_provider_event, record_availability
         for r in succeeded:
             record_provider_event(
                 provider=r['provider'], event_type="provision", success=True,
@@ -2212,7 +2212,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     for r in succeeded:
         # Cost tracking DB
         try:
-            from terradev_cli.core.cost_tracker import record_provision
+            from core.cost_tracker import record_provision
             record_provision(
                 instance_id=r['instance_id'], provider=r['provider'],
                 gpu_type=gpu_type, region=r['region'],
@@ -2240,7 +2240,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
 
         # Log provision to telemetry for visibility
         try:
-            from terradev_cli.core.telemetry import TelemetryClient
+            from core.telemetry import TelemetryClient
             telemetry = TelemetryClient()
             telemetry.log_usage("provision", {
                 "instance_id": r['instance_id'],
@@ -2261,8 +2261,8 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     # Store SSH key path in cost DB for this provision group
     if _provision_ssh_pubkey and succeeded:
         try:
-            from terradev_cli.core.cost_tracker import set_ssh_key_path
-            from terradev_cli.core.ssh_key_manager import get_provision_ssh_key_path as _get_ssh_path
+            from core.cost_tracker import set_ssh_key_path
+            from core.ssh_key_manager import get_provision_ssh_key_path as _get_ssh_path
             ssh_path = _get_ssh_path(group_id)
             if ssh_path:
                 set_ssh_key_path(group_id, ssh_path)
@@ -2271,7 +2271,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
 
     # Silent: governance audit log for every provision
     try:
-        from terradev_cli.core.data_governance import DataGovernanceManager
+        from core.data_governance import DataGovernanceManager
         gov = DataGovernanceManager()
         import json as _json
         for r in succeeded:
@@ -2295,7 +2295,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     # ── Step 5: Integration hooks (W&B + Prometheus) ──
     # Prometheus: push provision metrics
     try:
-        from terradev_cli.integrations.prometheus_integration import (
+        from integrations.prometheus_integration import (
             is_configured as prom_configured, build_provision_metrics, push_metrics,
         )
         if prom_configured(api.credentials) and succeeded:
@@ -2312,7 +2312,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     # W&B: show env var injection status
     wandb_injected = False
     try:
-        from terradev_cli.integrations.wandb_integration import is_configured as wandb_configured, build_env_vars
+        from integrations.wandb_integration import is_configured as wandb_configured, build_env_vars
         if wandb_configured(api.credentials) and succeeded:
             wandb_injected = True
     except Exception:
@@ -2374,7 +2374,7 @@ def manage(instance_id, action):
     print(f"   Provider: {instance['provider']}  |  GPU: {instance['gpu_type']}  |  Region: {instance.get('region', '?')}")
 
     async def _run():
-        from terradev_cli.providers.provider_factory import ProviderFactory
+        from providers.provider_factory import ProviderFactory
         factory = ProviderFactory()
         creds = api._provider_creds(pname)
         provider = factory.create_provider(pname, creds)
@@ -2394,14 +2394,14 @@ def manage(instance_id, action):
             api.usage["instances_created"] = [i for i in api.usage["instances_created"] if i["id"] != instance_id]
             api.save_usage()
             try:
-                from terradev_cli.core.cost_tracker import end_provision
+                from core.cost_tracker import end_provision
                 end_provision(instance_id)
             except Exception:
                 pass
             # Enterprise+ GPU-hour metering — report usage to Stripe
             try:
                 if api.tier.get('name') == 'Enterprise+':
-                    from terradev_cli.core.stripe_manager import StripeManager
+                    from core.stripe_manager import StripeManager
                     sm = StripeManager()
                     metering = sm._load_metering()
                     sub_item_id = metering.get('subscription_item_id')
@@ -2426,7 +2426,7 @@ def manage(instance_id, action):
                 pass
             # Prometheus: push terminate metrics
             try:
-                from terradev_cli.integrations.prometheus_integration import (
+                from integrations.prometheus_integration import (
                     is_configured as prom_configured, build_terminate_metrics, push_metrics,
                 )
                 if prom_configured(api.credentials):
@@ -2484,7 +2484,7 @@ def status(format, live):
 
     # Cost DB summary
     try:
-        from terradev_cli.core.cost_tracker import get_spend_summary
+        from core.cost_tracker import get_spend_summary
         summary = get_spend_summary(30)
         print(f"\nLast 30 days: ${summary['total_provision_cost']:.2f} provision cost  |  {summary['quotes_fetched']} quotes fetched")
         if summary['by_provider']:
@@ -2513,7 +2513,7 @@ def status(format, live):
         print("   (querying providers for live status...)")
 
         async def _query_all():
-            from terradev_cli.providers.provider_factory import ProviderFactory
+            from providers.provider_factory import ProviderFactory
             factory = ProviderFactory()
             results = {}
             for inst in instances:
@@ -2561,7 +2561,7 @@ def stage(dataset, target_regions, compression, plan_only):
     print(f"🗜️  Compression: {compression}")
 
     try:
-        from terradev_cli.core.dataset_stager import DatasetStager
+        from core.dataset_stager import DatasetStager
         stager = DatasetStager()
 
         # Show plan
@@ -2595,7 +2595,7 @@ def stage(dataset, target_regions, compression, plan_only):
 
         # Record to cost DB
         try:
-            from terradev_cli.core.cost_tracker import record_staging
+            from core.cost_tracker import record_staging
             record_staging(dataset, result['original_size'], result['compressed_size'],
                           result['compression'], result['chunks'], regions)
         except Exception:
@@ -2603,7 +2603,7 @@ def stage(dataset, target_regions, compression, plan_only):
 
         # Silent: governance audit log for dataset staging
         try:
-            from terradev_cli.core.data_governance import DataGovernanceManager
+            from core.data_governance import DataGovernanceManager
             gov = DataGovernanceManager()
             import json as _json
             entry = {
@@ -2650,7 +2650,7 @@ def execute(instance_id, command, async_exec):
     print(f"   $ {command}")
 
     async def _exec():
-        from terradev_cli.providers.provider_factory import ProviderFactory
+        from providers.provider_factory import ProviderFactory
         factory = ProviderFactory()
         creds = api._provider_creds(pname)
         provider = factory.create_provider(pname, creds)
@@ -2680,7 +2680,7 @@ def analytics(days, format):
     """Show cost analytics from the cost tracking database."""
 
     try:
-        from terradev_cli.core.cost_tracker import get_spend_summary, get_daily_spend
+        from core.cost_tracker import get_spend_summary, get_daily_spend
         summary = get_spend_summary(days)
 
         if format == 'json':
@@ -2792,7 +2792,7 @@ def optimize():
 
     # Egress optimization
     try:
-        from terradev_cli.core.egress_optimizer import estimate_egress_cost
+        from core.egress_optimizer import estimate_egress_cost
         egress_recs = []
         providers_in_use = list(set(inst.get('provider', '').lower().replace(' ', '_') for inst in instances))
         if len(providers_in_use) >= 2:
@@ -2845,7 +2845,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
     # ── Export modes ──
     if export_grafana:
         try:
-            from terradev_cli.integrations.prometheus_integration import generate_grafana_dashboard_json
+            from integrations.prometheus_integration import generate_grafana_dashboard_json
             import json as _json
             dashboard = generate_grafana_dashboard_json()
             print(_json.dumps(dashboard, indent=2))
@@ -2857,7 +2857,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
 
     if export_scrape_config:
         try:
-            from terradev_cli.integrations.prometheus_integration import generate_scrape_config
+            from integrations.prometheus_integration import generate_scrape_config
             print("# Add this to your prometheus.yml under scrape_configs:")
             print(generate_scrape_config())
         except Exception as e:
@@ -2866,7 +2866,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
 
     if export_wandb_script:
         try:
-            from terradev_cli.integrations.wandb_integration import is_configured, generate_setup_script
+            from integrations.wandb_integration import is_configured, generate_setup_script
             if not is_configured(api.credentials):
                 print("W&B not configured. Run: terradev configure --provider wandb")
                 return
@@ -2881,7 +2881,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
 
     # W&B
     try:
-        from terradev_cli.integrations.wandb_integration import get_status_summary
+        from integrations.wandb_integration import get_status_summary
         wb = get_status_summary(api.credentials)
         status = "Connected" if wb['configured'] else "Not configured"
         print(f"\nWeights & Biases          {status}")
@@ -2900,7 +2900,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
 
     # Prometheus
     try:
-        from terradev_cli.integrations.prometheus_integration import get_status_summary
+        from integrations.prometheus_integration import get_status_summary
         pm = get_status_summary(api.credentials)
         status = "Connected" if pm['configured'] else "Not configured"
         print(f"\nPrometheus                {status}")
@@ -3048,7 +3048,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
     
     # Silent: record inference price ticks for ML training data
     try:
-        from terradev_cli.core.price_intelligence import record_price_ticks_batch
+        from core.price_intelligence import record_price_ticks_batch
         ticks = [
             {
                 "gpu_type": q.get("gpu_type", gpu_type or "A100"),
@@ -3082,7 +3082,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
     print(f"\nDeploying to {pname}...")
 
     async def _deploy_inference():
-        from terradev_cli.providers.provider_factory import ProviderFactory
+        from providers.provider_factory import ProviderFactory
         factory = ProviderFactory()
         creds = api._provider_creds(pname)
         prov = factory.create_provider(pname, creds)
@@ -3120,7 +3120,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
 
     # Register with inference router for health tracking + failover
     try:
-        from terradev_cli.core.inference_router import InferenceRouter
+        from core.inference_router import InferenceRouter
         router = InferenceRouter()
         router.register_endpoint(
             endpoint_id=endpoint_id,
@@ -3201,7 +3201,7 @@ def infer_deploy(model_path, name, provider, gpu_type, min_workers, max_workers,
     # Provision the instance
     print(f"Deploying endpoint...")
     async def _provision():
-        from terradev_cli.providers.provider_factory import ProviderFactory
+        from providers.provider_factory import ProviderFactory
         factory = ProviderFactory()
         creds = api._provider_creds(pname)
         prov = factory.create_provider(pname, creds)
@@ -3227,7 +3227,7 @@ def infer_deploy(model_path, name, provider, gpu_type, min_workers, max_workers,
     
     # Silent: record inference deployment tick for ML training data
     try:
-        from terradev_cli.core.price_intelligence import record_price_tick
+        from core.price_intelligence import record_price_tick
         record_price_tick(
             gpu_type=gpu_type or "A100",
             provider=provider or "auto",
@@ -3257,7 +3257,7 @@ def infer_deploy(model_path, name, provider, gpu_type, min_workers, max_workers,
 
     # Register with inference router for health tracking + failover
     try:
-        from terradev_cli.core.inference_router import InferenceRouter
+        from core.inference_router import InferenceRouter
         router = InferenceRouter()
         router.register_endpoint(
             endpoint_id=endpoint_id,
@@ -3301,7 +3301,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
     if not api.check_provision_limit():
         # Check with telemetry server for server-side enforcement
         try:
-            from terradev_cli.core.telemetry import check_license
+            from core.telemetry import check_license
             if not check_license('provision'):
                 return  # Blocked by server-side paywall
         except ImportError:
@@ -3328,7 +3328,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
                 stripe_session_id = session_match.group(1)
                 
             # Log Stripe checkout initiation
-            from terradev_cli.core.telemetry import TelemetryClient
+            from core.telemetry import TelemetryClient
             telemetry = TelemetryClient()
             telemetry.log_usage("stripe_checkout_initiated", {
                 "tier": api.tier["name"],
@@ -3344,7 +3344,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
             pass  # Telemetry is best-effort        
         # Log paywall hit to telemetry for visibility
         try:
-            from terradev_cli.core.telemetry import TelemetryClient
+            from core.telemetry import TelemetryClient
             telemetry = TelemetryClient()
             telemetry.log_usage("paywall_hit", {
                 "tier": api.tier["name"],
@@ -3363,7 +3363,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
                 
                 # Track Stripe checkout opened
                 try:
-                    from terradev_cli.core.telemetry import TelemetryClient
+                    from core.telemetry import TelemetryClient
                     telemetry = TelemetryClient()
                     telemetry.log_usage("stripe_checkout_opened", {
                         "tier": api.tier["name"],
@@ -3424,7 +3424,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
 
     # Silent: record price ticks for ML training data
     try:
-        from terradev_cli.core.price_intelligence import record_price_ticks_batch
+        from core.price_intelligence import record_price_ticks_batch
         ticks = [
             {
                 "gpu_type": q.get("gpu_type", gpu or ""),
@@ -3462,7 +3462,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
     print(f"\nProvisioning on {best['provider']}...")
 
     async def _provision():
-        from terradev_cli.providers.provider_factory import ProviderFactory
+        from providers.provider_factory import ProviderFactory
         factory = ProviderFactory()
         pname = best['provider'].lower().replace(' ', '_')
         creds = api._provider_creds(pname)
@@ -3496,7 +3496,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
     api.save_usage()
 
     try:
-        from terradev_cli.core.cost_tracker import record_provision
+        from core.cost_tracker import record_provision
         record_provision(
             instance_id=instance_id, provider=best['provider'],
             gpu_type=gpu, region=best.get('region', ''),
@@ -3519,7 +3519,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
 
     # Auto-inject W&B env vars if configured
     try:
-        from terradev_cli.integrations.wandb_integration import is_configured as wandb_configured, build_env_vars
+        from integrations.wandb_integration import is_configured as wandb_configured, build_env_vars
         if wandb_configured(api.credentials):
             wandb_env = build_env_vars(api.credentials)
             for k, v in wandb_env.items():
@@ -3537,7 +3537,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
     print(f"   $ {docker_cmd}")
 
     async def _deploy_and_exec():
-        from terradev_cli.providers.provider_factory import ProviderFactory
+        from providers.provider_factory import ProviderFactory
         factory = ProviderFactory()
         creds = api._provider_creds(pname)
         prov = factory.create_provider(pname, creds)
@@ -3573,7 +3573,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
         if exit_code == 0:
             print(f"\n🛑 Auto-terminating instance...")
             async def _terminate():
-                from terradev_cli.providers.provider_factory import ProviderFactory
+                from providers.provider_factory import ProviderFactory
                 factory = ProviderFactory()
                 creds = api._provider_creds(pname)
                 prov = factory.create_provider(pname, creds)
@@ -3585,14 +3585,14 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
                 ]
                 api.save_usage()
                 try:
-                    from terradev_cli.core.cost_tracker import end_provision
+                    from core.cost_tracker import end_provision
                     end_provision(instance_id)
                 except Exception:
                     pass
                 # Enterprise+ GPU-hour metering — report usage to Stripe
                 try:
                     if api.tier.get('name') == 'Enterprise+':
-                        from terradev_cli.core.stripe_manager import StripeManager
+                        from core.stripe_manager import StripeManager
                         sm = StripeManager()
                         metering_data = sm._load_metering()
                         sub_item_id = metering_data.get('subscription_item_id')
@@ -3640,7 +3640,7 @@ def infer_status(check):
     Use --check to run live health probes before displaying.
     """
     try:
-        from terradev_cli.core.inference_router import InferenceRouter
+        from core.inference_router import InferenceRouter
     except ImportError:
         print("❌ Inference router module not available.")
         print("   This may require Research+ or Enterprise tier.")
@@ -3709,7 +3709,7 @@ def infer_failover(dry_run):
         sys.exit(1)
 
     try:
-        from terradev_cli.core.inference_router import InferenceRouter
+        from core.inference_router import InferenceRouter
     except ImportError:
         print("❌ Inference router module not available.")
         sys.exit(1)
@@ -3778,7 +3778,7 @@ def infer_route(model, strategy, measure):
         sys.exit(1)
 
     try:
-        from terradev_cli.core.inference_router import InferenceRouter
+        from core.inference_router import InferenceRouter
     except ImportError:
         print("❌ Inference router module not available.")
         print("   Run: terradev upgrade")
@@ -4232,7 +4232,7 @@ def k8s_info(cluster_name):
 def smart_deploy(image, workload, command, gpu_count, budget, namespace, name, env, mount, option, memory, storage, hours, region, dry_run):
     """Smart deployment with automatic optimization"""
     try:
-        from terradev_cli.core.deployment_router import SmartDeploymentRouter
+        from core.deployment_router import SmartDeploymentRouter
     except ImportError:
         print("❌ Smart deployment module not available. Install terradev_cli package.")
         sys.exit(1)
@@ -4320,7 +4320,7 @@ def smart_deploy(image, workload, command, gpu_count, budget, namespace, name, e
 def price_discovery(gpu_type, region, hours, trends):
     """Enhanced price discovery with capacity and confidence scoring"""
     try:
-        from terradev_cli.core.price_discovery import PriceDiscoveryEngine
+        from core.price_discovery import PriceDiscoveryEngine
     except ImportError:
         print("❌ Price discovery module not available. Install terradev_cli package.")
         sys.exit(1)
@@ -4373,7 +4373,7 @@ def budget_optimize(gpu_type, budget, gpu_count, hours, region, workload):
     import asyncio
     
     async def _budget_optimize():
-        from terradev_cli.core.price_discovery import BudgetOptimizationEngine
+        from core.price_discovery import BudgetOptimizationEngine
         
         optimizer = BudgetOptimizationEngine()
         
@@ -4421,7 +4421,7 @@ def budget_optimize(gpu_type, budget, gpu_count, hours, region, workload):
 @click.option('--dry-run', is_flag=True, help='Show chart config without generating')
 def helm_generate(workload, gpu_type, image, gpu_count, memory, storage, budget, region, output, name, dry_run):
     """Generate Helm charts from Terradev workloads"""
-    from terradev_cli.core.helm_generator import HelmChartGenerator
+    from core.helm_generator import HelmChartGenerator
     
     generator = HelmChartGenerator()
     
@@ -4501,7 +4501,7 @@ def helm_generate(workload, gpu_type, image, gpu_count, memory, storage, budget,
 def percentiles(gpu_type, provider, spot, window):
     """Show historical price percentiles (p10–p99) per provider."""
     try:
-        from terradev_cli.core.price_intelligence import compute_percentiles
+        from core.price_intelligence import compute_percentiles
     except ImportError:
         print("❌ Price intelligence module not available")
         sys.exit(1)
@@ -4543,7 +4543,7 @@ def percentiles(gpu_type, provider, spot, window):
 def availability(gpu_type, window):
     """Show GPU availability / stock status across providers."""
     try:
-        from terradev_cli.core.price_intelligence import get_availability, get_availability_summary
+        from core.price_intelligence import get_availability, get_availability_summary
     except ImportError:
         print("❌ Price intelligence module not available")
         sys.exit(1)
@@ -4595,7 +4595,7 @@ def availability(gpu_type, window):
 def reliability(provider, window, ranking):
     """Show provider reliability scores and error rates."""
     try:
-        from terradev_cli.core.price_intelligence import get_provider_reliability, get_provider_ranking
+        from core.price_intelligence import get_provider_reliability, get_provider_ranking
     except ImportError:
         print("❌ Price intelligence module not available")
         sys.exit(1)
@@ -4671,7 +4671,7 @@ def ml():
 def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type, cpu_limit, memory_limit, resources, install_monitoring, metrics_summary, dashboard):
     """Enhanced Kubernetes cluster management with Karpenter and monitoring"""
     try:
-        from terradev_cli.ml_services.kubernetes_enhanced import create_enhanced_kubernetes_service_from_credentials, get_enhanced_kubernetes_setup_instructions
+        from ml_services.kubernetes_enhanced import create_enhanced_kubernetes_service_from_credentials, get_enhanced_kubernetes_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('kubernetes')
@@ -4796,7 +4796,7 @@ def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type,
 def wandb(test, list_projects, create_project, list_runs, run_details, export, create_dashboard, create_report, setup_alerts, dashboard_status):
     """Enhanced Weights & Biases with dashboards, reports, and alerts"""
     try:
-        from terradev_cli.ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials, get_enhanced_wandb_setup_instructions
+        from ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials, get_enhanced_wandb_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('wandb')
@@ -4935,7 +4935,7 @@ def wandb(test, list_projects, create_project, list_runs, run_details, export, c
 def langchain(test, create_workflow, create_langgraph, create_pipeline, list_projects, list_runs, project, create_trace, run_id, data):
     """Enhanced LangChain integration with workflows, LangGraph, and SGLang"""
     try:
-        from terradev_cli.ml_services.langchain_service import create_langchain_service_from_credentials, get_langchain_setup_instructions
+        from ml_services.langchain_service import create_langchain_service_from_credentials, get_langchain_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('langchain')
@@ -5057,7 +5057,7 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
 def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph):
     """Enhanced LangGraph workflow orchestration with monitoring"""
     try:
-        from terradev_cli.ml_services.langgraph_service import create_langgraph_service_from_credentials, get_langgraph_setup_instructions
+        from ml_services.langgraph_service import create_langgraph_service_from_credentials, get_langgraph_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('langchain')
@@ -5149,7 +5149,7 @@ def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph)
 def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
     """Enhanced SGLang model serving with monitoring"""
     try:
-        from terradev_cli.ml_services.sglang_service import create_sglang_service_from_credentials, get_sglang_setup_instructions
+        from ml_services.sglang_service import create_sglang_service_from_credentials, get_sglang_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('sglang')
@@ -5259,7 +5259,7 @@ def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
 def huggingface(test, list_models, author, list_datasets, model_info, create_endpoint, model, name, instance_type, list_endpoints, inference, inputs):
     """Hugging Face models, datasets, and inference endpoints"""
     try:
-        from terradev_cli.ml_services.huggingface_service import create_huggingface_service_from_credentials, get_huggingface_setup_instructions
+        from ml_services.huggingface_service import create_huggingface_service_from_credentials, get_huggingface_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('huggingface')
@@ -5350,7 +5350,7 @@ def huggingface(test, list_models, author, list_datasets, model_info, create_end
 def kserve(test):
     """KServe model deployment and management"""
     try:
-        from terradev_cli.ml_services.kserve_service import create_kserve_service_from_credentials, get_kserve_setup_instructions
+        from ml_services.kserve_service import create_kserve_service_from_credentials, get_kserve_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('kserve')
@@ -5384,7 +5384,7 @@ def kserve(test):
 def langsmith(test, list_projects, create_project, export):
     """LangSmith experiment tracking and monitoring"""
     try:
-        from terradev_cli.ml_services.langsmith_service import create_langsmith_service_from_credentials, get_langsmith_setup_instructions
+        from ml_services.langsmith_service import create_langsmith_service_from_credentials, get_langsmith_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('langsmith')
@@ -5440,7 +5440,7 @@ def langsmith(test, list_projects, create_project, export):
 def dvc(test, init, add_remote, add_data, push, pull, status):
     """DVC (Data Version Control) management"""
     try:
-        from terradev_cli.ml_services.dvc_service import create_dvc_service_from_credentials, get_dvc_setup_instructions
+        from ml_services.dvc_service import create_dvc_service_from_credentials, get_dvc_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('dvc')
@@ -5511,7 +5511,7 @@ def dvc(test, init, add_remote, add_data, push, pull, status):
 def mlflow(test, list_experiments, create_experiment, list_runs, export):
     """MLflow experiment tracking and model registry"""
     try:
-        from terradev_cli.ml_services.mlflow_service import create_mlflow_service_from_credentials, get_mlflow_setup_instructions
+        from ml_services.mlflow_service import create_mlflow_service_from_credentials, get_mlflow_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('mlflow')
@@ -5579,7 +5579,7 @@ def mlflow(test, list_experiments, create_experiment, list_runs, export):
 def ray(test, status, list_nodes, start, stop, dashboard, install, install_monitoring, metrics_summary, grafana, prometheus):
     """Enhanced Ray distributed computing with monitoring and dashboards"""
     try:
-        from terradev_cli.ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials, get_enhanced_ray_setup_instructions
+        from ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials, get_enhanced_ray_setup_instructions
         
         api = TerradevAPI()
         creds = api._provider_creds('ray')
@@ -5739,8 +5739,8 @@ def up(job, cache_dir, fix_drift, gpu_type, gpu_count, hours, budget, region, da
     import asyncio
     
     async def _up():
-        from terradev_cli.core.manifest_cache import ManifestCache, Manifest, ManifestNode
-        from terradev_cli.core.drift_detector import DriftDetector
+        from core.manifest_cache import ManifestCache, Manifest, ManifestNode
+        from core.drift_detector import DriftDetector
         
         cache = ManifestCache(cache_dir)
         detector = DriftDetector(cache_dir)
@@ -5771,7 +5771,7 @@ def up(job, cache_dir, fix_drift, gpu_type, gpu_count, hours, budget, region, da
         print(f"Deploying Provisioning job {job} with manifest cache...")
         
         # Get optimal deployment (existing logic)
-        from terradev_cli.core.deployment_router import SmartDeploymentRouter
+        from core.deployment_router import SmartDeploymentRouter
         
         router = SmartDeploymentRouter()
         user_request = {
@@ -5858,7 +5858,7 @@ def rollback(job_version, cache_dir):
     import asyncio
     
     async def _rollback():
-        from terradev_cli.core.drift_detector import DriftDetector
+        from core.drift_detector import DriftDetector
         
         # Parse job@version
         if '@' not in job_version:
@@ -5892,7 +5892,7 @@ def rollback(job_version, cache_dir):
 def manifests(job, cache_dir):
     """List cached manifests and versions"""
     try:
-        from terradev_cli.core.manifest_cache import ManifestCache
+        from core.manifest_cache import ManifestCache
     except ImportError:
         print("❌ Manifest cache module not available. Install terradev_cli package.")
         sys.exit(1)
@@ -5955,7 +5955,7 @@ def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret
     import asyncio
     
     async def _hf_space():
-        from terradev_cli.core.hf_spaces import HFSpacesDeployer, HFSpaceConfig, HFSpaceTemplates
+        from core.hf_spaces import HFSpacesDeployer, HFSpaceConfig, HFSpaceTemplates
         
         # Get HF token
         hf_token = os.getenv('HF_TOKEN') or os.getenv('HUGGINGFACE_HUB_TOKEN')
@@ -6039,7 +6039,7 @@ def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret
               default='billing_optimized', help='Scaling policy')
 def orchestrator_start(gpu_id, memory_gb, policy):
     """Start the model orchestrator for multi-model inference"""
-    from terradev_cli.core.model_orchestrator import ModelOrchestrator, ScalingPolicy
+    from core.model_orchestrator import ModelOrchestrator, ScalingPolicy
     
     policy_map = {
         'billing_optimized': ScalingPolicy.BILLING_OPTIMIZED,
@@ -6082,7 +6082,7 @@ def orchestrator_start(gpu_id, memory_gb, policy):
 @click.option('--tags', help='Comma-separated tags for model categorization')
 def orchestrator_register(model_id, model_path, framework, priority, tags):
     """Register a model with the orchestrator"""
-    from terradev_cli.core.model_orchestrator import ModelOrchestrator
+    from core.model_orchestrator import ModelOrchestrator
     
     orchestrator = ModelOrchestrator()
     tag_set = set(tags.split(',')) if tags else None
@@ -6106,7 +6106,7 @@ def orchestrator_register(model_id, model_path, framework, priority, tags):
 @click.option('--force', is_flag=True, help='Force loading even if memory is full')
 def orchestrator_load(model_id, force):
     """Load a model into GPU memory"""
-    from terradev_cli.core.model_orchestrator import ModelOrchestrator
+    from core.model_orchestrator import ModelOrchestrator
     
     orchestrator = ModelOrchestrator()
     
@@ -6128,7 +6128,7 @@ def orchestrator_load(model_id, force):
 @click.argument('model-id')
 def orchestrator_evict(model_id):
     """Evict a model from GPU memory"""
-    from terradev_cli.core.model_orchestrator import ModelOrchestrator
+    from core.model_orchestrator import ModelOrchestrator
     
     orchestrator = ModelOrchestrator()
     
@@ -6145,7 +6145,7 @@ def orchestrator_evict(model_id):
 @click.option('--model-id', help='Get details for specific model')
 def orchestrator_status(model_id):
     """Get orchestrator and model status"""
-    from terradev_cli.core.model_orchestrator import ModelOrchestrator
+    from core.model_orchestrator import ModelOrchestrator
     
     orchestrator = ModelOrchestrator()
     
@@ -6188,7 +6188,7 @@ def orchestrator_status(model_id):
 @click.argument('model-id')
 def orchestrator_infer(model_id):
     """Test inference with a model"""
-    from terradev_cli.core.model_orchestrator import ModelOrchestrator
+    from core.model_orchestrator import ModelOrchestrator
     
     orchestrator = ModelOrchestrator()
     
@@ -6209,7 +6209,7 @@ def orchestrator_infer(model_id):
 @click.option('--min-warm', default=3, help='Minimum models to keep warm')
 def warm_pool_start(strategy, max_warm, min_warm):
     """Start the warm pool manager for intelligent pre-warming"""
-    from terradev_cli.core.warm_pool_manager import WarmPoolManager, WarmPoolConfig, WarmStrategy
+    from core.warm_pool_manager import WarmPoolManager, WarmPoolConfig, WarmStrategy
     
     strategy_map = {
         'traffic_based': WarmStrategy.TRAFFIC_BASED,
@@ -6253,7 +6253,7 @@ def warm_pool_start(strategy, max_warm, min_warm):
 @click.option('--priority', default=0, help='Model priority for warming')
 def warm_pool_register(model_id, priority):
     """Register a model with the warm pool manager"""
-    from terradev_cli.core.warm_pool_manager import WarmPoolManager, WarmPoolConfig
+    from core.warm_pool_manager import WarmPoolManager, WarmPoolConfig
     
     warm_pool = WarmPoolManager(WarmPoolConfig())
     warm_pool.register_model(model_id, priority)
@@ -6264,7 +6264,7 @@ def warm_pool_register(model_id, priority):
 @cli.command()
 def warm_pool_status():
     """Get warm pool manager status"""
-    from terradev_cli.core.warm_pool_manager import WarmPoolManager, WarmPoolConfig
+    from core.warm_pool_manager import WarmPoolManager, WarmPoolConfig
     
     warm_pool = WarmPoolManager(WarmPoolConfig())
     status = warm_pool.get_status()
@@ -6289,7 +6289,7 @@ def warm_pool_status():
 @click.option('--cost-per-gb', default=0.10, help='Cost per GB per hour in USD')
 def cost_scaler_start(strategy, budget, cost_per_gb):
     """Start the cost-aware scaling manager"""
-    from terradev_cli.core.cost_scaler import CostScaler, CostConfig, CostStrategy
+    from core.cost_scaler import CostScaler, CostConfig, CostStrategy
     
     strategy_map = {
         'minimize_cost': CostStrategy.MINIMIZE_COST,
@@ -6331,7 +6331,7 @@ def cost_scaler_start(strategy, budget, cost_per_gb):
 @cli.command()
 def cost_scaler_status():
     """Get cost scaler status and recommendations"""
-    from terradev_cli.core.cost_scaler import CostScaler, CostConfig
+    from core.cost_scaler import CostScaler, CostConfig
     
     cost_scaler = CostScaler(CostConfig())
     status = cost_scaler.get_status()
@@ -6363,7 +6363,7 @@ def cost_scaler_status():
 @click.argument('model-id')
 def cost_scaler_model_details(model_id):
     """Get cost details for a specific model"""
-    from terradev_cli.core.cost_scaler import CostScaler, CostConfig
+    from core.cost_scaler import CostScaler, CostConfig
     
     cost_scaler = CostScaler(CostConfig())
     details = cost_scaler.get_model_cost_details(model_id)
@@ -6397,7 +6397,7 @@ def gitops():
 @click.option('--prune/--no-prune', default=True, help='Enable resource pruning')
 def init(provider, repository, tool, cluster, git_url, git_token, namespace, auto_sync, prune):
     """Initialize GitOps repository and structure"""
-    from terradev_cli.core.gitops_manager import GitOpsManager, GitOpsConfig, GitProvider, GitOpsTool
+    from core.gitops_manager import GitOpsManager, GitOpsConfig, GitProvider, GitOpsTool
     
     provider_map = {
         'github': GitProvider.GITHUB,
@@ -6450,7 +6450,7 @@ def init(provider, repository, tool, cluster, git_url, git_token, namespace, aut
 @click.option('--namespace', default='gitops-system', help='Namespace for GitOps tools')
 def bootstrap(tool, cluster, namespace):
     """Bootstrap GitOps tool on the cluster"""
-    from terradev_cli.core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
+    from core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
     
     # This is a simplified bootstrap - in practice, you'd load config from previous init
     config = GitOpsConfig(
@@ -6482,7 +6482,7 @@ def bootstrap(tool, cluster, namespace):
 @click.option('--tool', type=click.Choice(['argocd', 'flux']), default='argocd', help='GitOps tool')
 def sync(cluster, environment, tool):
     """Sync cluster with Git repository"""
-    from terradev_cli.core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
+    from core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
     
     # This is a simplified sync - in practice, you'd load config from previous init
     config = GitOpsConfig(
@@ -6513,7 +6513,7 @@ def sync(cluster, environment, tool):
 @click.option('--environment', default='prod', help='Environment to validate')
 def validate(dry_run, cluster, environment):
     """Validate GitOps configuration"""
-    from terradev_cli.core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
+    from core.gitops_manager import GitOpsManager, GitOpsConfig, GitOpsTool
     
     # This is a simplified validation - in practice, you'd load config from previous init
     config = GitOpsConfig(
@@ -6615,7 +6615,7 @@ def deploy(model, image, gpu_type, gpu_memory, max_concurrency, framework, opena
     with open(config_file) as f:
         config = json.load(f)
     
-    from terradev_cli.providers.inferx_provider import InferXProvider
+    from providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6670,7 +6670,7 @@ def status(model_id):
     with open(config_file) as f:
         config = json.load(f)
     
-    from terradev_cli.providers.inferx_provider import InferXProvider
+    from providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6706,7 +6706,7 @@ def delete(model_id):
     with open(config_file) as f:
         config = json.load(f)
     
-    from terradev_cli.providers.inferx_provider import InferXProvider
+    from providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6740,7 +6740,7 @@ def inferx_list():
     with open(config_file) as f:
         config = json.load(f)
     
-    from terradev_cli.providers.inferx_provider import InferXProvider
+    from providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6782,7 +6782,7 @@ def usage():
     with open(config_file) as f:
         config = json.load(f)
     
-    from terradev_cli.providers.inferx_provider import InferXProvider
+    from providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6820,7 +6820,7 @@ def quote(gpu_type, region):
     with open(config_file) as f:
         config = json.load(f)
     
-    from terradev_cli.providers.inferx_provider import InferXProvider
+    from providers.inferx_provider import InferXProvider
     
     provider = InferXProvider(config)
     
@@ -6863,7 +6863,7 @@ def optimize(cluster_config, usage_metrics, tier, output, implement):
     """Analyze and optimize InferX costs with AI-powered recommendations"""
     import json
     from pathlib import Path
-    from terradev_cli.cost_optimizer import InferXCostOptimizer, CostTier
+    from k8s.t_optimizer import InferXCostOptimizer, CostTier
     
     optimizer = InferXCostOptimizer()
     target_tier = CostTier(tier)
@@ -6956,7 +6956,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
     if an encrypted per-provision key was generated during provision.
     """
     try:
-        from terradev_cli.core.cost_tracker import (
+        from core.cost_tracker import (
             get_active_instances, get_latest_parallel_group, set_instance_ip,
             get_provision_ssh_key_path as _db_ssh_path,
         )
@@ -6997,7 +6997,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
         api = TerradevAPI()
 
         async def _resolve_ips():
-            from terradev_cli.providers.provider_factory import ProviderFactory
+            from providers.provider_factory import ProviderFactory
             factory = ProviderFactory()
             results = {}
 
@@ -7038,7 +7038,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
     resolved_ssh_key = None
     try:
         if _db_ssh_path(group_id):
-            from terradev_cli.core.ssh_key_manager import decrypt_private_key
+            from core.ssh_key_manager import decrypt_private_key
             resolved_ssh_key = decrypt_private_key(group_id)
             if resolved_ssh_key and fmt != "json":
                 print(f"  SSH key auto-resolved from provision group (ephemeral decrypt)")
@@ -7067,7 +7067,7 @@ def preflight(nodes, ssh_user, ssh_key, provision_group, quick, fmt):
         terradev preflight --from-provision latest
         terradev preflight -f json
     """
-    from terradev_cli.core.preflight_validator import PreflightValidator
+    from core.preflight_validator import PreflightValidator
 
     node_list = list(nodes) if nodes else []
     resolved_ssh_key = ssh_key
@@ -7139,7 +7139,7 @@ def train(config_path, script, framework, backend, nodes, provision_group,
         terradev train -s train.py --from-provision pg_1709123456_abc12345
         terradev train -s train.py --from-provision latest
     """
-    from terradev_cli.core.training_orchestrator import TrainingOrchestrator, TrainingConfig
+    from core.training_orchestrator import TrainingOrchestrator, TrainingConfig
 
     # ── Resolve nodes from provision group if specified ──
     resolved_nodes = list(nodes)
@@ -7220,7 +7220,7 @@ def monitor(job_id, nodes, ssh_user, ssh_key, provision_group, log_path, interva
         terradev monitor --prometheus http://localhost:9090 -f json
         terradev monitor -j job-abc123 --interval 5 --count 10
     """
-    from terradev_cli.core.training_monitor import TrainingMonitor
+    from core.training_monitor import TrainingMonitor
 
     node_list = list(nodes) if nodes else []
     resolved_ssh_key = ssh_key
@@ -7277,7 +7277,7 @@ def checkpoint(action, job_id, step, checkpoint_id, dest, fmt):
         terradev checkpoint promote -j job-abc123 --checkpoint-id ckpt-xyz --dest /models/final
         terradev checkpoint delete -j job-abc123 --checkpoint-id ckpt-xyz
     """
-    from terradev_cli.core.checkpoint_manager import CheckpointManager
+    from core.checkpoint_manager import CheckpointManager
 
     mgr = CheckpointManager()
 
@@ -7339,7 +7339,7 @@ def train_status(job_id, fmt):
         terradev train-status -j job-abc123
         terradev train-status -f json
     """
-    from terradev_cli.core.job_state_manager import JobStateManager
+    from core.job_state_manager import JobStateManager
 
     sm = JobStateManager()
 
@@ -7399,7 +7399,7 @@ def train_stop(job_id, fmt):
     Examples:
         terradev train-stop -j job-abc123
     """
-    from terradev_cli.core.training_orchestrator import TrainingOrchestrator
+    from core.training_orchestrator import TrainingOrchestrator
 
     orch = TrainingOrchestrator()
     result = orch.stop(job_id)
@@ -7423,7 +7423,7 @@ def train_resume(job_id, checkpoint_id, fmt):
         terradev train-resume -j job-abc123
         terradev train-resume -j job-abc123 --checkpoint-id ckpt-xyz
     """
-    from terradev_cli.core.training_orchestrator import TrainingOrchestrator
+    from core.training_orchestrator import TrainingOrchestrator
 
     orch = TrainingOrchestrator()
     result = orch.resume(job_id, checkpoint_id=checkpoint_id or None)
@@ -7480,7 +7480,7 @@ def vllm_optimize(model, type, gpu_count, output):
         terradev vllm optimize -m meta-llama/Llama-2-7b-hf -t throughput
         terradev vllm optimize -m mistralai/Mistral-7B-v0.1 -t latency -g 4
     """
-    from terradev_cli.ml_services.vllm_service import VLLMConfig
+    from ml_services.vllm_service import VLLMConfig
     
     # Create optimized config
     if type == 'throughput':
@@ -7493,7 +7493,7 @@ def vllm_optimize(model, type, gpu_count, output):
     
     if output == 'args':
         # Import the service to get the args
-        from terradev_cli.ml_services.vllm_service import VLLMService
+        from ml_services.vllm_service import VLLMService
         service = VLLMService(config)
         args = service._build_server_args()
         print(" ".join(args))
@@ -7549,7 +7549,7 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
         # Generate and apply Helm values
         terradev vllm auto-optimize -e http://localhost:8000 -m codellama/CodeLlama-34b-hf -o helm
     """
-    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService, WorkloadProfile
+    from ml_services.vllm_service import VLLMConfig, VLLMService, WorkloadProfile
     import asyncio
     
     async def run_optimization():
@@ -7630,7 +7630,7 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
                 print(json.dumps(optimized, indent=2))
             elif output == 'args':
                 # Generate CLI args from optimized config
-                from terradev_cli.ml_services.vllm_service import VLLMService
+                from ml_services.vllm_service import VLLMService
                 temp_config = VLLMConfig(
                     model_name=optimized['model_name'],
                     max_num_batched_tokens=optimized['max_num_batched_tokens'],
@@ -7679,7 +7679,7 @@ def vllm_analyze(endpoint, duration):
         terradev vllm analyze -e http://localhost:8000
         terradev vllm analyze -e http://10.0.0.1:8000 -d 120
     """
-    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+    from ml_services.vllm_service import VLLMConfig, VLLMService
     import asyncio
     
     async def run_analysis():
@@ -7735,7 +7735,7 @@ def vllm_analyze(endpoint, duration):
 @click.option('--concurrent', '-c', type=int, default=1, help='Concurrent requests')
 def vllm_benchmark(endpoint, api_key, prompt, concurrent):
     """Benchmark vLLM endpoint performance."""
-    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+    from ml_services.vllm_service import VLLMConfig, VLLMService
     import asyncio
     import time
     
@@ -7797,7 +7797,7 @@ def lora_list_cmd(endpoint, api_key):
     Examples:
         terradev lora list -e http://10.0.0.1:8000
     """
-    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+    from ml_services.vllm_service import VLLMConfig, VLLMService
 
     host, port = _parse_vllm_endpoint(endpoint)
     svc = VLLMService(VLLMConfig(model_name="", host=host, port=port, api_key=api_key))
@@ -7831,7 +7831,7 @@ def lora_add_cmd(endpoint, name, path, api_key):
     Examples:
         terradev lora add -e http://10.0.0.1:8000 -n customer-a -p /adapters/customer-a
     """
-    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService, LoRAModule
+    from ml_services.vllm_service import VLLMConfig, VLLMService, LoRAModule
 
     host, port = _parse_vllm_endpoint(endpoint)
     svc = VLLMService(VLLMConfig(model_name="", host=host, port=port, api_key=api_key))
@@ -7853,7 +7853,7 @@ def lora_remove_cmd(endpoint, name, api_key):
     Examples:
         terradev lora remove -e http://10.0.0.1:8000 -n customer-a
     """
-    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+    from ml_services.vllm_service import VLLMConfig, VLLMService
 
     host, port = _parse_vllm_endpoint(endpoint)
     svc = VLLMService(VLLMConfig(model_name="", host=host, port=port, api_key=api_key))
@@ -7882,7 +7882,7 @@ def datadog():
 @click.option('--site', default='datadoghq.com')
 def datadog_configure(api_key, app_key, site):
     """Configure Datadog credentials."""
-    from terradev_cli.integrations.datadog_integration import save_credentials
+    from integrations.datadog_integration import save_credentials
     save_credentials(api_key, app_key, site)
     print(f"✅ Datadog credentials saved (site: {site})")
 
@@ -7890,7 +7890,7 @@ def datadog_configure(api_key, app_key, site):
 @datadog.command('status')
 def datadog_status():
     """Show Datadog integration status."""
-    from terradev_cli.integrations.datadog_integration import (
+    from integrations.datadog_integration import (
         load_credentials, validate_credentials)
     creds = load_credentials()
     if not creds:
@@ -7909,7 +7909,7 @@ def datadog_status():
 @click.option('--tags', '-t', multiple=True)
 def datadog_submit_metric(metric, value, tags):
     """Submit a custom metric to Datadog."""
-    from terradev_cli.integrations.datadog_integration import (
+    from integrations.datadog_integration import (
         load_credentials, submit_metric)
     creds = load_credentials()
     if not creds:
@@ -7929,7 +7929,7 @@ def datadog_submit_metric(metric, value, tags):
 @click.option('--notify', default='@slack-terradev-alerts')
 def datadog_create_monitor(template, notify):
     """Create a monitor from a FinOps template."""
-    from terradev_cli.integrations.datadog_integration import (
+    from integrations.datadog_integration import (
         load_credentials, create_monitor)
     creds = load_credentials()
     if not creds:
@@ -7944,7 +7944,7 @@ def datadog_create_monitor(template, notify):
 @datadog.command('list-monitors')
 def datadog_list_monitors():
     """List Terradev monitors in Datadog."""
-    from terradev_cli.integrations.datadog_integration import (
+    from integrations.datadog_integration import (
         load_credentials, list_monitors)
     creds = load_credentials()
     if not creds:
@@ -7966,7 +7966,7 @@ def datadog_list_monitors():
 @click.confirmation_option(prompt='Delete this monitor?')
 def datadog_delete_monitor(monitor_id):
     """Delete a Datadog monitor by ID."""
-    from terradev_cli.integrations.datadog_integration import (
+    from integrations.datadog_integration import (
         load_credentials, delete_monitor)
     creds = load_credentials()
     if not creds:
@@ -7982,7 +7982,7 @@ def datadog_delete_monitor(monitor_id):
 @click.option('--title', default='Terradev GPU FinOps')
 def datadog_create_dashboard(title):
     """Create the GPU FinOps dashboard."""
-    from terradev_cli.integrations.datadog_integration import (
+    from integrations.datadog_integration import (
         load_credentials, create_dashboard)
     creds = load_credentials()
     if not creds:
@@ -7997,7 +7997,7 @@ def datadog_create_dashboard(title):
 @datadog.command('push-costs')
 def datadog_push_costs():
     """Push cost snapshot from cost tracker to Datadog."""
-    from terradev_cli.integrations.datadog_integration import (
+    from integrations.datadog_integration import (
         load_credentials, push_cost_snapshot)
     creds = load_credentials()
     if not creds:
@@ -8013,7 +8013,7 @@ def datadog_push_costs():
 @datadog.command('export-tf')
 def datadog_export_tf():
     """Export Terraform module config for Datadog."""
-    from terradev_cli.integrations.datadog_integration import (
+    from integrations.datadog_integration import (
         load_credentials, export_terraform_vars)
     creds = load_credentials()
     if not creds:
@@ -8041,7 +8041,7 @@ def phoenix():
 @phoenix.command('test')
 def phoenix_test():
     """Test connection to Phoenix server."""
-    from terradev_cli.ml_services.phoenix_service import (
+    from ml_services.phoenix_service import (
         create_phoenix_service_from_credentials, get_phoenix_setup_instructions)
     api = TerradevAPI()
     creds = api._provider_creds('phoenix')
@@ -8061,7 +8061,7 @@ def phoenix_test():
 @click.option('--limit', '-l', default=50, help='Max projects to return')
 def phoenix_projects(limit):
     """List Phoenix projects."""
-    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
+    from ml_services.phoenix_service import create_phoenix_service_from_credentials
     api = TerradevAPI()
     svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
     data = asyncio.run(svc.list_projects(limit=limit))
@@ -8079,8 +8079,8 @@ def phoenix_projects(limit):
 @click.option('--limit', '-l', default=20, help='Max spans')
 def phoenix_spans(project, filter_cond, limit):
     """List recent spans for a project."""
-    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
-    from terradev_cli.core.trace_viewer import view_recent_spans
+    from ml_services.phoenix_service import create_phoenix_service_from_credentials
+    from core.trace_viewer import view_recent_spans
     api = TerradevAPI()
     svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
     output = asyncio.run(view_recent_spans(svc, project=project, limit=limit, filter_condition=filter_cond))
@@ -8092,8 +8092,8 @@ def phoenix_spans(project, filter_cond, limit):
 @click.option('--project', '-p', default=None, help='Project ID or name')
 def phoenix_trace(trace_id, project):
     """View full execution tree for a trace."""
-    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
-    from terradev_cli.core.trace_viewer import view_trace
+    from ml_services.phoenix_service import create_phoenix_service_from_credentials
+    from core.trace_viewer import view_trace
     api = TerradevAPI()
     svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
     output = asyncio.run(view_trace(svc, trace_id, project=project))
@@ -8104,7 +8104,7 @@ def phoenix_trace(trace_id, project):
 @click.option('--project', '-p', default=None, help='Project name')
 def phoenix_otel_env(project):
     """Print OTEL env vars to inject into serving pods."""
-    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
+    from ml_services.phoenix_service import create_phoenix_service_from_credentials
     api = TerradevAPI()
     svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
     env = svc.generate_otel_env(project_name=project)
@@ -8116,7 +8116,7 @@ def phoenix_otel_env(project):
 @click.option('--project', '-p', default=None, help='Project name')
 def phoenix_snippet(project):
     """Print Python instrumentation snippet."""
-    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
+    from ml_services.phoenix_service import create_phoenix_service_from_credentials
     api = TerradevAPI()
     svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
     print(svc.generate_instrumentation_snippet(project_name=project))
@@ -8126,7 +8126,7 @@ def phoenix_snippet(project):
 @click.option('--namespace', '-n', default='observability', help='K8s namespace')
 def phoenix_k8s(namespace):
     """Print K8s deployment manifest for Phoenix server."""
-    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
+    from ml_services.phoenix_service import create_phoenix_service_from_credentials
     api = TerradevAPI()
     svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
     print(svc.generate_k8s_deployment(namespace=namespace))
@@ -8145,7 +8145,7 @@ def guardrails():
 @guardrails.command('test')
 def guardrails_test_cmd():
     """Test connection to guardrails server."""
-    from terradev_cli.ml_services.guardrails_service import (
+    from ml_services.guardrails_service import (
         create_guardrails_service_from_credentials, get_guardrails_setup_instructions)
     api = TerradevAPI()
     creds = api._provider_creds('guardrails')
@@ -8165,7 +8165,7 @@ def guardrails_test_cmd():
 @click.option('--config-id', '-c', default=None, help='Guardrails config_id')
 def guardrails_chat(message, config_id):
     """Send a message through guardrails and show the result."""
-    from terradev_cli.ml_services.guardrails_service import create_guardrails_service_from_credentials
+    from ml_services.guardrails_service import create_guardrails_service_from_credentials
     api = TerradevAPI()
     svc = create_guardrails_service_from_credentials(api._provider_creds('guardrails'))
     result = asyncio.run(svc.test_rail(message, config_id=config_id))
@@ -8179,7 +8179,7 @@ def guardrails_chat(message, config_id):
 @click.option('--output-dir', '-o', default='./guardrails', help='Output directory')
 def guardrails_generate_config(config_id, output_dir):
     """Generate default Colang 2.x guardrails configuration."""
-    from terradev_cli.ml_services.guardrails_service import create_guardrails_service_from_credentials
+    from ml_services.guardrails_service import create_guardrails_service_from_credentials
     api = TerradevAPI()
     svc = create_guardrails_service_from_credentials(api._provider_creds('guardrails'))
     files = svc.generate_colang_config(config_id=config_id)
@@ -8196,7 +8196,7 @@ def guardrails_generate_config(config_id, output_dir):
 @click.option('--namespace', '-n', default='guardrails', help='K8s namespace')
 def guardrails_k8s(namespace):
     """Print K8s deployment manifest for guardrails server."""
-    from terradev_cli.ml_services.guardrails_service import create_guardrails_service_from_credentials
+    from ml_services.guardrails_service import create_guardrails_service_from_credentials
     api = TerradevAPI()
     svc = create_guardrails_service_from_credentials(api._provider_creds('guardrails'))
     print(svc.generate_k8s_deployment(namespace=namespace))
@@ -8215,7 +8215,7 @@ def qdrant():
 @qdrant.command('test')
 def qdrant_test():
     """Test connection to Qdrant server."""
-    from terradev_cli.ml_services.qdrant_service import (
+    from ml_services.qdrant_service import (
         create_qdrant_service_from_credentials, get_qdrant_setup_instructions)
     api = TerradevAPI()
     creds = api._provider_creds('qdrant')
@@ -8234,7 +8234,7 @@ def qdrant_test():
 @qdrant.command('collections')
 def qdrant_collections():
     """List all collections."""
-    from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
+    from ml_services.qdrant_service import create_qdrant_service_from_credentials
     api = TerradevAPI()
     svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
     cols = asyncio.run(svc.list_collections())
@@ -8250,7 +8250,7 @@ def qdrant_collections():
 @click.option('--embedding-model', '-e', default=None, help='Embedding model (auto-sets vector size)')
 def qdrant_create_collection(name, embedding_model):
     """Create a vector collection (auto-configured for embedding model)."""
-    from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
+    from ml_services.qdrant_service import create_qdrant_service_from_credentials
     api = TerradevAPI()
     svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
     result = asyncio.run(svc.configure_rag_collection(name=name, embedding_model=embedding_model))
@@ -8263,7 +8263,7 @@ def qdrant_create_collection(name, embedding_model):
 @click.option('--name', '-n', default=None, help='Collection name')
 def qdrant_info(name):
     """Get collection info and stats."""
-    from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
+    from ml_services.qdrant_service import create_qdrant_service_from_credentials
     api = TerradevAPI()
     svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
     info = asyncio.run(svc.get_collection_info(name=name))
@@ -8274,7 +8274,7 @@ def qdrant_info(name):
 @click.option('--name', '-n', default=None, help='Collection name')
 def qdrant_count(name):
     """Count points in a collection."""
-    from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
+    from ml_services.qdrant_service import create_qdrant_service_from_credentials
     api = TerradevAPI()
     svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
     count = asyncio.run(svc.count_points(name=name))
@@ -8285,7 +8285,7 @@ def qdrant_count(name):
 @click.option('--namespace', '-n', default='vector-db', help='K8s namespace')
 def qdrant_k8s(namespace):
     """Print K8s StatefulSet manifest for Qdrant."""
-    from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
+    from ml_services.qdrant_service import create_qdrant_service_from_credentials
     api = TerradevAPI()
     svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
     print(svc.generate_k8s_deployment(namespace=namespace))
