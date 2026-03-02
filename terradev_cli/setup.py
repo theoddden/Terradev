@@ -12,7 +12,7 @@ long_description = readme_file.read_text() if readme_file.exists() else ""
 
 setup(
     name="terradev-cli",
-    version="3.5.4",
+    version="3.5.5",
     author="Terradev Team",
     author_email="team@terradev.com",
     description="Cross-cloud GPU provisioning with automatic vLLM optimization, GitOps automation and HuggingFace Spaces deployment",
@@ -20,7 +20,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/theoddden/terradev",
     packages=find_packages(),
-    py_modules=["cli"],
+    py_modules=[],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
