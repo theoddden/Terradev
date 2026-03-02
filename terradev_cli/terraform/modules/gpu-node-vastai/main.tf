@@ -51,6 +51,10 @@ resource "vastai_instance" "gpu_node" {
     labels = local.gpu_labels
     provider = "vastai"
   })
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Wait for instance to be ready
@@ -80,7 +84,7 @@ resource "tailscale_device" "node" {
   depends_on = [null_resource.wait_for_instance]
 }
 
-# Create Kubernetes node (if control plane is ready)
+# Create Kubernetes node — runs in parallel with tailscale_device after wait
 resource "kubernetes_node" "gpu_node" {
   count = var.kubeconfig_path != "" ? 1 : 0
   

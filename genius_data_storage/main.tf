@@ -138,6 +138,10 @@ resource "aws_s3_bucket" "data_storage" {
       bucket_key_enabled = true
     }
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Google Cloud Storage buckets
@@ -193,6 +197,10 @@ resource "google_storage_bucket" "data_storage" {
     compression = "enabled"
     tier        = count.index < 2 ? "hot" : count.index < 4 ? "warm" : "cold"
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Azure Blob Storage containers
@@ -213,6 +221,10 @@ resource "azurerm_storage_account" "data_storage" {
     compression = "enabled"
     tier        = count.index < 2 ? "hot" : count.index < 4 ? "warm" : "cold"
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "azurerm_storage_container" "data_storage" {
@@ -224,6 +236,7 @@ resource "azurerm_storage_container" "data_storage" {
 }
 
 # Data compression and chunking service
+# All 4 Lambda functions are independent — Terraform creates them in parallel
 resource "aws_lambda_function" "data_compressor" {
   function_name = "genius-data-compressor"
   role          = aws_iam_role.lambda_exec.arn
@@ -244,6 +257,10 @@ resource "aws_lambda_function" "data_compressor" {
   
   tags = {
     Name = "Genius Data Compressor"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
@@ -267,6 +284,10 @@ resource "aws_lambda_function" "data_distributor" {
   
   tags = {
     Name = "Genius Data Distributor"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
@@ -302,6 +323,10 @@ resource "aws_lambda_function" "zero_egress_accessor" {
   tags = {
     Name = "Genius Zero Egress Accessor"
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Data integrity verification service
@@ -323,6 +348,10 @@ resource "aws_lambda_function" "integrity_verifier" {
   
   tags = {
     Name = "Genius Integrity Verifier"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

@@ -1,0 +1,290 @@
+# RAG Infrastructure Template — Kubernetes Manifests
+# Components: vLLM + Qdrant + Embedding Model + Redis (LMCache)
+# NUMA-aware: co-locate Qdrant + embedding model on same node
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rag
+
+# ── vLLM Generation Server ──────────────────────────────────────────
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-generation
+  namespace: rag
+  labels:
+    app: vllm
+    component: generation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+        component: generation
+    spec:
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:latest
+          args:
+            - "vllm"
+            - "serve"
+            - "$(MODEL_NAME)"
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8000"
+            - "--gpu-memory-utilization"
+            - "0.9"
+            # Auto-applied optimizations
+            - "--attention-backend=FLASHINFER"
+            - "--kv-connector=offloading"
+            - "--speculative-config.method=mtp"
+            - "--speculative-config.num_speculative_tokens=5"
+            - "--enable-sleep-mode"
+            # LMCache for distributed KV cache
+            - "--lmcache-enable"
+            - "--lmcache-backend=redis"
+            - "--lmcache-remote-url=redis://redis-svc.rag:6379"
+            - "--lmcache-pipelined-backend"
+          env:
+            - name: MODEL_NAME
+              value: "zai-org/GLM-5-FP8"
+            - name: VLLM_ATTENTION_BACKEND
+              value: "FLASHINFER"
+            - name: VLLM_USE_DEEP_GEMM
+              value: "1"
+            # OTEL for Phoenix (if enabled)
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://phoenix-svc.observability:6006"
+            - name: OTEL_SERVICE_NAME
+              value: "terradev-rag-generation"
+          ports:
+            - containerPort: 8000
+              name: http
+          resources:
+            requests:
+              cpu: "4"
+              memory: "32Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: "64Gi"
+              nvidia.com/gpu: "1"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-svc
+  namespace: rag
+spec:
+  selector:
+    app: vllm
+  ports:
+    - port: 8000
+      targetPort: http
+      name: http
+  type: ClusterIP
+
+# ── Qdrant Vector Database ──────────────────────────────────────────
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qdrant
+  namespace: rag
+  labels:
+    app: qdrant
+    component: vector-db
+spec:
+  serviceName: qdrant
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qdrant
+  template:
+    metadata:
+      labels:
+        app: qdrant
+        component: vector-db
+        # NUMA affinity: co-locate with embedding model
+        topology-group: embed-search
+    spec:
+      containers:
+        - name: qdrant
+          image: qdrant/qdrant:latest
+          ports:
+            - containerPort: 6333
+              name: rest
+            - containerPort: 6334
+              name: grpc
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          volumeMounts:
+            - name: qdrant-storage
+              mountPath: /qdrant/storage
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: rest
+            initialDelaySeconds: 5
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: qdrant-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant-svc
+  namespace: rag
+spec:
+  selector:
+    app: qdrant
+  ports:
+    - port: 6333
+      targetPort: rest
+      name: rest
+    - port: 6334
+      targetPort: grpc
+      name: grpc
+  type: ClusterIP
+
+# ── Embedding Model Server ──────────────────────────────────────────
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding-server
+  namespace: rag
+  labels:
+    app: embedding
+    component: embed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: embedding
+  template:
+    metadata:
+      labels:
+        app: embedding
+        component: embed
+        # NUMA affinity: co-locate with Qdrant
+        topology-group: embed-search
+    spec:
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: topology-group
+                      operator: In
+                      values: ["embed-search"]
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: embedding
+          image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.5
+          args:
+            - "--model-id"
+            - "BAAI/bge-large-en-v1.5"
+            - "--port"
+            - "8001"
+          ports:
+            - containerPort: 8001
+              name: http
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: embedding-svc
+  namespace: rag
+spec:
+  selector:
+    app: embedding
+  ports:
+    - port: 8001
+      targetPort: http
+      name: http
+  type: ClusterIP
+
+# ── Redis (LMCache backend) ────────────────────────────────────────
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: rag
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-svc
+  namespace: rag
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: redis
+      name: redis
+  type: ClusterIP

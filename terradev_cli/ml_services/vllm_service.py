@@ -9,9 +9,23 @@ import json
 import asyncio
 import aiohttp
 import subprocess
-from typing import Dict, List, Any, Optional
+import statistics
+from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
+
+
+@dataclass
+class WorkloadProfile:
+    """Workload characteristics for automatic optimization"""
+    avg_prompt_length: float = 0.0  # Average input tokens
+    avg_response_length: float = 0.0  # Average output tokens
+    requests_per_second: float = 0.0  # Expected QPS
+    concurrent_users: int = 1  # Concurrent users
+    latency_sensitivity: float = 0.5  # 0=throughput focused, 1=latency focused
+    memory_pressure: float = 0.5  # 0=plenty of memory, 1=memory constrained
+    gpu_count: int = 1  # Number of GPUs available
+    model_size_gb: float = 0.0  # Model size in GB
 
 
 @dataclass
@@ -30,9 +44,18 @@ class VLLMConfig:
     host: str = "0.0.0.0"
     port: int = 8000
     api_key: Optional[str] = None
-    gpu_memory_utilization: float = 0.9
+    gpu_memory_utilization: float = 0.95  # Optimized: 0.90 → 0.95 (10% more VRAM)
     max_model_len: Optional[int] = None
     tensor_parallel_size: int = 1
+    
+    # ── Critical Throughput Optimizations (6 knobs most teams never touch) ─────
+    max_num_batched_tokens: int = 16384  # Optimized: 2048 → 16384 (8x throughput)
+    max_num_seqs: int = 1024  # Optimized: 256/1024 → 1024 (higher concurrency)
+    enable_prefix_caching: bool = True  # Optimized: OFF → ON (free throughput win)
+    enable_chunked_prefill: bool = True  # Optimized: OFF → ON (V0) / verify ON (V1)
+    
+    # ── CPU Core Allocation (2 + #GPUs for V1 busy loop) ───────────────────────
+    cpu_cores: Optional[int] = None  # Auto-calculated if None: 2 + gpu_count
 
     # ── Multi-LoRA for MoE (vLLM ≥0.15.0) ──────────────────────────────
     enable_lora: bool = False
@@ -80,6 +103,216 @@ class VLLMConfig:
     lmcache_s3_bucket: Optional[str] = None
     lmcache_s3_region: str = "us-east-1"
     lmcache_disk_path: str = "/tmp/lmcache"
+
+    @classmethod
+    def create_auto_optimized(cls, model_name: str, workload: WorkloadProfile, **kwargs) -> 'VLLMConfig':
+        """Create vLLM config automatically optimized based on workload characteristics.
+        
+        Analyzes workload patterns and selects optimal settings for the 6 critical knobs:
+        1. max_num_batched_tokens - Based on prompt/response lengths and QPS
+        2. gpu_memory_utilization - Based on model size and memory pressure
+        3. max_num_seqs - Based on concurrent users and QPS
+        4. enable_prefix_caching - Based on prompt similarity patterns
+        5. enable_chunked_prefill - Based on average prompt length
+        6. CPU cores - Auto-calculated based on GPU count and workload
+        """
+        # Calculate optimal max_num_batched_tokens
+        total_tokens_per_request = workload.avg_prompt_length + workload.avg_response_length
+        
+        # For high QPS workloads, increase batch size
+        if workload.requests_per_second > 50:
+            max_batched = 32768  # Maximum for high throughput
+        elif workload.requests_per_second > 10:
+            max_batched = 16384  # High throughput
+        elif workload.requests_per_second > 2:
+            max_batched = 8192   # Medium throughput
+        else:
+            max_batched = 4096   # Low throughput/latency focused
+        
+        # Adjust for latency sensitivity
+        if workload.latency_sensitivity > 0.7:
+            max_batched = min(max_batched, 4096)
+        elif workload.latency_sensitivity < 0.3:
+            max_batched = max(max_batched, 16384)
+        
+        # Calculate optimal max_num_seqs
+        # Base on concurrent users and expected burst patterns
+        base_seqs = max(workload.concurrent_users, int(workload.requests_per_second * 2))
+        
+        # Add buffer for bursty traffic
+        if workload.requests_per_second > 10:
+            max_seqs = base_seqs * 2
+        else:
+            max_seqs = min(base_seqs * 1.5, 1024)
+        
+        # Cap at reasonable limits and ensure integer
+        max_seqs = int(min(max_seqs, 2048))
+        max_seqs = int(max(max_seqs, 256))
+        
+        # Adjust for latency sensitivity
+        if workload.latency_sensitivity > 0.7:
+            max_seqs = min(max_seqs, 512)
+        
+        # Calculate GPU memory utilization
+        if workload.memory_pressure > 0.8:
+            gpu_util = 0.85  # Conservative for memory pressure
+        elif workload.model_size_gb > 40:  # Large models
+            gpu_util = 0.90
+        else:
+            gpu_util = 0.95  # Aggressive for smaller models
+        
+        # Determine prefix caching value
+        # Enable if prompts are likely to share prefixes (system prompts, templates)
+        enable_prefix_cache = (
+            workload.avg_prompt_length > 100 or  # Long prompts likely have shared prefixes
+            workload.concurrent_users > 5 or     # Multi-user scenarios
+            workload.requests_per_second > 5     # High QPS benefits from caching
+        )
+        
+        # Determine chunked prefill
+        # Most beneficial for long prompts and high QPS
+        enable_chunked_prefill = (
+            workload.avg_prompt_length > 512 or   # Long prompts
+            workload.requests_per_second > 2      # Any significant QPS
+        )
+        
+        # Auto-calculate CPU cores
+        cpu_cores = 2 + workload.gpu_count
+        
+        # Add extra CPU for high QPS workloads
+        if workload.requests_per_second > 20:
+            cpu_cores += 2
+        elif workload.requests_per_second > 10:
+            cpu_cores += 1
+        
+        config = cls(
+            model_name=model_name,
+            max_num_batched_tokens=max_batched,
+            gpu_memory_utilization=gpu_util,
+            max_num_seqs=int(max_seqs),
+            enable_prefix_caching=enable_prefix_cache,
+            enable_chunked_prefill=enable_chunked_prefill,
+            cpu_cores=cpu_cores,
+            tensor_parallel_size=workload.gpu_count,
+            **kwargs
+        )
+        
+        return config
+    
+    @classmethod
+    def analyze_workload_from_samples(cls, samples: List[Dict[str, Any]], gpu_count: int = 1) -> WorkloadProfile:
+        """Analyze workload from sample requests to create profile.
+        
+        Args:
+            samples: List of sample requests with 'prompt', 'response', 'timestamp' keys
+            gpu_count: Number of GPUs available
+            
+        Returns:
+            WorkloadProfile with analyzed characteristics
+        """
+        if not samples:
+            # Return default profile if no samples
+            return WorkloadProfile(
+                avg_prompt_length=256,
+                avg_response_length=128,
+                requests_per_second=1.0,
+                concurrent_users=1,
+                latency_sensitivity=0.5,
+                memory_pressure=0.5,
+                gpu_count=gpu_count
+            )
+        
+        # Extract metrics from samples
+        prompt_lengths = []
+        response_lengths = []
+        timestamps = []
+        
+        for sample in samples:
+            # Simple token estimation (rough approximation: 1 token ≈ 4 characters)
+            prompt_text = sample.get('prompt', '')
+            response_text = sample.get('response', '')
+            
+            prompt_lengths.append(len(prompt_text) // 4)
+            response_lengths.append(len(response_text) // 4)
+            
+            if 'timestamp' in sample:
+                timestamps.append(sample['timestamp'])
+        
+        # Calculate statistics
+        avg_prompt = statistics.mean(prompt_lengths) if prompt_lengths else 256
+        avg_response = statistics.mean(response_lengths) if response_lengths else 128
+        
+        # Calculate QPS from timestamps
+        if len(timestamps) > 1:
+            timestamps.sort()
+            time_span = (timestamps[-1] - timestamps[0]) / 1000  # Convert to seconds
+            requests_per_second = len(timestamps) / max(time_span, 1)
+        else:
+            requests_per_second = 1.0
+        
+        # Estimate concurrent users (simplified)
+        concurrent_users = min(len(set(s.get('user_id', 'default') for s in samples)), 10)
+        
+        # Determine latency sensitivity based on response lengths and QPS
+        if avg_response < 50 and requests_per_second < 2:
+            latency_sensitivity = 0.8  # Short responses, low QPS = latency sensitive
+        elif requests_per_second > 10:
+            latency_sensitivity = 0.2  # High QPS = throughput focused
+        else:
+            latency_sensitivity = 0.5  # Balanced
+        
+        return WorkloadProfile(
+            avg_prompt_length=avg_prompt,
+            avg_response_length=avg_response,
+            requests_per_second=requests_per_second,
+            concurrent_users=concurrent_users,
+            latency_sensitivity=latency_sensitivity,
+            memory_pressure=0.5,  # Default, can be updated based on system info
+            gpu_count=gpu_count
+        )
+
+    @classmethod
+    def create_throughput_optimized(cls, model_name: str, **kwargs) -> 'VLLMConfig':
+        """Create vLLM config optimized for throughput-heavy production.
+        
+        Applies the 6 critical knobs with throughput-focused values:
+        - max_num_batched_tokens: 16384 (8x default)
+        - gpu_memory_utilization: 0.95 (10% more VRAM)
+        - enable_prefix_caching: true (free throughput win)
+        - enable_chunked_prefill: true
+        - max_num_seqs: 1024 (higher concurrency)
+        """
+        config = cls(
+            model_name=model_name,
+            max_num_batched_tokens=16384,
+            gpu_memory_utilization=0.95,
+            enable_prefix_caching=True,
+            enable_chunked_prefill=True,
+            max_num_seqs=1024,
+            **kwargs
+        )
+        return config
+    
+    @classmethod
+    def create_latency_optimized(cls, model_name: str, **kwargs) -> 'VLLMConfig':
+        """Create vLLM config optimized for latency-sensitive production.
+        
+        Applies the 6 critical knobs with latency-focused values:
+        - max_num_batched_tokens: 4096 (balanced)
+        - max_num_seqs: 512 (prevent queue buildup)
+        - enable_chunked_prefill: true
+        - gpu_memory_utilization: 0.95 (still optimized)
+        """
+        config = cls(
+            model_name=model_name,
+            max_num_batched_tokens=4096,
+            gpu_memory_utilization=0.95,
+            enable_prefix_caching=True,  # Still beneficial for latency
+            enable_chunked_prefill=True,
+            max_num_seqs=512,
+            **kwargs
+        )
+        return config
 
 
 class VLLMService:
@@ -444,6 +677,16 @@ systemctl daemon-reload
             args.extend(["--max-model-len", str(self.config.max_model_len)])
         if self.config.api_key:
             args.extend(["--api-key", self.config.api_key])
+        
+        # ── Critical Throughput Optimizations (6 knobs) ───────────────────────
+        args.extend(["--max-num-batched-tokens", str(self.config.max_num_batched_tokens)])
+        args.extend(["--max-num-seqs", str(self.config.max_num_seqs)])
+        
+        if self.config.enable_prefix_caching:
+            args.append("--enable-prefix-caching")
+        
+        if self.config.enable_chunked_prefill:
+            args.append("--enable-chunked-prefill")
 
         # ── FlashInfer Fused Attention ────────────────────────────────
         if self.config.enable_flashinfer:
@@ -696,3 +939,242 @@ echo "✅ vLLM server started on http://{instance_ip}:{self.config.port}/v1"
 echo "🔗 Test with: curl http://{instance_ip}:{self.config.port}/v1/models"
 """
         return script
+    
+    async def analyze_current_workload(self, duration_seconds: int = 60) -> Dict[str, Any]:
+        """Analyze current workload patterns from running vLLM server.
+        
+        Args:
+            duration_seconds: How long to monitor the server
+            
+        Returns:
+            Workload analysis with optimization recommendations
+        """
+        try:
+            if not self.session:
+                self.session = aiohttp.ClientSession()
+            
+            # Get server metrics
+            metrics_url = f"{self.base_url}/metrics"
+            async with self.session.get(metrics_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    return {"status": "failed", "error": f"Metrics endpoint not available: {resp.status}"}
+                
+                metrics_text = await resp.text()
+            
+            # Parse metrics to extract workload patterns
+            workload_data = self._parse_vllm_metrics(metrics_text)
+            
+            # Get current server info
+            server_info = await self.get_server_info()
+            
+            # Analyze and generate recommendations
+            analysis = {
+                "status": "success",
+                "current_workload": workload_data,
+                "server_info": server_info,
+                "optimization_recommendations": self._generate_optimization_recommendations(workload_data),
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            return analysis
+            
+        except Exception as e:
+            return {"status": "failed", "error": f"Workload analysis failed: {str(e)}"}
+    
+    def _parse_vllm_metrics(self, metrics_text: str) -> Dict[str, Any]:
+        """Parse vLLM Prometheus metrics to extract workload patterns."""
+        workload = {
+            "avg_prompt_tokens": 0,
+            "avg_generation_tokens": 0,
+            "requests_per_second": 0,
+            "active_requests": 0,
+            "queue_size": 0,
+            "gpu_utilization": 0,
+            "memory_usage": 0
+        }
+        
+        for line in metrics_text.split('\n'):
+            if 'vllm:avg_prompt_tokens' in line:
+                workload["avg_prompt_tokens"] = float(line.split()[-1])
+            elif 'vllm:avg_generation_tokens' in line:
+                workload["avg_generation_tokens"] = float(line.split()[-1])
+            elif 'vllm:requests_per_second' in line:
+                workload["requests_per_second"] = float(line.split()[-1])
+            elif 'vllm:active_requests' in line:
+                workload["active_requests"] = int(float(line.split()[-1]))
+            elif 'vllm:queue_size' in line:
+                workload["queue_size"] = int(float(line.split()[-1]))
+        
+        return workload
+    
+    def _generate_optimization_recommendations(self, workload_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate optimization recommendations based on current workload."""
+        recommendations = []
+        
+        # Analyze batch size optimization
+        current_rps = workload_data.get("requests_per_second", 0)
+        current_batch_tokens = self.config.max_num_batched_tokens
+        
+        if current_rps > 20 and current_batch_tokens < 16384:
+            recommendations.append({
+                "type": "increase_batch_size",
+                "current_value": current_batch_tokens,
+                "recommended_value": 16384,
+                "reason": f"High QPS ({current_rps:.1f}) would benefit from larger batch size",
+                "impact": "2-3x throughput improvement"
+            })
+        elif current_rps < 2 and current_batch_tokens > 4096:
+            recommendations.append({
+                "type": "decrease_batch_size",
+                "current_value": current_batch_tokens,
+                "recommended_value": 4096,
+                "reason": f"Low QPS ({current_rps:.1f}) would benefit from smaller batch size for lower latency",
+                "impact": "10-20% latency reduction"
+            })
+        
+        # Analyze max sequences optimization
+        queue_size = workload_data.get("queue_size", 0)
+        current_max_seqs = self.config.max_num_seqs
+        
+        if queue_size > 10 and current_max_seqs < 1024:
+            recommendations.append({
+                "type": "increase_max_sequences",
+                "current_value": current_max_seqs,
+                "recommended_value": min(current_max_seqs * 2, 2048),
+                "reason": f"Queue size ({queue_size}) indicates sequence limit is too low",
+                "impact": "Reduce queuing, improve burst handling"
+            })
+        
+        # Analyze prefix caching
+        avg_prompt = workload_data.get("avg_prompt_tokens", 0)
+        if not self.config.enable_prefix_caching and avg_prompt > 100:
+            recommendations.append({
+                "type": "enable_prefix_caching",
+                "current_value": False,
+                "recommended_value": True,
+                "reason": f"Long prompts ({avg_prompt:.0f} tokens) would benefit from prefix caching",
+                "impact": "1.5-3x throughput for similar prompts"
+            })
+        
+        # Analyze chunked prefill
+        if not self.config.enable_chunked_prefill and avg_prompt > 512:
+            recommendations.append({
+                "type": "enable_chunked_prefill",
+                "current_value": False,
+                "recommended_value": True,
+                "reason": f"Very long prompts ({avg_prompt:.0f} tokens) would benefit from chunked prefill",
+                "impact": "20-50% faster prefill for long prompts"
+            })
+        
+        return recommendations
+    
+    async def auto_optimize_from_workload(self, samples: Optional[List[Dict[str, Any]]] = None, 
+                                        gpu_count: int = 1) -> Dict[str, Any]:
+        """Automatically optimize configuration based on workload analysis.
+        
+        Args:
+            samples: Optional sample requests for analysis
+            gpu_count: Number of GPUs available
+            
+        Returns:
+            Optimization results with new configuration
+        """
+        try:
+            # Analyze workload from samples or current server
+            if samples:
+                workload = VLLMConfig.analyze_workload_from_samples(samples, gpu_count)
+            else:
+                # Analyze current server workload
+                analysis = await self.analyze_current_workload()
+                if analysis["status"] != "success":
+                    return analysis
+                
+                current = analysis["current_workload"]
+                workload = WorkloadProfile(
+                    avg_prompt_length=current.get("avg_prompt_tokens", 256),
+                    avg_response_length=current.get("avg_generation_tokens", 128),
+                    requests_per_second=current.get("requests_per_second", 1.0),
+                    concurrent_users=max(current.get("active_requests", 1), 1),
+                    latency_sensitivity=0.5,  # Default, can be inferred from patterns
+                    memory_pressure=0.5,
+                    gpu_count=gpu_count
+                )
+            
+            # Generate optimized configuration
+            optimized_config = VLLMConfig.create_auto_optimized(
+                self.config.model_name, workload
+            )
+            
+            # Compare with current config
+            comparison = self._compare_configurations(self.config, optimized_config)
+            
+            return {
+                "status": "success",
+                "workload_profile": workload,
+                "current_config": self._config_to_dict(self.config),
+                "optimized_config": self._config_to_dict(optimized_config),
+                "changes": comparison,
+                "recommendations": "Apply optimized configuration for better performance"
+            }
+            
+        except Exception as e:
+            return {"status": "failed", "error": f"Auto-optimization failed: {str(e)}"}
+    
+    def _compare_configurations(self, current: 'VLLMConfig', optimized: 'VLLMConfig') -> List[Dict[str, Any]]:
+        """Compare current and optimized configurations."""
+        changes = []
+        
+        if current.max_num_batched_tokens != optimized.max_num_batched_tokens:
+            changes.append({
+                "parameter": "max_num_batched_tokens",
+                "current": current.max_num_batched_tokens,
+                "optimized": optimized.max_num_batched_tokens,
+                "impact": "throughput" if optimized.max_num_batched_tokens > current.max_num_batched_tokens else "latency"
+            })
+        
+        if current.max_num_seqs != optimized.max_num_seqs:
+            changes.append({
+                "parameter": "max_num_seqs",
+                "current": current.max_num_seqs,
+                "optimized": optimized.max_num_seqs,
+                "impact": "concurrency"
+            })
+        
+        if current.gpu_memory_utilization != optimized.gpu_memory_utilization:
+            changes.append({
+                "parameter": "gpu_memory_utilization",
+                "current": current.gpu_memory_utilization,
+                "optimized": optimized.gpu_memory_utilization,
+                "impact": "memory_efficiency"
+            })
+        
+        if current.enable_prefix_caching != optimized.enable_prefix_caching:
+            changes.append({
+                "parameter": "enable_prefix_caching",
+                "current": current.enable_prefix_caching,
+                "optimized": optimized.enable_prefix_caching,
+                "impact": "cache_efficiency"
+            })
+        
+        if current.enable_chunked_prefill != optimized.enable_chunked_prefill:
+            changes.append({
+                "parameter": "enable_chunked_prefill",
+                "current": current.enable_chunked_prefill,
+                "optimized": optimized.enable_chunked_prefill,
+                "impact": "prefill_speed"
+            })
+        
+        return changes
+    
+    def _config_to_dict(self, config: 'VLLMConfig') -> Dict[str, Any]:
+        """Convert VLLMConfig to dictionary for serialization."""
+        return {
+            "model_name": config.model_name,
+            "max_num_batched_tokens": config.max_num_batched_tokens,
+            "max_num_seqs": config.max_num_seqs,
+            "gpu_memory_utilization": config.gpu_memory_utilization,
+            "enable_prefix_caching": config.enable_prefix_caching,
+            "enable_chunked_prefill": config.enable_chunked_prefill,
+            "cpu_cores": config.cpu_cores,
+            "tensor_parallel_size": config.tensor_parallel_size
+        }

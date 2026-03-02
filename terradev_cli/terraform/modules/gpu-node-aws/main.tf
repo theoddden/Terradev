@@ -80,9 +80,13 @@ resource "aws_instance" "gpu_node" {
       "tailscale status"
     ]
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-# Add to Tailscale network
+# Add to Tailscale network — runs in parallel with k8s_node after instance is ready
 resource "tailscale_device" "node" {
   name = local.node_name
   
@@ -110,10 +114,9 @@ resource "kubernetes_node" "gpu_node" {
     unschedulable = false
   }
   
-  depends_on = [aws_instance.gpu_node]
 }
 
-# EBS volume for additional storage
+# EBS volume created in parallel with Tailscale + K8s node registration
 resource "aws_ebs_volume" "gpu_storage" {
   availability_zone = aws_instance.gpu_node.availability_zone
   size              = 500
@@ -126,13 +129,15 @@ resource "aws_ebs_volume" "gpu_storage" {
     Cluster = var.cluster_name
     Provider = "aws"
   })
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-# Attach storage volume
+# Attach storage volume — depends_on inferred from instance_id + volume_id refs
 resource "aws_volume_attachment" "gpu_storage" {
   device_name = "/dev/sdc"
   instance_id = aws_instance.gpu_node.id
   volume_id   = aws_ebs_volume.gpu_storage.id
-  
-  depends_on = [aws_instance.gpu_node]
 }

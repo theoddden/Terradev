@@ -17,6 +17,9 @@ from .langgraph_service import LangGraphService
 from .sglang_service import SGLangService
 from .vllm_service import VLLMService
 from .ollama_service import OllamaService
+from .phoenix_service import PhoenixService
+from .guardrails_service import GuardrailsService
+from .qdrant_service import QdrantService
 
 __all__ = [
     'KServeService',
@@ -31,5 +34,8 @@ __all__ = [
     'LangGraphService',
     'SGLangService',
     'VLLMService',
-    'OllamaService'
+    'OllamaService',
+    'PhoenixService',
+    'GuardrailsService',
+    'QdrantService',
 ]

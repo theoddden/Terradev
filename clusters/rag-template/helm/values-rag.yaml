@@ -1,0 +1,106 @@
+# RAG Infrastructure Template — Helm Values
+# Components: vLLM (generation) + Qdrant (vector DB) + Embedding Model + LMCache
+# Auto-applied optimizations: FlashInfer, KV Offloading, Speculative Decoding
+
+# ── vLLM Generation Model ───────────────────────────────────────────
+vllm:
+  model: "zai-org/GLM-5-FP8"
+  replicas: 1
+  tensorParallelSize: 1
+  gpuMemoryUtilization: 0.9
+  maxModelLen: 32768
+  port: 8000
+
+  # Auto-applied optimizations
+  flashInfer:
+    enabled: true
+  sleepMode:
+    enabled: true
+  kvOffloading:
+    enabled: true
+    connector: "offloading"
+  speculative:
+    enabled: true
+    method: "mtp"
+    numTokens: 5
+
+  # LMCache distributed KV cache
+  lmcache:
+    enabled: true
+    backend: "redis"
+    remoteUrl: "redis://redis-svc:6379"
+
+  resources:
+    requests:
+      cpu: "4"
+      memory: "32Gi"
+      nvidia.com/gpu: "1"
+    limits:
+      cpu: "8"
+      memory: "64Gi"
+      nvidia.com/gpu: "1"
+
+# ── Qdrant Vector Database ──────────────────────────────────────────
+qdrant:
+  image: "qdrant/qdrant:latest"
+  replicas: 1
+  ports:
+    rest: 6333
+    grpc: 6334
+  persistence:
+    enabled: true
+    size: "100Gi"
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "2Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+  hnsw:
+    m: 16
+    efConstruct: 100
+  defaultCollection:
+    name: "rag-embeddings"
+    vectorSize: 1024
+    distance: "Cosine"
+
+# ── Embedding Model ─────────────────────────────────────────────────
+embedding:
+  model: "BAAI/bge-large-en-v1.5"
+  replicas: 1
+  port: 8001
+  # Can run on CPU or GPU; FastEmbed uses CPU by default
+  backend: "fastembed"  # fastembed (CPU) or vllm (GPU)
+  resources:
+    requests:
+      cpu: "2"
+      memory: "4Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+
+# ── Redis (for LMCache + optional Qdrant metadata) ─────────────────
+redis:
+  enabled: true
+  image: "redis:7-alpine"
+  port: 6379
+  persistence:
+    enabled: true
+    size: "10Gi"
+
+# ── Phoenix Observability (optional) ────────────────────────────────
+phoenix:
+  enabled: false
+  image: "arizephoenix/phoenix:latest"
+  port: 6006
+  persistence:
+    enabled: true
+    size: "50Gi"
+
+# ── NeMo Guardrails (optional) ──────────────────────────────────────
+guardrails:
+  enabled: false
+  image: "nvcr.io/nvidia/nemo-guardrails:latest"
+  port: 8090
+  deploymentMode: "standalone"  # standalone or sidecar

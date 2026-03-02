@@ -199,6 +199,10 @@ resource "aws_instance" "gpu_instance" {
       "echo 'Instance provisioned successfully'"
     ]
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # GCP GPU Instance (conditional)
@@ -266,6 +270,10 @@ resource "google_compute_instance" "gpu_instance" {
       "nvidia-smi",
       "echo 'Instance provisioned successfully'"
     ]
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

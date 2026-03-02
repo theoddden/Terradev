@@ -206,4 +206,8 @@ resource "terradev_startup_script" "model_download" {
   EOT
 
   run_before_container = true
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }

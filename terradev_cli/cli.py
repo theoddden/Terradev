@@ -7453,6 +7453,333 @@ def _parse_vllm_endpoint(endpoint: str):
 
 
 @cli.group()
+def vllm():
+    """vLLM optimization and management commands."""
+    pass
+
+
+@vllm.command('optimize')
+@click.option('--model', '-m', required=True, help='Model name')
+@click.option('--type', '-t', type=click.Choice(['throughput', 'latency']), 
+              default='throughput', help='Optimization type')
+@click.option('--gpu-count', '-g', type=int, default=1, help='Number of GPUs')
+@click.option('--output', '-o', type=click.Choice(['args', 'config', 'helm']), 
+              default='args', help='Output format')
+def vllm_optimize(model, type, gpu_count, output):
+    """Generate optimized vLLM configurations using the 6 critical knobs.
+    
+    Applies the 6 knobs most teams never touch:
+    1. --max-num-batched-tokens (2048→16384 for throughput, 4096 for latency)
+    2. --gpu-memory-utilization (0.90→0.95)
+    3. --max-num-seqs (256/1024→1024 for throughput, 512 for latency)
+    4. --enable-prefix-caching (OFF→ON)
+    5. --enable-chunked-prefill (OFF→ON)
+    6. CPU cores (2 + #GPUs for V1 busy loop)
+    
+    Examples:
+        terradev vllm optimize -m meta-llama/Llama-2-7b-hf -t throughput
+        terradev vllm optimize -m mistralai/Mistral-7B-v0.1 -t latency -g 4
+    """
+    from terradev_cli.ml_services.vllm_service import VLLMConfig
+    
+    # Create optimized config
+    if type == 'throughput':
+        config = VLLMConfig.create_throughput_optimized(model, tensor_parallel_size=gpu_count)
+    else:
+        config = VLLMConfig.create_latency_optimized(model, tensor_parallel_size=gpu_count)
+    
+    # Auto-calculate CPU cores: 2 + #GPUs
+    config.cpu_cores = 2 + gpu_count
+    
+    if output == 'args':
+        # Import the service to get the args
+        from terradev_cli.ml_services.vllm_service import VLLMService
+        service = VLLMService(config)
+        args = service._build_server_args()
+        print(" ".join(args))
+    elif output == 'config':
+        print(json.dumps({
+            'model_name': config.model_name,
+            'gpu_memory_utilization': config.gpu_memory_utilization,
+            'max_num_batched_tokens': config.max_num_batched_tokens,
+            'max_num_seqs': config.max_num_seqs,
+            'enable_prefix_caching': config.enable_prefix_caching,
+            'enable_chunked_prefill': config.enable_chunked_prefill,
+            'tensor_parallel_size': config.tensor_parallel_size,
+            'cpu_cores': config.cpu_cores
+        }, indent=2))
+    elif output == 'helm':
+        print(f"# Helm values for {type}-optimized vLLM")
+        print("serving:")
+        print("  vllm:")
+        print(f"    gpuMemoryUtilization: {config.gpu_memory_utilization}")
+        print(f"    maxNumBatchedTokens: {config.max_num_batched_tokens}")
+        print(f"    maxNumSeqs: {config.max_num_seqs}")
+        print(f"    enablePrefixCaching: {config.enable_prefix_caching}")
+        print(f"    enableChunkedPrefill: {config.enable_chunked_prefill}")
+        print(f"    tensorParallelSize: {config.tensor_parallel_size}")
+        print("resources:")
+        print(f"  requests:")
+        print(f"    cpu: \"{config.cpu_cores}\"")
+        print(f"  limits:")
+        print(f"    cpu: \"{config.cpu_cores + 4}\"  # Extra headroom")
+
+
+@vllm.command('auto-optimize')
+@click.option('--endpoint', '-e', help='vLLM endpoint to analyze (if not provided, uses sample analysis)')
+@click.option('--samples', '-s', type=click.Path(exists=True), help='JSON file with sample requests')
+@click.option('--gpu-count', '-g', type=int, default=1, help='Number of GPUs available')
+@click.option('--model', '-m', required=True, help='Model name')
+@click.option('--output', '-o', type=click.Choice(['config', 'args', 'helm']), 
+              default='config', help='Output format')
+@click.option('--apply', is_flag=True, help='Apply optimizations automatically')
+def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
+    """Automatically optimize vLLM configuration based on workload analysis.
+    
+    Analyzes current workload patterns or sample requests to automatically
+    select optimal settings for the 6 critical knobs.
+    
+    Examples:
+        # Analyze running server
+        terradev vllm auto-optimize -e http://localhost:8000 -m meta-llama/Llama-2-7b-hf
+        
+        # Analyze from sample file
+        terradev vllm auto-optimize -s samples.json -m mistralai/Mistral-7B-v0.1 -g 4
+        
+        # Generate and apply Helm values
+        terradev vllm auto-optimize -e http://localhost:8000 -m codellama/CodeLlama-34b-hf -o helm
+    """
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService, WorkloadProfile
+    import asyncio
+    
+    async def run_optimization():
+        try:
+            # Load samples if provided
+            sample_data = None
+            if samples:
+                with open(samples, 'r') as f:
+                    sample_data = json.load(f)
+            
+            if endpoint:
+                # Analyze running server
+                host, port = _parse_vllm_endpoint(endpoint)
+                config = VLLMConfig(model_name=model, host=host, port=port)
+                
+                async with VLLMService(config) as svc:
+                    result = await svc.auto_optimize_from_workload(sample_data, gpu_count)
+            else:
+                # Analyze from samples only
+                if not sample_data:
+                    print("❌ Either --endpoint or --samples must be provided")
+                    return
+                
+                workload = VLLMConfig.analyze_workload_from_samples(sample_data, gpu_count)
+                optimized_config = VLLMConfig.create_auto_optimized(model, workload)
+                
+                result = {
+                    "status": "success",
+                    "workload_profile": workload,
+                    "optimized_config": svc._config_to_dict(optimized_config) if endpoint else {
+                        "model_name": optimized_config.model_name,
+                        "max_num_batched_tokens": optimized_config.max_num_batched_tokens,
+                        "max_num_seqs": optimized_config.max_num_seqs,
+                        "gpu_memory_utilization": optimized_config.gpu_memory_utilization,
+                        "enable_prefix_caching": optimized_config.enable_prefix_caching,
+                        "enable_chunked_prefill": optimized_config.enable_chunked_prefill,
+                        "cpu_cores": optimized_config.cpu_cores,
+                        "tensor_parallel_size": optimized_config.tensor_parallel_size
+                    },
+                    "recommendations": "Configuration optimized based on workload analysis"
+                }
+            
+            if result['status'] != 'success':
+                print(f"❌ Auto-optimization failed: {result.get('error')}")
+                return
+            
+            # Display results
+            print("🧠 Workload Analysis Complete")
+            print("=" * 50)
+            
+            workload = result.get('workload_profile')
+            if workload:
+                print(f"📊 Workload Profile:")
+                print(f"   Avg Prompt Tokens: {workload.avg_prompt_length:.0f}")
+                print(f"   Avg Response Tokens: {workload.avg_response_length:.0f}")
+                print(f"   Requests/Second: {workload.requests_per_second:.1f}")
+                print(f"   Concurrent Users: {workload.concurrent_users}")
+                print(f"   Latency Sensitivity: {workload.latency_sensitivity:.2f}")
+                print()
+            
+            print("🔧 Optimized Configuration:")
+            optimized = result['optimized_config']
+            for key, value in optimized.items():
+                print(f"   {key}: {value}")
+            
+            # Show changes if comparison available
+            changes = result.get('changes', [])
+            if changes:
+                print(f"\n📈 Recommended Changes ({len(changes)}):")
+                for change in changes:
+                    direction = "↑" if change['optimized'] > change['current'] else "↓"
+                    print(f"   {change['parameter']}: {change['current']} → {change['optimized']} {direction}")
+                    print(f"      Impact: {change['impact']}")
+            
+            # Generate output
+            if output == 'config':
+                print(f"\n📄 JSON Configuration:")
+                print(json.dumps(optimized, indent=2))
+            elif output == 'args':
+                # Generate CLI args from optimized config
+                from terradev_cli.ml_services.vllm_service import VLLMService
+                temp_config = VLLMConfig(
+                    model_name=optimized['model_name'],
+                    max_num_batched_tokens=optimized['max_num_batched_tokens'],
+                    max_num_seqs=optimized['max_num_seqs'],
+                    gpu_memory_utilization=optimized['gpu_memory_utilization'],
+                    enable_prefix_caching=optimized['enable_prefix_caching'],
+                    enable_chunked_prefill=optimized['enable_chunked_prefill'],
+                    tensor_parallel_size=optimized.get('tensor_parallel_size', 1)
+                )
+                temp_service = VLLMService(temp_config)
+                args = temp_service._build_server_args()
+                print(f"\n⚡ CLI Arguments:")
+                print(" ".join(args))
+            elif output == 'helm':
+                print(f"\n☸️  Helm Values:")
+                print("serving:")
+                print("  vllm:")
+                print(f"    gpuMemoryUtilization: {optimized['gpu_memory_utilization']}")
+                print(f"    maxNumBatchedTokens: {optimized['max_num_batched_tokens']}")
+                print(f"    maxNumSeqs: {optimized['max_num_seqs']}")
+                print(f"    enablePrefixCaching: {optimized['enable_prefix_caching']}")
+                print(f"    enableChunkedPrefill: {optimized['enable_chunked_prefill']}")
+                print(f"    tensorParallelSize: {optimized.get('tensor_parallel_size', 1)}")
+                print("resources:")
+                print(f"  requests:")
+                print(f"    cpu: \"{optimized.get('cpu_cores', '2')}\"")
+                print(f"  limits:")
+                print(f"    cpu: \"{optimized.get('cpu_cores', 2) + 4}\"  # Extra headroom")
+            
+        except Exception as e:
+            print(f"❌ Error during auto-optimization: {e}")
+    
+    asyncio.run(run_optimization())
+
+
+@vllm.command('analyze')
+@click.option('--endpoint', '-e', required=True, help='vLLM endpoint to analyze')
+@click.option('--duration', '-d', type=int, default=60, help='Analysis duration in seconds')
+def vllm_analyze(endpoint, duration):
+    """Analyze current vLLM server workload and provide optimization recommendations.
+    
+    Monitors the running vLLM server to understand workload patterns and
+    generates specific optimization recommendations.
+    
+    Examples:
+        terradev vllm analyze -e http://localhost:8000
+        terradev vllm analyze -e http://10.0.0.1:8000 -d 120
+    """
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+    import asyncio
+    
+    async def run_analysis():
+        try:
+            host, port = _parse_vllm_endpoint(endpoint)
+            config = VLLMConfig(model_name="", host=host, port=port)
+            
+            async with VLLMService(config) as svc:
+                print(f"🔍 Analyzing vLLM server at {endpoint} for {duration}s...")
+                print("=" * 60)
+                
+                result = await svc.analyze_current_workload(duration)
+                
+                if result['status'] != 'success':
+                    print(f"❌ Analysis failed: {result.get('error')}")
+                    return
+                
+                # Display current workload
+                workload = result['current_workload']
+                print("📊 Current Workload:")
+                print(f"   Avg Prompt Tokens: {workload.get('avg_prompt_tokens', 0):.0f}")
+                print(f"   Avg Generation Tokens: {workload.get('avg_generation_tokens', 0):.0f}")
+                print(f"   Requests/Second: {workload.get('requests_per_second', 0):.1f}")
+                print(f"   Active Requests: {workload.get('active_requests', 0)}")
+                print(f"   Queue Size: {workload.get('queue_size', 0)}")
+                print()
+                
+                # Display recommendations
+                recommendations = result.get('optimization_recommendations', [])
+                if recommendations:
+                    print(f"💡 Optimization Recommendations ({len(recommendations)}):")
+                    for i, rec in enumerate(recommendations, 1):
+                        print(f"   {i}. {rec['type'].replace('_', ' ').title()}")
+                        print(f"      Current: {rec['current_value']} → Recommended: {rec['recommended_value']}")
+                        print(f"      Reason: {rec['reason']}")
+                        print(f"      Impact: {rec['impact']}")
+                        print()
+                else:
+                    print("✅ Configuration appears well-optimized for current workload")
+                
+                print(f"🕐 Analysis completed at {result.get('timestamp')}")
+                
+        except Exception as e:
+            print(f"❌ Error during analysis: {e}")
+    
+    asyncio.run(run_analysis())
+
+
+@vllm.command('benchmark')
+@click.option('--endpoint', '-e', required=True, help='vLLM endpoint to test')
+@click.option('--api-key', help='vLLM API key')
+@click.option('--prompt', default="Explain quantum computing in simple terms.", help='Test prompt')
+@click.option('--concurrent', '-c', type=int, default=1, help='Concurrent requests')
+def vllm_benchmark(endpoint, api_key, prompt, concurrent):
+    """Benchmark vLLM endpoint performance."""
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+    import asyncio
+    import time
+    
+    host, port = _parse_vllm_endpoint(endpoint)
+    config = VLLMConfig(model_name="", host=host, port=port, api_key=api_key)
+    
+    async def run_benchmark():
+        async with VLLMService(config) as svc:
+            # Test connection
+            health = await svc.test_connection()
+            if health['status'] != 'connected':
+                print(f"❌ Connection failed: {health.get('error')}")
+                return
+            
+            print(f"✅ Connected to vLLM at {endpoint}")
+            
+            # Run concurrent requests
+            start_time = time.time()
+            tasks = []
+            for i in range(concurrent):
+                task = svc.test_inference(f"{prompt} (request {i+1})")
+                tasks.append(task)
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            end_time = time.time()
+            
+            # Analyze results
+            successful = sum(1 for r in results if isinstance(r, dict) and r.get('status') == 'success')
+            total_time = end_time - start_time
+            throughput = successful / total_time if total_time > 0 else 0
+            
+            print(f"\n📊 Benchmark Results:")
+            print(f"   Concurrent requests: {concurrent}")
+            print(f"   Successful: {successful}/{concurrent}")
+            print(f"   Total time: {total_time:.2f}s")
+            print(f"   Throughput: {throughput:.2f} req/s")
+            
+            if successful < concurrent:
+                print(f"   ⚠️  {concurrent - successful} requests failed")
+    
+    asyncio.run(run_benchmark())
+
+
+@cli.group()
 def lora():
     """Manage LoRA adapters on a running vLLM endpoint.
 
@@ -7537,6 +7864,431 @@ def lora_remove_cmd(endpoint, name, api_key):
     else:
         print(f"ERROR: {result.get('error')}")
 
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Datadog FinOps Integration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@cli.group()
+def datadog():
+    """Datadog FinOps monitoring — metrics, monitors, dashboards."""
+    pass
+
+
+@datadog.command('configure')
+@click.option('--api-key', prompt='Datadog API Key', hide_input=True)
+@click.option('--app-key', prompt='Datadog App Key', hide_input=True)
+@click.option('--site', default='datadoghq.com')
+def datadog_configure(api_key, app_key, site):
+    """Configure Datadog credentials."""
+    from terradev_cli.integrations.datadog_integration import save_credentials
+    save_credentials(api_key, app_key, site)
+    print(f"✅ Datadog credentials saved (site: {site})")
+
+
+@datadog.command('status')
+def datadog_status():
+    """Show Datadog integration status."""
+    from terradev_cli.integrations.datadog_integration import (
+        load_credentials, validate_credentials)
+    creds = load_credentials()
+    if not creds:
+        print("❌ Not configured. Run: terradev datadog configure")
+        return
+    print(f"Site:    {creds.get('site', 'datadoghq.com')}")
+    print(f"API Key: ***{creds['api_key'][-4:]}")
+    print(f"App Key: ***{creds['app_key'][-4:]}")
+    ok, msg = validate_credentials(creds)
+    print(f"{'✅' if ok else '❌'} {msg}")
+
+
+@datadog.command('submit-metric')
+@click.option('--metric', '-m', required=True)
+@click.option('--value', '-v', required=True, type=float)
+@click.option('--tags', '-t', multiple=True)
+def datadog_submit_metric(metric, value, tags):
+    """Submit a custom metric to Datadog."""
+    from terradev_cli.integrations.datadog_integration import (
+        load_credentials, submit_metric)
+    creds = load_credentials()
+    if not creds:
+        print("❌ Not configured"); return
+    r = submit_metric(creds, metric, value, list(tags))
+    if r.get('status') == 'ok':
+        print(f"✅ terradev.{metric} = {value}")
+    else:
+        print(f"❌ {r.get('error')}")
+
+
+@datadog.command('create-monitor')
+@click.option('--template', '-t', required=True,
+              type=click.Choice(['budget_alert', 'cost_spike', 'idle_gpu',
+                                 'spot_volatility', 'provider_degraded',
+                                 'egress_anomaly']))
+@click.option('--notify', default='@slack-terradev-alerts')
+def datadog_create_monitor(template, notify):
+    """Create a monitor from a FinOps template."""
+    from terradev_cli.integrations.datadog_integration import (
+        load_credentials, create_monitor)
+    creds = load_credentials()
+    if not creds:
+        print("❌ Not configured"); return
+    r = create_monitor(creds, template, notify)
+    if r.get('id'):
+        print(f"✅ Monitor '{template}' created (id: {r['id']})")
+    else:
+        print(f"❌ {r.get('error')}")
+
+
+@datadog.command('list-monitors')
+def datadog_list_monitors():
+    """List Terradev monitors in Datadog."""
+    from terradev_cli.integrations.datadog_integration import (
+        load_credentials, list_monitors)
+    creds = load_credentials()
+    if not creds:
+        print("❌ Not configured"); return
+    monitors = list_monitors(creds)
+    if not monitors:
+        print("No Terradev monitors found."); return
+    print(f"{'ID':<12} {'Name':<42} {'Status'}")
+    print("─" * 66)
+    for m in monitors:
+        mid = m['id']
+        name = m['name'][:40]
+        state = m.get('overall_state', '?')
+        print(f"{mid:<12} {name:<42} {state}")
+
+
+@datadog.command('delete-monitor')
+@click.option('--monitor-id', '-i', required=True, type=int)
+@click.confirmation_option(prompt='Delete this monitor?')
+def datadog_delete_monitor(monitor_id):
+    """Delete a Datadog monitor by ID."""
+    from terradev_cli.integrations.datadog_integration import (
+        load_credentials, delete_monitor)
+    creds = load_credentials()
+    if not creds:
+        print("❌ Not configured"); return
+    r = delete_monitor(creds, monitor_id)
+    if r.get('deleted'):
+        print(f"✅ Monitor {monitor_id} deleted")
+    else:
+        print(f"❌ {r.get('error')}")
+
+
+@datadog.command('create-dashboard')
+@click.option('--title', default='Terradev GPU FinOps')
+def datadog_create_dashboard(title):
+    """Create the GPU FinOps dashboard."""
+    from terradev_cli.integrations.datadog_integration import (
+        load_credentials, create_dashboard)
+    creds = load_credentials()
+    if not creds:
+        print("❌ Not configured"); return
+    r = create_dashboard(creds, title)
+    if r.get('id'):
+        print(f"✅ Dashboard: {r.get('url', r['id'])}")
+    else:
+        print(f"❌ {r.get('error')}")
+
+
+@datadog.command('push-costs')
+def datadog_push_costs():
+    """Push cost snapshot from cost tracker to Datadog."""
+    from terradev_cli.integrations.datadog_integration import (
+        load_credentials, push_cost_snapshot)
+    creds = load_credentials()
+    if not creds:
+        print("❌ Not configured"); return
+    r = push_cost_snapshot(creds)
+    if r.get('status') == 'ok':
+        n = r.get('metrics_pushed', 0)
+        print(f"✅ {n} cost metrics pushed to Datadog")
+    else:
+        print(f"❌ {r.get('error')}")
+
+
+@datadog.command('export-tf')
+def datadog_export_tf():
+    """Export Terraform module config for Datadog."""
+    from terradev_cli.integrations.datadog_integration import (
+        load_credentials, export_terraform_vars)
+    creds = load_credentials()
+    if not creds:
+        print("❌ Not configured"); return
+    tf = export_terraform_vars(creds)
+    print("# Add to your terraform.tfvars:\n")
+    for k, v in tf.items():
+        if isinstance(v, str):
+            print(f'{k} = "{v}"')
+        else:
+            print(f"{k} = {v}")
+    print(f"\n# Then: terraform apply -parallelism=20")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phoenix — LLM Trace Observability (Arize Phoenix, ELv2)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@cli.group()
+def phoenix():
+    """Arize Phoenix LLM trace observability — traces, spans, OTEL."""
+    pass
+
+
+@phoenix.command('test')
+def phoenix_test():
+    """Test connection to Phoenix server."""
+    from terradev_cli.ml_services.phoenix_service import (
+        create_phoenix_service_from_credentials, get_phoenix_setup_instructions)
+    api = TerradevAPI()
+    creds = api._provider_creds('phoenix')
+    if not any(creds.values()):
+        print(get_phoenix_setup_instructions())
+        return
+    svc = create_phoenix_service_from_credentials(creds)
+    result = asyncio.run(svc.test_connection())
+    if result['status'] == 'connected':
+        print(f"✅ Phoenix connected: {result['collector_endpoint']}")
+        print(f"   Projects found: {result['projects_found']}")
+    else:
+        print(f"❌ Connection failed: {result.get('error')}")
+
+
+@phoenix.command('projects')
+@click.option('--limit', '-l', default=50, help='Max projects to return')
+def phoenix_projects(limit):
+    """List Phoenix projects."""
+    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
+    api = TerradevAPI()
+    svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
+    data = asyncio.run(svc.list_projects(limit=limit))
+    projects = data.get('data', [])
+    if not projects:
+        print("No projects found.")
+        return
+    for p in projects:
+        print(f"  📁 {p.get('name', p.get('id', '?'))}")
+
+
+@phoenix.command('spans')
+@click.option('--project', '-p', default=None, help='Project ID or name')
+@click.option('--filter', '-f', 'filter_cond', default=None, help='SpanQuery DSL filter, e.g. "span_kind == \'RETRIEVER\'"')
+@click.option('--limit', '-l', default=20, help='Max spans')
+def phoenix_spans(project, filter_cond, limit):
+    """List recent spans for a project."""
+    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
+    from terradev_cli.core.trace_viewer import view_recent_spans
+    api = TerradevAPI()
+    svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
+    output = asyncio.run(view_recent_spans(svc, project=project, limit=limit, filter_condition=filter_cond))
+    print(output)
+
+
+@phoenix.command('trace')
+@click.option('--trace-id', '-t', required=True, help='Trace ID to inspect')
+@click.option('--project', '-p', default=None, help='Project ID or name')
+def phoenix_trace(trace_id, project):
+    """View full execution tree for a trace."""
+    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
+    from terradev_cli.core.trace_viewer import view_trace
+    api = TerradevAPI()
+    svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
+    output = asyncio.run(view_trace(svc, trace_id, project=project))
+    print(output)
+
+
+@phoenix.command('otel-env')
+@click.option('--project', '-p', default=None, help='Project name')
+def phoenix_otel_env(project):
+    """Print OTEL env vars to inject into serving pods."""
+    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
+    api = TerradevAPI()
+    svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
+    env = svc.generate_otel_env(project_name=project)
+    for k, v in env.items():
+        print(f"export {k}=\"{v}\"")
+
+
+@phoenix.command('snippet')
+@click.option('--project', '-p', default=None, help='Project name')
+def phoenix_snippet(project):
+    """Print Python instrumentation snippet."""
+    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
+    api = TerradevAPI()
+    svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
+    print(svc.generate_instrumentation_snippet(project_name=project))
+
+
+@phoenix.command('k8s')
+@click.option('--namespace', '-n', default='observability', help='K8s namespace')
+def phoenix_k8s(namespace):
+    """Print K8s deployment manifest for Phoenix server."""
+    from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
+    api = TerradevAPI()
+    svc = create_phoenix_service_from_credentials(api._provider_creds('phoenix'))
+    print(svc.generate_k8s_deployment(namespace=namespace))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# NeMo Guardrails — Output Safety Layer (Apache 2.0)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@cli.group()
+def guardrails():
+    """NeMo Guardrails — LLM output safety, jailbreak detection, PII masking."""
+    pass
+
+
+@guardrails.command('test')
+def guardrails_test_cmd():
+    """Test connection to guardrails server."""
+    from terradev_cli.ml_services.guardrails_service import (
+        create_guardrails_service_from_credentials, get_guardrails_setup_instructions)
+    api = TerradevAPI()
+    creds = api._provider_creds('guardrails')
+    if not any(creds.values()):
+        print(get_guardrails_setup_instructions())
+        return
+    svc = create_guardrails_service_from_credentials(creds)
+    result = asyncio.run(svc.test_connection())
+    if result['status'] == 'connected':
+        print(f"✅ Guardrails connected: {result['server_url']}")
+    else:
+        print(f"❌ Connection failed: {result.get('error')}")
+
+
+@guardrails.command('chat')
+@click.option('--message', '-m', required=True, help='Message to send through guardrails')
+@click.option('--config-id', '-c', default=None, help='Guardrails config_id')
+def guardrails_chat(message, config_id):
+    """Send a message through guardrails and show the result."""
+    from terradev_cli.ml_services.guardrails_service import create_guardrails_service_from_credentials
+    api = TerradevAPI()
+    svc = create_guardrails_service_from_credentials(api._provider_creds('guardrails'))
+    result = asyncio.run(svc.test_rail(message, config_id=config_id))
+    print(f"Input:     {result['input']}")
+    print(f"Config:    {result['config_id']}")
+    print(f"Output:    {json.dumps(result['output'], indent=2)}")
+
+
+@guardrails.command('generate-config')
+@click.option('--config-id', '-c', default=None, help='Config ID name')
+@click.option('--output-dir', '-o', default='./guardrails', help='Output directory')
+def guardrails_generate_config(config_id, output_dir):
+    """Generate default Colang 2.x guardrails configuration."""
+    from terradev_cli.ml_services.guardrails_service import create_guardrails_service_from_credentials
+    api = TerradevAPI()
+    svc = create_guardrails_service_from_credentials(api._provider_creds('guardrails'))
+    files = svc.generate_colang_config(config_id=config_id)
+    output_path = Path(output_dir)
+    for fname, content in files.items():
+        fpath = output_path / fname
+        fpath.parent.mkdir(parents=True, exist_ok=True)
+        fpath.write_text(content)
+        print(f"  ✅ {fpath}")
+    print(f"\n🛡️ Config generated. Start server: nemoguardrails server --config {output_dir}")
+
+
+@guardrails.command('k8s')
+@click.option('--namespace', '-n', default='guardrails', help='K8s namespace')
+def guardrails_k8s(namespace):
+    """Print K8s deployment manifest for guardrails server."""
+    from terradev_cli.ml_services.guardrails_service import create_guardrails_service_from_credentials
+    api = TerradevAPI()
+    svc = create_guardrails_service_from_credentials(api._provider_creds('guardrails'))
+    print(svc.generate_k8s_deployment(namespace=namespace))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Qdrant — Vector Database for RAG (Apache 2.0)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@cli.group()
+def qdrant():
+    """Qdrant vector database — collections, search, RAG infrastructure."""
+    pass
+
+
+@qdrant.command('test')
+def qdrant_test():
+    """Test connection to Qdrant server."""
+    from terradev_cli.ml_services.qdrant_service import (
+        create_qdrant_service_from_credentials, get_qdrant_setup_instructions)
+    api = TerradevAPI()
+    creds = api._provider_creds('qdrant')
+    if not any(creds.values()):
+        print(get_qdrant_setup_instructions())
+        return
+    svc = create_qdrant_service_from_credentials(creds)
+    result = asyncio.run(svc.test_connection())
+    if result['status'] == 'connected':
+        print(f"✅ Qdrant connected: {result['url']}")
+        print(f"   Collections: {', '.join(result['collections']) or 'none'}")
+    else:
+        print(f"❌ Connection failed: {result.get('error')}")
+
+
+@qdrant.command('collections')
+def qdrant_collections():
+    """List all collections."""
+    from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
+    api = TerradevAPI()
+    svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
+    cols = asyncio.run(svc.list_collections())
+    if not cols:
+        print("No collections found.")
+        return
+    for c in cols:
+        print(f"  🗄️  {c}")
+
+
+@qdrant.command('create-collection')
+@click.option('--name', '-n', default=None, help='Collection name')
+@click.option('--embedding-model', '-e', default=None, help='Embedding model (auto-sets vector size)')
+def qdrant_create_collection(name, embedding_model):
+    """Create a vector collection (auto-configured for embedding model)."""
+    from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
+    api = TerradevAPI()
+    svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
+    result = asyncio.run(svc.configure_rag_collection(name=name, embedding_model=embedding_model))
+    print(f"✅ Collection created: {result['collection']}")
+    print(f"   Embedding model: {result['embedding_model']}")
+    print(f"   Vector size: {result['vector_size']}")
+
+
+@qdrant.command('info')
+@click.option('--name', '-n', default=None, help='Collection name')
+def qdrant_info(name):
+    """Get collection info and stats."""
+    from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
+    api = TerradevAPI()
+    svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
+    info = asyncio.run(svc.get_collection_info(name=name))
+    print(json.dumps(info, indent=2))
+
+
+@qdrant.command('count')
+@click.option('--name', '-n', default=None, help='Collection name')
+def qdrant_count(name):
+    """Count points in a collection."""
+    from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
+    api = TerradevAPI()
+    svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
+    count = asyncio.run(svc.count_points(name=name))
+    print(f"Points: {count}")
+
+
+@qdrant.command('k8s')
+@click.option('--namespace', '-n', default='vector-db', help='K8s namespace')
+def qdrant_k8s(namespace):
+    """Print K8s StatefulSet manifest for Qdrant."""
+    from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
+    api = TerradevAPI()
+    svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
+    print(svc.generate_k8s_deployment(namespace=namespace))
 
 
 if __name__ == '__main__':
