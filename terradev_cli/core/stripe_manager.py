@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 # Enterprise+ metered billing rate
 ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS = 9  # $0.09 per GPU-hour
 ENTERPRISE_PLUS_MIN_GPUS = 32
+ENTERPRISE_PLUS_MIN_MONTHLY_HOURS = 128  # Minimum 128 hours of usage per month
+# Monthly floor: 32 GPUs × 128 hrs = 4,096 GPU-hours = $368.64/month minimum
+ENTERPRISE_PLUS_MONTHLY_FLOOR_GPU_HOURS = ENTERPRISE_PLUS_MIN_GPUS * ENTERPRISE_PLUS_MIN_MONTHLY_HOURS
 
 
 class StripeManager:
@@ -136,14 +139,15 @@ class StripeManager:
         Enterprise+ uses Stripe metered usage billing:
         - $0.09 × max(gpu_count, 32) × hours_used, billed monthly
         - 32-GPU floor per instance (8 GPUs billed as 32, 72 billed as 72)
-        - Billed only for actual runtime — $0 when nothing is running
+        - Monthly minimum: 32 GPUs × 128 hrs = 4,096 GPU-hrs ($368.64/mo)
+        - No charge for months with zero usage; minimum reconciled at month end
         - Card on file, invoiced at end of billing period
         """
         try:
             product = self._get_or_create_product('enterprise_plus', {
                 'name': 'Terradev Enterprise+',
                 'description': 'Metered GPU-hour billing — $0.09 × max(gpu_count, 32) × hours_used. '
-                               '32-GPU floor per instance, billed only for actual runtime. '
+                               '32-GPU floor per instance. Monthly minimum: 4,096 GPU-hrs ($368.64/mo). '
                                'Unlimited provisions, servers, seats, dedicated support.',
             })
             
@@ -315,6 +319,71 @@ class StripeManager:
             logging.error(f"Failed to look up subscription item: {e}")
             return None
 
+    def reconcile_monthly_minimum(self, subscription_item_id: str) -> Optional[Dict[str, Any]]:
+        """Reconcile monthly minimum at month boundary.
+
+        Enterprise+ floor: 32 GPUs x 48 hrs = 1,536 GPU-hrs ($138.24/mo).
+        If actual usage for previous month < floor, report shortfall to Stripe.
+        Tracks reconciled months to prevent double-billing.
+        No charge if zero usage in the month (customer wasn't active).
+        """
+        metering = self._load_metering()
+        now = datetime.now()
+
+        if now.month == 1:
+            prev_year, prev_month = now.year - 1, 12
+        else:
+            prev_year, prev_month = now.year, now.month - 1
+        prev_key = f"{prev_year}-{prev_month:02d}"
+
+        reconciled = metering.get('reconciled_months', [])
+        if prev_key in reconciled:
+            return None
+
+        prev_start = datetime(prev_year, prev_month, 1)
+        prev_end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        records = metering.get('records', [])
+        prev_hours = 0.0
+        for r in records:
+            try:
+                ts = datetime.fromisoformat(r['timestamp'])
+                if prev_start <= ts < prev_end:
+                    prev_hours += r.get('gpu_hours', 0)
+            except Exception:
+                continue
+
+        # Mark reconciled regardless of outcome
+        metering.setdefault('reconciled_months', []).append(prev_key)
+
+        if prev_hours < 0.01:
+            self._save_metering(metering)
+            return None
+
+        shortfall = ENTERPRISE_PLUS_MONTHLY_FLOOR_GPU_HOURS - prev_hours
+        if shortfall <= 0:
+            self._save_metering(metering)
+            return None
+
+        result = self.report_gpu_hours(
+            subscription_item_id, shortfall,
+            gpu_type='monthly_minimum_topup',
+            instance_id=f'minimum-{prev_key}',
+        )
+        self._save_metering(metering)
+
+        cost = round(math.ceil(shortfall) * ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100, 2)
+        logger.info(f"Monthly minimum for {prev_key}: {prev_hours:.1f} used, "
+                     f"{shortfall:.1f} top-up, ${cost:.2f}")
+        return {
+            'month': prev_key,
+            'actual_gpu_hours': round(prev_hours, 2),
+            'floor_gpu_hours': ENTERPRISE_PLUS_MONTHLY_FLOOR_GPU_HOURS,
+            'shortfall_gpu_hours': round(shortfall, 2),
+            'topup_cost_usd': cost,
+            'stripe_result': result,
+        }
+
     def get_current_period_usage(self) -> Dict[str, Any]:
         """Get GPU-hour usage for the current billing period."""
         metering = self._load_metering()
@@ -330,17 +399,25 @@ class StripeManager:
         ]
         
         total_hours = sum(r.get('gpu_hours', 0) for r in current_records)
-        total_cost = round(math.ceil(total_hours) * ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100, 2)
+        billed_hours = max(math.ceil(total_hours), 0)
+        floor = ENTERPRISE_PLUS_MONTHLY_FLOOR_GPU_HOURS
+        projected_billed = max(billed_hours, floor) if total_hours > 0.01 else 0
+        total_cost = round(projected_billed * ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100, 2)
+        shortfall = max(floor - billed_hours, 0) if total_hours > 0.01 else 0
         
         return {
             'billing_period_start': month_start.isoformat(),
             'total_gpu_hours': round(total_hours, 2),
-            'total_gpu_hours_billed': math.ceil(total_hours),
+            'total_gpu_hours_billed': billed_hours,
+            'monthly_minimum_gpu_hours': floor,
+            'projected_billed_gpu_hours': projected_billed,
+            'shortfall_gpu_hours': shortfall,
             'estimated_cost_usd': total_cost,
             'rate_per_gpu_hour': ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100,
             'record_count': len(current_records),
             'min_gpus_per_instance': ENTERPRISE_PLUS_MIN_GPUS,
-            'billing_formula': 'max(gpu_count, 32) × hours_used × $0.09',
+            'min_monthly_hours': ENTERPRISE_PLUS_MIN_MONTHLY_HOURS,
+            'billing_formula': 'max(gpu_count, 32) × hours_used × $0.09, min 4096 GPU-hrs/mo ($368.64)',
         }
 
     # ── Local metering persistence ───────────────────────────────────

@@ -113,9 +113,12 @@ class TerradevAPI:
                 'max_instances': 'unlimited',
                 'user_seats': 'unlimited',
                 'min_gpus_per_instance': 32,
+                'min_monthly_hours': 128,
+                'monthly_floor_gpu_hours': 4096,
+                'monthly_floor_usd': 368.64,
                 'gpu_hour_rate': 0.09,
                 'billing_model': 'metered',
-                'billing_formula': 'max(gpu_count, 32) × hours_used × $0.09',
+                'billing_formula': 'max(gpu_count, 32) × hours_used × $0.09, min 4096 GPU-hrs/mo',
                 'providers': ['all'],
                 'features': ['all', 'inference', 'full_provenance', 'priority_support', 'sla_guarantee', 'dedicated_support', 'gpu_metering', 'fleet_management']
             }
@@ -316,11 +319,13 @@ class TerradevAPI:
         Billing model (metered, per-instance):
             billable_gpus = max(instance.gpu_count, 32)
             billable_gpu_hours += billable_gpus × hours_running
+            Monthly minimum: 32 × 128 = 4,096 GPU-hrs ($368.64/mo)
 
         Examples:
           - 8 GPUs for 0.75 hrs  → max(8, 32) × 0.75  = 24 GPU-hrs
           - 72 GPUs for 32 hrs   → max(72, 32) × 32    = 2,304 GPU-hrs
           - 0 instances running  → $0 (no idle charge)
+          - Month with only 500 GPU-hrs → billed 4,096 (shortfall top-up)
         """
         if self.tier.get('name') != 'Enterprise+':
             return
@@ -333,9 +338,16 @@ class TerradevAPI:
             if not sub_item_id:
                 return  # Not yet linked — will link on activation
 
+            # Monthly minimum reconciliation — once per month boundary
+            topup = sm.reconcile_monthly_minimum(sub_item_id)
+            if topup:
+                print(f"   Enterprise+ monthly min for {topup['month']}: "
+                      f"{topup['actual_gpu_hours']:.0f}/{topup['floor_gpu_hours']} GPU-hrs, "
+                      f"top-up {topup['shortfall_gpu_hours']:.0f} (${topup['topup_cost_usd']:.2f})")
+
             instances = self.usage.get('instances_created', [])
             if not instances:
-                # No active instances — nothing to bill.
+                metering = sm._load_metering()
                 metering['last_sync_ts'] = datetime.now().isoformat()
                 sm._save_metering(metering)
                 return
