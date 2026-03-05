@@ -3979,11 +3979,11 @@ def _build_k8s_job_manifest(
     }
 
     node_selector = {
-        'karpenter.sh/provisioner-name': profile['provisioner'],
+        'karpenter.sh/nodepool': profile['provisioner'],
     }
     tolerations = [
         {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
-        {'key': 'karpenter.sh/capacity-type', 'value': effective_capacity, 'effect': 'NoSchedule'},
+        {'key': 'karpenter.sh/capacity-type', 'operator': 'Equal', 'value': effective_capacity, 'effect': 'NoSchedule'},
     ]
 
     # Container spec
@@ -4073,6 +4073,11 @@ def _build_k8s_job_manifest(
 def _kubectl_apply(manifest_dict: Dict[str, Any], dry_run: bool = False) -> bool:
     """Apply a manifest via kubectl."""
     import tempfile
+    try:
+        import yaml
+    except ImportError:
+        import json as yaml
+        yaml.dump = lambda d, **kw: json.dumps(d, indent=2, default=str)
     manifest_yaml = yaml.dump(manifest_dict, default_flow_style=False)
     with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
         f.write(manifest_yaml)
@@ -4138,9 +4143,9 @@ def k8s_create(cluster_name, gpu, count, max_price, multi_cloud, prefer_spot, aw
         'control_plane': control_plane
     }
     
-    print(f"Deploying Creating Kubernetes cluster '{cluster_name}'...")
+    print(f"🚀 Creating Kubernetes cluster '{cluster_name}'...")
     print(f"🎮 GPU Type: {gpu}")
-    print(f"Status Node Count: {count}")
+    print(f"📊 Node Count: {count}")
     print(f"💰 Max Price: ${max_price}/hr")
     print(f"☁️  Multi-Cloud: {multi_cloud}")
     print(f"🎯 Spot Instances: {prefer_spot}")
@@ -4161,7 +4166,7 @@ def k8s_create(cluster_name, gpu, count, max_price, multi_cloud, prefer_spot, aw
     if success:
         print(f"✅ Cluster '{cluster_name}' created successfully!")
         print(f"   Topology: NUMA-aligned, GPUDirect RDMA, Topology Manager=restricted")
-        print(f"Status Run 'terradev k8s info {cluster_name}' for details")
+        print(f"ℹ️  Run 'terradev k8s info {cluster_name}' for details")
         print(f"🔗 Run 'export KUBECONFIG=~/.terradev/clusters/{cluster_name}.json' to connect")
     else:
         print(f"❌ Failed to create cluster '{cluster_name}'")
@@ -4181,7 +4186,7 @@ def k8s_destroy(cluster_name):
     
     wrapper = TerraformWrapper()
     
-    print(f"Cleaning Destroying Kubernetes cluster '{cluster_name}'...")
+    print(f"🗑️  Destroying Kubernetes cluster '{cluster_name}'...")
     
     success = wrapper.destroy_cluster(cluster_name)
     
@@ -4479,23 +4484,25 @@ def budget_optimize(gpu_type, budget, gpu_count, hours, region, workload):
 
 
 @cli.command()
-@click.option('--workload', default='training', help='Workload type (training, inference, cost-optimized, high-performance)')
-@click.option('--gpu-type', default='A100', help='GPU type')
+@click.option('--workload', default='training', help='Workload type (training, inference, cost-optimized, high-performance, moe-inference, rag, vllm-optimized)')
+@click.option('--gpu-type', default='A100', help='GPU type (A100, H100, V100, L4, L40S, RTX 4090, T4, etc.)')
 @click.option('--image', required=True, help='Docker image')
 @click.option('--gpu-count', type=int, default=1, help='Number of GPUs')
 @click.option('--memory', type=int, help='Memory in GB')
 @click.option('--storage', type=int, help='Storage in GB')
 @click.option('--budget', type=float, help='Budget constraint ($/hr)')
 @click.option('--region', help='Preferred region')
+@click.option('--port', '-p', type=int, multiple=True, help='Expose port(s) via Service (repeatable)')
+@click.option('--stack', '-s', multiple=True, help='Stack integrations: qdrant, phoenix, guardrails (repeatable)')
 @click.option('--output', '-o', help='Output directory')
 @click.option('--name', help='Chart name')
 @click.option('--dry-run', is_flag=True, help='Show chart config without generating')
-def helm_generate(workload, gpu_type, image, gpu_count, memory, storage, budget, region, output, name, dry_run):
+def helm_generate(workload, gpu_type, image, gpu_count, memory, storage, budget, region, port, stack, output, name, dry_run):
     """Generate Helm charts from Terradev workloads"""
     from core.helm_generator import HelmChartGenerator
-    
+
     generator = HelmChartGenerator()
-    
+
     # Build workload configuration
     workload_config = {
         'workload_type': workload,
@@ -4507,11 +4514,13 @@ def helm_generate(workload, gpu_type, image, gpu_count, memory, storage, budget,
         'budget': budget,
         'region': region or 'us-east-1',
         'spot': True if budget and budget < 2.0 else False,
-        'provider': 'auto'
+        'provider': 'auto',
+        'ports': list(port) if port else [],
+        'stack': list(stack) if stack else [],
     }
-    
+
     if dry_run:
-        print("🔍 Helm Chart Configuration (Dry Run):")
+        print("Helm Chart Configuration (Dry Run):")
         print("=" * 50)
         print(f"Workload: {workload}")
         print(f"GPU: {gpu_type} x{gpu_count}")
@@ -4522,43 +4531,52 @@ def helm_generate(workload, gpu_type, image, gpu_count, memory, storage, budget,
             print(f"Budget: ${budget}/hr")
         print(f"Region: {workload_config['region']}")
         print(f"Spot: {workload_config['spot']}")
+        if port:
+            print(f"Ports: {list(port)}")
+        if stack:
+            print(f"Stack: {list(stack)}")
         print()
-        print("📦 Chart files that would be generated:")
+        print("Chart files that would be generated:")
         print("   Chart.yaml")
         print("   values.yaml")
         print("   templates/")
-        print("     - job.yaml or deployment.yaml")
-        print("     - service.yaml (if inference)")
-        print("     - configmap.yaml (if env vars)")
+        if workload in ('training', 'cost-optimized'):
+            print("     - job.yaml")
+        else:
+            print("     - deployment.yaml")
+            print("     - service.yaml")
+            print("     - hpa.yaml")
+            print("     - pdb.yaml")
+        print("     - configmap.yaml")
         print("     - pvc.yaml (if storage)")
+        print("     - serviceaccount.yaml")
         print("     - _helpers.tpl")
         print("     - NOTES.txt")
         print("   README.md")
         return
-    
+
     # Generate chart
     chart_name = name or f"terradev-{workload}"
     output_dir = output or f"./{chart_name}"
-    
-    print(f"Deploying Generating Helm chart for {workload} workload...")
-    
+
+    print(f"Generating Helm chart for {workload} workload...")
+
     try:
         chart_path = generator.generate_chart(workload_config, output_dir)
-        print(f"✅ Helm chart generated successfully!")
+        print(f"Helm chart generated successfully!")
         print(f"   Location: {chart_path}")
         print()
-        print("Plan Next steps:")
+        print("Next steps:")
         print(f"   1. Review the chart: cd {chart_path}")
         print(f"   2. Customize values: vim values.yaml")
         print(f"   3. Install chart: helm install my-{workload} .")
-        print(f"   4. Check status: kubectl get jobs -l app.kubernetes.io/name=my-{workload}")
+        print(f"   4. Check status: kubectl get all -l app.kubernetes.io/name=my-{workload}")
         print()
-        print("📚 For more information:")
         print(f"   Chart README: {chart_path}/README.md")
         print(f"   Terradev docs: https://terradev.dev/docs")
-        
+
     except Exception as e:
-        print(f"❌ Failed to generate Helm chart: {e}")
+        print(f"Failed to generate Helm chart: {e}")
 
 
 # Price Percentiles Command
@@ -7260,6 +7278,9 @@ def train(config_path, script, framework, backend, nodes, provision_group,
             print(f"  PID: {result['pid']}")
         if result.get('master_addr'):
             print(f"  Master: {result['master_addr']}")
+        fo = result.get('flashoptim', {})
+        if fo.get('enabled'):
+            print(f"  FlashOptim: {fo.get('optimizer_class', 'FlashAdamW')} (auto-applied — {fo.get('reason', '')})")
         if status == 'failed':
             print(f"  Errors: {result.get('errors', '')}")
         print()

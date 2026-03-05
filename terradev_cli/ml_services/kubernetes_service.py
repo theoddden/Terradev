@@ -265,7 +265,7 @@ class KubernetesService:
 
             # Generate topology-aware provisioner YAML
             provisioner_yaml = f"""
-apiVersion: karpenter.sh/v1beta1
+apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
   name: gpu-{gpu_type.lower()}
@@ -293,7 +293,7 @@ spec:
         operator: In
         values: ["on-demand", "spot"]
       nodeClassRef:
-        apiVersion: karpenter.k8s.aws/v1beta1
+        apiVersion: karpenter.k8s.aws/v1
         kind: EC2NodeClass
         name: gpu-{gpu_type.lower()}
       kubelet:
@@ -307,7 +307,7 @@ spec:
     consolidationPolicy: WhenUnderutilized
     expireAfter: 720h
 ---
-apiVersion: karpenter.k8s.aws/v1beta1
+apiVersion: karpenter.k8s.aws/v1
 kind: EC2NodeClass
 metadata:
   name: gpu-{gpu_type.lower()}
@@ -393,7 +393,7 @@ spec:
                             memory = parts[2].replace('Mi', '')
                             
                             try:
-                                cpu_int = int(cpu_cores) / 1000 if cpu_cores.endswith('m') else int(cpu_cores)
+                                cpu_int = int(cpu_cores) / 1000 if 'm' in parts[1] else int(cpu_cores)
                                 mem_gb = int(memory) / 1024
                                 
                                 resources["nodes"].append({

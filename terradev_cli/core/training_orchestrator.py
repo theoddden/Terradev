@@ -66,6 +66,12 @@ class TrainingConfig:
     # Elastic
     max_restarts: int = 3
     rdzv_port: int = 29400
+    # FlashOptim (auto-applied when beneficial — user never needs to set these)
+    flashoptim: str = "auto"  # auto | on | off
+    flashoptim_optimizer: str = "adamw"  # adamw | adam | sgd | sgdw | lion
+    flashoptim_master_weight_bits: int = 24  # 24 (default) | 32 | 0 (=None)
+    flashoptim_compress_checkpoints: bool = False
+    flashoptim_gradient_release: bool = False
 
     @classmethod
     def from_yaml(cls, path: str) -> "TrainingConfig":
@@ -83,6 +89,142 @@ class TrainingConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         return {k: getattr(self, k) for k in self.__dataclass_fields__}
+
+
+# ---------------------------------------------------------------------------
+# FlashOptim auto-detection (pure function — no side effects)
+# ---------------------------------------------------------------------------
+
+def _flashoptim_auto_config(
+    config: TrainingConfig,
+    topology: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Decide whether FlashOptim should be auto-injected into this training job.
+
+    Returns a dict with:
+      - "enabled": bool
+      - "reason": str  (why it was enabled/disabled — for structured JSON output)
+      - "optimizer_class": str  (e.g. "FlashAdamW")
+      - "env_vars": dict  (env vars to inject)
+      - "pip_install": str  (pip install command, empty if not needed)
+      - "script_args_hint": list  (suggested --optimizer args for the training script)
+
+    Decision rules (conservative — only enable when clearly beneficial):
+      1. OFF if user explicitly set flashoptim="off"
+      2. OFF if framework is "megatron" (Megatron has its own fused optimizer)
+      3. OFF if no NVIDIA GPUs detected in topology
+      4. OFF if all GPUs have <24GB VRAM (too small — overhead not worth it)
+      5. ON  if user explicitly set flashoptim="on"
+      6. ON  if model is being finetuned in bf16/fp16 (detected from script_args)
+      7. ON  if total GPU memory across all GPUs >= 40GB (i.e., serious training)
+      8. OFF otherwise (default conservative — don't inject into tiny test jobs)
+    """
+    result = {
+        "enabled": False,
+        "reason": "",
+        "optimizer_class": "",
+        "env_vars": {},
+        "pip_install": "",
+        "script_args_hint": [],
+    }
+
+    # Rule 1: explicit off
+    if config.flashoptim == "off":
+        result["reason"] = "disabled by user (flashoptim=off)"
+        return result
+
+    # Rule 2: Megatron has its own fused optimizer path
+    if config.framework == "megatron":
+        result["reason"] = "skipped: Megatron uses built-in fused optimizer"
+        return result
+
+    # Gather GPU info from topology
+    nodes = topology.get("nodes", {})
+    all_gpus = []
+    for node_info in nodes.values():
+        all_gpus.extend(node_info.get("gpus", []))
+
+    # Rule 3: no GPUs
+    if not all_gpus:
+        result["reason"] = "skipped: no NVIDIA GPUs detected"
+        return result
+
+    min_vram_mb = min((g.get("memory_mb", 0) for g in all_gpus), default=0)
+    total_vram_mb = sum(g.get("memory_mb", 0) for g in all_gpus)
+
+    # Rule 4: tiny GPUs (< 24GB)
+    if min_vram_mb < 24000 and config.flashoptim != "on":
+        result["reason"] = f"skipped: smallest GPU has {min_vram_mb:.0f}MB VRAM (<24GB)"
+        return result
+
+    # Detect training precision from script args
+    args_str = " ".join(config.script_args).lower()
+    uses_reduced_precision = any(kw in args_str for kw in [
+        "bf16", "bfloat16", "fp16", "float16", "--bf16", "--fp16",
+        "mixed_precision", "--mixed-precision", "half",
+    ])
+
+    # Detect if user is already specifying an optimizer
+    user_has_optimizer = any(kw in args_str for kw in [
+        "--optimizer", "--optim ", "--optim=",
+    ])
+
+    # Map config to FlashOptim class name
+    optimizer_map = {
+        "adamw": "FlashAdamW",
+        "adam": "FlashAdam",
+        "sgd": "FlashSGD",
+        "sgdw": "FlashSGDW",
+        "lion": "FlashLion",
+    }
+    flash_class = optimizer_map.get(config.flashoptim_optimizer, "FlashAdamW")
+
+    master_bits = config.flashoptim_master_weight_bits if config.flashoptim_master_weight_bits != 0 else None
+
+    # Rule 5: explicit on
+    if config.flashoptim == "on":
+        result["enabled"] = True
+        result["reason"] = "enabled by user (flashoptim=on)"
+    # Rule 6: reduced precision training detected
+    elif uses_reduced_precision:
+        result["enabled"] = True
+        result["reason"] = (
+            f"auto-enabled: reduced-precision training detected in script args "
+            f"(~57% optimizer memory savings with {flash_class})"
+        )
+    # Rule 7: large enough job to benefit
+    elif total_vram_mb >= 40000:
+        result["enabled"] = True
+        result["reason"] = (
+            f"auto-enabled: {total_vram_mb / 1000:.0f}GB total GPU memory — "
+            f"FlashOptim saves ~35% peak memory"
+        )
+    else:
+        result["reason"] = "skipped: job too small to benefit meaningfully"
+        return result
+
+    # Build injection payload
+    result["optimizer_class"] = flash_class
+    result["pip_install"] = "pip install -q flashoptim 2>/dev/null || true"
+
+    # Env vars that training scripts can read to auto-configure
+    result["env_vars"] = {
+        "FLASHOPTIM_ENABLED": "1",
+        "FLASHOPTIM_OPTIMIZER": flash_class,
+        "FLASHOPTIM_MASTER_WEIGHT_BITS": str(master_bits) if master_bits else "",
+        "FLASHOPTIM_COMPRESS_CHECKPOINTS": "1" if config.flashoptim_compress_checkpoints else "0",
+        "FLASHOPTIM_GRADIENT_RELEASE": "1" if config.flashoptim_gradient_release else "0",
+    }
+
+    # Hint args that can be passed to training scripts that support --optim
+    if not user_has_optimizer:
+        result["script_args_hint"] = [
+            f"# FlashOptim: replace your optimizer with {flash_class}",
+            f"# from flashoptim import {flash_class}, cast_model",
+        ]
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -303,6 +445,14 @@ def _build_artifacts(ctx: Dict[str, Any]) -> Dict[str, Any]:
         env.setdefault("NCCL_IB_DISABLE", "0")
         env.setdefault("NCCL_DEBUG", "WARN")
 
+    # ── FlashOptim auto-injection (silent — like KV offloading for training) ──
+    flashoptim_info = _flashoptim_auto_config(config, topology)
+    if flashoptim_info["enabled"]:
+        env.update(flashoptim_info["env_vars"])
+        logger.info(f"FlashOptim: {flashoptim_info['reason']}")
+    else:
+        logger.debug(f"FlashOptim: {flashoptim_info['reason']}")
+
     return {
         "cmd_parts": cmd_parts,
         "env": env,
@@ -312,6 +462,7 @@ def _build_artifacts(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "n_nodes": n_nodes,
         "master_addr": master_addr,
         "topology": topology,
+        "flashoptim": flashoptim_info,
     }
 
 
@@ -339,6 +490,15 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
         os.makedirs(os.path.dirname(config.log_path) or ".", exist_ok=True)
         cmd += f" 2>&1 | tee {config.log_path}"
 
+    # Pre-install FlashOptim if auto-enabled (non-blocking, fail-safe)
+    flashoptim_info = artifacts.get("flashoptim", {})
+    if flashoptim_info.get("enabled") and flashoptim_info.get("pip_install"):
+        pip_cmd = flashoptim_info["pip_install"]
+        logger.info(f"FlashOptim pre-install: {pip_cmd}")
+        node_list = config.nodes or [None]
+        for node in node_list:
+            _run_on(node, pip_cmd, config.ssh_user, config.ssh_key or None, timeout=120)
+
     logger.info(f"Launching: {cmd}")
     try:
         process = subprocess.Popen(
@@ -354,6 +514,7 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
             "framework": config.framework,
             "backend": "native",
             "master_addr": artifacts.get("master_addr", "localhost"),
+            "flashoptim": flashoptim_info,
         }
     except Exception as e:
         return {"status": "failed", "error": str(e)}
@@ -471,6 +632,7 @@ class TrainingOrchestrator:
             "nodes": config.nodes or ["localhost"],
             "master_addr": launch_out.get("master_addr"),
             "preflight": preflight_out,
+            "flashoptim": launch_out.get("flashoptim", {}),
         }
 
     def resume(self, job_id: str, checkpoint_id: Optional[str] = None) -> Dict[str, Any]:

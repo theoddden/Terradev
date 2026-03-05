@@ -33,8 +33,8 @@ class KubernetesConfig:
 class EnhancedKubernetesService:
     """Enhanced Kubernetes service with deep monitoring integration"""
     
-    def __init__(self, config: KubernetesConfig):
-        self.config = config
+    def __init__(self, config: Optional[KubernetesConfig] = None):
+        self.config = config or KubernetesConfig()
         self.session: Optional[aiohttp.ClientSession] = None
         
     async def __aenter__(self):
@@ -45,9 +45,15 @@ class EnhancedKubernetesService:
         if self.session:
             await self.session.close()
     
-    async def install_monitoring_stack(self) -> Dict[str, Any]:
+    async def install_monitoring_stack(
+        self,
+        cluster_name: str = "",
+        namespace: str = "monitoring",
+        grafana_password: Optional[str] = None,
+        enable_alerting: bool = True,
+    ) -> Dict[str, Any]:
         """Install Prometheus and Grafana with Karpenter dashboards"""
-        if not self.config.monitoring_enabled:
+        if not self.config.monitoring_enabled and not cluster_name:
             return {
                 "status": "failed",
                 "error": "Monitoring not enabled in configuration"
@@ -86,10 +92,10 @@ scrape_configs:
             - karpenter
             - monitoring
     relabel_configs:
-      - source_labels: [__meta_kubernetes_pod_name__]
-        target_label: __meta_kubernetes_pod_label_name__
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
     metric_relabel_configs:
-      - source_label: __name__
+      - source_labels: [__name__]
         target_label: __name__
     static_configs:
       - targets: ['localhost:9090']
@@ -109,7 +115,7 @@ alerting:
             
             prometheus_cmd = [
                 "helm", "install", "prometheus", "prometheus-community/prometheus",
-                "--namespace", "monitoring",
+                "--namespace", namespace, "--create-namespace",
                 "--values", "/tmp/prometheus-karpenter.yaml",
                 "--wait"
             ]
@@ -121,7 +127,7 @@ alerting:
             
             # Install Grafana with Karpenter dashboards
             grafana_values = f"""
-adminPassword: prom-operator
+adminPassword: {grafana_password or 'prom-operator'}
 adminUser: admin
 service:
   type: LoadBalancer
@@ -166,8 +172,8 @@ dashboardProviders:
                 f.write(grafana_values)
             
             grafana_cmd = [
-                "helm", "install", "grafana", "grafana-charts/grafana",
-                "--namespace", "monitoring",
+                "helm", "install", "grafana", "grafana/grafana",
+                "--namespace", namespace,
                 "--values", "/tmp/grafana-karpenter.yaml",
                 "--wait"
             ]
@@ -500,6 +506,228 @@ dashboardProviders:
                 "error": str(e)
             }
     
+    # ── Methods called by MCP v5.0.0 K8s Enhanced tools ─────────────────
+
+    async def install_gpu_operator(
+        self,
+        cluster_name: str = "",
+        namespace: str = "gpu-operator",
+        driver_version: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Install NVIDIA GPU Operator on the cluster."""
+        try:
+            env = os.environ.copy()
+            if self.config.kubeconfig_path:
+                env["KUBECONFIG"] = self.config.kubeconfig_path
+
+            # Add NVIDIA Helm repo
+            subprocess.run(
+                ["helm", "repo", "add", "nvidia",
+                 "https://helm.ngc.nvidia.com/nvidia", "--force-update"],
+                capture_output=True, text=True, timeout=60, env=env,
+            )
+            subprocess.run(
+                ["helm", "repo", "update"],
+                capture_output=True, text=True, timeout=60, env=env,
+            )
+
+            helm_cmd = [
+                "helm", "upgrade", "--install", "gpu-operator",
+                "nvidia/gpu-operator",
+                "--namespace", namespace, "--create-namespace",
+                "--set", "driver.enabled=true",
+                "--set", "toolkit.enabled=true",
+                "--set", "devicePlugin.enabled=true",
+                "--set", "dcgmExporter.enabled=true",
+                "--set", "gfd.enabled=true",
+                "--wait", "--timeout=10m",
+            ]
+            if driver_version:
+                helm_cmd.extend(["--set", f"driver.version={driver_version}"])
+
+            result = subprocess.run(
+                helm_cmd, capture_output=True, text=True, timeout=600, env=env,
+            )
+
+            if result.returncode != 0:
+                raise Exception(f"GPU Operator install failed: {result.stderr}")
+
+            return {
+                "status": "installed",
+                "cluster": cluster_name or self.config.cluster_name or "current",
+                "namespace": namespace,
+                "driver_version": driver_version or "auto-detect",
+                "components": ["driver", "toolkit", "device-plugin", "dcgm-exporter", "gfd"],
+            }
+        except FileNotFoundError:
+            return {"status": "failed", "error": "helm not found — install Helm first"}
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
+    async def configure_device_plugin(
+        self,
+        cluster_name: str = "",
+        strategy: str = "none",
+        replicas: int = 2,
+    ) -> Dict[str, Any]:
+        """Configure NVIDIA device plugin (MIG strategy + time-slicing)."""
+        try:
+            env = os.environ.copy()
+            if self.config.kubeconfig_path:
+                env["KUBECONFIG"] = self.config.kubeconfig_path
+
+            config_yaml = json.dumps({
+                "version": "v1",
+                "flags": {"migStrategy": strategy},
+                "sharing": {
+                    "timeSlicing": {
+                        "renameByDefault": False,
+                        "resources": [{"name": "nvidia.com/gpu", "replicas": replicas}],
+                    }
+                },
+            })
+
+            # Apply as ConfigMap
+            cm_manifest = (
+                f"apiVersion: v1\nkind: ConfigMap\nmetadata:\n"
+                f"  name: nvidia-device-plugin\n  namespace: gpu-operator\n"
+                f"data:\n  config.json: |\n"
+            )
+            for line in config_yaml.splitlines():
+                cm_manifest += f"    {line}\n"
+
+            result = subprocess.run(
+                ["kubectl", "apply", "-f", "-"],
+                input=cm_manifest, text=True, capture_output=True, timeout=30, env=env,
+            )
+            if result.returncode != 0:
+                raise Exception(f"ConfigMap apply failed: {result.stderr}")
+
+            return {
+                "status": "configured",
+                "cluster": cluster_name or self.config.cluster_name or "current",
+                "strategy": strategy,
+                "replicas": replicas,
+            }
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
+    async def configure_mig(
+        self,
+        cluster_name: str = "",
+        mig_profile: str = "all-1g.10gb",
+        gpu_indices: Optional[List[int]] = None,
+    ) -> Dict[str, Any]:
+        """Configure Multi-Instance GPU (MIG) partitioning on A100/H100."""
+        try:
+            env = os.environ.copy()
+            if self.config.kubeconfig_path:
+                env["KUBECONFIG"] = self.config.kubeconfig_path
+
+            # MIG profiles: 1g.10gb, 2g.20gb, 3g.40gb, 4g.40gb, 7g.80gb (A100)
+            valid_profiles = [
+                "all-1g.10gb", "all-2g.20gb", "all-3g.40gb",
+                "all-4g.40gb", "all-7g.80gb", "all-1g.20gb",
+                "all-1g.10gb,2g.20gb", "mixed",
+            ]
+
+            # Label nodes with MIG config
+            label_cmd = [
+                "kubectl", "label", "nodes", "--all",
+                f"nvidia.com/mig.config={mig_profile}",
+                "--overwrite",
+            ]
+            if gpu_indices:
+                label_cmd = [
+                    "kubectl", "label", "nodes",
+                    f"--selector=nvidia.com/gpu.count>={max(gpu_indices) + 1}",
+                    f"nvidia.com/mig.config={mig_profile}",
+                    "--overwrite",
+                ]
+
+            result = subprocess.run(
+                label_cmd, capture_output=True, text=True, timeout=30, env=env,
+            )
+            if result.returncode != 0:
+                raise Exception(f"MIG label failed: {result.stderr}")
+
+            return {
+                "status": "configured",
+                "cluster": cluster_name or self.config.cluster_name or "current",
+                "mig_profile": mig_profile,
+                "gpu_indices": gpu_indices or "all",
+                "note": "GPU Operator will apply MIG config on next device-plugin restart",
+            }
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
+    async def configure_time_slicing(
+        self,
+        cluster_name: str = "",
+        replicas: int = 4,
+        oversubscribe: bool = True,
+    ) -> Dict[str, Any]:
+        """Configure GPU time-slicing for multi-tenant pod sharing."""
+        try:
+            env = os.environ.copy()
+            if self.config.kubeconfig_path:
+                env["KUBECONFIG"] = self.config.kubeconfig_path
+
+            ts_config = {
+                "version": "v1",
+                "sharing": {
+                    "timeSlicing": {
+                        "renameByDefault": False,
+                        "failRequestsGreaterThanOne": not oversubscribe,
+                        "resources": [
+                            {"name": "nvidia.com/gpu", "replicas": replicas},
+                        ],
+                    }
+                },
+            }
+
+            cm_manifest = (
+                "apiVersion: v1\nkind: ConfigMap\nmetadata:\n"
+                "  name: time-slicing-config\n  namespace: gpu-operator\n"
+                "data:\n  config.json: |\n"
+            )
+            for line in json.dumps(ts_config, indent=2).splitlines():
+                cm_manifest += f"    {line}\n"
+
+            result = subprocess.run(
+                ["kubectl", "apply", "-f", "-"],
+                input=cm_manifest, text=True, capture_output=True, timeout=30, env=env,
+            )
+            if result.returncode != 0:
+                raise Exception(f"Time-slicing ConfigMap apply failed: {result.stderr}")
+
+            # Patch ClusterPolicy to use this ConfigMap
+            patch_cmd = [
+                "kubectl", "patch", "clusterpolicy/cluster-policy",
+                "-n", "gpu-operator", "--type=merge",
+                "-p", json.dumps({
+                    "spec": {
+                        "devicePlugin": {
+                            "config": {"name": "time-slicing-config", "default": "config.json"}
+                        }
+                    }
+                }),
+            ]
+            patch_result = subprocess.run(
+                patch_cmd, capture_output=True, text=True, timeout=30, env=env,
+            )
+
+            return {
+                "status": "configured",
+                "cluster": cluster_name or self.config.cluster_name or "current",
+                "replicas_per_gpu": replicas,
+                "oversubscribe": oversubscribe,
+                "cluster_policy_patched": patch_result.returncode == 0,
+                "note": f"Each physical GPU now appears as {replicas} virtual GPUs",
+            }
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
     async def get_cluster_resources(self) -> Dict[str, Any]:
         """Get cluster resource information"""
         try:
@@ -533,7 +761,7 @@ dashboardProviders:
                             memory = parts[2].replace('Mi', '')
                             
                             try:
-                                cpu_int = int(cpu_cores) / 1000 if cpu_cores.endswith('m') else int(cpu_cores)
+                                cpu_int = int(cpu_cores) / 1000 if 'm' in parts[1] else int(cpu_cores)
                                 mem_gb = int(memory) / 1024
                                 
                                 resources["nodes"].append({
@@ -574,7 +802,15 @@ dashboardProviders:
     
     def get_enhanced_config(self) -> Dict[str, str]:
         """Get enhanced Kubernetes configuration for environment variables"""
-        config = super().get_kubernetes_config()
+        config: Dict[str, str] = {}
+        if self.config.kubeconfig_path:
+            config["KUBECONFIG"] = self.config.kubeconfig_path
+        if self.config.cluster_name:
+            config["KUBERNETES_CLUSTER_NAME"] = self.config.cluster_name
+        if self.config.namespace:
+            config["KUBERNETES_NAMESPACE"] = self.config.namespace
+        if self.config.aws_region:
+            config["AWS_DEFAULT_REGION"] = self.config.aws_region
         
         # Add monitoring configuration
         if self.config.monitoring_enabled:

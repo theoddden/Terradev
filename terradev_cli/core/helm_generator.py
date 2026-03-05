@@ -1,15 +1,44 @@
 #!/usr/bin/env python3
 """
-Helm Chart Generator - Fixed Version
-Generate Helm charts from Terradev workloads for Kubernetes deployment
+Helm Chart Generator
+Generate production-grade Helm charts from Terradev workloads for Kubernetes deployment.
+
+Supports workload types: training, inference, cost-optimized, high-performance,
+                         moe-inference, rag, vllm-optimized
+Supports stack integrations: qdrant, phoenix, guardrails
 """
 
 import os
 import yaml
 from typing import Dict, List, Any, Optional
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+
+# GPU product labels used by the NVIDIA GPU Operator / device plugin.
+GPU_NODE_LABELS: Dict[str, str] = {
+    'A100': 'NVIDIA-A100-SXM4-80GB',
+    'A100-40G': 'NVIDIA-A100-SXM4-40GB',
+    'A100-80G': 'NVIDIA-A100-SXM4-80GB',
+    'H100': 'NVIDIA-H100-80GB-HBM3',
+    'H100_SXM': 'NVIDIA-H100-80GB-HBM3',
+    'H200': 'NVIDIA-H200-141GB-HBM3e',
+    'V100': 'Tesla-V100-SXM2-16GB',
+    'L4': 'NVIDIA-L4',
+    'L40S': 'NVIDIA-L40S',
+    'RTX 3090': 'NVIDIA-GeForce-RTX-3090',
+    'RTX 4090': 'NVIDIA-GeForce-RTX-4090',
+    'T4': 'Tesla-T4',
+}
+
+# GPU VRAM in GB — both variants where applicable
+GPU_MEMORY_GB: Dict[str, int] = {
+    'A100': 80, 'A100-40G': 40, 'A100-80G': 80,
+    'H100': 80, 'H100_SXM': 80, 'H200': 141,
+    'V100': 16, 'L4': 24, 'L40S': 48,
+    'RTX 3090': 24, 'RTX 4090': 24, 'T4': 16,
+}
+
 
 @dataclass
 class HelmChartConfig:
@@ -20,276 +49,375 @@ class HelmChartConfig:
     kube_version: str
     maintainers: List[Dict[str, str]]
     keywords: List[str]
+    dependencies: List[Dict[str, Any]] = field(default_factory=list)
+
 
 class HelmChartGenerator:
-    """Generate Helm charts from Terradev workloads"""
-    
+    """Generate production-grade Helm charts from Terradev workloads"""
+
+    WORKLOAD_TYPES = [
+        'training', 'inference', 'cost-optimized', 'high-performance',
+        'moe-inference', 'rag', 'vllm-optimized',
+    ]
+    STACK_COMPONENTS = ['qdrant', 'phoenix', 'guardrails']
+
     def __init__(self):
         self.chart_templates = {
             'training': self._get_training_template(),
             'inference': self._get_inference_template(),
             'cost-optimized': self._get_cost_optimized_template(),
-            'high-performance': self._get_high_performance_template()
+            'high-performance': self._get_high_performance_template(),
+            'moe-inference': self._get_moe_inference_template(),
+            'rag': self._get_rag_template(),
+            'vllm-optimized': self._get_vllm_optimized_template(),
         }
-    
+
     def generate_chart(self, workload_config: Dict[str, Any], output_dir: str) -> str:
         """Generate complete Helm chart from Terradev workload"""
         chart_name = workload_config.get('name', f"terradev-{workload_config['workload_type']}")
         chart_path = Path(output_dir) / chart_name
-        
-        # Create chart directory structure
+
         chart_path.mkdir(parents=True, exist_ok=True)
         (chart_path / "templates").mkdir(exist_ok=True)
         (chart_path / "charts").mkdir(exist_ok=True)
-        
-        # Generate Chart.yaml
+
         chart_config = self._generate_chart_config(workload_config, chart_name)
         self._write_chart_yaml(chart_path, chart_config)
-        
-        # Generate values.yaml
+
         values = self._generate_values(workload_config)
         self._write_values_yaml(chart_path, values)
-        
-        # Generate templates
+
         templates = self._generate_templates(workload_config)
         self._write_templates(chart_path, templates)
-        
-        # Generate README
+
         readme = self._generate_readme(workload_config, chart_name)
         self._write_readme(chart_path, readme)
-        
+
         return str(chart_path)
-    
+
     def _generate_chart_config(self, workload: Dict[str, Any], chart_name: str) -> HelmChartConfig:
         """Generate Chart.yaml configuration"""
+        deps: List[Dict[str, Any]] = []
+        for stack in workload.get('stack', []):
+            if stack == 'qdrant':
+                deps.append({'name': 'qdrant', 'version': '0.9.x',
+                             'repository': 'https://qdrant.github.io/qdrant-helm',
+                             'condition': 'qdrant.enabled'})
         return HelmChartConfig(
-            name=chart_name,
-            version="1.0.0",
-            description=f"Terradev {workload['workload_type'].title()} workload for {workload['gpu_type']}",
-            app_version="1.0.0",
-            kube_version=">=1.20.0-0",
-            maintainers=[
-                {
-                    "name": "Terradev",
-                    "email": "support@terradev.dev",
-                    "url": "https://terradev.dev"
-                }
-            ],
-            keywords=["gpu", "machine-learning", "kubernetes", workload['workload_type'], workload['gpu_type']]
+            name=chart_name, version="1.0.0",
+            description=f"Terradev {workload['workload_type'].title()} workload for {workload.get('gpu_type', 'GPU')}",
+            app_version="1.0.0", kube_version=">=1.24.0-0",
+            maintainers=[{"name": "Terradev", "email": "support@terradev.dev", "url": "https://terradev.dev"}],
+            keywords=["gpu", "machine-learning", "kubernetes", workload['workload_type'], workload.get('gpu_type', 'gpu')],
+            dependencies=deps,
         )
-    
+
     def _generate_values(self, workload: Dict[str, Any]) -> Dict[str, Any]:
         """Generate values.yaml"""
-        base_values = self.chart_templates[workload['workload_type']]
-        
-        # Override with workload-specific values
+        wtype = workload['workload_type']
+        base_values = self.chart_templates.get(wtype, self.chart_templates['inference'])
+
         values = {
             **base_values,
-            'image': {
-                'repository': workload['image'],
-                'tag': workload.get('tag', 'latest'),
-                'pullPolicy': 'IfNotPresent'
-            },
+            'image': {'repository': workload['image'], 'tag': workload.get('tag', 'latest'), 'pullPolicy': 'IfNotPresent'},
             'gpu': {
-                'type': workload['gpu_type'],
-                'count': workload.get('gpu_count', 1),
-                'memory': workload.get('memory_gb', 16),
-                'storage': workload.get('storage_gb', 100)
+                'type': workload['gpu_type'], 'count': workload.get('gpu_count', 1),
+                'memory': workload.get('memory_gb', 16), 'storage': workload.get('storage_gb', 100),
+                'nodeLabel': GPU_NODE_LABELS.get(workload['gpu_type'], workload['gpu_type']),
             },
             'resources': self._calculate_resources(workload),
-            'budget': {
-                'maxHourlyRate': workload.get('budget'),
-                'enforce': workload.get('budget') is not None
-            },
-            'terradev': {
-                'provider': workload.get('provider', 'auto'),
-                'region': workload.get('region', 'us-east-1'),
-                'spot': workload.get('spot', True)
-            }
+            'budget': {'maxHourlyRate': workload.get('budget'), 'enforce': workload.get('budget') is not None},
+            'terradev': {'provider': workload.get('provider', 'auto'), 'region': workload.get('region', 'us-east-1'), 'spot': workload.get('spot', True)},
+            'securityContext': {'runAsNonRoot': True, 'runAsUser': 1000, 'runAsGroup': 1000, 'fsGroup': 1000, 'capabilities': {'drop': ['ALL']}},
+            'podSecurityContext': {'fsGroup': 1000, 'seccompProfile': {'type': 'RuntimeDefault'}},
+            'serviceAccount': {'create': True, 'name': '', 'annotations': {}},
+            'metrics': {'enabled': True, 'serviceMonitor': {'enabled': True, 'interval': '15s', 'path': '/metrics'}},
         }
-        
-        # Add environment variables
+
+        # Health probes, autoscaling, PDB for non-job workloads
+        if wtype not in ('training', 'cost-optimized'):
+            values['probes'] = {
+                'startup': {'enabled': True, 'path': '/health', 'initialDelaySeconds': 30, 'periodSeconds': 10, 'failureThreshold': 30},
+                'liveness': {'enabled': True, 'path': '/health', 'periodSeconds': 15, 'failureThreshold': 3},
+                'readiness': {'enabled': True, 'path': '/health', 'periodSeconds': 5, 'failureThreshold': 2},
+            }
+            values['autoscaling'] = {'enabled': False, 'minReplicas': 1, 'maxReplicas': 4, 'targetGPUUtilization': 80, 'targetCPUUtilizationPercentage': 80}
+            values['podDisruptionBudget'] = {'enabled': True, 'minAvailable': 1}
+
         if workload.get('environment_vars'):
             values['env'] = workload['environment_vars']
-        
-        # Add ports for inference workloads
-        if workload['workload_type'] == 'inference' and workload.get('ports'):
-            values['service'] = {
-                'type': 'LoadBalancer',
-                'ports': [{'port': port, 'targetPort': port} for port in workload['ports']]
-            }
-        
+
+        # Ports for all non-job workloads — default 8000 if none specified
+        ports = workload.get('ports', [])
+        if wtype not in ('training', 'cost-optimized'):
+            if not ports:
+                ports = [8000]
+            values['service'] = {'type': 'LoadBalancer', 'ports': [{'port': p, 'targetPort': p} for p in ports], 'annotations': {}}
+
+        # Stack integrations (qdrant, phoenix, guardrails)
+        for stack in workload.get('stack', []):
+            stack_values = self._get_stack_values(stack, workload)
+            if stack_values:
+                values.update(stack_values)
+
         return values
-    
+
     def _calculate_resources(self, workload: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate resource requirements"""
         gpu_count = workload.get('gpu_count', 1)
         memory_gb = workload.get('memory_gb', 16)
-        
+
         # Estimate CPU based on GPU count (rule of thumb: 4-8 CPU cores per GPU)
         cpu_cores = gpu_count * 6
-        
-        # Add memory for GPU (GPU memory + system memory)
-        gpu_memory_map = {
-            'A100': 40,  # 40GB per A100
-            'H100': 80,  # 80GB per H100
-            'V100': 16,  # 16GB per V100
-            'RTX 3090': 24,  # 24GB per RTX 3090
-            'RTX 4090': 24,  # 24GB per RTX 4090
-        }
-        
-        gpu_memory = gpu_memory_map.get(workload['gpu_type'], 16) * gpu_count
+
+        # GPU VRAM + system memory overhead
+        gpu_memory = GPU_MEMORY_GB.get(workload['gpu_type'], 16) * gpu_count
         total_memory = max(memory_gb, gpu_memory + 8)  # Add 8GB for system
-        
+
         return {
             'requests': {
-                'cpu': f"{cpu_cores}m",
+                'cpu': str(cpu_cores),
                 'memory': f"{total_memory}Gi",
-                'nvidia.com/gpu': str(gpu_count)
+                'nvidia.com/gpu': str(gpu_count),
             },
             'limits': {
-                'cpu': f"{cpu_cores * 2}m",
+                'cpu': str(cpu_cores * 2),
                 'memory': f"{total_memory * 2}Gi",
-                'nvidia.com/gpu': str(gpu_count)
-            }
+                'nvidia.com/gpu': str(gpu_count),
+            },
         }
+
+    # ── Stack integrations ─────────────────────────────────────────────
+
+    def _get_stack_values(self, stack: str, workload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Get Helm values for a stack component by importing its service."""
+        if stack == 'qdrant':
+            try:
+                from ml_services.qdrant_service import QdrantService, QdrantConfig
+                return QdrantService(QdrantConfig()).generate_helm_values()
+            except ImportError:
+                return {'qdrant': {'enabled': True, 'image': 'qdrant/qdrant:latest', 'replicas': 1,
+                                   'ports': {'rest': 6333, 'grpc': 6334}, 'persistence': {'enabled': True, 'size': '100Gi'},
+                                   'resources': {'requests': {'cpu': '500m', 'memory': '2Gi'}, 'limits': {'cpu': '4', 'memory': '8Gi'}}}}
+        elif stack == 'phoenix':
+            try:
+                from ml_services.phoenix_service import PhoenixService, PhoenixConfig
+                return PhoenixService(PhoenixConfig()).generate_helm_values()
+            except ImportError:
+                return {'phoenix': {'enabled': True, 'image': 'arizephoenix/phoenix:latest', 'port': 6006,
+                                    'persistence': {'enabled': True, 'size': '50Gi'},
+                                    'resources': {'requests': {'cpu': '500m', 'memory': '1Gi'}, 'limits': {'cpu': '2', 'memory': '4Gi'}}}}
+        elif stack == 'guardrails':
+            try:
+                from ml_services.guardrails_service import GuardrailsService, GuardrailsConfig
+                return GuardrailsService(GuardrailsConfig()).generate_helm_values()
+            except ImportError:
+                return {'guardrails': {'enabled': True, 'image': 'nvcr.io/nvidia/nemo-guardrails:latest', 'port': 8090,
+                                       'deploymentMode': 'standalone',
+                                       'resources': {'requests': {'cpu': '500m', 'memory': '1Gi'}, 'limits': {'cpu': '2', 'memory': '4Gi'}}}}
+        return None
     
+    # ── template generation ────────────────────────────────────────────
+
     def _generate_templates(self, workload: Dict[str, Any]) -> Dict[str, str]:
         """Generate Kubernetes templates"""
         templates = {}
-        
-        if workload['workload_type'] in ['training', 'cost-optimized']:
-            # Generate Job template
+        wtype = workload['workload_type']
+
+        if wtype in ('training', 'cost-optimized'):
             templates['job.yaml'] = self._generate_job_template(workload)
         else:
-            # Generate Deployment template
             templates['deployment.yaml'] = self._generate_deployment_template(workload)
-            
-            # Generate Service template for inference
-            if workload.get('ports'):
-                templates['service.yaml'] = self._generate_service_template(workload)
-        
-        # Generate ConfigMap for environment variables
-        if workload.get('environment_vars'):
-            templates['configmap.yaml'] = self._generate_configmap_template(workload)
-        
-        # Generate PVC for storage
+            templates['service.yaml'] = self._generate_service_template(workload)
+
+        templates['configmap.yaml'] = self._generate_configmap_template(workload)
+
         if workload.get('storage_gb', 0) > 0:
             templates['pvc.yaml'] = self._generate_pvc_template(workload)
-        
+
+        templates['serviceaccount.yaml'] = self._generate_serviceaccount_template()
+        if wtype not in ('training', 'cost-optimized'):
+            templates['hpa.yaml'] = self._generate_hpa_template()
+            templates['pdb.yaml'] = self._generate_pdb_template()
+
         return templates
-    
+
     def _generate_job_template(self, workload: Dict[str, Any]) -> str:
-        """Generate Kubernetes Job template (fixed f-string issues)"""
-        command_str = str(workload.get('command', [])).replace("'", '"')
-        
-        template = """apiVersion: batch/v1
+        """Generate Kubernetes Job template"""
+        return """apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "{{ include "terradev.fullname" . }}-{{ .Release.Revision }}"
+  name: {{ include "terradev.fullname" . }}-{{ .Release.Revision }}
   labels:
-    {{- include "terradev.labels" . | nindent 4}}
+    {{- include "terradev.labels" . | nindent 4 }}
 spec:
-  backoffLimit: 3
+  backoffLimit: {{ .Values.backoffLimit | default 3 }}
+  {{- if .Values.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ .Values.ttlSecondsAfterFinished }}
+  {{- end }}
   completions: 1
   parallelism: 1
   template:
     metadata:
       labels:
-        {{- include "terradev.selectorLabels" . | nindent 8}}
+        {{- include "terradev.selectorLabels" . | nindent 8 }}
     spec:
-      restartPolicy: Never
+      restartPolicy: {{ .Values.restartPolicy | default "Never" }}
+      serviceAccountName: {{ include "terradev.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
-      - name: "{{ .Chart.Name }}"
+      - name: {{ .Chart.Name }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-        imagePullPolicy: "{{ .Values.image.pullPolicy | quote }}"
-        command: """ + command_str + """
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.command }}
+        command:
+          {{- toYaml .Values.command | nindent 10 }}
+        {{- end }}
         {{- if .Values.env }}
         envFrom:
         - configMapRef:
-            name: "{{ include "terradev.fullname" . }}-config"
+            name: {{ include "terradev.fullname" . }}-config
+        {{- end }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
         {{- end }}
         resources:
-          {{- toYaml .Values.resources | nindent 10}}
-        {{- if .Values.storage }}
+          {{- toYaml .Values.resources | nindent 10 }}
+        {{- if .Values.gpu.storage }}
         volumeMounts:
         - name: storage
           mountPath: /data
         {{- end }}
-      {{- if .Values.storage }}
+      {{- if .Values.gpu.storage }}
       volumes:
       - name: storage
         persistentVolumeClaim:
-          claimName: "{{ include "terradev.fullname" . }}-storage"
-      {{- end}}
+          claimName: {{ include "terradev.fullname" . }}-storage
+      {{- end }}
+      {{- with .Values.nodeSelector }}
       nodeSelector:
-        {{- include "terradev.nodeSelector" . | nindent 8}}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
       tolerations:
-        {{- include "terradev.tolerations" . | nindent 8}}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
       affinity:
-        {{- include "terradev.affinity" . | nindent 8}}"""
-        
-        return template
-    
+        {{- toYaml . | nindent 8 }}
+      {{- end }}"""
+
     def _generate_deployment_template(self, workload: Dict[str, Any]) -> str:
         """Generate Kubernetes Deployment template"""
-        command_str = str(workload.get('command', [])).replace("'", '"')
-        
-        template = """apiVersion: apps/v1
+        return """apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: "{{ include "terradev.fullname" . }}"
+  name: {{ include "terradev.fullname" . }}
   labels:
-    {{- include "terradev.labels" . | nindent 4}}
+    {{- include "terradev.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount | default 1 }}
+  {{- end }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
-      {{- include "terradev.selectorLabels" . | nindent 6}}
+      {{- include "terradev.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
-        {{- include "terradev.selectorLabels" . | nindent 8}}
+        {{- include "terradev.selectorLabels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "terradev.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
-      - name: "{{ .Chart.Name }}"
+      - name: {{ .Chart.Name }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-        imagePullPolicy: "{{ .Values.image.pullPolicy | quote }}"
-        command: """ + command_str + """
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.command }}
+        command:
+          {{- toYaml .Values.command | nindent 10 }}
+        {{- end }}
         {{- if .Values.env }}
         envFrom:
         - configMapRef:
-            name: "{{ include "terradev.fullname" . }}-config"
+            name: {{ include "terradev.fullname" . }}-config
+        {{- end }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
         {{- end }}
         resources:
-          {{- toYaml .Values.resources | nindent 10}}
-        {{- if .Values.service.ports }}
+          {{- toYaml .Values.resources | nindent 10 }}
+        {{- if .Values.service }}
         ports:
         {{- range .Values.service.ports }}
         - containerPort: {{ .targetPort }}
           protocol: TCP
         {{- end }}
         {{- end }}
-        {{- if .Values.storage }}
+        {{- if and .Values.probes .Values.probes.startup .Values.probes.startup.enabled }}
+        startupProbe:
+          httpGet:
+            path: {{ .Values.probes.startup.path }}
+            port: {{ (index .Values.service.ports 0).targetPort }}
+          initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+          failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+        {{- end }}
+        {{- if and .Values.probes .Values.probes.liveness .Values.probes.liveness.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.probes.liveness.path }}
+            port: {{ (index .Values.service.ports 0).targetPort }}
+          periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+        {{- end }}
+        {{- if and .Values.probes .Values.probes.readiness .Values.probes.readiness.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.probes.readiness.path }}
+            port: {{ (index .Values.service.ports 0).targetPort }}
+          periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+          failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+        {{- end }}
+        {{- if .Values.gpu.storage }}
         volumeMounts:
         - name: storage
           mountPath: /data
         {{- end }}
-      {{- if .Values.storage }}
+      {{- if .Values.gpu.storage }}
       volumes:
       - name: storage
         persistentVolumeClaim:
-          claimName: "{{ include "terradev.fullname" . }}-storage"
-      {{- end}}
+          claimName: {{ include "terradev.fullname" . }}-storage
+      {{- end }}
+      {{- with .Values.nodeSelector }}
       nodeSelector:
-        {{- include "terradev.nodeSelector" . | nindent 8}}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
       tolerations:
-        {{- include "terradev.tolerations" . | nindent 8}}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
       affinity:
-        {{- include "terradev.affinity" . | nindent 8}}"""
-        
-        return template
-    
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}"""
+
     def _generate_service_template(self, workload: Dict[str, Any]) -> str:
         """Generate Kubernetes Service template"""
         return """apiVersion: v1
@@ -297,9 +425,13 @@ kind: Service
 metadata:
   name: {{ include "terradev.fullname" . }}
   labels:
-    {{- include "terradev.labels" . | nindent 4}}
+    {{- include "terradev.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ .Values.service.type | default "ClusterIP" }}
   ports:
   {{- range .Values.service.ports }}
     - port: {{ .port }}
@@ -308,40 +440,103 @@ spec:
       name: port-{{ .port }}
   {{- end }}
   selector:
-    {{- include "terradev.selectorLabels" . | nindent 4}}"""
-    
+    {{- include "terradev.selectorLabels" . | nindent 4 }}"""
+
     def _generate_configmap_template(self, workload: Dict[str, Any]) -> str:
-        """Generate ConfigMap template"""
-        env_vars = workload.get('environment_vars', {})
-        env_data = '\n'.join([f'  {k}: "{v}"' for k, v in env_vars.items()])
-        
-        return f"""apiVersion: v1
+        """Generate ConfigMap template — fully data-driven from .Values.env"""
+        return """{{- if .Values.env }}
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "terradev.fullname" . }}-config
   labels:
-    {{- include "terradev.labels" . | nindent 4}}
+    {{- include "terradev.labels" . | nindent 4 }}
 data:
-{env_data}"""
-    
+  {{- range $key, $value := .Values.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}"""
+
     def _generate_pvc_template(self, workload: Dict[str, Any]) -> str:
-        """Generate PersistentVolumeClaim template"""
-        storage_gb = workload.get('storage_gb', 100)
-        
-        return f"""apiVersion: v1
+        """Generate PersistentVolumeClaim template — pure raw string, no f-string"""
+        return """apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "{{{{ include "terradev.fullname" . }}}}-storage"
+  name: {{ include "terradev.fullname" . }}-storage
   labels:
-    "{{{{- include "terradev.labels" . | nindent 4}}}}"
+    {{- include "terradev.labels" . | nindent 4 }}
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: {storage_gb}Gi
-  storageClassName: gp3"""
+      storage: {{ .Values.gpu.storage }}Gi
+  {{- if .Values.persistence }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+  {{- end }}
+  {{- else }}
+  storageClassName: gp3
+  {{- end }}"""
+
+    def _generate_serviceaccount_template(self) -> str:
+        """Generate ServiceAccount template"""
+        return """{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "terradev.serviceAccountName" . }}
+  labels:
+    {{- include "terradev.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}"""
+
+    def _generate_hpa_template(self) -> str:
+        """Generate HorizontalPodAutoscaler template"""
+        return """{{- if .Values.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "terradev.fullname" . }}
+  labels:
+    {{- include "terradev.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "terradev.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}"""
+
+    def _generate_pdb_template(self) -> str:
+        """Generate PodDisruptionBudget template"""
+        return """{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "terradev.fullname" . }}
+  labels:
+    {{- include "terradev.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "terradev.selectorLabels" . | nindent 6 }}
+{{- end }}"""
     
+    # ── workload type templates ────────────────────────────────────────
+
     def _get_training_template(self) -> Dict[str, Any]:
         """Get training workload template"""
         return {
@@ -349,38 +544,24 @@ spec:
             'restartPolicy': 'Never',
             'backoffLimit': 3,
             'ttlSecondsAfterFinished': 300,
-            'nodeSelector': {
-                'accelerator': 'nvidia-tesla-a100'
-            },
+            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
             'tolerations': [
-                {
-                    'key': 'nvidia.com/gpu',
-                    'operator': 'Exists',
-                    'effect': 'NoSchedule'
-                }
-            ]
+                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+            ],
         }
-    
+
     def _get_inference_template(self) -> Dict[str, Any]:
         """Get inference workload template"""
         return {
             'workloadType': 'Deployment',
-            'replicas': 1,
-            'service': {
-                'type': 'LoadBalancer'
-            },
-            'nodeSelector': {
-                'accelerator': 'nvidia-tesla-a100'
-            },
+            'replicaCount': 1,
+            'strategy': {'type': 'Recreate'},
+            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
             'tolerations': [
-                {
-                    'key': 'nvidia.com/gpu',
-                    'operator': 'Exists',
-                    'effect': 'NoSchedule'
-                }
-            ]
+                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+            ],
         }
-    
+
     def _get_cost_optimized_template(self) -> Dict[str, Any]:
         """Get cost-optimized workload template"""
         return {
@@ -388,59 +569,145 @@ spec:
             'restartPolicy': 'Never',
             'backoffLimit': 2,
             'ttlSecondsAfterFinished': 60,
-            'nodeSelector': {
-                'accelerator': 'nvidia-tesla-a100',
-                'instance-type': 'g4dn'
-            },
+            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
             'tolerations': [
-                {
-                    'key': 'nvidia.com/gpu',
-                    'operator': 'Exists',
-                    'effect': 'NoSchedule'
-                },
-                {
-                    'key': 'spot',
-                    'operator': 'Exists',
-                    'effect': 'NoSchedule'
-                }
-            ]
+                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+                {'key': 'spot', 'operator': 'Exists', 'effect': 'NoSchedule'},
+            ],
         }
-    
+
     def _get_high_performance_template(self) -> Dict[str, Any]:
         """Get high-performance workload template"""
         return {
             'workloadType': 'Deployment',
-            'replicas': 1,
-            'nodeSelector': {
-                'accelerator': 'nvidia-tesla-a100',
-                'instance-type': 'p4d'
-            },
+            'replicaCount': 1,
+            'strategy': {'type': 'Recreate'},
+            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
             'tolerations': [
-                {
-                    'key': 'nvidia.com/gpu',
-                    'operator': 'Exists',
-                    'effect': 'NoSchedule'
-                }
+                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+                {'key': 'dedicated', 'operator': 'Equal', 'value': 'gpu-inference', 'effect': 'NoSchedule'},
             ],
             'affinity': {
-                'nodeAffinity': {
-                    'requiredDuringSchedulingIgnoredDuringExecution': {
-                        'nodeSelectorTerms': [
-                            {
-                                'matchExpressions': [
-                                    {
-                                        'key': 'topology.kubernetes.io/zone',
-                                        'operator': 'In',
-                                        'values': ['us-east-1a', 'us-east-1b', 'us-east-1c']
-                                    }
-                                ]
-                            }
-                        ]
-                    }
+                'podAntiAffinity': {
+                    'preferredDuringSchedulingIgnoredDuringExecution': [{
+                        'weight': 100,
+                        'podAffinityTerm': {
+                            'labelSelector': {'matchExpressions': [
+                                {'key': 'app.kubernetes.io/name', 'operator': 'In',
+                                 'values': ['{{ include "terradev.name" . }}']}
+                            ]},
+                            'topologyKey': 'kubernetes.io/hostname',
+                        },
+                    }]
                 }
-            }
+            },
         }
-    
+
+    # ── MoE / RAG / vLLM workload types (Strategic #9) ────────────────
+
+    def _get_moe_inference_template(self) -> Dict[str, Any]:
+        """Get MoE inference workload template — mirrors clusters/moe-template"""
+        return {
+            'workloadType': 'Deployment',
+            'replicaCount': 1,
+            'strategy': {'type': 'Recreate'},
+            'serving': {
+                'backend': 'vllm', 'port': 8000, 'host': '0.0.0.0',
+                'expertParallel': {
+                    'enabled': True, 'dataParallelSize': 8,
+                    'enableEplb': True, 'enableDbo': True,
+                    'all2allBackend': 'deepep_low_latency',
+                },
+                'vllm': {
+                    'tensorParallelSize': 8, 'gpuMemoryUtilization': 0.95,
+                    'maxModelLen': 32768, 'dtype': 'auto', 'trustRemoteCode': True,
+                    'maxNumBatchedTokens': 16384, 'maxNumSeqs': 1024,
+                    'enablePrefixCaching': True, 'enableChunkedPrefill': True,
+                },
+                'flashinfer': {'enabled': True, 'backend': 'FLASHINFER'},
+                'sleepMode': {'enabled': True, 'level': 1},
+                'kvOffloading': {'enabled': True, 'connector': 'offloading'},
+                'speculative': {'enabled': True, 'method': 'mtp', 'numTokens': 1},
+                'lmcache': {
+                    'enabled': True, 'backend': 'redis',
+                    'redisUrl': 'redis://lmcache-redis:6379',
+                    'chunkSize': 256, 'pipelined': True,
+                },
+                'lora': {'enabled': False, 'maxLoras': 8, 'maxLoraRank': 64},
+                'router': {'enabled': False, 'replicas': 2, 'port': 8080, 'policy': 'consistent_hash'},
+            },
+            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
+            'tolerations': [
+                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+                {'key': 'dedicated', 'operator': 'Equal', 'value': 'gpu-inference', 'effect': 'NoSchedule'},
+            ],
+            'persistence': {
+                'modelCache': {'enabled': True, 'size': '500Gi', 'storageClass': 'nvme-ssd', 'mountPath': '/models'},
+                'sharedMemory': {'enabled': True, 'size': '32Gi', 'mountPath': '/dev/shm'},
+            },
+            'env': {
+                'CUDA_VISIBLE_DEVICES': '0,1,2,3,4,5,6,7',
+                'NCCL_P2P_DISABLE': '0', 'NCCL_IB_DISABLE': '0', 'NCCL_SOCKET_IFNAME': 'eth0',
+                'VLLM_ATTENTION_BACKEND': 'FLASHINFER', 'VLLM_USE_DEEP_GEMM': '1', 'VLLM_SERVER_DEV_MODE': '1',
+            },
+        }
+
+    def _get_rag_template(self) -> Dict[str, Any]:
+        """Get RAG infrastructure workload template — mirrors clusters/rag-template"""
+        return {
+            'workloadType': 'Deployment',
+            'replicaCount': 1,
+            'strategy': {'type': 'Recreate'},
+            'serving': {
+                'backend': 'vllm', 'port': 8000,
+                'vllm': {'tensorParallelSize': 1, 'gpuMemoryUtilization': 0.9, 'maxModelLen': 32768},
+                'flashInfer': {'enabled': True},
+                'sleepMode': {'enabled': True},
+                'kvOffloading': {'enabled': True, 'connector': 'offloading'},
+                'speculative': {'enabled': True, 'method': 'mtp', 'numTokens': 5},
+                'lmcache': {'enabled': True, 'backend': 'redis', 'remoteUrl': 'redis://redis-svc:6379'},
+            },
+            'embedding': {
+                'model': 'BAAI/bge-large-en-v1.5', 'replicas': 1, 'port': 8001, 'backend': 'fastembed',
+                'resources': {'requests': {'cpu': '2', 'memory': '4Gi'}, 'limits': {'cpu': '4', 'memory': '8Gi'}},
+            },
+            'redis': {'enabled': True, 'image': 'redis:7-alpine', 'port': 6379, 'persistence': {'enabled': True, 'size': '10Gi'}},
+            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
+            'tolerations': [
+                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+            ],
+        }
+
+    def _get_vllm_optimized_template(self) -> Dict[str, Any]:
+        """Get vLLM-optimized inference template with all 6 critical knobs"""
+        return {
+            'workloadType': 'Deployment',
+            'replicaCount': 1,
+            'strategy': {'type': 'Recreate'},
+            'serving': {
+                'backend': 'vllm', 'port': 8000,
+                'vllm': {
+                    'tensorParallelSize': 1, 'gpuMemoryUtilization': 0.92,
+                    'maxModelLen': 8192, 'dtype': 'auto', 'trustRemoteCode': True,
+                    'maxNumBatchedTokens': 8192, 'maxNumSeqs': 256,
+                    'enablePrefixCaching': True, 'enableChunkedPrefill': True,
+                },
+                'flashinfer': {'enabled': True, 'backend': 'FLASHINFER'},
+                'sleepMode': {'enabled': True, 'level': 1},
+                'kvOffloading': {'enabled': True, 'connector': 'offloading'},
+                'speculative': {'enabled': False},
+            },
+            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
+            'tolerations': [
+                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+            ],
+            'env': {
+                'VLLM_ATTENTION_BACKEND': 'FLASHINFER', 'VLLM_USE_DEEP_GEMM': '1',
+            },
+        }
+
+    # ── file writers ───────────────────────────────────────────────────
+
     def _write_chart_yaml(self, chart_path: Path, config: HelmChartConfig):
         """Write Chart.yaml"""
         chart_data = {
@@ -452,31 +719,70 @@ spec:
             'appVersion': config.app_version,
             'kubeVersion': config.kube_version,
             'maintainers': config.maintainers,
-            'keywords': config.keywords
+            'keywords': config.keywords,
         }
-        
+        if config.dependencies:
+            chart_data['dependencies'] = config.dependencies
+
         with open(chart_path / 'Chart.yaml', 'w') as f:
             yaml.dump(chart_data, f, default_flow_style=False)
-    
+
     def _write_values_yaml(self, chart_path: Path, values: Dict[str, Any]):
         """Write values.yaml"""
         with open(chart_path / 'values.yaml', 'w') as f:
             yaml.dump(values, f, default_flow_style=False)
-    
+
     def _write_templates(self, chart_path: Path, templates: Dict[str, str]):
         """Write template files"""
         for filename, content in templates.items():
             with open(chart_path / 'templates' / filename, 'w') as f:
                 f.write(content)
-        
-        # Generate helper templates
         self._write_helper_templates(chart_path)
-    
+
     def _write_helper_templates(self, chart_path: Path):
         """Write helper templates"""
         helpers = {
-            '_helpers.tpl': """{{- /*
-Generate basic labels for Terradev workloads
+            '_helpers.tpl': self._get_helpers_tpl(),
+            'NOTES.txt': self._get_notes_txt(),
+        }
+        for filename, content in helpers.items():
+            with open(chart_path / 'templates' / filename, 'w') as f:
+                f.write(content)
+
+    @staticmethod
+    def _get_helpers_tpl() -> str:
+        return """{{- /*
+Expand the name of the chart.
+*/}}
+{{- define "terradev.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- /*
+Create a default fully qualified app name.
+*/}}
+{{- define "terradev.fullname" -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- if contains $name .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- /*
+Create chart name and version as used by the chart label.
+*/}}
+{{- define "terradev.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- /*
+Common labels
 */}}
 {{- define "terradev.labels" -}}
 helm.sh/chart: {{ include "terradev.chart" . }}
@@ -484,7 +790,7 @@ helm.sh/chart: {{ include "terradev.chart" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{- /*
@@ -496,143 +802,65 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{- /*
-Create the name of the chart
+Create the name of the service account to use
 */}}
-{{- define "terradev.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{- /*
-Create chart name and version as used by the chart label
-*/}}
-{{- define "terradev.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{- /*
-Common labels
-*/}}
-{{- define "terradev.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- define "terradev.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "terradev.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- if contains $name .Release.Name }}
-{{- $name }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
-{{- end }}
+"""
 
-{{- /*
-Node selector for GPU workloads
-*/}}
-{{- define "terradev.nodeSelector" -}}
-accelerator: nvidia-tesla-{{ .Values.gpu.type | lower }}
-{{- if eq .Values.terradev.spot true }}
-instance-type: {{ .Values.terradev.provider }}-spot
-{{- end }}
-{{- end }}
+    @staticmethod
+    def _get_notes_txt() -> str:
+        return """Terradev GPU Workload deployed!
 
-{{- /*
-Tolerations for GPU workloads
-*/}}
-{{- define "terradev.tolerations" -}}
-- key: nvidia.com/gpu
-  operator: Exists
-  effect: NoSchedule
-{{- if eq .Values.terradev.spot true }}
-- key: spot
-  operator: Exists
-  effect: NoSchedule
-{{- end }}
-{{- end }}
-
-{{- /*
-Affinity for GPU workloads
-*/}}
-{{- define "terradev.affinity" -}}
-nodeAffinity:
-  requiredDuringSchedulingIgnoredDuringExecution:
-    nodeSelectorTerms:
-    - matchExpressions:
-      - key: accelerator
-        operator: In
-        values:
-        - nvidia-tesla-{{ .Values.gpu.type | lower }}
-{{- if eq .Values.terradev.spot true }}
-      - key: instance-type
-        operator: In
-        values:
-        - spot
-{{- end }}
-{{- end }}
-""",
-            'NOTES.txt': """Terradev GPU Workload
-
-This chart deploys a {{ .Values.gpu.type }} GPU workload on Kubernetes.
+GPU: {{ .Values.gpu.type }} x{{ .Values.gpu.count }}
+Node label: {{ .Values.gpu.nodeLabel }}
 
 {{- if .Values.budget.enforce }}
-Budget enforcement is enabled with a maximum rate of ${{ .Values.budget.maxHourlyRate }}/hour.
+Budget: ${{ .Values.budget.maxHourlyRate }}/hr (enforced)
 {{- end }}
-
-## GPU Resources
-- Type: {{ .Values.gpu.type }}
-- Count: {{ .Values.gpu.count }}
-- Memory: {{ .Values.resources.requests.memory }}
-
-## Accessing the Workload
 
 {{- if eq .Values.workloadType "Job" }}
 Check job status:
   kubectl get jobs -l app.kubernetes.io/name={{ include "terradev.fullname" . }}
-
-View job logs:
+View logs:
   kubectl logs job/{{ include "terradev.fullname" . }}
 {{- else }}
-Check deployment status:
-  kubectl get deployments -l app.kubernetes.io/name={{ include "terradev.fullname" . }}
-
-View pod logs:
-  kubectl logs deployment/{{ include "terradev.fullname" . }}
-
+Check deployment:
+  kubectl get deploy {{ include "terradev.fullname" . }}
+View logs:
+  kubectl logs deploy/{{ include "terradev.fullname" . }}
 {{- if .Values.service }}
-Access the service:
-  kubectl get service {{ include "terradev.fullname" . }}
+Service:
+  kubectl get svc {{ include "terradev.fullname" . }}
 {{- end }}
 {{- end }}
 """
-        }
-        
-        for filename, content in helpers.items():
-            with open(chart_path / 'templates' / filename, 'w') as f:
-                f.write(content)
     
     def _write_readme(self, chart_path: Path, readme: str):
         """Write README.md"""
         with open(chart_path / 'README.md', 'w') as f:
             f.write(readme)
-    
+
     def _generate_readme(self, workload: Dict[str, Any], chart_name: str) -> str:
         """Generate README content"""
+        gpu_label = GPU_NODE_LABELS.get(workload['gpu_type'], workload['gpu_type'])
+        stacks = workload.get('stack', [])
+        stack_section = ""
+        if stacks:
+            stack_section = "\n### Stack Integrations\n\n" + "\n".join(f"- `{s}`" for s in stacks) + "\n"
+
         return f"""# {chart_name}
 
-Terradev Helm chart for {workload['workload_type'].title()} workloads using {workload['gpu_type']} GPUs.
+Terradev Helm chart for **{workload['workload_type']}** workloads on {workload['gpu_type']} GPUs.
 
-## 🚀 Quick Start
-
-### Add the Terradev Helm repository
+## Quick Start
 
 ```bash
-helm repo add terradev https://charts.terradev.dev
-helm repo update
-```
-
-### Generate and install the chart
-
-```bash
-# Generate the chart with Terradev CLI
 terradev helm-generate \\
   --workload {workload['workload_type']} \\
   --gpu-type {workload['gpu_type']} \\
@@ -640,130 +868,56 @@ terradev helm-generate \\
   --gpu-count {workload.get('gpu_count', 1)} \\
   --output {chart_name}
 
-# Install the chart
 cd {chart_name}
-helm install my-{workload['workload_type']} . \\
-  --set gpu.type={workload['gpu_type']} \\
-  --set gpu.count={workload.get('gpu_count', 1)} \\
-  --namespace terradev-workloads
+helm install my-{workload['workload_type']} . --namespace terradev-workloads
 ```
 
-## 📋 Configuration
+## Configuration
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `image.repository` | Container image repository | `{workload['image']}` |
-| `gpu.type` | GPU type to use | `{workload['gpu_type']}` |
+| `image.repository` | Container image | `{workload['image']}` |
+| `gpu.type` | GPU type | `{workload['gpu_type']}` |
 | `gpu.count` | Number of GPUs | `{workload.get('gpu_count', 1)}` |
-| `gpu.memory` | GPU memory in GB | `{workload.get('memory_gb', 16)}` |
-| `gpu.storage` | Storage size in GB | `{workload.get('storage_gb', 100)}` |
-| `budget.maxHourlyRate` | Maximum hourly rate in USD | `{workload.get('budget')}` |
-| `terradev.provider` | Cloud provider | `auto` |
-| `terradev.region` | Cloud region | `us-east-1` |
-| `terradev.spot` | Use spot instances | `true` |
+| `gpu.nodeLabel` | K8s node label | `{gpu_label}` |
+| `gpu.storage` | Storage in GB | `{workload.get('storage_gb', 100)}` |
+| `budget.maxHourlyRate` | Max $/hr | `{workload.get('budget')}` |
+| `autoscaling.enabled` | Enable HPA | `false` |
+| `podDisruptionBudget.enabled` | Enable PDB | `true` |
+| `serviceAccount.create` | Create SA | `true` |
 
-## 🎯 Workload Types
+## Workload Types
 
-### Training
-- **Type**: Kubernetes Job
-- **Use Case**: Model training, batch processing
-- **Features**: Automatic cleanup, restart on failure
+| Type | K8s Kind | Use Case |
+|------|----------|----------|
+| `training` | Job | Model training, batch processing |
+| `inference` | Deployment + Service | Model serving, real-time inference |
+| `cost-optimized` | Job | Budget-constrained, spot instances |
+| `high-performance` | Deployment | Multi-GPU, anti-affinity |
+| `moe-inference` | Deployment | MoE expert parallel, vLLM optimized |
+| `rag` | Deployment | RAG stack (vLLM + Qdrant + Embedding) |
+| `vllm-optimized` | Deployment | vLLM with FlashInfer, KV offloading |
+{stack_section}
+## Production Features
 
-### Inference
-- **Type**: Kubernetes Deployment + Service
-- **Use Case**: Model serving, real-time inference
-- **Features**: Load balancing, external access
+- **Health probes**: startup + liveness + readiness
+- **Security context**: runAsNonRoot, seccomp, drop ALL capabilities
+- **ServiceAccount + RBAC**: auto-created
+- **HPA**: configurable autoscaling (disabled by default)
+- **PDB**: minAvailable=1
+- **Config checksum**: auto-restart on ConfigMap change
+- **Metrics**: ServiceMonitor for Prometheus
 
-### Cost-Optimized
-- **Type**: Kubernetes Job
-- **Use Case**: Budget-constrained workloads
-- **Features**: Spot instances, aggressive cleanup
-
-### High-Performance
-- **Type**: Kubernetes Deployment
-- **Use Case**: Large-scale training, HPC workloads
-- **Features**: Multi-AZ, high-performance networking
-
-## 🔍 Monitoring and Logs
-
-### Check workload status
+## Monitoring
 
 ```bash
-# For training jobs
-kubectl get jobs -l app.kubernetes.io/name=my-{workload['workload_type']}
-
-# For inference deployments
-kubectl get deployments -l app.kubernetes.io/name=my-{workload['workload_type']}
+kubectl get nodes -l nvidia.com/gpu.product={gpu_label}
+kubectl logs deploy/my-{workload['workload_type']}
+kubectl get events --field-selector reason=FailedScheduling
 ```
 
-### View logs
-
-```bash
-# View pod logs
-kubectl logs -l app.kubernetes.io/name=my-{workload['workload_type']}
-
-# Follow logs
-kubectl logs -f -l app.kubernetes.io/name=my-{workload['workload_type']}
-```
-
-### Monitor GPU utilization
-
-```bash
-# Check GPU nodes
-kubectl get nodes -l accelerator=nvidia-tesla-{workload['gpu_type'].lower()}
-
-# View GPU metrics
-kubectl describe node <gpu-node-name>
-```
-
-## 💰 Cost Management
-
-The chart includes built-in cost management features:
-
-- **Budget Enforcement**: Automatically stops workloads exceeding budget
-- **Spot Optimization**: Prefers spot instances for cost savings
-- **Resource Efficiency**: Right-sized GPU allocations
-
-### Budget Alerts
-
-Set up budget alerts to monitor spending:
-
-```bash
-# Check current spending
-kubectl get events --field-selector reason=BudgetExceeded
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **GPU Not Available**
-   ```bash
-   kubectl get nodes -l accelerator=nvidia-tesla-{workload['gpu_type'].lower()}
-   kubectl describe node <gpu-node>
-   ```
-
-2. **Workload Pending**
-   ```bash
-   kubectl get events --field-selector reason=FailedScheduling
-   ```
-
-3. **Budget Exceeded**
-   ```bash
-   kubectl get events --field-selector reason=BudgetExceeded
-   ```
-
-## 📚 More Information
+## More Information
 
 - [Terradev Documentation](https://terradev.dev/docs)
-- [Karpenter Documentation](https://karpenter.sh/)
 - [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator)
-
-## 🤝 Contributing
-
-This chart is maintained by the Terradev team. For contributions and issues, please visit our [GitHub repository](https://github.com/terradev/helm-charts).
-
-## 📄 License
-
-This chart is licensed under the Apache License 2.0.
 """
