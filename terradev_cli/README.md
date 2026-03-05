@@ -1,12 +1,12 @@
-# Terradev CLI v3.6.2
+# Terradev CLI v3.7.0
 
-**Compare GPU prices across 19 clouds. Provision the cheapest one in one command. Automatic vLLM optimization included.**
+**Compare GPU prices across 20 clouds. Provision the cheapest one in one command. Arize Phoenix observability, NeMo Guardrails safety, Qdrant vector DB, and automatic vLLM optimization included.**
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif" alt="Terradev CLI Demo" width="800">
 </p>
 
-## 🚀 What's New in v3.6.2
+## 🚀 What's New in v3.7.0
 
 ### 🧠 Automatic vLLM Workload-Based Optimization
 The most advanced vLLM optimization system - automatically analyzes your workload patterns and optimizes the 6 critical knobs most teams never touch:
