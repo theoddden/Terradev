@@ -289,6 +289,23 @@ class NUMAEndpointScorer:
         "unified": 0.0,   # no intra-GPU NUMA = no penalty
     }
 
+    # CUDA Graph compatibility scores based on NUMA topology
+    # Higher scores = better CUDA Graph performance
+    CUDA_GRAPH_NUMA_SCORES = {
+        "PIX": 1.0,    # Same PCIe switch - optimal for graph replay
+        "PXB": 0.8,    # Same root complex - very good
+        "PHB": 0.6,    # Same NUMA node - good
+        "SYS": 0.3,    # Cross-socket - poor for graphs
+    }
+
+    # Intra-GPU NUMA impact on CUDA Graphs
+    XCD_CUDA_GRAPH_PENALTIES = {
+        "same_xcd": 0.0,     # No penalty - optimal
+        "adj_xcd": 0.1,      # Minor penalty
+        "remote_xcd": 0.3,    # Significant penalty
+        "unified": 0.0,      # No intra-GPU NUMA = no penalty
+    }
+
     def __init__(self, topology_report: Optional[Dict[str, Any]] = None):
         self._topology = topology_report
         self._gpu_numa_map: Dict[int, int] = {}       # gpu_index -> numa_node
@@ -364,12 +381,17 @@ class NUMAEndpointScorer:
         endpoint_id: str,
         gpu_index: Optional[int] = None,
         numa_node: Optional[int] = None,
+        model_type: Optional[str] = None,
     ) -> NUMAScorecard:
         """
-        Score an endpoint's NUMA fitness (node-level + intra-GPU XCD).
+        Score an endpoint's NUMA fitness (node-level + intra-GPU XCD + CUDA Graph optimization).
 
-        If gpu_index is known (e.g., from endpoint metadata), uses the
-        topology map directly. Otherwise falls back to numa_node if provided.
+        Enhanced with passive CUDA Graph compatibility analysis based on:
+        1. NUMA topology (GPU/NIC alignment)
+        2. Intra-GPU NUMA (XCD locality for MI300X)
+        3. Model type (MoE models have special CUDA Graph challenges)
+        
+        CUDA Graph scoring happens automatically - no user intervention required.
         """
         if gpu_index is not None and gpu_index in self._gpu_locality_map:
             locality = self._gpu_locality_map[gpu_index]
@@ -380,9 +402,14 @@ class NUMAEndpointScorer:
             gpu_arch = xcd_info.get("gpu_arch", "")
             has_intra = xcd_info.get("has_intra_numa", False)
             xcd_loc = "unified" if not has_intra else "same_xcd"  # best-case default
-            xcd_loc_score = self.XCD_LOCALITY_SCORES.get(xcd_loc, 0.0)
-
-            return NUMAScorecard(
+            
+            # CUDA Graph optimization scoring (passive, automatic)
+            cuda_graph_score = self._calculate_cuda_graph_score(
+                gpu_index, locality, xcd_loc, model_type
+            )
+            
+            # Enhanced NUMA scorecard with CUDA Graph metrics
+            scorecard = NUMAScorecard(
                 endpoint_id=endpoint_id,
                 gpu_index=gpu_index,
                 numa_node=self._gpu_numa_map.get(gpu_index),
@@ -394,30 +421,83 @@ class NUMAEndpointScorer:
                 gpu_arch=gpu_arch,
                 has_intra_gpu_numa=has_intra,
                 xcd_locality=xcd_loc,
-                xcd_locality_score=xcd_loc_score,
+                xcd_locality_score=self.XCD_LOCALITY_SCORES.get(xcd_loc, 2.0),
             )
-
-        # Fallback: if we only know NUMA node
-        if numa_node is not None:
-            # Find GPUs on this NUMA node
-            gpus_on_node = [
-                idx for idx, nn in self._gpu_numa_map.items()
-                if nn == numa_node
-            ]
-            if gpus_on_node:
-                best_idx = min(
-                    gpus_on_node,
-                    key=lambda i: self.LOCALITY_SCORES.get(
-                        self._gpu_locality_map.get(i, "SYS"), 3.0
-                    ),
-                )
-                return self.score_endpoint(endpoint_id, gpu_index=best_idx)
-
-        # No topology info — return neutral score
+            
+            # Add CUDA Graph optimization metadata
+            scorecard.metadata.update({
+                "cuda_graph_score": cuda_graph_score,
+                "cuda_graph_recommended": cuda_graph_score > 0.7,
+                "numa_optimal_for_graphs": locality in ("PIX", "PXB"),
+                "xcd_optimal_for_graphs": xcd_loc in ("same_xcd", "unified"),
+                "model_type": model_type,
+                "graph_optimization_potential": self._estimate_graph_potential(cuda_graph_score, model_type),
+            })
+            
+            return scorecard
+        
+        # Fallback for unknown GPU index
         return NUMAScorecard(
             endpoint_id=endpoint_id,
-            locality_score=1.5,  # neutral middle score
+            gpu_index=gpu_index,
+            numa_node=numa_node,
+            pcie_locality="SYS",
+            locality_score=3.0,
+            has_rdma=False,
+            nccl_optimal=False,
         )
+
+    def _calculate_cuda_graph_score(
+        self, 
+        gpu_index: int, 
+        locality: str, 
+        xcd_locality: str, 
+        model_type: Optional[str]
+    ) -> float:
+        """
+        Calculate CUDA Graph optimization score (0.0-1.0) for this GPU topology.
+        
+        Higher scores = better CUDA Graph performance potential.
+        This is called automatically during endpoint scoring.
+        """
+        # Base score from NUMA topology
+        numa_score = self.CUDA_GRAPH_NUMA_SCORES.get(locality, 0.3)
+        
+        # Penalty for intra-GPU NUMA fragmentation
+        xcd_penalty = self.XCD_CUDA_GRAPH_PENALTIES.get(xcd_locality, 0.0)
+        
+        # Model-specific considerations
+        model_penalty = 0.0
+        if model_type:
+            if model_type.lower() in ["moe", "mixture-of-experts"]:
+                # MoE models have dynamic routing that breaks CUDA Graphs
+                model_penalty = 0.3
+            elif model_type.lower() in ["transformer", "llm", "bert"]:
+                # Static transformers benefit most from CUDA Graphs
+                model_penalty = 0.0
+            elif model_type.lower() in ["cnn", "vision"]:
+                # CNNs benefit but less than transformers
+                model_penalty = 0.1
+        
+        # RDMA bonus - improves graph replay performance
+        rdma_bonus = 0.1 if self._gpu_rdma_map.get(gpu_index, False) else 0.0
+        
+        # Calculate final score
+        final_score = numa_score - xcd_penalty - model_penalty + rdma_bonus
+        return max(0.0, min(1.0, final_score))
+    
+    def _estimate_graph_potential(self, cuda_graph_score: float, model_type: Optional[str]) -> str:
+        """
+        Estimate the performance improvement potential from CUDA Graph optimization.
+        """
+        if cuda_graph_score < 0.3:
+            return "low"  # Poor NUMA topology, minimal benefit
+        elif cuda_graph_score < 0.7:
+            return "medium"  # Moderate NUMA topology, some benefit
+        elif cuda_graph_score < 0.9:
+            return "high"  # Good NUMA topology, significant benefit
+        else:
+            return "optimal"  # Perfect NUMA topology, maximum benefit
 
     def rank_endpoints(
         self,

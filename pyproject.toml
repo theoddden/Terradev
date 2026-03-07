@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "3.6.2"
-description = "Cross-cloud GPU provisioning with automatic vLLM optimization, GitOps automation and HuggingFace Spaces deployment"
+version = "3.7.2"
+description = "NUMA-aware GPU provisioning and orchestration for stateless MoE workloads of all sizes"
 readme = "README.md"
 license = {text = "BUSL-1.1"}
 authors = [
@@ -80,7 +80,14 @@ keywords = [
     "xcd",
     "mi300x",
     "h200",
-    "prefill-decode"
+    "prefill-decode",
+    "cuda-graph",
+    "cuda-graphs",
+    "numa-topology",
+    "gpu-optimization",
+    "passive-optimization",
+    "warm-pool",
+    "endpoint-scoring"
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

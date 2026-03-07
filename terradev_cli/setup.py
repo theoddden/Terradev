@@ -12,10 +12,10 @@ long_description = readme_file.read_text() if readme_file.exists() else ""
 
 setup(
     name="terradev-cli",
-    version="3.7.0",
+    version="3.7.2",
     author="Terradev Team",
     author_email="team@terradev.com",
-    description="Cross-cloud GPU provisioning with Arize Phoenix observability, NeMo Guardrails safety, Qdrant vector DB, vLLM/SGLang inference, and Terraform-powered parallel provisioning",
+    description="NUMA-aware GPU provisioning and orchestration for stateless MoE workloads of all sizes",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/theoddden/terradev",

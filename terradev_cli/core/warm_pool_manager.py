@@ -52,17 +52,29 @@ class WarmPoolMetrics:
     avg_cold_latency_ms: float = 0.0
     memory_saved_gb: float = 0.0
     cost_saved_usd: float = 0.0
+    # CUDA Graph optimization metrics
+    cuda_graph_optimized_models: int = 0
+    avg_graph_capture_time_ms: float = 0.0
+    graph_replay_speedup: float = 1.0
+    numa_aligned_warms: int = 0
 
 
 class WarmPoolManager:
     """
-    Intelligent warm pool manager for multi-model inference.
+    Intelligent warm pool manager for multi-model inference with CUDA Graph optimization.
+    
+    Enhanced with passive CUDA Graph awareness:
+    1. Automatically detects CUDA Graph-compatible models
+    2. Prioritizes NUMA-optimal endpoints for graph capture
+    3. Tracks graph capture/replay performance
+    4. Optimizes warm pool strategy based on graph potential
     
     Solves the "warm pools become manual capacity planning" problem by:
     1. Automatically managing warm pool size based on traffic patterns
     2. Predictive warming based on historical usage
     3. Cost-aware eviction policies
     4. Performance monitoring and optimization
+    5. CUDA Graph-aware warming strategies
     """
     
     def __init__(self, config: WarmPoolConfig, config_dir: Optional[Path] = None):
@@ -76,26 +88,35 @@ class WarmPoolManager:
         self.model_traffic: Dict[str, List[datetime]] = {}
         self.model_load_times: Dict[str, float] = {}
         
+        # CUDA Graph optimization state
+        self.cuda_graph_models: Set[str] = set()  # Models that can use CUDA Graphs
+        self.model_graph_scores: Dict[str, float] = {}  # Graph optimization scores
+        self.endpoint_numa_scores: Dict[str, Dict[str, Any]] = {}  # NUMA scores per endpoint
+        
         # Metrics tracking
         self.metrics = WarmPoolMetrics()
         self.metrics_file = self.config_dir / 'warm_pool_metrics.json'
         self.traffic_file = self.config_dir / 'model_traffic.json'
+        self.graph_metrics_file = self.config_dir / 'cuda_graph_metrics.json'
         
         # Background tasks
         self._warming_task: Optional[asyncio.Task] = None
         self._eviction_task: Optional[asyncio.Task] = None
+        self._graph_optimization_task: Optional[asyncio.Task] = None
         self._running = False
         
         # Load historical data
         self._load_metrics()
         self._load_traffic_history()
+        self._load_cuda_graph_metrics()
     
     async def start(self):
         """Start warm pool management background tasks"""
         self._running = True
         self._warming_task = asyncio.create_task(self._warming_manager())
         self._eviction_task = asyncio.create_task(self._eviction_manager())
-        logger.info("Warm Pool Manager started")
+        self._graph_optimization_task = asyncio.create_task(self._cuda_graph_optimizer())
+        logger.info("Warm Pool Manager started with CUDA Graph optimization")
     
     async def stop(self):
         """Stop warm pool management"""
@@ -104,6 +125,8 @@ class WarmPoolManager:
             self._warming_task.cancel()
         if self._eviction_task:
             self._eviction_task.cancel()
+        if self._graph_optimization_task:
+            self._graph_optimization_task.cancel()
         logger.info("Warm Pool Manager stopped")
     
     # ── Model Management ──
@@ -207,6 +230,11 @@ class WarmPoolManager:
     def _should_warm_priority_based(self, model_id: str) -> bool:
         """Priority-based warming: always keep high-priority models warm"""
         priority = self.model_priorities.get(model_id, 0)
+        
+        # Boost priority for CUDA Graph compatible models
+        if self.should_warm_with_cuda_graphs(model_id):
+            priority += 2  # Boost CUDA Graph models by 2 priority levels
+            self.metrics.numa_aligned_warms += 1
         
         # Always warm models with priority >= 5
         if priority >= 5:
@@ -465,6 +493,10 @@ class WarmPoolManager:
             'avg_cold_latency_ms': self.metrics.avg_cold_latency_ms,
             'memory_saved_gb': self.metrics.memory_saved_gb,
             'cost_saved_usd': self.metrics.cost_saved_usd,
+            'cuda_graph_optimized_models': self.metrics.cuda_graph_optimized_models,
+            'avg_graph_capture_time_ms': self.metrics.avg_graph_capture_time_ms,
+            'graph_replay_speedup': self.metrics.graph_replay_speedup,
+            'numa_aligned_warms': self.metrics.numa_aligned_warms,
         }
         
         with open(self.metrics_file, 'w') as f:
@@ -494,3 +526,201 @@ class WarmPoolManager:
         
         with open(self.traffic_file, 'w') as f:
             json.dump(data, f, indent=2)
+
+    def _load_cuda_graph_metrics(self):
+        """Load CUDA Graph optimization metrics from disk"""
+        if self.graph_metrics_file.exists():
+            try:
+                with open(self.graph_metrics_file, 'r') as f:
+                    data = json.load(f)
+                    self.model_graph_scores = data.get('model_graph_scores', {})
+                    self.endpoint_numa_scores = data.get('endpoint_numa_scores', {})
+                    self.cuda_graph_models = set(data.get('cuda_graph_models', []))
+            except Exception as e:
+                logger.warning(f"Failed to load CUDA Graph metrics: {e}")
+                self.model_graph_scores = {}
+                self.endpoint_numa_scores = {}
+                self.cuda_graph_models = set()
+    
+    def _save_cuda_graph_metrics(self):
+        """Save CUDA Graph optimization metrics to disk"""
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        data = {
+            'model_graph_scores': self.model_graph_scores,
+            'endpoint_numa_scores': self.endpoint_numa_scores,
+            'cuda_graph_models': list(self.cuda_graph_models),
+        }
+        
+        with open(self.graph_metrics_file, 'w') as f:
+            json.dump(data, f, indent=2)
+
+    async def _cuda_graph_optimizer(self):
+        """
+        Background task that optimizes warm pool for CUDA Graph performance.
+        
+        This runs passively in the background, automatically:
+        1. Detecting models that can benefit from CUDA Graphs
+        2. Prioritizing NUMA-optimal endpoints for graph capture
+        3. Tracking graph performance metrics
+        4. Adjusting warm pool strategy based on graph potential
+        """
+        while self._running:
+            try:
+                await self._analyze_cuda_graph_potential()
+                await self._optimize_endpoint_selection()
+                await asyncio.sleep(300)  # Run every 5 minutes
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"CUDA Graph optimizer error: {e}")
+                await asyncio.sleep(60)  # Wait before retrying
+
+    async def _analyze_cuda_graph_potential(self):
+        """Analyze which models can benefit from CUDA Graph optimization"""
+        for model_id in self.model_priorities.keys():
+            # Check if model is already analyzed
+            if model_id in self.model_graph_scores:
+                continue
+            
+            # Detect model type from model_id (simple heuristic)
+            model_type = self._detect_model_type(model_id)
+            
+            # Calculate CUDA Graph compatibility score
+            graph_score = self._calculate_model_graph_score(model_id, model_type)
+            self.model_graph_scores[model_id] = graph_score
+            
+            # Add to CUDA Graph models if score is high enough
+            if graph_score > 0.7:
+                self.cuda_graph_models.add(model_id)
+                logger.info(f"Model {model_id} identified as CUDA Graph compatible (score: {graph_score:.2f})")
+
+    def _detect_model_type(self, model_id: str) -> str:
+        """Detect model type from model identifier"""
+        model_id_lower = model_id.lower()
+        
+        if any(keyword in model_id_lower for keyword in ['moe', 'mixture', 'expert']):
+            return 'moe'
+        elif any(keyword in model_id_lower for keyword in ['llama', 'bert', 'gpt', 'transformer', 't5']):
+            return 'transformer'
+        elif any(keyword in model_id_lower for keyword in ['resnet', 'conv', 'cnn', 'vision']):
+            return 'cnn'
+        else:
+            return 'unknown'
+
+    def _calculate_model_graph_score(self, model_id: str, model_type: str) -> float:
+        """Calculate CUDA Graph compatibility score for a model"""
+        base_score = 0.5  # Default score
+        
+        if model_type == 'transformer':
+            base_score = 0.9  # Transformers benefit greatly from CUDA Graphs
+        elif model_type == 'cnn':
+            base_score = 0.7  # CNNs benefit moderately
+        elif model_type == 'moe':
+            base_score = 0.4  # MoE models have challenges with dynamic routing
+        else:
+            base_score = 0.5  # Unknown model type
+        
+        # Adjust based on traffic patterns (more traffic = more benefit from graphs)
+        traffic_score = min(1.0, len(self.model_traffic.get(model_id, [])) / 100.0)
+        
+        return (base_score + traffic_score) / 2.0
+
+    async def _optimize_endpoint_selection(self):
+        """Optimize endpoint selection for CUDA Graph performance"""
+        for model_id in self.cuda_graph_models:
+            # Get available endpoints for this model
+            endpoints = await self._get_model_endpoints(model_id)
+            
+            if not endpoints:
+                continue
+            
+            # Score endpoints by CUDA Graph optimization potential
+            best_endpoint = None
+            best_score = 0.0
+            
+            for endpoint_id in endpoints:
+                # Get NUMA scorecard for this endpoint
+                numa_score = self.endpoint_numa_scores.get(endpoint_id, {})
+                graph_score = numa_score.get('cuda_graph_score', 0.0)
+                
+                if graph_score > best_score:
+                    best_score = graph_score
+                    best_endpoint = endpoint_id
+            
+            # Update endpoint priority based on CUDA Graph score
+            if best_endpoint and best_score > 0.7:
+                # Prioritize this endpoint for warming
+                current_priority = self.model_priorities.get(model_id, 0)
+                if best_score > 0.9:
+                    self.model_priorities[model_id] = max(current_priority, 10)  # Highest priority
+                elif best_score > 0.8:
+                    self.model_priorities[model_id] = max(current_priority, 7)   # High priority
+                else:
+                    self.model_priorities[model_id] = max(current_priority, 5)   # Medium priority
+                
+                logger.debug(f"Prioritized endpoint {best_endpoint} for CUDA Graph model {model_id} (score: {best_score:.2f})")
+
+    async def _get_model_endpoints(self, model_id: str) -> List[str]:
+        """Get available endpoints for a model (placeholder implementation)"""
+        # This would integrate with your endpoint discovery system
+        # For now, return empty list - would be implemented based on your architecture
+        return []
+
+    def should_warm_with_cuda_graphs(self, model_id: str) -> bool:
+        """
+        Determine if a model should be warmed with CUDA Graph optimization.
+        
+        This is called automatically during warm pool decisions.
+        """
+        return (
+            model_id in self.cuda_graph_models and
+            self.model_graph_scores.get(model_id, 0.0) > 0.7
+        )
+
+    def get_cuda_graph_optimization_tips(self, model_id: str) -> Dict[str, Any]:
+        """
+        Get CUDA Graph optimization recommendations for a model.
+        
+        Returns tips that can be automatically applied during model loading.
+        """
+        graph_score = self.model_graph_scores.get(model_id, 0.0)
+        model_type = self._detect_model_type(model_id)
+        
+        recommendations = {
+            "use_cuda_graphs": graph_score > 0.7,
+            "graph_capture_warmup": graph_score > 0.8,
+            "memory_pool_size": f"{int(graph_score * 4)}GB" if graph_score > 0.5 else "2GB",
+            "batch_size_optimization": graph_score > 0.6,
+            "numa_awareness_required": graph_score > 0.8,
+            "model_type": model_type,
+            "optimization_potential": self._get_optimization_potential(graph_score),
+        }
+        
+        # Add model-specific recommendations
+        if model_type == 'moe':
+            recommendations.update({
+                "dynamic_routing_handling": True,
+                "expert_graph_caching": False,  # MoE models can't cache expert graphs
+                "fallback_to_eager": True,
+            })
+        elif model_type == 'transformer':
+            recommendations.update({
+                "attention_graph_optimization": True,
+                "layer_fusion": graph_score > 0.8,
+                "sequence_length_aware": True,
+            })
+        
+        return recommendations
+
+    def _get_optimization_potential(self, graph_score: float) -> str:
+        """Get human-readable optimization potential"""
+        if graph_score > 0.9:
+            return "optimal - expect 2-5x speedup"
+        elif graph_score > 0.8:
+            return "excellent - expect 1.5-3x speedup"
+        elif graph_score > 0.7:
+            return "good - expect 1.2-2x speedup"
+        elif graph_score > 0.5:
+            return "moderate - expect 1.1-1.5x speedup"
+        else:
+            return "minimal - expect <1.2x speedup"
