@@ -1,37 +1,14 @@
-# Terradev CLI v3.7.3 - Enterprise GPU Infrastructure
+# Terradev CLI v3.7.3
 
-**Enterprise-grade GPU provisioning and orchestration with adaptive scaling for 500+ concurrent users**
+**NUMA-aware GPU provisioning and orchestration for stateless MoE workloads of all sizes**
 
-Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning with enterprise-grade scalability.
+![Terradev Demo](demo/terradev-demo.gif)
+
+Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
 
 ## What's New in v3.7.3
 
-### 🚀 Enterprise Scaling Features
-
-**Adaptive Concurrency Control**: Automatically scales from 6 to 50 concurrent provisions based on load, supporting 500+ concurrent users with 10x throughput improvement.
-
-**Priority-Based Model Queuing**: Heap-based priority queues replace linear lists, enabling O(log n) operations for 1000+ models with 100x faster queue processing.
-
-**Connection Pooling**: Reused HTTP connections across provider APIs reduce overhead by 80% for high-frequency operations.
-
-**Lazy Tool Loading**: MCP server loads tools on-demand, reducing memory footprint by 50% for enterprise deployments.
-
-**Async Configuration I/O**: Non-blocking configuration operations with TTL-based caching eliminate file I/O bottlenecks.
-
-**Performance Improvements**:
-- **10x** concurrent user capacity (50 → 500+ users)
-- **8x** parallel provisioning throughput  
-- **50%** memory usage reduction
-- **100x** model queue performance at scale
-- **Non-blocking** configuration operations
-
-```bash
-# Enterprise-scale provisioning with adaptive concurrency
-terradev provision -g H100 -n 50 --parallel 25  # Automatically scales to 25 concurrent
-
-# Priority-based model management
-terradev ml warm-pool --configure --strategy priority_based --max-warm-models 100
-```
+Performance and scalability improvements for enterprise deployments.
 
 ### CUDA Graph Optimization with NUMA Awareness
 
