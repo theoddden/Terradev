@@ -24,10 +24,13 @@ class AzureProvider(BaseProvider):
         self.resource_group = credentials.get("resource_group", "terradev-rg")
         self.location = credentials.get("location", "eastus")
         self.compute_client = None
+        self.quota_client = None
 
         try:
             from azure.identity import ClientSecretCredential
             from azure.mgmt.compute import ComputeManagementClient
+            from azure.mgmt.resource import ResourceManagementClient
+            from azure.mgmt.quota import QuotaManagementClient
 
             cred = ClientSecretCredential(
                 tenant_id=credentials.get("tenant_id"),
@@ -35,6 +38,7 @@ class AzureProvider(BaseProvider):
                 client_secret=credentials.get("client_secret"),
             )
             self.compute_client = ComputeManagementClient(cred, self.subscription_id)
+            self.quota_client = QuotaManagementClient(cred, self.subscription_id)
         except Exception as e:
             logger.debug(f"Azure client init deferred (BYOAPI): {e}")
 
@@ -44,21 +48,42 @@ class AzureProvider(BaseProvider):
     async def get_instance_quotes(
         self, gpu_type: str, region: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Get instance quotes from Azure API - NO STATIC FALLBACK"""
+        """Get instance quotes from Azure API with quota validation"""
         if not self.compute_client:
             logger.debug("Azure client not available - configure credentials first")
             return []
         
+        target_region = region or self.location
+        
+        # CRITICAL: Check GPU quota first - biggest operational landmine
+        quota_check = await self._check_gpu_quota(gpu_type, target_region)
+        if not quota_check["available"]:
+            logger.error(f"Azure GPU quota BLOCKED: {quota_check['reason']}")
+            return [{
+                "provider": "azure",
+                "gpu_type": gpu_type,
+                "region": target_region,
+                "available": False,
+                "quota_block": True,
+                "reason": quota_check["reason"],
+                "action_required": quota_check["action_required"],
+            }]
+        
         try:
             # Get pricing from Azure API
-            pricing_info = await self._get_azure_pricing(gpu_type, region)
+            pricing_info = await self._get_azure_pricing(gpu_type, target_region)
             if pricing_info:
+                # Add quota status to all quotes
+                for quote in pricing_info:
+                    quote.update({
+                        "quota_available": True,
+                        "quota_remaining": quota_check["remaining"],
+                    })
                 return pricing_info
         except Exception as e:
             logger.debug(f"Error getting Azure pricing: {e}")
             return []
         
-        # No static fallback - require API access
         return []
 
     async def _get_azure_pricing(self, gpu_type: str, region: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -81,6 +106,11 @@ class AzureProvider(BaseProvider):
     ) -> Dict[str, Any]:
         if not self.compute_client:
             raise Exception("Azure client not initialised – configure credentials first")
+
+        # CRITICAL: Double-check quota before provisioning
+        quota_check = await self._check_gpu_quota(gpu_type, region)
+        if not quota_check["available"]:
+            raise Exception(f"GPU quota blocked: {quota_check['reason']}. {quota_check['action_required']}")
 
         vm_name = f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
@@ -126,6 +156,7 @@ class AzureProvider(BaseProvider):
                 "gpu_type": gpu_type,
                 "status": "provisioning",
                 "provider": "azure",
+                "quota_remaining": quota_check["remaining"],
                 "metadata": {
                     "resource_group": self.resource_group,
                     "subscription": self.subscription_id,
@@ -301,3 +332,101 @@ class AzureProvider(BaseProvider):
 
     def _get_auth_headers(self) -> Dict[str, str]:
         return {}
+
+    async def _check_gpu_quota(self, gpu_type: str, region: str) -> Dict[str, Any]:
+        """CRITICAL: Check GPU quota availability - Azure's biggest operational landmine
+        
+        GPU quota starts at 0 for specialized families. Must be manually approved.
+        Quota calculation uses instance_count=1, not raw core count.
+        Separate quota pools for subscription vs ML workspace.
+        """
+        if not self.quota_client:
+            return {
+                "available": False,
+                "reason": "Quota client not initialized - check Azure credentials",
+                "action_required": "Configure Azure service principal with quota reader permissions",
+                "remaining": 0,
+            }
+        
+        try:
+            # Map GPU types to Azure quota resource names
+            gpu_quota_mapping = {
+                "A100": "Standard_ND_A100_v4_Series",
+                "H100": "Standard_ND_H100_v5_Series", 
+                "V100": "Standard_NC_v3_Series",
+                "T4": "Standard_NCasT4_v3_Series",
+                "A10": "Standard_NCA_A10_v4_Series",
+                "L40S": "Standard_NCL_L40S_v3_Series",
+            }
+            
+            quota_resource = gpu_quota_mapping.get(gpu_type)
+            if not quota_resource:
+                return {
+                    "available": False,
+                    "reason": f"Unknown GPU type: {gpu_type}",
+                    "action_required": "Use supported GPU type (A100, H100, V100, T4, A10, L40S)",
+                    "remaining": 0,
+                }
+            
+            loop = asyncio.get_event_loop()
+            
+            # Check subscription-level quota first
+            sub_quota = await loop.run_in_executor(
+                None,
+                lambda: self.quota_client.quota.get(
+                    scope=f"/subscriptions/{self.subscription_id}",
+                    resource_name=quota_resource,
+                )
+            )
+            
+            # CRITICAL: Azure uses instance_count=1 for quota calculation
+            # Not the raw core count that users assume
+            available_quota = sub_quota.properties.limit.value - sub_quota.properties.current_value.value
+            
+            if available_quota <= 0:
+                return {
+                    "available": False,
+                    "reason": f"GPU quota exhausted (0/{sub_quota.properties.limit.value})",
+                    "action_required": f"Request quota increase for {quota_resource} in Azure portal",
+                    "remaining": 0,
+                    "limit": sub_quota.properties.limit.value,
+                    "current": sub_quota.properties.current_value.value,
+                }
+            
+            # Check if this is ML workspace region (separate quota pool)
+            ml_workspace_quotas = await self._check_ml_workspace_quota(gpu_type, region)
+            if ml_workspace_quotas and ml_workspace_quotas["available"] <= 0:
+                return {
+                    "available": False,
+                    "reason": f"ML workspace quota exhausted (0/{ml_workspace_quotas['limit']})",
+                    "action_required": f"Request quota increase for ML workspace in Azure ML Studio",
+                    "remaining": 0,
+                    "subscription_quota": available_quota,
+                    "ml_workspace_quota": 0,
+                }
+            
+            return {
+                "available": True,
+                "remaining": available_quota,
+                "limit": sub_quota.properties.limit.value,
+                "current": sub_quota.properties.current_value.value,
+                "ml_workspace_quota": ml_workspace_quotas.get("available") if ml_workspace_quotas else None,
+            }
+            
+        except Exception as e:
+            logger.debug(f"Quota check failed: {e}")
+            return {
+                "available": False,
+                "reason": f"Quota check failed: {str(e)}",
+                "action_required": "Verify Azure permissions and subscription access",
+                "remaining": 0,
+            }
+    
+    async def _check_ml_workspace_quota(self, gpu_type: str, region: str) -> Optional[Dict[str, Any]]:
+        """Check ML workspace quota (separate from subscription quota)"""
+        try:
+            # This would require ML workspace client - for now return None
+            # In production, integrate with Azure ML quota APIs
+            return None
+        except Exception:
+            return None

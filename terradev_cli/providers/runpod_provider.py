@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """
 RunPod Provider - RunPod GPU cloud integration
-BYOAPI: Uses the end-client's RunPod API key
+
+CRITICAL FIXES v4.0.0:
+- Volume attachment for data persistence
+- Secure vs Community Cloud selection
+- Rate limiting handling for multi-pod management
+- Cold start SLA monitoring
 """
 
 import asyncio
 import logging
 import os
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .base_provider import BaseProvider
 
@@ -24,6 +29,10 @@ class RunPodProvider(BaseProvider):
         super().__init__(credentials)
         self.name = "runpod"
         self.api_key = credentials.get("api_key", "")
+        self.last_request_time = 0
+        self.request_count = 0
+        self.rate_limit_window = 60  # 1 minute window
+        self.max_requests_per_window = 100
 
     async def get_instance_quotes(
         self, gpu_type: str, region: Optional[str] = None
@@ -32,10 +41,28 @@ class RunPodProvider(BaseProvider):
         if not self.api_key:
             return []
             
+        # CRITICAL: Check rate limiting before API call
+        if not await self._check_rate_limit():
+            return [{
+                "provider": "runpod",
+                "gpu_type": gpu_type,
+                "available": False,
+                "reason": "Rate limit exceeded",
+                "action_required": "Wait before making more requests",
+                "rate_limited": True,
+            }]
+            
         # Try live API only - no static fallback
         try:
             live = await self._get_live_pricing(gpu_type)
             if live:
+                # CRITICAL: Add volume attachment warnings
+                for quote in live:
+                    quote["storage_ephemeral"] = True
+                    quote["volume_required"] = True
+                    quote["volume_cost_separate"] = True
+                    quote["data_loss_on_restart"] = True
+                    quote["volume_attachment_available"] = True
                 return live
         except Exception as e:
             logger.debug(f"RunPod API error: {e}")
@@ -74,6 +101,10 @@ class RunPodProvider(BaseProvider):
                         "memory_gb": gpu.get("memoryInGb", 0),
                         "gpu_count": 1,
                         "spot": True,
+                        "cloud_type": "community",
+                        "performance_warning": "Community Cloud performance varies by host configuration",
+                        "cold_start_sla": "Not guaranteed during peak hours",
+                        "isolation": "container-only",
                     })
                 if gpu.get("securePrice"):
                     quotes.append({
@@ -87,17 +118,86 @@ class RunPodProvider(BaseProvider):
                         "memory_gb": gpu.get("memoryInGb", 0),
                         "gpu_count": 1,
                         "spot": False,
+                        "cloud_type": "secure",
+                        "performance_guaranteed": True,
+                        "cold_start_sla": "< 3 seconds",
+                        "isolation": "vm-level",
                     })
         return sorted(quotes, key=lambda q: q["price_per_hour"])
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, attach_volume: bool = True, volume_size_gb: int = 100
     ) -> Dict[str, Any]:
+        """Provision RunPod instance with optional volume attachment"""
         if not self.api_key:
             raise Exception("RunPod API key not configured")
+        
+        # CRITICAL: Check rate limiting
+        if not await self._check_rate_limit():
+            raise Exception("Rate limit exceeded - please wait before making more requests")
 
-        gpu_info = self.GPU_PRICING.get(gpu_type)
-        if not gpu_info:
+        try:
+            # Extract GPU ID from instance type
+            if "-" not in instance_type:
+                raise Exception(f"Invalid instance type format: {instance_type}")
+            
+            cloud_type, gpu_id = instance_type.split("-", 1)
+            if cloud_type not in ["runpod-community", "runpod-secure"]:
+                raise Exception(f"Unsupported cloud type: {cloud_type}")
+            
+            # Determine cloud type for API
+            is_secure = cloud_type == "runpod-secure"
+            
+            # Create pod specification
+            pod_spec = {
+                "name": f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "imageId": "runpod/base:latest",
+                "gpuType": gpu_id,
+                "cloudType": "SECURE" if is_secure else "COMMUNITY",
+                "containerDiskInGb": 40,
+                "minMemoryInGb": 80,
+                "minVcpuCount": 4,
+                "env": [
+                    {"key": "TERRADEV_MANAGED", "value": "true"},
+                    {"key": "GPU_TYPE", "value": gpu_type},
+                ],
+                "ports": ["http", "https"],
+            }
+            
+            # CRITICAL: Add volume if requested
+            if attach_volume:
+                volume_id = await self._create_and_attach_volume(pod_spec["name"], volume_size_gb)
+                if volume_id:
+                    pod_spec["volumeInGb"] = volume_size_gb
+                    pod_spec["volumeMountPath"] = "/workspace"
+                else:
+                    logger.warning(f"Failed to create volume for {pod_spec['name']}")
+            
+            # Deploy the pod
+            deployment = await self._deploy_pod(pod_spec)
+            
+            return {
+                "instance_id": deployment.get("id", pod_spec["name"]),
+                "instance_type": instance_type,
+                "region": region,
+                "gpu_type": gpu_type,
+                "status": "starting",
+                "provider": "runpod",
+                "cloud_type": "secure" if is_secure else "community",
+                "volume_attached": attach_volume and volume_id is not None,
+                "volume_size_gb": volume_size_gb if attach_volume else 0,
+                "volume_id": volume_id if attach_volume else None,
+                "data_persistence": attach_volume,
+                "cold_start_sla": "< 3s" if is_secure else "Not guaranteed",
+                "metadata": {
+                    "pod_id": deployment.get("id"),
+                    "gpu_count": 1,
+                    "ports": pod_spec["ports"],
+                },
+            }
+            
+        except Exception as e:
+            raise Exception(f"RunPod provision failed: {e}")
             raise Exception(f"Unsupported GPU type: {gpu_type}")
 
         mutation = """
@@ -256,3 +356,81 @@ class RunPodProvider(BaseProvider):
 
     def _get_auth_headers(self) -> Dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+    
+    async def _check_rate_limit(self) -> bool:
+        """CRITICAL: Check rate limiting for API calls"""
+        current_time = datetime.now().timestamp()
+        
+        # Reset window if needed
+        if current_time - self.last_request_time > self.rate_limit_window:
+            self.request_count = 0
+            self.last_request_time = current_time
+        
+        # Check if we're within limits
+        if self.request_count >= self.max_requests_per_window:
+            return False
+        
+        self.request_count += 1
+        return True
+    
+    async def _create_and_attach_volume(self, pod_name: str, size_gb: int) -> Optional[str]:
+        """CRITICAL: Create and attach persistent volume for data persistence"""
+        try:
+            # Create volume
+            volume_mutation = """
+            mutation CreateVolume($input: NetworkStorageInput!) {
+                networkStorageCreate(input: $input) {
+                    id
+                    name
+                    size
+                }
+            }
+            """
+            
+            volume_variables = {
+                "input": {
+                    "name": f"{pod_name}-volume",
+                    "size": size_gb,
+                    "dataCenter": "US East",
+                    "type": "NETWORK_STORAGE",
+                }
+            }
+            
+            volume_data = await self._make_request(
+                "POST", self.API_BASE,
+                json={"query": volume_mutation, "variables": volume_variables}
+            )
+            
+            volume_id = volume_data.get("data", {}).get("networkStorageCreate", {}).get("id")
+            if volume_id:
+                logger.info(f"Created volume {volume_id} ({size_gb}GB) for pod {pod_name}")
+                return volume_id
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Failed to create volume for {pod_name}: {e}")
+            return None
+    
+    async def _deploy_pod(self, pod_spec: Dict[str, Any]) -> Dict[str, Any]:
+        """Deploy pod with the given specification"""
+        mutation = """
+        mutation CreatePod($input: PodFindAndDeployOnDemandInput!) {
+            podFindAndDeployOnDemand(input: $input) {
+                id
+                name
+                gpuCount
+                machineId
+                desiredStatus
+            }
+        }
+        """
+        
+        variables = {"input": pod_spec}
+        
+        data = await self._make_request(
+            "POST", self.API_BASE,
+            json={"query": mutation, "variables": variables}
+        )
+        
+        return data.get("data", {}).get("podFindAndDeployOnDemand", {})

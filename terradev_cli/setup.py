@@ -12,10 +12,10 @@ long_description = readme_file.read_text() if readme_file.exists() else ""
 
 setup(
     name="terradev-cli",
-    version="3.7.3",
+    version="4.0.1",
     author="Terradev Team",
     author_email="team@terradev.com",
-    description="NUMA-aware GPU provisioning and orchestration for stateless MoE workloads of all sizes",
+    description="MLA-aware VRAM estimation, weight streaming, and KV cache checkpointing for production ML workloads",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/theoddden/terradev",
