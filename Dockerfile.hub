@@ -1,0 +1,70 @@
+# Terradev CLI - Docker Hub Distribution
+FROM python:3.9-slim
+
+# Metadata for Docker Hub
+LABEL maintainer="theoddden" \
+      version="2.9.2" \
+      description="Terradev CLI - Cross-cloud GPU optimization platform" \
+      org.opencontainers.image.source="https://github.com/theoddden/terradev" \
+      org.opencontainers.image.licenses="BUSL-1.1" \
+      org.opencontainers.image.title="Terradev CLI" \
+      org.opencontainers.image.description="BYOAPI: Cross-cloud GPU provisioning and cost optimization platform" \
+      org.opencontainers.image.url="https://github.com/theoddden/terradev"
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    TERRADEV_CLI_VERSION=2.9.2 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    wget \
+    unzip \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user for security
+RUN groupadd -r terradev && useradd -r -g terradev -d /home/terradev -s /bin/bash terradev \
+    && mkdir -p /home/terradev \
+    && chown -R terradev:terradev /home/terradev
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Copy and install Terradev CLI
+COPY . .
+RUN pip install --no-cache-dir -e .
+
+# Switch to non-root user
+USER terradev
+WORKDIR /home/terradev
+
+# Copy CLI to user home and set up PATH
+COPY --chown=terradev:terradev /app /home/terradev/terradev-cli
+RUN pip install --no-cache-dir -e /home/terradev/terradev-cli \
+    && echo 'export PATH="/home/terradev/terradev-cli:$PATH"' >> /home/terradev/.bashrc
+
+# Expose common ports for different services
+EXPOSE 8000 8080 8888
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -m terradev_cli --version || exit 1
+
+# Default command - show help
+CMD ["python", "-m", "terradev_cli", "--help"]
+
+# Docker Hub search tags
+LABEL com.docker.compose.version="2.9.2" \
+      com.docker.compose.project="terradev-cli" \
+      com.docker.compose.service="gpu-optimization" \
+      com.docker.compose.description="Cross-cloud GPU cost optimization and provisioning"

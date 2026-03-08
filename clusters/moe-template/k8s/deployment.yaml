@@ -1,0 +1,358 @@
+# MoE Model Inference Deployment — Parameterized Template
+# Works with any MoE model via environment variable overrides
+#
+# Includes: Multi-LoRA MoE, Sleep Mode, KV Cache Offloading,
+#           Speculative Decoding, and vLLM Router (v0.15.0+)
+#
+# Customize via kustomize or envsubst:
+#   export MODEL_ID=zai-org/GLM-5-FP8 MODEL_NAME=glm-5-fp8 TP_SIZE=8 GPU_COUNT=8
+#   envsubst < deployment.yaml | kubectl apply -f -
+#
+# Or edit the env values directly below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: moe-vllm
+  namespace: moe-inference
+  labels:
+    app.kubernetes.io/name: moe-inference
+    app.kubernetes.io/component: vllm-serving
+    app.kubernetes.io/managed-by: terradev
+    terradev.io/arch: moe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: moe-inference
+      app.kubernetes.io/component: vllm-serving
+  strategy:
+    type: Recreate  # GPU workloads cannot do rolling updates
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: moe-inference
+        app.kubernetes.io/component: vllm-serving
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Require NVLink-connected multi-GPU node
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-H100-80GB-HBM3
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: dedicated
+          operator: Equal
+          value: gpu-inference
+          effect: NoSchedule
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: moe-inference
+
+      # Init container — download model weights to shared PVC
+      initContainers:
+        - name: model-downloader
+          image: python:3.11-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              pip install -q huggingface-hub
+              python3 -c "
+              from huggingface_hub import snapshot_download
+              import os
+              model_id = os.environ.get('MODEL_ID', 'zai-org/GLM-5-FP8')
+              token = os.environ.get('HF_TOKEN', '')
+              if os.path.exists('/models/weights/config.json'):
+                  print('Model weights already cached, skipping download')
+              else:
+                  print(f'Downloading {model_id}...')
+                  snapshot_download(
+                      model_id,
+                      local_dir='/models/weights',
+                      token=token if token else None,
+                      max_workers=8
+                  )
+                  print('Model download complete')
+              "
+          env:
+            - name: MODEL_ID
+              value: "zai-org/GLM-5-FP8"  # CHANGE: set your model ID
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: moe-secrets
+                  key: hf-token
+                  optional: true
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+
+      containers:
+        - name: vllm-server
+          image: vllm/vllm-openai:nightly
+          command: ["vllm", "serve", "/models/weights"]
+          args:
+            - --tensor-parallel-size=1           # TP=1 per DP rank (EP handles expert distribution)
+            - --data-parallel-size=8             # CHANGE: match your GPU count
+            - --gpu-memory-utilization=0.95     # Optimized: 0.90 → 0.95 (10% more VRAM)
+            - --max-model-len=32768
+            - --dtype=auto
+            - --trust-remote-code
+            - --enable-auto-tool-choice
+            - --enable-expert-parallel           # MoE: distribute experts across DP ranks
+            - --enable-eplb                      # Runtime expert load balancing
+            - --enable-dbo                       # Dual-batch overlap for all-to-all/compute overlap
+            - --served-model-name=moe-model      # CHANGE: set your model name
+            - --host=0.0.0.0
+            - --port=8000
+            # ── Critical Throughput Optimizations (6 knobs most teams never touch) ───
+            - --max-num-batched-tokens=16384     # Optimized: 2048 → 16384 (8x throughput)
+            - --max-num-seqs=1024               # Optimized: 256/1024 → 1024 (higher concurrency)
+            - --enable-prefix-caching           # Optimized: OFF → ON (free throughput win)
+            - --enable-chunked-prefill          # Optimized: OFF → ON (V0) / verify ON (V1)
+            # ── Auto-applied cost optimizations (Terradev defaults) ───
+            - --attention-backend=FLASHINFER          # FlashInfer fused attention (~50% mem BW recovery)
+            - --kv-connector=offloading              # KV cache → CPU DRAM (up to 9x throughput)
+            - --speculative-config.method=mtp        # MTP speculative decoding (up to 2.8x speed)
+            - --speculative-config.num_speculative_tokens=1
+            - --enable-sleep-mode                    # Auto-sleep on idle (18-200x faster than restart)
+            # ── LMCache Distributed KV Cache (Terradev extension) ───────
+            - --lmcache-enable                       # Enable distributed KV cache sharing
+            - --lmcache-backend=redis                # Redis backend for multi-instance sharing
+            - --lmcache-redis-url=redis://lmcache-redis:6379  # Redis service endpoint
+            - --lmcache-chunk-size=256                # Chunk size for cache distribution
+            - --lmcache-pipelined-backend             # Pipelined backend for better performance
+            # ── Multi-LoRA (uncomment + add your adapters) ────────────
+            # - --enable-lora
+            # - --max-loras=8
+            # - --max-lora-rank=64
+            # - --lora-modules=customer-a=/adapters/customer-a
+          env:
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0,1,2,3,4,5,6,7"          # CHANGE: adjust for GPU count
+            - name: NCCL_P2P_DISABLE
+              value: "0"
+            - name: NCCL_IB_DISABLE
+              value: "0"
+            - name: NCCL_SOCKET_IFNAME
+              value: "eth0"
+            - name: VLLM_ATTENTION_BACKEND
+              value: "FLASHINFER"               # FlashInfer fused attention (megakernel phase 1)
+            - name: VLLM_USE_DEEP_GEMM
+              value: "1"                        # DeepGEMM for MoE expert computation
+            - name: VLLM_ALL2ALL_BACKEND
+              value: "deepep_low_latency"        # DeepEP all-to-all for expert routing
+            - name: VLLM_SERVER_DEV_MODE
+              value: "1"                          # Required for auto-sleep/wake
+            - name: TRANSFORMERS_CACHE
+              value: "/models/cache"
+            - name: HF_HOME
+              value: "/models/cache"
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          # Startup probe — MoE model loading takes 2-5 min
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              nvidia.com/gpu: "8"               # CHANGE: match your GPU count
+              cpu: "10"                         # Optimized: 2 + #GPUs = 10 for 8 GPUs (V1 busy loop)
+              memory: "256Gi"
+            limits:
+              nvidia.com/gpu: "8"               # CHANGE: match your GPU count
+              cpu: "16"                         # Extra headroom for V1 engine core busy loop
+              memory: "512Gi"
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+            - name: dshm
+              mountPath: /dev/shm
+            # Uncomment for Multi-LoRA adapter storage:
+            # - name: lora-adapters
+            #   mountPath: /adapters
+
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: moe-model-cache
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Gi  # NCCL shared memory for MoE TP communication
+        # Uncomment for Multi-LoRA adapter storage:
+        # - name: lora-adapters
+        #   persistentVolumeClaim:
+        #     claimName: moe-lora-adapters
+
+      terminationGracePeriodSeconds: 60
+      restartPolicy: Always
+---
+# Secret for HuggingFace token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: moe-secrets
+  namespace: moe-inference
+type: Opaque
+data:
+  # Base64-encode your HF_TOKEN: echo -n "hf_xxx" | base64
+  hf-token: ""
+---
+# PVC for LoRA adapters (create only if using Multi-LoRA)
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: moe-lora-adapters
+#   namespace: moe-inference
+# spec:
+#   accessModes: [ReadWriteMany]  # RWX so adapters can be uploaded while serving
+#   storageClassName: efs-sc       # CHANGE: use your shared filesystem StorageClass
+#   resources:
+#     requests:
+#       storage: 50Gi
+---
+# vLLM Router — P/D-aware load balancer for multi-replica deployments
+# Consistent hashing maximises KV cache reuse across replicas.
+# Deploy only when running >1 replica or using P/D disaggregation.
+#
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: vllm-router
+#   namespace: moe-inference
+#   labels:
+#     app.kubernetes.io/name: moe-inference
+#     app.kubernetes.io/component: vllm-router
+# spec:
+#   replicas: 2
+#   selector:
+#     matchLabels:
+#       app.kubernetes.io/component: vllm-router
+#   template:
+#     metadata:
+#       labels:
+#         app.kubernetes.io/component: vllm-router
+#     spec:
+#       containers:
+#         - name: router
+#           image: vllm/vllm-router:latest
+#           args:
+#             - --port=8080
+#             - --service-discovery=k8s
+#             - --target-port=8000
+#             - --routing-policy=consistent_hash  # consistent_hash | power_of_two | round_robin
+#             - --session-key=x-session-id
+#           ports:
+#             - containerPort: 8080
+#           resources:
+#             requests:
+#               cpu: "1"
+#               memory: "512Mi"
+#             limits:
+#               cpu: "2"
+#               memory: "1Gi"
+---
+# LMCache Redis Cluster for Distributed KV Cache
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: lmcache-redis
+  namespace: moe-inference
+  labels:
+    app: lmcache-redis
+    component: kv-cache
+spec:
+  serviceName: lmcache-redis
+  replicas: 3
+  selector:
+    matchLabels:
+      app: lmcache-redis
+  template:
+    metadata:
+      labels:
+        app: lmcache-redis
+        component: kv-cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: "1"
+              memory: "16Gi"
+            limits:
+              cpu: "2"
+              memory: "20Gi"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          command:
+            - redis-server
+            - --appendonly=yes
+            - --maxmemory=14gb
+            - --maxmemory-policy=allkeys-lru
+      volumes:
+        - name: redis-data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 32Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lmcache-redis
+  namespace: moe-inference
+  labels:
+    app: lmcache-redis
+    component: kv-cache
+spec:
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis
+  selector:
+    app: lmcache-redis

@@ -1,0 +1,105 @@
+name: Terradev CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.11', '3.12']
+    env:
+      TERRADEV_SKIP_ONBOARDING: "1"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install package + test deps
+      run: |
+        pip install -e ".[dev]" 2>/dev/null || pip install -e .
+        pip install pytest pytest-asyncio
+
+    - name: CLI smoke test
+      run: |
+        terradev --version
+        terradev --help
+
+    - name: Run test suite
+      run: pytest tests/ -v --tb=short
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Build wheel + sdist
+      run: |
+        pip install build
+        python -m build
+
+    - name: Verify built package installs
+      run: |
+        pip install dist/*.whl
+        terradev --version
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist
+        path: dist/
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install + scan
+      run: |
+        pip install bandit
+        bandit -r terradev_cli/ -f json -o bandit-report.json -ll || true
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: security-reports
+        path: bandit-report.json
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Build
+      run: |
+        pip install build
+        python -m build
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}

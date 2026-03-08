@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: terradev-telemetry
+    env: python
+    plan: free
+    buildCommand: "pip install requests"
+    startCommand: "python production_telemetry_server.py"
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+    healthCheck:
+      path: /health
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    autoDeploy: true

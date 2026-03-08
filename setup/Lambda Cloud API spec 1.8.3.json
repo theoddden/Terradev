@@ -1,0 +1,4816 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Lambda Cloud API",
+    "version": "1.8.3",
+    "description": "The Lambda Cloud API provides a set of REST API endpoints you can use to create\nand manage your Lambda Cloud resources.\n\nRequests to the API are generally limited to one request per second. Requests to\nthe `/instance-operations/launch` endpoint are limited to one request per 12\nseconds, or five requests per minute.\n\n## Response types and formats {#formats}\n\nThe format of each response object depends on whether the request succeeded or failed.\n\n### Success responses {#success-responses}\n\nWhen a request succeeds, the API returns a response object in the following format. `<PAYLOAD>`\nrepresents the endpoint-specific data object returned as part of the response object.\n\n```json\n{\n    \"data\": <PAYLOAD>\n}\n```\n\n### Error responses {#error-responses}\n\nWhen a request fails, the API returns an error response object in the following format:\n\n```json\n{\n    \"error\": {\n        \"code\": string,\n        \"message\": string,\n        \"suggestion\": string?\n    }\n}\n```\n\n- `code`: A machine- and human-readable error code specific to a particular failure mode.\n- `message`: An explanation of the error.\n- `suggestion`: When present, a suggestion for how to address the error.\n\n:::note{type=\"info\" title=\"Note\"}\nWhen handling errors, avoid relying on the values of `message` or `suggestion`, as\nthese values are subject to change. Instead, use the value of `code`.\n:::\n\n#### Provider errors {#provider-errors}\n\nIn some cases, you might receive errors that come from upstream services/providers rather than directly\nfrom Lambda services. You can identify these errors by their error code prefix, `provider/`.\n\nCommon provider errors include:\n\n- Network outages or connectivity issues\n- Service unavailability\n- Quota limitations or resource exhaustion\n\nAn example of a typical service unavailability error:\n\n```json\n{\n  \"error\": {\n    \"code\": \"provider/internal-unavailable\",\n    \"message\": \"Provider unavailable\",\n    \"suggestion\": \"Try again shortly\"\n  }\n}\n```\n## Authentication {#authentication}\n\nThe Lambda Cloud API uses API keys to authenticate incoming requests. You\ncan generate a new API key pair or view your existing API keys by visiting\nthe [API keys page](https://cloud.lambda.ai/api-keys) in the Lambda Cloud\ndashboard.\n\nIn general, Lambda recommends passing an HTTP Bearer header that contains\nyour API key:\n\n```http\nAuthorization: Bearer <YOUR-API-KEY>\n```\n\n### Authenticating with `curl` {#authenticating-with-curl}\n\nThe API also supports passing an HTTP Basic header. This option chiefly exists\nto support `curl`'s `-u` flag, which allows you to pass your credentials\nwithout having to write out the full `Authorization: Basic` header string.\nFor example:\n\n```bash\ncurl --request GET --url 'https://cloud.lambda.ai/api/v1/instances' \\\n  --header 'accept: application/json' \\\n  --user '<YOUR-API-KEY>:'\n```\n\nIf your use case requires it, you can also pass the HTTP Basic header directly.\nThe value you pass must be a Base64-encoded string containing your API key\nand a trailing colon:\n\n```http\nAuthorization: Basic <BASE64-ENCODED-API-KEY>:\n```\n\n:::note{type=\"attention\" title=\"Important\"}\nIf you make a request without including a supported `Authorization` header,\nthe request will fail.\n:::"
+  },
+  "paths": {
+    "/api/v1/instances": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Instance"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Instances"
+        ],
+        "summary": "List running instances",
+        "description": "Retrieves a list of your running instances.",
+        "operationId": "listInstances",
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "query",
+            "description": "If provided, the resulting list will only include\n            instances that are part of a cluster with this unique identifier (ID).",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "ddaedf1b7a0e41ac981711504493b242",
+              "description": "If provided, the resulting list will only include\n            instances that are part of a cluster with this unique identifier (ID)."
+            },
+            "example": "ddaedf1b7a0e41ac981711504493b242"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/instances/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Instance"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInstanceNotFound"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Instances"
+        ],
+        "summary": "Retrieve instance details",
+        "description": "Retrieves the details of a specific instance, including whether or not the instance is running.",
+        "operationId": "getInstance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The unique identifier (ID) of the instance",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ddaedf1b7a0e41ac981711504493b242",
+              "description": "The unique identifier (ID) of the instance"
+            },
+            "example": "ddaedf1b7a0e41ac981711504493b242"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      },
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Instance"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInstanceNotFound"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Instances"
+        ],
+        "summary": "Update instance details",
+        "description": "Updates the details of the specified instance.",
+        "operationId": "postInstance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The unique identifier (ID) of the instance",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ddaedf1b7a0e41ac981711504493b242",
+              "description": "The unique identifier (ID) of the instance"
+            },
+            "example": "ddaedf1b7a0e41ac981711504493b242"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 64,
+                    "description": "The new, user-provided name for the instance.",
+                    "examples": [
+                      "My Instance"
+                    ]
+                  }
+                },
+                "title": "InstanceModificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/instance-types": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/InstanceTypes"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Instances"
+        ],
+        "summary": "List available instance types",
+        "description": "Retrieves a list of the instance types currently offered on Lambda's public cloud, as well as details about each type. Details include resource specifications, pricing, and regional availability.",
+        "operationId": "listInstanceTypes",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/instance-operations/launch": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/InstanceLaunchResponse"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/ApiErrorFileSystemInWrongRegion"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorInsufficientCapacity"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorLaunchResourceNotFound"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorQuotaExceeded"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorInvalidBillingAddress"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorLaunchResourceNotFound"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Instances"
+        ],
+        "summary": "Launch instances",
+        "description": "Launches a Lambda On-Demand Cloud instance.",
+        "operationId": "launchInstance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "region_name": {
+                    "$ref": "#/components/schemas/PublicRegionCode",
+                    "description": "The region into which you want to launch the instance."
+                  },
+                  "instance_type_name": {
+                    "type": "string",
+                    "description": "The type of instance you want to launch. To retrieve a list of available instance types, see\n[List available instance types](#listInstanceTypes).",
+                    "examples": [
+                      "gpu_8x_a100"
+                    ]
+                  },
+                  "ssh_key_names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The names of the SSH keys you want to use to provide access to the instance.\nCurrently, exactly one SSH key must be specified.",
+                    "examples": [
+                      [
+                        "my-public-key"
+                      ]
+                    ]
+                  },
+                  "file_system_names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The names of the filesystems you want to mount to the instance. When specified\nalongside `file_system_mounts`, any filesystems referred to in both lists will use the\nmount path specified in `file_system_mounts`, rather than the default.",
+                    "examples": [
+                      [
+                        "my-filesystem"
+                      ],
+                      []
+                    ]
+                  },
+                  "file_system_mounts": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/RequestedFilesystemMountEntry"
+                    },
+                    "description": "The filesystem mounts to mount to the instance. When specified alongside\n`file_system_names`, any filesystems referred to in both lists will use the\nmount path specified in `file_system_mounts`, rather than the default."
+                  },
+                  "hostname": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9][0-9a-z-]{0,62}$",
+                    "description": "The hostname to assign to the instance. If not specified, a default, IP-address-based\nhostname is assigned. This hostname is driven into /etc/hostname on the instance.",
+                    "examples": [
+                      "headnode1"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 64,
+                    "description": "The name you want to assign to your instance. Must be 64 characters or fewer.",
+                    "examples": [
+                      "My Instance"
+                    ]
+                  },
+                  "image": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/ImageSpecificationID"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ImageSpecificationFamily"
+                      }
+                    ],
+                    "description": "The machine image you want to use. Defaults to the latest Lambda Stack image."
+                  },
+                  "user_data": {
+                    "type": "string",
+                    "writeOnly": true,
+                    "format": "password",
+                    "description": "An instance configuration string specified in a valid\n[cloud-init user-data](https://cloudinit.readthedocs.io/en/latest/explanation/format.html)\nformat. You can use this field to configure your instance on launch. The\nuser data string must be plain text and cannot exceed 1MB in size."
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/RequestedTagEntry"
+                    },
+                    "description": "Key/value pairs representing the instance's tags."
+                  },
+                  "firewall_rulesets": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/FirewallRulesetEntry"
+                    },
+                    "description": "The firewall rulesets to associate with the instance.\nThe firewall rulesets must exist in the same region as the instance."
+                  }
+                },
+                "required": [
+                  "region_name",
+                  "instance_type_name",
+                  "ssh_key_names"
+                ],
+                "title": "InstanceLaunchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/instance-operations/restart": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/InstanceRestartResponse",
+                      "examples": [
+                        {
+                          "restarted_instances": [
+                            {
+                              "id": "0920582c7ff041399e34823a0be62549",
+                              "name": "My Instance",
+                              "ip": "198.51.100.2",
+                              "private_ip": "10.0.2.100",
+                              "status": "active",
+                              "ssh_key_names": [
+                                "My SSH key"
+                              ],
+                              "file_system_names": [
+                                "my-filesystem"
+                              ],
+                              "file_system_mounts": [
+                                {
+                                  "mount_point": "/lambda/nfs/my-filesystem",
+                                  "file_system_id": "a098b0c7ff041399e34823a0be62549"
+                                }
+                              ],
+                              "region": {
+                                "name": "us-west-1",
+                                "description": "California, USA"
+                              },
+                              "instance_type": {
+                                "name": "gpu_8x_a100",
+                                "description": "8x A100 (40 GB SXM4)",
+                                "gpu_description": "A100 (40 GB SXM4)",
+                                "price_cents_per_hour": 1032,
+                                "specs": {
+                                  "vcpus": 124,
+                                  "memory_gib": 1800,
+                                  "storage_gib": 6144,
+                                  "gpus": 8
+                                }
+                              },
+                              "hostname": "198.51.100.2",
+                              "jupyter_token": "03b7d30d9d3e4d8fa41657bc0d478c1b",
+                              "jupyter_url": "https://jupyter-249e1ccff1894822af39ac822637f881.lambdaspaces.com/?token=03b7d30d9d3e4d8fa41657bc0d478c1b",
+                              "is_reserved": false,
+                              "actions": {
+                                "migrate": {
+                                  "available": true
+                                },
+                                "rebuild": {
+                                  "available": true
+                                },
+                                "restart": {
+                                  "available": true
+                                },
+                                "cold_reboot": {
+                                  "available": true
+                                },
+                                "terminate": {
+                                  "available": true
+                                }
+                              },
+                              "tags": [
+                                {
+                                  "key": "key1",
+                                  "value": "value1"
+                                },
+                                {
+                                  "key": "key2",
+                                  "value": "value2"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInstanceNotFound"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Instances"
+        ],
+        "summary": "Restart instances",
+        "description": "Restarts one or more instances.",
+        "operationId": "restartInstance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "instance_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The unique identifiers (IDs) of the instances to restart.",
+                    "examples": [
+                      [
+                        "0920582c7ff041399e34823a0be62549"
+                      ]
+                    ]
+                  }
+                },
+                "required": [
+                  "instance_ids"
+                ],
+                "title": "InstanceRestartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/instance-operations/terminate": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/InstanceTerminateResponse",
+                      "examples": [
+                        {
+                          "terminated_instances": [
+                            {
+                              "id": "0920582c7ff041399e34823a0be62549",
+                              "name": "My Instance",
+                              "ip": "198.51.100.2",
+                              "private_ip": "10.0.2.100",
+                              "status": "terminating",
+                              "ssh_key_names": [
+                                "My SSH key"
+                              ],
+                              "file_system_names": [
+                                "my-filesystem"
+                              ],
+                              "file_system_mounts": [
+                                {
+                                  "mount_point": "/lambda/nfs/my-filesystem",
+                                  "file_system_id": "a098b0c7ff041399e34823a0be62549"
+                                }
+                              ],
+                              "region": {
+                                "name": "us-west-1",
+                                "description": "California, USA"
+                              },
+                              "instance_type": {
+                                "name": "gpu_8x_a100",
+                                "description": "8x A100 (40 GB SXM4)",
+                                "gpu_description": "A100 (40 GB SXM4)",
+                                "price_cents_per_hour": 1032,
+                                "specs": {
+                                  "vcpus": 124,
+                                  "memory_gib": 1800,
+                                  "storage_gib": 6144,
+                                  "gpus": 8
+                                }
+                              },
+                              "hostname": "198.51.100.2",
+                              "jupyter_token": "03b7d30d9d3e4d8fa41657bc0d478c1b",
+                              "jupyter_url": "https://jupyter-249e1ccff1894822af39ac822637f881.lambdaspaces.com/?token=03b7d30d9d3e4d8fa41657bc0d478c1b",
+                              "is_reserved": false,
+                              "actions": {
+                                "migrate": {
+                                  "available": true
+                                },
+                                "rebuild": {
+                                  "available": true
+                                },
+                                "restart": {
+                                  "available": true
+                                },
+                                "cold_reboot": {
+                                  "available": true
+                                },
+                                "terminate": {
+                                  "available": true
+                                }
+                              },
+                              "tags": [
+                                {
+                                  "key": "key1",
+                                  "value": "value1"
+                                },
+                                {
+                                  "key": "key2",
+                                  "value": "value2"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInstanceNotFound"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Instances"
+        ],
+        "summary": "Terminate instances",
+        "description": "Terminates one or more instances.",
+        "operationId": "terminateInstance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "instance_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The unique identifiers (IDs) of the instances to terminate.",
+                    "examples": [
+                      [
+                        "0920582c7ff041399e34823a0be62549"
+                      ]
+                    ]
+                  }
+                },
+                "required": [
+                  "instance_ids"
+                ],
+                "title": "InstanceTerminateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ssh-keys": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SSHKey"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "SSH keys"
+        ],
+        "summary": "List your SSH keys",
+        "description": "Retrieves a list of your SSH keys.",
+        "operationId": "listSSHKeys",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      },
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/GeneratedSSHKey"
+                        },
+                        {
+                          "$ref": "#/components/schemas/SSHKey"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "SSH keys"
+        ],
+        "summary": "Add an SSH key",
+        "description": "\nAdd an SSH key to your Lambda Cloud account. You can upload an existing public\nkey, or you can generate a new key pair.\n\n-  To use an existing key pair, set the `public_key` property in the request body\n   to your public key.\n\n-  To generate a new key pair, omit the `public_key` property from the request\n   body.\n\n:::note{type=\"attention\" title=\"Important\"}\nLambda doesn't store your private key after it's been generated.\nIf you generate a new key pair, make sure to save the resulting private key locally.\n:::\n\nFor example, to generate a new key pair and associate it with a Lambda\nOn-Demand Cloud instance:\n\n1. Generate the key pair. The command provided below automatically extracts and\n    saves the returned private key to a new file called `key.pem`. Replace\n    `<NEW-KEY-NAME>` with the name you want to assign to the SSH key:\n\n    ```bash\n    curl --request POST --url 'https://cloud.lambda.ai/api/v1/ssh-keys' \\\n    --fail \\\n    --user ${LAMBDA_API_KEY}: \\\n    --data '{\"name\": \"<NEW-KEY-NAME>\"}' \\\n    | jq -r '.data.private_key' > key.pem\n    ```\n\n2. Next, set the private key's permissions to read-only:\n\n    ```bash\n    chmod 400 key.pem\n    ```\n\n3. Launch a new instance. Replace `<NEW-KEY-NAME>` with the name you assigned\n   to your SSH key.\n\n    ```bash\n    curl --request POST 'https://cloud.lambda.ai/api/v1/instance-operations/launch' \\\n    --fail \\\n    --user ${LAMBDA_API_KEY}: \\\n    --data '{\"region_name\":\"us-west-1\",\"instance_type_name\":\"gpu_1x_a10\",\"ssh_key_names\":[\"<NEW-KEY-NAME>\"],\"file_system_names\":[],\"quantity\":1,\"name\":\"My Instance\"}'\n    ```\n\n4. From your local terminal, establish an SSH connection to the instance.\n   Replace `<INSTANCE-IP>` with the public IP of the instance:\n\n    ```bash\n    ssh -i key.pem <INSTANCE-IP>\n    ```\n",
+        "operationId": "addSSHKey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "The name of the SSH key.",
+                    "examples": [
+                      "my-public-key"
+                    ]
+                  },
+                  "public_key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "description": "The public key for the SSH key.",
+                    "examples": [
+                      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICN+lJwsONkwrdsSnQsu1ydUkIuIg5oOC+Eslvmtt60T noname"
+                    ]
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "title": "AddSSHKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ssh-keys/{id}": {
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/EmptyResponse"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "SSH keys"
+        ],
+        "summary": "Delete an SSH key",
+        "description": "Deletes the specified SSH key.",
+        "operationId": "deleteSSHKey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The unique identifier (ID) of the SSH key to delete",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "ddf9a910ceb744a0bb95242cbba6cb50",
+              "description": "The unique identifier (ID) of the SSH key to delete"
+            },
+            "example": "ddf9a910ceb744a0bb95242cbba6cb50"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/file-systems": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Filesystem"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Filesystems"
+        ],
+        "summary": "List filesystems",
+        "description": "Retrieves a list of your filesystems.",
+        "operationId": "listFilesystems",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/filesystems": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Filesystem"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/ApiErrorDuplicate"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorQuotaExceeded"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorInvalidBillingAddress"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Filesystems"
+        ],
+        "summary": "Create filesystem",
+        "description": "Creates a new filesystem.",
+        "operationId": "createFilesystem",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60,
+                    "pattern": "^[a-zA-Z]+[0-9a-zA-Z-]*$",
+                    "description": "The name of the filesystem.",
+                    "examples": [
+                      "my-filesystem"
+                    ]
+                  },
+                  "region": {
+                    "$ref": "#/components/schemas/PublicRegionCode",
+                    "description": "The region in which you want to create the filesystem.",
+                    "examples": [
+                      "us-west-1"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "region"
+                ],
+                "title": "FilesystemCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/filesystems/{id}": {
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FilesystemDeleteResponse"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/ApiErrorFilesystemInUse"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorFilesystemNotFound"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Filesystems"
+        ],
+        "summary": "Delete filesystem",
+        "description": "Deletes the filesystem with the specified ID. The filesystem must not be mounted to any running instances at the time of deletion.",
+        "operationId": "filesystemDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The unique identifier (ID) of the filesystem to delete",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "398578a2336b49079e74043f0bd2cfe8",
+              "description": "The unique identifier (ID) of the filesystem to delete"
+            },
+            "example": "398578a2336b49079e74043f0bd2cfe8"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/images": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Image"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Images"
+        ],
+        "summary": "List available images",
+        "description": "Retrieves a list of available images by region.",
+        "operationId": "listImages",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/firewall-rules": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FirewallRule"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Firewalls"
+        ],
+        "summary": "List inbound firewall rules",
+        "description": "Retrieves a list of your firewall rules.\n\n**Note:** Firewall rules do not apply to the **us-south-1** region.",
+        "operationId": "firewallRulesList",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      },
+      "put": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FirewallRule"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Firewalls"
+        ],
+        "summary": "Replace inbound firewall rules",
+        "description": "Overwrites the inbound firewall rules currently active for your account's instances with the desired rules.\n\n**Note:** Firewall rules do not apply to the **us-south-1** region.",
+        "operationId": "firewallRulesSet",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/FirewallRule"
+                    },
+                    "description": "The list of inbound firewall rules."
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "title": "FirewallRulesPutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/firewall-rulesets": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FirewallRuleset"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Firewalls"
+        ],
+        "summary": "List firewall rulesets",
+        "description": "Retrieves a list of your firewall rulesets.",
+        "operationId": "firewallRulesetsList",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      },
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FirewallRuleset"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/ApiErrorQuotaExceeded"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInternal"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Firewalls"
+        ],
+        "summary": "Create firewall ruleset",
+        "description": "Creates a new firewall ruleset with the specified name and rules.",
+        "operationId": "createFirewallRuleset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "description": "The name of the firewall ruleset.",
+                    "examples": [
+                      "My Firewall Ruleset"
+                    ]
+                  },
+                  "region": {
+                    "$ref": "#/components/schemas/PublicRegionCode",
+                    "description": "The region in which the firewall ruleset is deployed."
+                  },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/FirewallRule"
+                    },
+                    "description": "The firewall rules to include in the ruleset."
+                  }
+                },
+                "required": [
+                  "name",
+                  "region",
+                  "rules"
+                ],
+                "title": "FirewallRulesetCreateRequest",
+                "description": "Request to create a new firewall ruleset."
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/firewall-rulesets/global": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/GlobalFirewallRuleset"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Firewalls"
+        ],
+        "summary": "Retrieve global firewall ruleset details",
+        "description": "Retrieves the details of the global firewall ruleset.",
+        "operationId": "getGlobalFirewallRuleset",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/GlobalFirewallRuleset"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInternal"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Firewalls"
+        ],
+        "summary": "Update global firewall ruleset",
+        "description": "Updates the global firewall ruleset. This allows updating the rules only.",
+        "operationId": "updateGlobalFirewallRuleset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/FirewallRule"
+                    },
+                    "description": "The new firewall rules for the ruleset. If not provided, the rules will not be updated."
+                  }
+                },
+                "title": "GlobalFirewallRulesetPatchRequest",
+                "description": "Request to update the global firewall ruleset."
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/firewall-rulesets/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FirewallRuleset"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorFirewallRulesetNotFound"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Firewalls"
+        ],
+        "summary": "Retrieve firewall ruleset details",
+        "description": "Retrieves the details of a specific firewall ruleset.",
+        "operationId": "getFirewallRuleset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The unique identifier (ID) of the firewall ruleset",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "c4d291f47f9d436fa39f58493ce3b50d",
+              "description": "The unique identifier (ID) of the firewall ruleset"
+            },
+            "example": "c4d291f47f9d436fa39f58493ce3b50d"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FirewallRuleset"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorFirewallRulesetNotFound"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInternal"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Firewalls"
+        ],
+        "summary": "Update firewall ruleset",
+        "description": "Updates a firewall ruleset. This is a partial update that allows updating either the name, rules, or both.",
+        "operationId": "updateFirewallRuleset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The unique identifier (ID) of the firewall ruleset",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "c4d291f47f9d436fa39f58493ce3b50d",
+              "description": "The unique identifier (ID) of the firewall ruleset"
+            },
+            "example": "c4d291f47f9d436fa39f58493ce3b50d"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "description": "The new name for the firewall ruleset. If not provided, the name will not be updated.",
+                    "examples": [
+                      "My Updated Firewall Ruleset"
+                    ]
+                  },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/FirewallRule"
+                    },
+                    "description": "The new firewall rules for the ruleset. If not provided, the rules will not be updated."
+                  }
+                },
+                "title": "FirewallRulesetPatchRequest",
+                "description": "Request to partially update a firewall ruleset."
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/EmptyResponse"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/ApiErrorFirewallRulesetInUse"
+                        },
+                        {
+                          "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorFirewallRulesetNotFound"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInternal"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Firewalls"
+        ],
+        "summary": "Delete firewall ruleset",
+        "description": "Deletes the firewall ruleset with the specified ID.",
+        "operationId": "deleteFirewallRuleset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The unique identifier (ID) of the firewall ruleset",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "c4d291f47f9d436fa39f58493ce3b50d",
+              "description": "The unique identifier (ID) of the firewall ruleset"
+            },
+            "example": "c4d291f47f9d436fa39f58493ce3b50d"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/audit-events": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuditEvent"
+                      }
+                    },
+                    "page_token": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Provide this token in your next request to retrieve the next page of results. If there are no additional pages, this field has a null value.",
+                      "examples": [
+                        "eyJuZXh0IjoxNzA0MTk2ODAwfQ=="
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "page_token"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorInvalidParameters"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorUnauthorized"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ApiErrorAccountInactive"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Audit Events"
+        ],
+        "summary": "Get audit events",
+        "description": "Retrieves a list of audit events that have occurred in your account. To view the full catalog of possible audit events, visit [Access and security > Audit logs](https://docs.lambda.ai/public-cloud/access-security#audit-logs) in the Lambda Cloud documentation.",
+        "operationId": "getAuditEvents",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "description": "An ISO 8601 timestamp defining the start of the time range to query, inclusive. If omitted, the response starts at the earliest available event.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "An ISO 8601 timestamp defining the start of the time range to query, inclusive. If omitted, the response starts at the earliest available event.",
+              "example": "2025-09-01T10:30:45.123456Z"
+            },
+            "example": "2025-09-01T10:30:45.123456Z"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "description": "An ISO 8601 timestamp defining the end of the time range to query, inclusive. If omitted, the response ends at the most recent event.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "An ISO 8601 timestamp defining the end of the time range to query, inclusive. If omitted, the response ends at the most recent event.",
+              "example": "2025-09-15T10:30:45.123456Z"
+            },
+            "example": "2025-09-15T10:30:45.123456Z"
+          },
+          {
+            "name": "page_token",
+            "in": "query",
+            "description": "The token returned by the previous API response to retrieve the next page of results.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "The token returned by the previous API response to retrieve the next page of results.",
+              "example": "abCdEFg0h1I2jKlm34n5O6Pq78r="
+            },
+            "example": "abCdEFg0h1I2jKlm34n5O6Pq78r="
+          },
+          {
+            "name": "resource_type",
+            "in": "query",
+            "description": "The resource type to filter by. By default, all available resource types are retrieved.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "The resource type to filter by. By default, all available resource types are retrieved.",
+              "example": "cloud.api_key"
+            },
+            "example": "cloud.api_key"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://cloud.lambda.ai/",
+      "description": "Production server"
+    },
+    {
+      "url": "https://cloud.lambdalabs.com/",
+      "description": "Secondary production server (deprecated)"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "ApiErrorAccountInactive": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/account-inactive",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "Your account is inactive.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "default": "Make sure you have verified your email address and have a valid payment method. Contact Support if problems continue.",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "suggestion"
+        ],
+        "title": "ApiErrorAccountInactive"
+      },
+      "InstanceActionUnavailableCode": {
+        "title": "InstanceActionUnavailableCode",
+        "enum": [
+          "vm-has-not-launched",
+          "vm-is-too-old",
+          "vm-is-terminating"
+        ],
+        "type": "string"
+      },
+      "InstanceActionAvailabilityDetails": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "If set, indicates that the relevant operation can be performed on the instance in its current state."
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstanceActionUnavailableCode"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "A code representing the instance state that is blocking the operation. Only provided if the operation is blocked."
+          },
+          "reason_description": {
+            "type": "string",
+            "description": "A longer description of why this operation is currently blocked. Only provided if the operation is blocked."
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "InstanceActionAvailabilityDetails"
+      },
+      "InstanceStatus": {
+        "title": "InstanceStatus",
+        "description": "The current status of the instance.",
+        "enum": [
+          "booting",
+          "active",
+          "unhealthy",
+          "terminated",
+          "terminating",
+          "preempted"
+        ],
+        "type": "string"
+      },
+      "FilesystemMountEntry": {
+        "type": "object",
+        "properties": {
+          "mount_point": {
+            "type": "string",
+            "description": "The absolute path indicating where on the instance the filesystem will be mounted.",
+            "examples": [
+              "/data/custom-mount-point"
+            ]
+          },
+          "file_system_id": {
+            "type": "string",
+            "description": "The id of the filesystem to mount to the instance.",
+            "examples": [
+              "398578a2336b49079e74043f0bd2cfe8"
+            ]
+          }
+        },
+        "required": [
+          "mount_point",
+          "file_system_id"
+        ],
+        "title": "FilesystemMountEntry",
+        "description": "The mount point for a filesystem mounted to an instance."
+      },
+      "PublicRegionCode": {
+        "title": "PublicRegionCode",
+        "enum": [
+          "europe-central-1",
+          "asia-south-1",
+          "australia-east-1",
+          "me-west-1",
+          "asia-northeast-1",
+          "asia-northeast-2",
+          "us-east-1",
+          "us-west-2",
+          "us-west-1",
+          "us-south-1",
+          "us-west-3",
+          "us-midwest-1",
+          "us-east-2",
+          "us-south-2",
+          "us-south-3",
+          "us-east-3",
+          "us-midwest-2",
+          "us-midwest-3"
+        ],
+        "type": "string"
+      },
+      "Region": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/PublicRegionCode",
+            "description": "The region code.",
+            "examples": [
+              "us-west-1"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "The location represented by the region code.",
+            "examples": [
+              "California, USA"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "Region"
+      },
+      "InstanceTypeSpecs": {
+        "type": "object",
+        "properties": {
+          "vcpus": {
+            "type": "integer",
+            "description": "The number of virtual CPUs.",
+            "examples": [
+              208
+            ]
+          },
+          "memory_gib": {
+            "type": "integer",
+            "description": "The amount of RAM in gibibytes (GiB).",
+            "examples": [
+              1800
+            ]
+          },
+          "storage_gib": {
+            "type": "integer",
+            "description": "The amount of storage in gibibytes (GiB).",
+            "examples": [
+              24780
+            ]
+          },
+          "gpus": {
+            "type": "integer",
+            "description": "The number of GPUs.",
+            "examples": [
+              8
+            ]
+          }
+        },
+        "required": [
+          "vcpus",
+          "memory_gib",
+          "storage_gib",
+          "gpus"
+        ],
+        "title": "InstanceTypeSpecs"
+      },
+      "InstanceType": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the instance type.",
+            "examples": [
+              "gpu_8x_h100_sxm5gdr"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of the instance type.",
+            "examples": [
+              "8x H100 (80 GB SXM5)"
+            ]
+          },
+          "gpu_description": {
+            "type": "string",
+            "description": "The type of GPU used by this instance type.",
+            "examples": [
+              "H100 (80 GB SXM5)"
+            ]
+          },
+          "price_cents_per_hour": {
+            "type": "integer",
+            "description": "The price of the instance type in US cents per hour.",
+            "examples": [
+              3592
+            ]
+          },
+          "specs": {
+            "$ref": "#/components/schemas/InstanceTypeSpecs",
+            "description": "Detailed technical specifications for the instance type."
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "gpu_description",
+          "price_cents_per_hour",
+          "specs"
+        ],
+        "title": "InstanceType"
+      },
+      "InstanceActionAvailability": {
+        "type": "object",
+        "properties": {
+          "migrate": {
+            "$ref": "#/components/schemas/InstanceActionAvailabilityDetails",
+            "description": "Indicates whether the instance is currently able to be migrated.\nIf not, describes why the operation is blocked."
+          },
+          "rebuild": {
+            "$ref": "#/components/schemas/InstanceActionAvailabilityDetails",
+            "description": "Indicates whether the instance is currently able to be rebuilt.\nIf not, describes why the operation is blocked."
+          },
+          "restart": {
+            "$ref": "#/components/schemas/InstanceActionAvailabilityDetails",
+            "description": "Indicates whether the instance is currently able to be restarted.\nIf not, describes why the operation is blocked."
+          },
+          "cold_reboot": {
+            "$ref": "#/components/schemas/InstanceActionAvailabilityDetails",
+            "description": "Indicates whether the instance is currently eligible for a cold reboot.\nIf not, describes why the operation is blocked."
+          },
+          "terminate": {
+            "$ref": "#/components/schemas/InstanceActionAvailabilityDetails",
+            "description": "Indicates whether the instance is currently able to be terminated.\nIf not, describes why the operation is blocked."
+          }
+        },
+        "required": [
+          "migrate",
+          "rebuild",
+          "restart",
+          "cold_reboot",
+          "terminate"
+        ],
+        "title": "InstanceActionAvailability"
+      },
+      "TagEntry": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The key of the tag.",
+            "examples": [
+              "key1"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "description": "The value of the tag.",
+            "examples": [
+              "value1"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "TagEntry"
+      },
+      "FirewallRulesetEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of the firewall ruleset.",
+            "examples": [
+              "c4d291f47f9d436fa39f58493ce3b50d"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "FirewallRulesetEntry",
+        "description": "Reference to a firewall ruleset."
+      },
+      "Instance": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of the instance.",
+            "examples": [
+              "0920582c7ff041399e34823a0be62549"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 64,
+            "description": "If set, the user-provided name of the instance.",
+            "examples": [
+              "My Instance"
+            ]
+          },
+          "ip": {
+            "type": "string",
+            "description": "The public IPv4 address of the instance.",
+            "examples": [
+              "198.51.100.2"
+            ]
+          },
+          "private_ip": {
+            "type": "string",
+            "description": "The private IPv4 address of the instance.",
+            "examples": [
+              "10.0.2.100"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/InstanceStatus"
+          },
+          "ssh_key_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the SSH keys that are allowed to access the instance.",
+            "examples": [
+              [
+                "My SSH key"
+              ],
+              []
+            ]
+          },
+          "file_system_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the filesystems mounted to the instance. If no filesystems are mounted, this array is empty.",
+            "examples": [
+              [
+                "my-filesystem"
+              ],
+              []
+            ]
+          },
+          "file_system_mounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilesystemMountEntry"
+            },
+            "description": "The filesystems, along with the mount paths, mounted to\nthe instances. If no filesystems are mounted, this parameter\nwill be missing from the response."
+          },
+          "region": {
+            "$ref": "#/components/schemas/Region",
+            "description": "The region in which the instance is deployed."
+          },
+          "instance_type": {
+            "$ref": "#/components/schemas/InstanceType",
+            "description": "Detailed information about the instance's instance type."
+          },
+          "hostname": {
+            "type": "string",
+            "description": "The hostname assigned to this instance, which resolves to the instance's IP.",
+            "examples": [
+              "headnode1"
+            ]
+          },
+          "jupyter_token": {
+            "type": "string",
+            "description": "The secret token used to log into the JupyterLab server hosted on the instance.",
+            "examples": [
+              "03b7d30d9d3e4d8fa41657bc0d478c1b"
+            ]
+          },
+          "jupyter_url": {
+            "type": "string",
+            "description": "The URL that opens the JupyterLab environment on the instance.",
+            "examples": [
+              "https://jupyter-249e1ccff1894822af39ac822637f881.lambdaspaces.com/?token=03b7d30d9d3e4d8fa41657bc0d478c1b"
+            ]
+          },
+          "actions": {
+            "$ref": "#/components/schemas/InstanceActionAvailability",
+            "description": "A set of status objects representing the current availability of common instance operations."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagEntry"
+            },
+            "description": "Key/value pairs representing the instance's tags."
+          },
+          "firewall_rulesets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FirewallRulesetEntry"
+            },
+            "description": "The firewall rulesets associated with this instance."
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "ssh_key_names",
+          "file_system_names",
+          "region",
+          "instance_type",
+          "actions"
+        ],
+        "title": "Instance",
+        "description": "Detailed information about the instance."
+      },
+      "ApiErrorInvalidParameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/invalid-parameters",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "Invalid request data.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ApiErrorInvalidParameters"
+      },
+      "ApiErrorUnauthorized": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/invalid-api-key",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "API key was invalid, expired, or deleted.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "default": "Check your API key or create a new one, then try again.",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "suggestion"
+        ],
+        "title": "ApiErrorUnauthorized"
+      },
+      "ApiErrorInstanceNotFound": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/object-does-not-exist",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "Specified instance does not exist.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ApiErrorInstanceNotFound"
+      },
+      "InstanceTypesItem": {
+        "type": "object",
+        "properties": {
+          "instance_type": {
+            "$ref": "#/components/schemas/InstanceType",
+            "description": "The description, technical specifications, and metadata for this instance type."
+          },
+          "regions_with_capacity_available": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Region"
+            },
+            "description": "A list of the regions in which this instance type is available."
+          }
+        },
+        "required": [
+          "instance_type",
+          "regions_with_capacity_available"
+        ],
+        "title": "InstanceTypesItem",
+        "description": "Detailed information and regional availability for the instance type."
+      },
+      "InstanceTypes": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/InstanceTypesItem"
+        },
+        "title": "InstanceTypes",
+        "example": {
+          "gpu_1x_gh200": {
+            "instance_type": {
+              "name": "gpu_1x_gh200",
+              "description": "1x GH200 (96 GB)",
+              "gpu_description": "GH200 (96 GB)",
+              "price_cents_per_hour": 199,
+              "specs": {
+                "vcpus": 64,
+                "memory_gib": 432,
+                "storage_gib": 4096,
+                "gpus": 1
+              }
+            },
+            "regions_with_capacity_available": [
+              {
+                "name": "us-west-1",
+                "description": "California, USA"
+              }
+            ]
+          }
+        }
+      },
+      "RequestedFilesystemMountEntry": {
+        "type": "object",
+        "properties": {
+          "mount_point": {
+            "type": "string",
+            "maxLength": 256,
+            "pattern": "^(/home|/lambda/nfs|/data)[//a-zA-Z0-9-]*$",
+            "description": "The absolute path indicating where on the instance the filesystem will be mounted.",
+            "examples": [
+              "/data/custom-mount-point"
+            ]
+          },
+          "file_system_id": {
+            "type": "string",
+            "description": "The id of the filesystem to mount to the instance.",
+            "examples": [
+              "398578a2336b49079e74043f0bd2cfe8"
+            ]
+          }
+        },
+        "required": [
+          "mount_point",
+          "file_system_id"
+        ],
+        "title": "RequestedFilesystemMountEntry",
+        "description": "The mount point for a filesystem mounted to an instance."
+      },
+      "ImageSpecificationID": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "ImageSpecificationID",
+        "description": "Specifies the image to use by its unique identifier."
+      },
+      "ImageSpecificationFamily": {
+        "type": "object",
+        "properties": {
+          "family": {
+            "type": "string",
+            "description": "The family name of the image."
+          }
+        },
+        "required": [
+          "family"
+        ],
+        "title": "ImageSpecificationFamily",
+        "description": "Specifies the image to use by its family name."
+      },
+      "RequestedTagEntry": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 55,
+            "pattern": "^[a-z][a-z0-9-:]+$",
+            "description": "The key of the tag.",
+            "examples": [
+              "key1"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "The value of the tag.",
+            "examples": [
+              "value1"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "RequestedTagEntry"
+      },
+      "ApiErrorInvalidBillingAddress": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/invalid-address",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "Your billing address is invalid.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "default": "Make sure your billing address is valid. Contact Support if problems continue.",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "suggestion"
+        ],
+        "title": "ApiErrorInvalidBillingAddress"
+      },
+      "InstanceLaunchResponse": {
+        "type": "object",
+        "properties": {
+          "instance_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The unique identifiers (IDs) of the launched instances.",
+            "examples": [
+              [
+                "0920582c7ff041399e34823a0be62549"
+              ]
+            ]
+          }
+        },
+        "required": [
+          "instance_ids"
+        ],
+        "title": "InstanceLaunchResponse"
+      },
+      "ApiErrorFileSystemInWrongRegion": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "instance-operations/launch/file-system-in-wrong-region",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ApiErrorFileSystemInWrongRegion"
+      },
+      "ApiErrorInsufficientCapacity": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "instance-operations/launch/insufficient-capacity",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "Not enough capacity to fulfill launch request.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ApiErrorInsufficientCapacity"
+      },
+      "ApiErrorLaunchResourceNotFound": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/object-does-not-exist",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "description": "The resource the API was unable to find."
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "suggestion"
+        ],
+        "title": "ApiErrorLaunchResourceNotFound"
+      },
+      "ApiErrorQuotaExceeded": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/quota-exceeded",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "Quota exceeded.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "default": "Contact Support to increase your quota.",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "suggestion"
+        ],
+        "title": "ApiErrorQuotaExceeded"
+      },
+      "InstanceRestartResponse": {
+        "type": "object",
+        "properties": {
+          "restarted_instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Instance"
+            },
+            "description": "The list of instances that were successfully restarted."
+          }
+        },
+        "required": [
+          "restarted_instances"
+        ],
+        "title": "InstanceRestartResponse"
+      },
+      "InstanceTerminateResponse": {
+        "type": "object",
+        "properties": {
+          "terminated_instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Instance"
+            },
+            "description": "The list of instances that were successfully terminated."
+          }
+        },
+        "required": [
+          "terminated_instances"
+        ],
+        "title": "InstanceTerminateResponse"
+      },
+      "SSHKey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier (ID) of the SSH key.",
+            "examples": [
+              "ddf9a910ceb744a0bb95242cbba6cb50"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The name of the SSH key.",
+            "examples": [
+              "my-public-key"
+            ]
+          },
+          "public_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "The public key for the SSH key.",
+            "examples": [
+              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICN+lJwsONkwrdsSnQsu1ydUkIuIg5oOC+Eslvmtt60T noname"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "public_key"
+        ],
+        "title": "SSHKey",
+        "description": "Information about a stored SSH key, which can be used to access instances over\nSSH."
+      },
+      "GeneratedSSHKey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier (ID) of the SSH key.",
+            "examples": [
+              "ddf9a910ceb744a0bb95242cbba6cb50"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The name of the SSH key.",
+            "examples": [
+              "my-public-key"
+            ]
+          },
+          "public_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "The public key for the SSH key.",
+            "examples": [
+              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICN+lJwsONkwrdsSnQsu1ydUkIuIg5oOC+Eslvmtt60T noname"
+            ]
+          },
+          "private_key": {
+            "type": "string",
+            "description": "The private key generated in the SSH key pair. Make sure to store a\ncopy of this key locally, as Lambda does not store the key server-side.",
+            "examples": [
+              "-----BEGIN RSA PRIVATE KEY-----\\nMIIEoAIBAAKCAQEAmTi0yMd35HkIKXgEAVLb14fE094YL5qgGqS5ayq9SHi72mlf\\np0hvMr9dqI1wVELRC6cqNYJio9B031gG3dGI3IMpxLzRptYPOmwXIN+jagV40Pzc\\nz6dExtn1OhFwJKlppoPj/2j0QXHSP7dHmRxmlkaQVZs7qy+twkcckMmHU7g9M3dP\\n89P0sQk6xWYX8lF+0bRv/VpNwBcFQfmy36xHpMgIq8hLlBaOZd2fti5jXrQaGOto\\nZo3gI7QLAY9YyFmfRLutBM+F+9ArvhYdYolroJOv8EvEIpN8cljn21WLH6plL22E\\ncLToH66+t0wcCYDHpqKZ/sLLzcjH6kxIgp/mJQIDAQABAoH/HJqr17uwEhg1vPhT\\nGoG6+Snzp45xVGCCT25odw3ERZmX8R6YZSgqtB8rDd2wFnJ53wrHvgePS6Pw63wg\\nRNi7DsX9nToEocY30kowbrezO9Qom7X4DSJwllinRY1pJy+10AWyjDzCZV5UpBHq\\n/M53W0M4rtPjGpgBSevuRVLym8PRMJAF4/YMKSOGN6grNmmBjsqCRw23Cps6ZiK9\\noE7V2UTcMK6WzPiPCbW1KxLoCx0ihdGH5q8Vj/lsRflKLpKVA9QUNCBXlnFzgEYh\\nYK7RGN0zmmITyQfvjdthvCFyMQJ4V2ccxVxa52zqN04Ywvy/HC1mhS9iy6wSSCtP\\nm2xTAoGBANciuYrof8Z3BWOXLBCsDvBYWzLs+wyIoi0SujVGSl9k9ThrahYTtbxq\\nnEKofeYP5gOzqeNGiKveIW8ZFqtiNNe36zSts6h3nndMKBLB92tGWjSG4yRDC7Tp\\nT0okUAkSDnDNwWONx0vhqdoNiLEIVvCp2HCCTCSxbHHOJcAAYtufAoGBALZTUaZz\\nUxF/WCICbxb9dABqk4hKLUe/3Hwhzb5e1PKTGnWesbnDIkIHqNx86MEcYaQQSGzW\\nZ/zBTUsbOC5qZt0UOuMeXiAb7cmwOEx4hiBYkEt/2xCKqQWNVnSY+4LLpGNZanFE\\nTVKZ5QB2oYNiJ3Lby16YStvRBzGc1TTQo+e7AoGAP4eAlRWNTfUtwTgOCipVCwJ8\\ng/BZPl1Gztqd5EeKhNsSUwPdQwG1BBvTYxfQfdSqDuPKQlQ83cvtwZn+CMQqaJ1m\\nNpso15HjWMVDfC6NOr9+uc4vWzD1TwoqoPFSNSuA2izYc+aVOMI93ydp+yVETzNI\\nuAiyJY/DP2Qp36X9i28CgYAlWUIDl+IvVmfGZ7s7+WV25F4ecBuAdCQFZaNQ2PpE\\nSrAD4iNEC14MKqeDqy6+yEKUKiW77dvVYf+kYAoNMAysQwWhGsprR21ZgHi36YSI\\nQbwlSyaj59Oh6IcKUYBMFc0x8NImK7ivMAlCJAsH7+Zm1/F8CjRjfRk9J4RhUlAR\\nGwKBgC4g7eZ/3fBBlL+eMxhCwK2QDS5E0emVI42676hhXAixPJ3PFePXWUmCFsXd\\nB1gDj7SR7h5nefoxjesCTwcf/rV+MPukjot6C9tEHhAJt7bDUelW9XOULwuEDWfL\\nCfG/iBa8YIxol5pw39I73/M+TF49EIDuq0ihXUHyap8MdpZs\\n-----END RSA PRIVATE KEY-----\\n"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "public_key",
+          "private_key"
+        ],
+        "title": "GeneratedSSHKey",
+        "description": "Information about a server-generated SSH key, which can be used to access instances over\nSSH."
+      },
+      "EmptyResponse": {
+        "type": "object",
+        "properties": {},
+        "title": "EmptyResponse"
+      },
+      "UserStatus": {
+        "title": "UserStatus",
+        "description": "Status of the user's account.",
+        "enum": [
+          "active",
+          "deactivated"
+        ],
+        "type": "string"
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier for the user.",
+            "examples": [
+              "3da5a70a57a7422ea8a7203f98b2198b"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address of the user.",
+            "examples": [
+              "me@example.com"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus",
+            "description": "The status of the user's account."
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "status"
+        ],
+        "title": "User",
+        "description": "Information about a user in your Team."
+      },
+      "Filesystem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier (ID) of the filesystem.",
+            "examples": [
+              "398578a2336b49079e74043f0bd2cfe8"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the filesystem.",
+            "examples": [
+              "my-filesystem"
+            ]
+          },
+          "mount_point": {
+            "type": "string",
+            "description": "The DEFAULT absolute path indicating where on instances the filesystem will be mounted.\nIf `file_system_mounts` were used at launch time, the actual mount point is in the\ninstance response.",
+            "examples": [
+              "/lambda/nfs/my-filesystem"
+            ]
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time at which the filesystem was created. Formatted as an ISO 8601 timestamp."
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/User",
+            "description": "The user in your Team that created the filesystem."
+          },
+          "is_in_use": {
+            "type": "boolean",
+            "description": "Whether the filesystem is currently mounted to an instance. Filesystems that\nare mounted cannot be deleted."
+          },
+          "region": {
+            "$ref": "#/components/schemas/Region",
+            "description": "The region in which the filesystem is deployed."
+          },
+          "bytes_used": {
+            "type": "integer",
+            "description": "The approximate amount of storage used by the filesystem in bytes. This estimate is\nupdated every few hours."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "mount_point",
+          "created",
+          "created_by",
+          "is_in_use",
+          "region"
+        ],
+        "title": "Filesystem",
+        "description": "Information about a shared filesystem."
+      },
+      "ApiErrorDuplicate": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/duplicate",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ApiErrorDuplicate"
+      },
+      "FilesystemDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "deleted_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The unique identifiers of the filesystems that were deleted.",
+            "examples": [
+              [
+                "398578a2336b49079e74043f0bd2cfe8"
+              ]
+            ]
+          }
+        },
+        "required": [
+          "deleted_ids"
+        ],
+        "title": "FilesystemDeleteResponse"
+      },
+      "ApiErrorFilesystemNotFound": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/object-does-not-exist",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "Filesystem was not found.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ApiErrorFilesystemNotFound"
+      },
+      "ApiErrorFilesystemInUse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "filesystems/filesystem-in-use",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ApiErrorFilesystemInUse"
+      },
+      "ImageArchitecture": {
+        "title": "ImageArchitecture",
+        "enum": [
+          "x86_64",
+          "arm64"
+        ],
+        "type": "string"
+      },
+      "Image": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier (ID) for an image.",
+            "examples": [
+              "43336648-096d-4cba-9aa2-f9bb7727639d"
+            ]
+          },
+          "created_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time that the image was created."
+          },
+          "updated_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time that the image was last updated."
+          },
+          "name": {
+            "type": "string",
+            "description": "The human-readable identifier for an image.",
+            "examples": [
+              "ubuntu-24.04.01"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "Additional information about the image.",
+            "examples": [
+              "Ubuntu LTS"
+            ]
+          },
+          "family": {
+            "type": "string",
+            "description": "The family the image belongs to.",
+            "examples": [
+              "ubuntu-lts"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "description": "The image version.",
+            "examples": [
+              "24.04.01"
+            ]
+          },
+          "architecture": {
+            "$ref": "#/components/schemas/ImageArchitecture",
+            "description": "The CPU architecture the image supports."
+          },
+          "region": {
+            "$ref": "#/components/schemas/Region",
+            "description": "The region in which this image is available."
+          }
+        },
+        "required": [
+          "id",
+          "created_time",
+          "updated_time",
+          "name",
+          "description",
+          "family",
+          "version",
+          "architecture",
+          "region"
+        ],
+        "title": "Image",
+        "description": "An available machine image in Lambda Cloud."
+      },
+      "NetworkProtocol": {
+        "title": "NetworkProtocol",
+        "enum": [
+          "tcp",
+          "udp",
+          "icmp",
+          "all"
+        ],
+        "type": "string"
+      },
+      "FirewallRule": {
+        "type": "object",
+        "properties": {
+          "protocol": {
+            "$ref": "#/components/schemas/NetworkProtocol",
+            "description": "The protocol to which the rule applies.",
+            "examples": [
+              "tcp"
+            ]
+          },
+          "port_range": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "maximum": 65535,
+              "minimum": 1
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "An inclusive range of network ports specified as `[min, max]`.\nNot allowed for the `icmp` protocol but required for the others.\n\nTo specify a single port, list it twice (for example, `[22,22]`).",
+            "examples": [
+              [
+                22,
+                22
+              ]
+            ]
+          },
+          "source_network": {
+            "type": "string",
+            "format": "ipv4network",
+            "description": "The set of source IPv4 addresses from which you want to allow inbound\ntraffic. These addresses must be specified in CIDR notation. You can\nspecify individual public IPv4 CIDR blocks such as `1.2.3.4` or\n`1.2.3.4/32`, or you can specify `0.0.0.0/0` to allow access from any\naddress.\n\nThis value is a string consisting of a public IPv4 address optionally\nfollowed by a slash (/) and an integer mask (the network prefix).\nIf no mask is provided, the API assumes `/32` by default.",
+            "examples": [
+              "0.0.0.0/0"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 128,
+            "description": "A human-readable description of the rule.",
+            "examples": [
+              "Allow SSH from anywhere"
+            ]
+          }
+        },
+        "required": [
+          "protocol",
+          "source_network",
+          "description"
+        ],
+        "title": "FirewallRule"
+      },
+      "FirewallRuleset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of the firewall ruleset.",
+            "examples": [
+              "c4d291f47f9d436fa39f58493ce3b50d"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the firewall ruleset.",
+            "examples": [
+              "My Firewall Ruleset"
+            ]
+          },
+          "region": {
+            "$ref": "#/components/schemas/Region",
+            "description": "The region in which the firewall ruleset is deployed."
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FirewallRule"
+            },
+            "description": "The list of firewall rules in this ruleset."
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time at which the firewall ruleset was created. Formatted as an ISO 8601 timestamp."
+          },
+          "instance_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The IDs of instances this firewall ruleset is associated with."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "region",
+          "rules",
+          "created",
+          "instance_ids"
+        ],
+        "title": "FirewallRuleset",
+        "description": "A collection of firewall rules that can be associated with instances."
+      },
+      "ApiErrorInternal": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/internal-error",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "An internal server error occurred.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "default": "Try again later. Contact Support if the problem persists.",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "suggestion"
+        ],
+        "title": "ApiErrorInternal"
+      },
+      "GlobalFirewallRuleset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "const": "global",
+            "type": "string",
+            "description": "The unique identifier of the firewall ruleset.",
+            "examples": [
+              "global"
+            ]
+          },
+          "name": {
+            "const": "Global Firewall Rules",
+            "type": "string",
+            "description": "The name of the firewall ruleset.",
+            "examples": [
+              "Global Firewall Rules"
+            ]
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FirewallRule"
+            },
+            "description": "The list of firewall rules in this ruleset."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "rules"
+        ],
+        "title": "GlobalFirewallRuleset",
+        "description": "Legacy type for the global firewall ruleset, now the default workspace."
+      },
+      "ApiErrorFirewallRulesetNotFound": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "global/object-does-not-exist",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "Firewall ruleset does not exist or you do not have permission to access it.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "default": "Check your firewall ruleset ID and try again.",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "suggestion"
+        ],
+        "title": "ApiErrorFirewallRulesetNotFound"
+      },
+      "ApiErrorFirewallRulesetInUse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "const": "firewall-rulesets/firewall-ruleset-in-use",
+            "type": "string",
+            "description": "The unique identifier for the type of error."
+          },
+          "message": {
+            "type": "string",
+            "default": "Firewall ruleset is in use by one or more instances.",
+            "description": "A description of the error."
+          },
+          "suggestion": {
+            "type": "string",
+            "default": "Terminate all instances that are using the ruleset before deleting it.",
+            "description": "One or more suggestions of possible ways to fix the error."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "suggestion"
+        ],
+        "title": "ApiErrorFirewallRulesetInUse"
+      },
+      "AuditEvent": {
+        "type": "object",
+        "properties": {
+          "service_name": {
+            "type": "string",
+            "description": "The service in which the action was performed.",
+            "examples": [
+              "cloud"
+            ]
+          },
+          "resource_name": {
+            "type": "string",
+            "description": "The type of resource that was affected.",
+            "examples": [
+              "api_key"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "The action that was performed.",
+            "examples": [
+              "created"
+            ]
+          },
+          "catalog_version": {
+            "type": "string",
+            "description": "The version of the event catalog schema.",
+            "examples": [
+              "2025-09-06"
+            ]
+          },
+          "event_id": {
+            "type": "string",
+            "description": "The unique identifier (ID) for this audit event.",
+            "examples": [
+              "0123456789abcdef0123456789abcdef"
+            ]
+          },
+          "event_time": {
+            "type": "string",
+            "description": "The UTC timestamp for when the event occurred (ISO 8601 format).",
+            "examples": [
+              "2025-09-15T10:30:45.123456Z"
+            ]
+          },
+          "actor_lrn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Lambda Resource Name (LRN) of the actor who performed the action.",
+            "examples": [
+              "lrn:cloud:identity:00112233445566778899aabbccddeeff"
+            ]
+          },
+          "resource_lrns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The Lambda Resource Names (LRNs) of the resources affected by this action.",
+            "examples": [
+              [
+                "lrn:cloud:api_key:ffeeddccbbaa99887766554433221100"
+              ]
+            ]
+          },
+          "resource_owner_lrn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Lambda Resource Name (LRN) of the account that owns the affected resources.",
+            "examples": [
+              "lrn:cloud:account:fedcba9876543210fedcba9876543210"
+            ]
+          },
+          "request_api_key_lrn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Lambda Resource Name (LRN) of the API key used to authenticate the request, if applicable.",
+            "examples": [
+              "lrn:cloud:api_key:0f1e2d3c4b5a69788796a5b4c3d2e1f0"
+            ]
+          },
+          "additional_details": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Additional event-specific details. The exact keys returned vary by event type.",
+            "properties": {},
+            "examples": [
+              {
+                "api_key_lrn": "lrn:cloud:api_key:ffeeddccbbaa99887766554433221100"
+              },
+              {
+                "ssh_key_lrn": "lrn:cloud:ssh_key:fedc7654ba983210dcba5432987610fe"
+              },
+              {
+                "instance_lrn": "lrn:cloud:instance:ef016789234abcd0123489ab4567cdef",
+                "instance_type": "gpu_1x_a10",
+                "region": "us-west-1"
+              }
+            ]
+          }
+        },
+        "required": [
+          "service_name",
+          "resource_name",
+          "action",
+          "catalog_version",
+          "event_id",
+          "event_time",
+          "actor_lrn",
+          "resource_lrns",
+          "resource_owner_lrn",
+          "request_api_key_lrn",
+          "additional_details"
+        ],
+        "title": "AuditEvent",
+        "description": "Audit event in the account's audit log. To view the full catalog of\npossible audit events, visit\n[Access and security > Audit logs](https://docs.lambda.ai/public-cloud/access-security#audit-logs)\nin the Lambda Cloud documentation."
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "description": "Bearer HTTP authentication. Allowed headers:\n  * `Authorization: Bearer <api_key>`",
+        "scheme": "bearer"
+      },
+      "basicAuth": {
+        "type": "http",
+        "description": "Basic HTTP authentication. Allowed headers:\n  * `Authorization: Basic <base64 encoding of api_key>:`\n  * `Authorization: Basic <api_key>`",
+        "scheme": "basic"
+      }
+    }
+  },
+  "x-lambda-api-keys-config-url": "https://cloud.lambda.ai/api-keys"
+}

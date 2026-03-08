@@ -1,0 +1,253 @@
+# Kubernetes Training Deployment Configuration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: training-deployment
+  namespace: default
+  labels:
+    app: training
+    component: ml-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: training
+      component: ml-workload
+  template:
+    metadata:
+      labels:
+        app: training
+        component: ml-workload
+    spec:
+      nodeSelector:
+        accelerator: nvidia-tesla-a100
+        node-type: p4d.24xlarge
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: training-container
+        image: pytorch/pytorch:latest
+        command: ["python", "train.py"]
+        env:
+        - name: PYTHONPATH
+          value: "/workspace"
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: BATCH_SIZE
+          value: "32"
+        - name: LEARNING_RATE
+          value: "0.001"
+        - name: EPOCHS
+          value: "10"
+        resources:
+          limits:
+            nvidia.com/gpu: "1"
+            cpu: "8"
+            memory: "32Gi"
+          requests:
+            nvidia.com/gpu: "1"
+            cpu: "4"
+            memory: "16Gi"
+        volumeMounts:
+        - name: workspace-volume
+          mountPath: /workspace
+        - name: data-volume
+          mountPath: /data
+        - name: model-volume
+          mountPath: /models
+      volumes:
+      - name: workspace-volume
+        persistentVolumeClaim:
+          claimName: workspace-pvc
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: data-pvc
+      - name: model-volume
+        persistentVolumeClaim:
+          claimName: model-pvc
+      restartPolicy: Always
+---
+# Service for Training Deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: training-service
+  namespace: default
+  labels:
+    app: training
+    component: ml-workload
+spec:
+  selector:
+    app: training
+    component: ml-workload
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: jupyter
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+  type: ClusterIP
+---
+# Persistent Volume Claims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workspace-pvc
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: gp2
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-pvc
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: gp2
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-pvc
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: gp2
+---
+# ConfigMap for Training Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: training-config
+  namespace: default
+data:
+  config.yaml: |
+    model:
+      name: "resnet50"
+      pretrained: true
+      num_classes: 1000
+    training:
+      batch_size: 32
+      learning_rate: 0.001
+      epochs: 10
+      optimizer: "adam"
+      scheduler: "cosine"
+    data:
+      dataset: "imagenet"
+      data_dir: "/data"
+      num_workers: 4
+    logging:
+      log_dir: "/workspace/logs"
+      tensorboard_port: 6006
+      wandb_project: "kubernetes-training"
+---
+# Secret for Training Credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: training-secrets
+  namespace: default
+type: Opaque
+data:
+  # Base64 encoded values
+  aws_access_key: ""
+  aws_secret_key: ""
+  huggingface_token: ""
+  wandb_api_key: ""
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: training-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: training-deployment
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: training-pdb
+  namespace: default
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: training
+      component: ml-workload
+---
+# Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: training-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: training
+      component: ml-workload
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8888
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: default
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: UDP
+      port: 53

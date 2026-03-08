@@ -1,0 +1,33 @@
+{
+  "transparency_demo": {
+    "timestamp": "2026-02-09T09:55:19.762662",
+    "version": "1.0.0",
+    "features": {
+      "permission_scopes": true,
+      "dry_run_modes": true,
+      "deterministic_decisions": true,
+      "rollback_pinning": true,
+      "audit_trail": true
+    },
+    "decision_engine": {
+      "decisions_made": 1,
+      "confidence_scores": [
+        0.6
+      ],
+      "avg_confidence": 0.6
+    },
+    "terraform_manager": {
+      "operations_total": 2,
+      "dry_runs": 1,
+      "plans": 1,
+      "applies": 0,
+      "rollbacks_available": 0
+    },
+    "audit_trail": {
+      "trails_total": 1,
+      "entries_total": 12,
+      "compliance_status": "compliant",
+      "avg_risk_score": 0.22000000000000003
+    }
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "pricing_analysis": {
+    "enterprise_price": {
+      "monthly_price": 299.99,
+      "hours_per_month": 675,
+      "max_gpus": 32,
+      "effective_hourly_rate": 0.4444296296296296
+    },
+    "best_savings_675": [
+      {
+        "provider": "azure",
+        "instance": "nd96asr_v4",
+        "hourly_rate": 48.96,
+        "gpus": 8,
+        "use_spot": false,
+        "cloud_monthly_675": 33048.0,
+        "terradev_monthly": 299.99,
+        "savings_675": 32748.01,
+        "savings_percent_675": 99.09225974340353,
+        "cloud_monthly_max": 1128038.4,
+        "terradev_equivalent": 10239.658666666666,
+        "savings_max": 1117798.7413333333,
+        "savings_percent_max": 99.09225974340355
+      },
+      {
+        "provider": "aws",
+        "instance": "g5.48xlarge",
+        "hourly_rate": 48.29,
+        "gpus": 8,
+        "use_spot": false,
+        "cloud_monthly_675": 32595.75,
+        "terradev_monthly": 299.99,
+        "savings_675": 32295.76,
+        "savings_percent_675": 99.0796652937883,
+        "cloud_monthly_max": 1112601.6,
+        "terradev_equivalent": 10239.658666666666,
+        "savings_max": 1102361.9413333335,
+        "savings_percent_max": 99.07966529378831
+      },
+      {
+        "provider": "gcp",
+        "instance": "a2-highgpu-8g",
+        "hourly_rate": 34.56,
+        "gpus": 8,
+        "use_spot": false,
+        "cloud_monthly_675": 23328.0,
+        "terradev_monthly": 299.99,
+        "savings_675": 23028.01,
+        "savings_percent_675": 98.71403463648834,
+        "cloud_monthly_max": 796262.4,
+        "terradev_equivalent": 10239.658666666666,
+        "savings_max": 786022.7413333333,
+        "savings_percent_max": 98.71403463648834
+      }
+    ],
+    "best_savings_max": [
+      {
+        "provider": "azure",
+        "instance": "nd96asr_v4",
+        "hourly_rate": 48.96,
+        "gpus": 8,
+        "use_spot": false,
+        "cloud_monthly_675": 33048.0,
+        "terradev_monthly": 299.99,
+        "savings_675": 32748.01,
+        "savings_percent_675": 99.09225974340353,
+        "cloud_monthly_max": 1128038.4,
+        "terradev_equivalent": 10239.658666666666,
+        "savings_max": 1117798.7413333333,
+        "savings_percent_max": 99.09225974340355
+      },
+      {
+        "provider": "aws",
+        "instance": "g5.48xlarge",
+        "hourly_rate": 48.29,
+        "gpus": 8,
+        "use_spot": false,
+        "cloud_monthly_675": 32595.75,
+        "terradev_monthly": 299.99,
+        "savings_675": 32295.76,
+        "savings_percent_675": 99.0796652937883,
+        "cloud_monthly_max": 1112601.6,
+        "terradev_equivalent": 10239.658666666666,
+        "savings_max": 1102361.9413333335,
+        "savings_percent_max": 99.07966529378831
+      },
+      {
+        "provider": "gcp",
+        "instance": "a2-highgpu-8g",
+        "hourly_rate": 34.56,
+        "gpus": 8,
+        "use_spot": false,
+        "cloud_monthly_675": 23328.0,
+        "terradev_monthly": 299.99,
+        "savings_675": 23028.01,
+        "savings_percent_675": 98.71403463648834,
+        "cloud_monthly_max": 796262.4,
+        "terradev_equivalent": 10239.658666666666,
+        "savings_max": 786022.7413333333,
+        "savings_percent_max": 98.71403463648834
+      }
+    ],
+    "avg_savings_percent": 49.371427034257565
+  },
+  "tam_analysis": {
+    "segments": [
+      {
+        "segment": "ai_startups",
+        "description": "Early-stage AI companies needing GPU compute",
+        "total_companies": 10000,
+        "adoption_rate": 0.15,
+        "potential_customers": 1500.0,
+        "avg_monthly_spend": 5000,
+        "annual_revenue": 5399820.0
+      },
+      {
+        "segment": "ml_teams_enterprise",
+        "description": "Enterprise ML teams in Fortune 500",
+        "total_companies": 5000,
+        "adoption_rate": 0.08,
+        "potential_customers": 400.0,
+        "avg_monthly_spend": 15000,
+        "annual_revenue": 1439952.0
+      },
+      {
+        "segment": "research_labs",
+        "description": "Academic and research institutions",
+        "total_companies": 2000,
+        "adoption_rate": 0.2,
+        "potential_customers": 400.0,
+        "avg_monthly_spend": 8000,
+        "annual_revenue": 1439952.0
+      },
+      {
+        "segment": "data_science_consultants",
+        "description": "Consulting firms offering ML services",
+        "total_companies": 3000,
+        "adoption_rate": 0.12,
+        "potential_customers": 360.0,
+        "avg_monthly_spend": 3000,
+        "annual_revenue": 1295956.8
+      },
+      {
+        "segment": "hedge_funds",
+        "description": "Quantitative trading firms",
+        "total_companies": 500,
+        "adoption_rate": 0.25,
+        "potential_customers": 125.0,
+        "avg_monthly_spend": 25000,
+        "annual_revenue": 449985.0
+      }
+    ],
+    "total_tam": 10025665.8
+  },
+  "recommendations": {
+    "pricing_competitive": false,
+    "first_year_revenue": 179994.0,
+    "target_segments": [
+      "research_labs",
+      "ai_startups",
+      "hedge_funds"
+    ]
+  }
+}

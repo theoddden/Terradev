@@ -1,0 +1,33 @@
+include README_PYPI.md
+include README.md
+include LICENSE
+include CHANGELOG.md
+include requirements*.txt
+include pyproject.toml
+include setup.py
+
+# Include configuration files
+recursive-include terradev/templates *.yaml *.json *.yml
+recursive-include terradev/config *.yaml *.json *.yml
+recursive-include terradev/data *.json *.yaml *.yml
+
+# Include documentation
+recursive-include docs *.md *.txt *.png *.jpg *.svg
+
+# Include tests (optional, for source distributions)
+recursive-include tests *.py
+
+# Exclude development files
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__
+global-exclude .git*
+global-exclude .DS_Store
+global-exclude *.so
+global-exclude .coverage
+global-exclude .pytest_cache
+global-exclude .mypy_cache
+global-exclude .tox
+global-exclude build
+global-exclude dist

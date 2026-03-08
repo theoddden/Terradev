@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  terradev-cli:
+    build: .
+    image: theoddden/terradev-cli:2.9.2
+    container_name: terradev-cli
+    environment:
+      - TERRADEV_API_URL=https://api.terradev.cloud
+      - TERRADEV_FALLBACK_URL=http://34.207.59.52:8080
+    volumes:
+      - ~/.aws:/home/terradev/.aws:ro
+      - ~/.gcp:/home/terradev/.gcp:ro
+      - ~/.azure:/home/terradev/.azure:ro
+      - ./config:/home/terradev/.terradev
+    ports:
+      - "8000:8000"
+      - "8080:8080"
+      - "8888:8888"
+    command: python -m terradev_cli status
+    restart: unless-stopped
+
+  terradev-jupyter:
+    build: .
+    image: theoddden/terradev-cli:2.9.2
+    container_name: terradev-jupyter
+    environment:
+      - TERRADEV_API_URL=https://api.terradev.cloud
+      - TERRADEV_FALLBACK_URL=http://34.207.59.52:8080
+    volumes:
+      - ./notebooks:/home/terradev/notebooks
+      - ~/.aws:/home/terradev/.aws:ro
+      - ~/.gcp:/home/terradev/.gcp:ro
+      - ~/.azure:/home/terradev/.azure:ro
+      - ./config:/home/terradev/.terradev
+    ports:
+      - "8888:8888"
+    command: >
+      bash -c "
+        pip install jupyterlab &&
+        jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''
+      "
+    restart: unless-stopped
+
+  terradev-api:
+    build: .
+    image: theoddden/terradev-cli:2.9.2
+    container_name: terradev-api
+    environment:
+      - TERRADEV_API_URL=https://api.terradev.cloud
+      - TERRADEV_FALLBACK_URL=http://34.207.59.52:8080
+      - FLASK_ENV=production
+    volumes:
+      - ~/.aws:/home/terradev/.aws:ro
+      - ~/.gcp:/home/terradev/.gcp:ro
+      - ~/.azure:/home/terradev/.azure:ro
+      - ./config:/home/terradev/.terradev
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "
+        pip install flask &&
+        python -c '
+        from flask import Flask, jsonify
+        import subprocess
+        import json
+        
+        app = Flask(__name__)
+        
+        @app.route(\"/health\")
+        def health():
+            return jsonify({\"status\": \"healthy\"})
+        
+        @app.route(\"/quote/<gpu_type>\")
+        def quote(gpu_type):
+            try:
+                result = subprocess.run([\"python\", \"-m\", \"terradev_cli\", \"quote\", \"-g\", gpu_type], 
+                                      capture_output=True, text=True)
+                return jsonify({\"gpu_type\": gpu_type, \"output\": result.stdout})
+            except Exception as e:
+                return jsonify({\"error\": str(e)}), 500
+        
+        app.run(host=\"0.0.0.0\", port=8080)
+        '
+      "
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: terradev
+      POSTGRES_USER: terradev
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -1,0 +1,423 @@
+# Terradev Production Configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+  resources: {}
+
+# Common Labels
+commonLabels:
+  app.kubernetes.io/name: terradev
+  app.kubernetes.io/instance: terradev-prod
+  app.kubernetes.io/managed-by: Helm
+
+# Image Configuration
+image:
+  registry: ghcr.io
+  repository: terradev/terradev
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# Replica Configuration
+replicaCount: 3
+
+# Resource Configuration
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+
+# Service Configuration
+service:
+  type: ClusterIP
+  ports:
+    http: 8080
+    grpc: 9090
+    metrics: 8081
+  annotations: {}
+  labels: {}
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+  hosts:
+    - host: api.terradev.io
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: terradev-tls
+      hosts:
+        - api.terradev.io
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: "gp3"
+  size: 100Gi
+  accessMode: ReadWriteOnce
+  annotations: {}
+
+# Database Configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: ""
+    existingSecret: "terradev-postgres-secret"
+    secretKeys:
+      adminPasswordKey: "postgres-password"
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: "gp3"
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: "gp3"
+
+# Redis Configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    existingSecret: "terradev-redis-secret"
+    existingSecretPasswordKey: "redis-password"
+  master:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: "gp3"
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: "gp3"
+
+# Monitoring Configuration
+prometheus:
+  enabled: true
+  server:
+    retention: 30d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: "gp3"
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 200Gi
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+
+grafana:
+  enabled: true
+  admin:
+    existingSecret: "terradev-grafana-secret"
+    userKey: "admin-user"
+    passwordKey: "admin-password"
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: "gp3"
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: "monitoring"
+    datasources:
+      enabled: true
+      searchNamespace: "monitoring"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+# Security Configuration
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+# Pod Security Context
+podSecurityContext:
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8081
+  egress:
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+        - protocol: UDP
+          port: 53
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  maxUnavailable: ""
+
+# Health Checks
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Startup Probe
+startupProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
+# Environment Variables
+env:
+  - name: ENVIRONMENT
+    value: "production"
+  - name: LOG_LEVEL
+    value: "INFO"
+  - name: METRICS_ENABLED
+    value: "true"
+  - name: TRACING_ENABLED
+    value: "true"
+
+# Secrets Management
+secrets:
+  - name: terradev-api-keys
+    stringData:
+      AWS_ACCESS_KEY_ID: ""
+      AWS_SECRET_ACCESS_KEY: ""
+      GCP_SERVICE_ACCOUNT_KEY: ""
+      AZURE_CLIENT_ID: ""
+      AZURE_CLIENT_SECRET: ""
+      RUNPOD_API_KEY: ""
+      LAMBDA_API_KEY: ""
+      COREWEAVE_API_KEY: ""
+      HUGGINGFACE_TOKEN: ""
+      VAST_API_KEY: ""
+  - name: terradev-database
+    stringData:
+      DATABASE_URL: ""
+      DATABASE_PASSWORD: ""
+  - name: terradev-redis
+    stringData:
+      REDIS_URL: ""
+      REDIS_PASSWORD: ""
+  - name: terradev-jwt
+    stringData:
+      JWT_SECRET: ""
+      JWT_REFRESH_SECRET: ""
+
+# ConfigMaps
+configMaps:
+  - name: terradev-config
+    data:
+      config.yaml: |
+        server:
+          port: 8080
+          host: "0.0.0.0"
+        database:
+          host: "terradev-postgresql"
+          port: 5432
+          name: "terradev"
+          ssl_mode: "require"
+        redis:
+          host: "terradev-redis-master"
+          port: 6379
+          db: 0
+        arbitrage:
+          providers: ["aws", "gcp", "azure", "runpod", "lambda", "coreweave"]
+          gpu_types: ["a100", "h100", "a10g", "rtx4090", "rtx3090"]
+          confidence_threshold: 0.8
+          max_risk_score: 0.3
+        monitoring:
+          prometheus:
+            enabled: true
+            port: 8081
+          tracing:
+            enabled: true
+            endpoint: "http://jaeger:14268/api/traces"
+        security:
+          jwt:
+            expiration: 3600
+            refresh_expiration: 604800
+          rate_limiting:
+            requests_per_minute: 100
+            burst: 200
+
+# Service Account Configuration
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ""
+    iam.gke.io/gcp-service-account: ""
+  name: "terradev"
+
+# RBAC Configuration
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "services", "configmaps", "secrets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["batch"]
+      resources: ["jobs"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "replicasets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Node Selector
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - terradev
+          topologyKey: kubernetes.io/hostname
+
+# Priority Class
+priorityClassName: ""
+
+# Termination Grace Period
+terminationGracePeriodSeconds: 30
+
+# Init Containers
+initContainers: []
+
+# Sidecars
+sidecars: []
+
+# Extra Labels
+extraLabels: {}
+
+# Extra Annotations
+extraAnnotations: {}
+
+# Volumes
+volumes: []
+
+# Volume Mounts
+volumeMounts: []
+
+# Pod Annotations
+podAnnotations: {}
+
+# Pod Labels
+podLabels: {}
+
+# Strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 25%

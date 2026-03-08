@@ -1,0 +1,50 @@
+name: 'Terradev CLI - GPU Cost Optimization'
+description: 'Cross-cloud GPU provisioning and cost optimization platform'
+author: 'theoddden'
+branding:
+  icon: 'cpu'
+  color: 'blue'
+inputs:
+  gpu_type:
+    description: 'GPU type to provision (A100, H100, V100, RTX4090, etc.)'
+    required: true
+    default: 'A100'
+  command:
+    description: 'Command to run (quote, provision, status, hf-space)'
+    required: true
+    default: 'quote'
+  duration_hours:
+    description: 'Duration for provision in hours'
+    required: false
+    default: '1'
+  cloud_provider:
+    description: 'Preferred cloud provider (aws, gcp, azure, runpod, lambda, etc.)'
+    required: false
+    default: 'auto'
+  region:
+    description: 'Preferred region for deployment'
+    required: false
+    default: 'auto'
+  huggingface_model:
+    description: 'HuggingFace model ID for Spaces deployment'
+    required: false
+    default: ''
+outputs:
+  pricing_data:
+    description: 'GPU pricing data across providers'
+  optimal_provider:
+    description: 'Recommended optimal provider'
+  estimated_cost:
+    description: 'Estimated cost for the workload'
+  deployment_url:
+    description: 'URL for deployed workload (if applicable)'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.command }}
+    - ${{ inputs.gpu_type }}
+    - ${{ inputs.duration_hours }}
+    - ${{ inputs.cloud_provider }}
+    - ${{ inputs.region }}
+    - ${{ inputs.huggingface_model }}

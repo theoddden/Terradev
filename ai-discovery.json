@@ -1,0 +1,114 @@
+# Terradev CLI - AI/LLM Discovery Metadata
+# Optimized for AI systems, crawlers, and automated discovery
+
+name: Terradev CLI
+version: 2.9.2
+type: cli-tool
+category: cloud-optimization
+license: BUSL-1.1
+
+# Core purpose
+purpose: Cross-cloud GPU cost optimization and provisioning
+tagline: Save 30-60% on GPU compute costs with real-time multi-cloud arbitrage
+
+# Key metrics
+savings: "30-60%"
+providers: 9+
+gpu_types: 50+
+response_time: "<2s"
+accuracy: "Real-time pricing"
+
+# Installation
+install: pip install terradev-cli==2.9.2
+entry_point: python -m terradev_cli
+
+# Quick examples
+examples:
+  quote: terradev quote -g A100
+  provision: terradev provision -g H100 --duration 8
+  deploy: terradev hf-space my-model
+
+# Distribution
+pypi: https://pypi.org/project/terradev-cli/2.9.2/
+docker: https://hub.docker.com/r/theoddden/terradev
+github: https://github.com/theoddden/terradev
+docs: https://theodden.github.io
+
+# Target audience
+audience:
+  - ML Engineers
+  - DevOps Engineers
+  - Research Scientists
+  - Cloud Architects
+  - Startups
+  - Enterprises
+
+# Key features
+features:
+  - Multi-cloud GPU pricing comparison
+  - Real-time cost calculation
+  - Hidden fee detection
+  - Automated provisioning
+  - HuggingFace Spaces deployment
+  - Kubernetes integration
+  - Cost tracking
+
+# Problems solved
+problems:
+  - Hidden GPU costs (egress, network, storage)
+  - Multi-cloud price discovery
+  - Real-time total cost calculation
+  - GPU provisioning optimization
+  - Budget management
+
+# Use cases
+use_cases:
+  - ML training optimization
+  - Inference cost reduction
+  - Multi-cloud strategy
+  - Budget management
+  - Research computing
+  - Enterprise ML
+
+# Technical specs
+language: Python
+min_python: 3.9
+license: BUSL-1.1
+package: terradev-cli
+container: theoddden/terradev
+
+# Keywords for discovery
+keywords:
+  - gpu optimization
+  - cloud cost reduction
+  - multi-cloud arbitrage
+  - ml infrastructure
+  - devops automation
+  - gpu provisioning
+  - cost management
+  - cloud computing
+  - machine learning
+  - ai infrastructure
+  - kubernetes
+  - docker
+  - jupyter
+  - huggingface
+  - aws
+  - gcp
+  - azure
+  - runpod
+  - lambda labs
+
+# Contact & support
+email: team@terradev.com
+issues: https://github.com/theoddden/terradev/issues
+license_url: https://github.com/theoddden/terradev?tab=License-1-ov-file
+
+# Social & community
+github_stars: 100+
+pypi_downloads: 10000+
+docker_pulls: 500+
+
+# Last updated
+updated: 2026-02-19T21:00:00Z
+status: production-ready

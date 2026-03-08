@@ -1,0 +1,119 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "terradev-cli"
+version = "2.0.0"
+description = "BYOAPI Parallel provisioning and orchestration for cross-cloud cost optimization with real-time analytics"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Terradev Team", email = "team@terradev.com"}
+]
+maintainers = [
+    {name = "Terradev Team", email = "team@terradev.com"}
+]
+keywords = [
+    "cloud",
+    "provisioning", 
+    "gpu",
+    "compute",
+    "multi-cloud",
+    "aws",
+    "gcp",
+    "azure",
+    "kubernetes",
+    "devops",
+    "infrastructure",
+    "automation",
+    "cost-optimization",
+    "parallel",
+    "egress",
+    "rate-limiting",
+    "arbitrage",
+    "telemetry",
+    "real-time",
+    "monitoring",
+    "dashboard",
+    "analytics"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9", 
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Natural Language :: English"
+]
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.0.0",
+    "aiohttp>=3.9.0",
+    "pyyaml>=6.0",
+    "cryptography>=41.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+aws = ["boto3>=1.34.0"]
+gcp = ["google-cloud-compute>=1.8.0"]
+azure = ["azure-mgmt-compute>=29.0.0", "azure-identity>=1.12.0"]
+all = [
+    "boto3>=1.34.0",
+    "google-cloud-compute>=1.8.0",
+    "azure-mgmt-compute>=29.0.0",
+    "azure-identity>=1.12.0",
+    "langchain>=0.1.0",
+    "langgraph>=0.0.20",
+    "sglang>=0.3.0",
+    "wandb>=0.16.0",
+    "mlflow>=2.8.0",
+    "huggingface-hub>=0.19.0",
+    "prometheus-client>=0.17.0",
+    "grafana-api>=1.0.3",
+]
+hf = [
+    "aiohttp>=3.9.0",
+    "huggingface-hub>=0.19.0",
+    "gradio>=4.0.0",
+    "streamlit>=1.28.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+    "build>=0.10.0",
+    "twine>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://terradev.cloud"
+Documentation = "https://docs.terradev.com"
+Repository = "https://github.com/terradev/terradev"
+"Bug Tracker" = "https://github.com/terradev/terradev/issues"
+Changelog = "https://github.com/terradev/terradev/blob/main/CHANGELOG.md"
+Analytics = "https://api.terradev.cloud/dashboard"
+
+[project.scripts]
+terradev = "terradev_cli.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["terradev_cli", "terradev_cli.*"]
+
+[tool.setuptools.package-data]
+terradev_cli = [
+    "templates/*.yaml",
+    "templates/*.json",
+    "config/*.json",
+]

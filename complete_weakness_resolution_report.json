@@ -1,0 +1,1336 @@
+{
+  "summary": {
+    "total_resolutions": 117,
+    "total_failures": 105,
+    "success_rate": 52.702702702702695,
+    "timestamp": "2026-02-09T04:57:33.475110"
+  },
+  "resolutions_by_type": {
+    "Code Quality": 95,
+    "Performance": 19,
+    "Architecture": 3
+  },
+  "detailed_resolutions": [
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/mock_runpod_data.py",
+      "type": "Code Quality",
+      "print_fixed": 21,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/microservices.py",
+      "type": "Code Quality",
+      "print_fixed": 4,
+      "exception_fixed": 1,
+      "function_fixed": 3
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform_controller.py",
+      "type": "Code Quality",
+      "print_fixed": 34,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_weakness_resolver.py",
+      "type": "Code Quality",
+      "print_fixed": 0,
+      "exception_fixed": 0,
+      "function_fixed": 3
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_runpod_working.py",
+      "type": "Code Quality",
+      "print_fixed": 25,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/github_api_integration.py",
+      "type": "Code Quality",
+      "print_fixed": 15,
+      "exception_fixed": 2,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/verify_critical_fixes.py",
+      "type": "Code Quality",
+      "print_fixed": 60,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_time_arbitrage_engine.py",
+      "type": "Code Quality",
+      "print_fixed": 15,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_saas_platform.py",
+      "type": "Code Quality",
+      "print_fixed": 38,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_parallel_provisioning.py",
+      "type": "Code Quality",
+      "print_fixed": 24,
+      "exception_fixed": 5,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_terminal_dashboard.py",
+      "type": "Code Quality",
+      "print_fixed": 2,
+      "exception_fixed": 0,
+      "function_fixed": 2
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/battle_test_analysis.py",
+      "type": "Code Quality",
+      "print_fixed": 70,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_production.py",
+      "type": "Code Quality",
+      "print_fixed": 6,
+      "exception_fixed": 2,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/latency_jitter_analyzer.py",
+      "type": "Code Quality",
+      "print_fixed": 8,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/working_google_api.py",
+      "type": "Code Quality",
+      "print_fixed": 15,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/advanced_parallel_provisioning.py",
+      "type": "Code Quality",
+      "print_fixed": 27,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/secure_gcp_setup.py",
+      "type": "Code Quality",
+      "print_fixed": 88,
+      "exception_fixed": 1,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_wrapper.py",
+      "type": "Code Quality",
+      "print_fixed": 3,
+      "exception_fixed": 1,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/enhanced_arbitrage_engine.py",
+      "type": "Code Quality",
+      "print_fixed": 48,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/simple_latency_oracle.py",
+      "type": "Code Quality",
+      "print_fixed": 14,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_aws_api.py",
+      "type": "Code Quality",
+      "print_fixed": 19,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/comprehensive_weakness_analysis.py",
+      "type": "Code Quality",
+      "print_fixed": 103,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/vast_gamma_engine.py",
+      "type": "Code Quality",
+      "print_fixed": 41,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/critical_weakness_fixer.py",
+      "type": "Code Quality",
+      "print_fixed": 0,
+      "exception_fixed": 0,
+      "function_fixed": 5
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_web.py",
+      "type": "Code Quality",
+      "print_fixed": 3,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/setup_oauth2_gcp.py",
+      "type": "Code Quality",
+      "print_fixed": 83,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_connect_card.py",
+      "type": "Code Quality",
+      "print_fixed": 31,
+      "exception_fixed": 0,
+      "function_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_hf_write_token.py",
+      "type": "Code Quality",
+      "print_fixed": 15,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_integration.py",
+      "type": "Code Quality",
+      "print_fixed": 7,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/setup_gcp_auth.py",
+      "type": "Code Quality",
+      "print_fixed": 37,
+      "exception_fixed": 0,
+      "function_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/price_volatility_engine.py",
+      "type": "Code Quality",
+      "print_fixed": 30,
+      "exception_fixed": 0,
+      "function_fixed": 4
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/simplified_garch_volatility.py",
+      "type": "Code Quality",
+      "print_fixed": 30,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/google_oauth_api.py",
+      "type": "Code Quality",
+      "print_fixed": 27,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/hf_limiting_circumvention.py",
+      "type": "Code Quality",
+      "print_fixed": 26,
+      "exception_fixed": 1,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/critical_fixes_final_report.py",
+      "type": "Code Quality",
+      "print_fixed": 138,
+      "exception_fixed": 1,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_arbitrage_engine.py",
+      "type": "Code Quality",
+      "print_fixed": 23,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/ultimate_circumvention.py",
+      "type": "Code Quality",
+      "print_fixed": 30,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_provider.py",
+      "type": "Code Quality",
+      "print_fixed": 10,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_cli.py",
+      "type": "Code Quality",
+      "print_fixed": 89,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_arbitrage_engine_all_providers.py",
+      "type": "Code Quality",
+      "print_fixed": 51,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_runpod_api.py",
+      "type": "Code Quality",
+      "print_fixed": 15,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/hf_integration.py",
+      "type": "Code Quality",
+      "print_fixed": 30,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_parallel.py",
+      "type": "Code Quality",
+      "print_fixed": 21,
+      "exception_fixed": 1,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/simple_volatility_spreads.py",
+      "type": "Code Quality",
+      "print_fixed": 89,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/vast_ai_integration.py",
+      "type": "Code Quality",
+      "print_fixed": 43,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/database_multicloud_integration.py",
+      "type": "Code Quality",
+      "print_fixed": 27,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_demo.py",
+      "type": "Code Quality",
+      "print_fixed": 47,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/comprehensive_weakness_finder.py",
+      "type": "Code Quality",
+      "print_fixed": 14,
+      "exception_fixed": 6,
+      "function_fixed": 5
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_runpod_fixed.py",
+      "type": "Code Quality",
+      "print_fixed": 25,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_credits.py",
+      "type": "Code Quality",
+      "print_fixed": 24,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/cloud_advisor_integration.py",
+      "type": "Code Quality",
+      "print_fixed": 24,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_battle_test.py",
+      "type": "Code Quality",
+      "print_fixed": 0,
+      "exception_fixed": 2,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_runpod_rest_api.py",
+      "type": "Code Quality",
+      "print_fixed": 22,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_terradev.py",
+      "type": "Code Quality",
+      "print_fixed": 17,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/spot_risk_manager.py",
+      "type": "Code Quality",
+      "print_fixed": 29,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_hf.py",
+      "type": "Code Quality",
+      "print_fixed": 1,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_training_engine.py",
+      "type": "Code Quality",
+      "print_fixed": 36,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/advanced_risk_engine.py",
+      "type": "Code Quality",
+      "print_fixed": 26,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/phase_based_circumvention.py",
+      "type": "Code Quality",
+      "print_fixed": 10,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/oci_integration.py",
+      "type": "Code Quality",
+      "print_fixed": 14,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_deployment.py",
+      "type": "Code Quality",
+      "print_fixed": 35,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_webapp.py",
+      "type": "Code Quality",
+      "print_fixed": 0,
+      "exception_fixed": 0,
+      "function_fixed": 2
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production_readiness_assessment.py",
+      "type": "Code Quality",
+      "print_fixed": 12,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/advanced-race-detector.py",
+      "type": "Code Quality",
+      "print_fixed": 1,
+      "exception_fixed": 1,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/race-detector.py",
+      "type": "Code Quality",
+      "print_fixed": 9,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/scripts/smart_cancellation_with_cost.py",
+      "type": "Code Quality",
+      "print_fixed": 13,
+      "exception_fixed": 0,
+      "function_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/scripts/content_aware_race_detector.py",
+      "type": "Code Quality",
+      "print_fixed": 9,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/scripts/cost_accounting.py",
+      "type": "Code Quality",
+      "print_fixed": 15,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/finops/attribution-engine.py",
+      "type": "Code Quality",
+      "print_fixed": 3,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/finops/granular-cost-tracker.py",
+      "type": "Code Quality",
+      "print_fixed": 2,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/finops/unified-billing-aggregator.py",
+      "type": "Code Quality",
+      "print_fixed": 2,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/finops/tenant-billing-engine.py",
+      "type": "Code Quality",
+      "print_fixed": 3,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/finops/multi-tenant-cost-allocator.py",
+      "type": "Code Quality",
+      "print_fixed": 4,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/config/production_config.py",
+      "type": "Code Quality",
+      "print_fixed": 23,
+      "exception_fixed": 0,
+      "function_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/security/auth_middleware.py",
+      "type": "Code Quality",
+      "print_fixed": 20,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/integration/latency-arbitrage-engine.py",
+      "type": "Code Quality",
+      "print_fixed": 16,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tests/conftest.py",
+      "type": "Code Quality",
+      "print_fixed": 0,
+      "exception_fixed": 0,
+      "function_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tests/performance/benchmark_arbitrage.py",
+      "type": "Code Quality",
+      "print_fixed": 42,
+      "exception_fixed": 1,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/integrations/cloud-provider-apis.py",
+      "type": "Code Quality",
+      "print_fixed": 2,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/examples/ml-training/training-script.py",
+      "type": "Code Quality",
+      "print_fixed": 0,
+      "exception_fixed": 0,
+      "function_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/cost-tracker.py",
+      "type": "Code Quality",
+      "print_fixed": 9,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/query-gpu.py",
+      "type": "Code Quality",
+      "print_fixed": 41,
+      "exception_fixed": 0,
+      "function_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/arbitrage-engine.py",
+      "type": "Code Quality",
+      "print_fixed": 1,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/b2b-roi-calculator.py",
+      "type": "Code Quality",
+      "print_fixed": 2,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/environment-generator.py",
+      "type": "Code Quality",
+      "print_fixed": 41,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/data-manager.py",
+      "type": "Code Quality",
+      "print_fixed": 22,
+      "exception_fixed": 0,
+      "function_fixed": 2
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/secret_rotation.py",
+      "type": "Code Quality",
+      "print_fixed": 8,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/gpu-volatility-index.py",
+      "type": "Code Quality",
+      "print_fixed": 4,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production/performance_optimization.py",
+      "type": "Code Quality",
+      "print_fixed": 12,
+      "exception_fixed": 0,
+      "function_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production/error_handling.py",
+      "type": "Code Quality",
+      "print_fixed": 10,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production/terradev_webapp_fixed.py",
+      "type": "Code Quality",
+      "print_fixed": 0,
+      "exception_fixed": 0,
+      "function_fixed": 2
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/inference/inference-arbitrage-engine.py",
+      "type": "Code Quality",
+      "print_fixed": 9,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/monitoring/observability_stack.py",
+      "type": "Code Quality",
+      "print_fixed": 3,
+      "exception_fixed": 2,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/modules/finops/scripts/token_optimizer.py",
+      "type": "Code Quality",
+      "print_fixed": 1,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/cost_management/cost_optimizer.py",
+      "type": "Code Quality",
+      "print_fixed": 6,
+      "exception_fixed": 0,
+      "function_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production_readiness_assessment_fixed.py",
+      "type": "Performance",
+      "io_fixed": 2,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/github_api_integration.py",
+      "type": "Performance",
+      "io_fixed": 4,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/secure_gcp_setup.py",
+      "type": "Performance",
+      "io_fixed": 8,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/simple_latency_oracle.py",
+      "type": "Performance",
+      "io_fixed": 1,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/vast_gamma_engine.py",
+      "type": "Performance",
+      "io_fixed": 0,
+      "loop_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/setup_oauth2_gcp.py",
+      "type": "Performance",
+      "io_fixed": 9,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_connect_card.py",
+      "type": "Performance",
+      "io_fixed": 10,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_demo.py",
+      "type": "Performance",
+      "io_fixed": 0,
+      "loop_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_battle_test.py",
+      "type": "Performance",
+      "io_fixed": 5,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_training_engine.py",
+      "type": "Performance",
+      "io_fixed": 1,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/oci_integration.py",
+      "type": "Performance",
+      "io_fixed": 0,
+      "loop_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_deployment.py",
+      "type": "Performance",
+      "io_fixed": 0,
+      "loop_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production_readiness_assessment.py",
+      "type": "Performance",
+      "io_fixed": 2,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/race-detector.py",
+      "type": "Performance",
+      "io_fixed": 2,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/scripts/smart_cancellation_with_cost.py",
+      "type": "Performance",
+      "io_fixed": 0,
+      "loop_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/scripts/content_aware_race_detector.py",
+      "type": "Performance",
+      "io_fixed": 0,
+      "loop_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tests/performance/benchmark_arbitrage.py",
+      "type": "Performance",
+      "io_fixed": 2,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/data-manager.py",
+      "type": "Performance",
+      "io_fixed": 1,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/monitoring/observability_stack.py",
+      "type": "Performance",
+      "io_fixed": 1,
+      "loop_fixed": 0
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_terminal_dashboard.py",
+      "type": "Architecture",
+      "god_class_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/critical_weakness_fixer.py",
+      "type": "Architecture",
+      "god_class_fixed": 1
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/examples/ml-training/training-script.py",
+      "type": "Architecture",
+      "god_class_fixed": 1
+    }
+  ],
+  "failed_resolutions": [
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_mock_battle_test.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/mock_runpod_data.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/microservices.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform_controller.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production_readiness_assessment_fixed.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_weakness_resolver.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_runpod_working.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/github_api_integration.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/verify_critical_fixes.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_time_arbitrage_engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_saas_platform.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_parallel_provisioning.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_terminal_dashboard.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/battle_test_analysis.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_production.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/latency_jitter_analyzer.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/working_google_api.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/advanced_parallel_provisioning.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/secure_gcp_setup.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_wrapper.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/garch_volatility_spreads.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/enhanced_arbitrage_engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/simple_latency_oracle.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_aws_api.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/comprehensive_weakness_analysis.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/vast_gamma_engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/critical_weakness_fixer.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_web.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/garch_volatility_engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/setup_oauth2_gcp.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_connect_card.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_hf_write_token.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_integration.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/setup_gcp_auth.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/price_volatility_engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/simplified_garch_volatility.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/google_oauth_api.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/hf_limiting_circumvention.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/critical_fixes_final_report.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_arbitrage_engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_battle_test.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/ultimate_circumvention.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_provider.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_cli.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_arbitrage_engine_all_providers.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_runpod_api.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/hf_integration.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_parallel.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_tensordock.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/simple_volatility_spreads.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/vast_ai_integration.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/database_multicloud_integration.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_demo.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/comprehensive_weakness_finder.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_runpod_fixed.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_credits.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/cloud_advisor_integration.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_battle_test.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_runpod_rest_api.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_terradev.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/spot_risk_manager.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_hf.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_training_engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/advanced_risk_engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/phase_based_circumvention.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/oci_integration.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_deployment.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_webapp.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production_readiness_assessment.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/advanced-race-detector.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/execute-smart-cancellation.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/race-detector.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/scripts/smart_cancellation_with_cost.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/scripts/content_aware_race_detector.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terraform/scripts/cost_accounting.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/finops/attribution-engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/finops/granular-cost-tracker.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/finops/unified-billing-aggregator.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/finops/tenant-billing-engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/finops/multi-tenant-cost-allocator.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/config/production_config.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/security/auth_middleware.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/auth/auth_service.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/integration/latency-arbitrage-engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tests/conftest.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tests/unit/test_arbitrage_engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tests/performance/benchmark_arbitrage.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/integrations/cloud-provider-apis.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/examples/ml-training/training-script.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/cost-tracker.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/query-gpu.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/arbitrage-engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/b2b-roi-calculator.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/environment-generator.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/data-manager.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/secret_rotation.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/scripts/gpu-volatility-index.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production/performance_optimization.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production/error_handling.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production/terradev_webapp_fixed.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/inference/inference-arbitrage-engine.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/monitoring/observability_stack.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/infrastructure/terraform/.terraform/modules/rds/examples/role-association-postgres/fixtures/lambda_function.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/modules/finops/scripts/token_optimizer.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/cost_management/cost_optimizer.py",
+      "type": "Security",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    }
+  ]
+}

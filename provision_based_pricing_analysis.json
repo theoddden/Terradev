@@ -1,0 +1,111 @@
+{
+  "pricing_tiers": {
+    "research": {
+      "name": "Research",
+      "price": 0,
+      "max_gpus": 1,
+      "provisions_per_month": 10,
+      "features": [
+        "1 GPU concurrent access",
+        "10 provisions per month",
+        "Multi-cloud arbitrage",
+        "Basic analytics",
+        "Community support",
+        "Perfect for researchers and students"
+      ]
+    },
+    "enterprise": {
+      "name": "Enterprise",
+      "price": 299.99,
+      "max_gpus": 32,
+      "provisions_per_month": null,
+      "features": [
+        "32 GPUs concurrent access",
+        "Unlimited provisions",
+        "Multi-cloud arbitrage",
+        "Advanced analytics dashboard",
+        "Priority support",
+        "Full API access",
+        "SLA guarantee",
+        "Inference compute capabilities",
+        "675 hours of compute time",
+        "Perfect for teams and production workloads"
+      ]
+    }
+  },
+  "provision_definition": {
+    "description": "A provision represents one GPU deployment or scaling action",
+    "examples": [
+      "Deploying a new GPU instance",
+      "Scaling up/down GPU resources",
+      "Switching cloud providers",
+      "Starting a new training job",
+      "Launching inference endpoints"
+    ],
+    "duration": "Provisions remain active until manually stopped",
+    "billing": "Billed monthly, not per-hour"
+  },
+  "stripe_updates": {
+    "research_tier": {
+      "product_name": "Terradev Research",
+      "description": "Free tier with 10 GPU provisions per month",
+      "price": 0,
+      "metadata": {
+        "tier": "research",
+        "provisions_per_month": 10,
+        "max_gpus": 1,
+        "billing_model": "provision_based"
+      }
+    },
+    "enterprise_tier": {
+      "product_name": "Terradev Enterprise",
+      "description": "Unlimited GPU provisions with 32 concurrent access",
+      "price": 29999,
+      "currency": "usd",
+      "recurring": {
+        "interval": "month"
+      },
+      "metadata": {
+        "tier": "enterprise",
+        "provisions_per_month": "unlimited",
+        "max_gpus": 32,
+        "billing_model": "provision_based"
+      }
+    }
+  },
+  "cli_updates": {
+    "status_command": {
+      "research_display": "Tier: RESEARCH\nProvisions: 10/month\nGPUs: 1 concurrent\nStatus: ACTIVE",
+      "enterprise_display": "Tier: ENTERPRISE\nProvisions: Unlimited\nGPUs: 32 concurrent\nStatus: ACTIVE"
+    },
+    "purchase_command": {
+      "research_flow": "Free signup - no payment required",
+      "enterprise_flow": "Standard Stripe checkout for $299.99/month"
+    },
+    "activation_command": {
+      "research_activation": "Automatic - no secret key needed",
+      "enterprise_activation": "Secret key email delivery after payment"
+    }
+  },
+  "revenue_projections": {
+    "Year 1": {
+      "research": 1000,
+      "enterprise": 25
+    },
+    "Year 2": {
+      "research": 5000,
+      "enterprise": 100
+    },
+    "Year 3": {
+      "research": 20000,
+      "enterprise": 300
+    }
+  },
+  "implementation_requirements": [
+    "Provision tracking system",
+    "Monthly provision reset",
+    "Usage dashboard",
+    "Alert system",
+    "Upgrade prompts"
+  ]
+}

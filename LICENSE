@@ -1,0 +1,114 @@
+Business Source License 1.1
+
+Parameters
+
+Licensor: Terradev Inc.
+Licensed Work: Terradev CLI
+Change Date: 2029-02-19
+Change License: MIT License
+
+Additional Use Grant: You may use the Licensed Work for your own internal compute provisioning, research, and development. You may not offer the Licensed Work or a derivative as a commercial compute orchestration or GPU brokering service to third parties.
+
+---
+
+Business Source License 1.1
+
+License text copyright (c) 2017 MariaDB Corporation Ab, All Rights Reserved.
+
+"Business Source License" is a trademark of MariaDB Corporation Ab.
+
+Terms
+
+The Licensor hereby grants you the right to copy, use, modify, and distribute this
+Work in any medium or format, as a Licensed Work, provided that you comply
+with the terms of this License.
+
+1. Definitions
+
+"Change Date" means the date that the Licensor elects to change this License
+to a subsequent version, as specified in Section 4.2.
+
+"Change License" means the license that the Licensor elects to change this
+License to, as specified in Section 4.2.
+
+"Licensed Work" means the original work of authorship made available under
+this License.
+
+"Licensor" means the individual or entity that offers the Licensed Work
+under the terms of this License.
+
+"Use" means the actual use of the Licensed Work, as permitted by this License.
+
+"You" means any individual or entity that exercises any rights granted
+under this License.
+
+2. License Grant
+
+Subject to the terms and conditions of this License, the Licensor hereby grants
+to You a perpetual, worldwide, non-exclusive, royalty-free, irrevocable
+license to Use the Licensed Work under the terms of this License.
+
+3. Restrictions
+
+You may not, without the express written permission of the Licensor:
+
+a) offer the Licensed Work as a hosted or managed service to third parties;
+
+b) use the Licensed Work to build a competing product or service;
+
+c) remove, obscure, or alter any proprietary notices on the Licensed Work;
+
+d) sublicense the Licensed Work;
+
+e) make any claims that the Licensor endorses your products or services.
+
+4. Change of License
+
+4.1. Change Date
+
+The Licensor may elect to change this License to a subsequent version at any
+time after the Change Date.
+
+4.2. Change License
+
+When the Licensor changes this License, the following terms shall apply:
+
+a) The Change License shall take effect on the Change Date.
+
+b) The Licensed Work shall be automatically licensed under the Change License
+to all users of the Licensed Work.
+
+c) The Change License shall be forward-compatible with the terms of this
+License.
+
+5. Termination
+
+This License shall terminate automatically if You breach any of its terms and
+conditions. However, if You cure such breach within 30 days of becoming aware
+of it, this License shall not terminate.
+
+6. Disclaimer of Warranty
+
+THE LICENSED WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE LICENSED WORK OR THE USE OR OTHER DEALINGS IN THE LICENSED WORK.
+
+7. Limitation of Liability
+
+IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE LICENSED WORK OR THE USE OR OTHER DEALINGS
+IN THE LICENSED WORK.
+
+8. Governing Law
+
+This License shall be governed by and construed in accordance with the laws of
+the State of New York, without regard to its conflict of law provisions.
+
+9. Entire Agreement
+
+This License constitutes the entire agreement between the parties with respect
+to the Licensed Work.

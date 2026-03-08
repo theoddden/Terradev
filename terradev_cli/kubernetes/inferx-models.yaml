@@ -1,0 +1,531 @@
+# Custom Resource Definition for Model Functions
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: modelfunctions.inferx.io
+  labels:
+    platform: inferx
+    component: crd
+spec:
+  group: inferx.io
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                modelImage:
+                  type: string
+                  description: "Docker image for the model"
+                gpuMemory:
+                  type: integer
+                  description: "GPU memory required in GB"
+                maxConcurrency:
+                  type: integer
+                  description: "Maximum concurrent requests"
+                snapshotEnabled:
+                  type: boolean
+                  default: true
+                  description: "Enable snapshot technology"
+                gpuSlicing:
+                  type: boolean
+                  default: true
+                  description: "Enable GPU slicing"
+                multiTenant:
+                  type: boolean
+                  default: true
+                  description: "Enable multi-tenant isolation"
+                framework:
+                  type: string
+                  enum: ["pytorch", "tensorflow", "vllm", "custom"]
+                  default: "pytorch"
+                openaiCompatible:
+                  type: boolean
+                  default: true
+                  description: "OpenAI-compatible API"
+                timeout:
+                  type: integer
+                  default: 300
+                  description: "Request timeout in seconds"
+                scaling:
+                  type: object
+                  properties:
+                    minReplicas:
+                      type: integer
+                      default: 0
+                    maxReplicas:
+                      type: integer
+                      default: 10
+                    targetRequestsPerMinute:
+                      type: integer
+                      default: 100
+                resources:
+                  type: object
+                  properties:
+                    cpu:
+                      type: string
+                      default: "2"
+                    memory:
+                      type: string
+                      default: "4Gi"
+                env:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                      valueFrom:
+                        type: object
+                        properties:
+                          secretKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                          configMapKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: ["Pending", "Deploying", "Ready", "Failed", "Terminating"]
+                endpoint:
+                  type: string
+                deploymentId:
+                  type: string
+                gpuType:
+                  type: string
+                coldStartTime:
+                  type: number
+                gpuUtilization:
+                  type: number
+                modelsOnGpu:
+                  type: number
+                requestsPerMinute:
+                  type: number
+                errorRate:
+                  type: number
+                lastScaleTime:
+                  type: string
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+  scope: Namespaced
+  names:
+    plural: modelfunctions
+    singular: modelfunction
+    kind: ModelFunction
+    shortNames:
+      - mf
+---
+# Example Model Function Deployments
+apiVersion: inferx.io/v1
+kind: ModelFunction
+metadata:
+  name: llama2-7b
+  namespace: inferx
+  labels:
+    model: llama2
+    size: 7b
+    framework: pytorch
+spec:
+  modelImage: "pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel"
+  gpuMemory: 14
+  maxConcurrency: 10
+  snapshotEnabled: true
+  gpuSlicing: true
+  multiTenant: true
+  framework: pytorch
+  openaiCompatible: true
+  timeout: 300
+  scaling:
+    minReplicas: 0
+    maxReplicas: 5
+    targetRequestsPerMinute: 50
+  resources:
+    cpu: "2"
+    memory: "4Gi"
+  env:
+    - name: MODEL_ID
+      value: "meta-llama/Llama-2-7b-hf"
+    - name: HUGGINGFACE_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: huggingface-secrets
+          key: token
+---
+apiVersion: inferx.io/v1
+kind: ModelFunction
+metadata:
+  name: mistral-7b
+  namespace: inferx
+  labels:
+    model: mistral
+    size: 7b
+    framework: pytorch
+spec:
+  modelImage: "pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel"
+  gpuMemory: 14
+  maxConcurrency: 15
+  snapshotEnabled: true
+  gpuSlicing: true
+  multiTenant: true
+  framework: pytorch
+  openaiCompatible: true
+  timeout: 300
+  scaling:
+    minReplicas: 0
+    maxReplicas: 10
+    targetRequestsPerMinute: 100
+  resources:
+    cpu: "2"
+    memory: "4Gi"
+  env:
+    - name: MODEL_ID
+      value: "mistralai/Mistral-7B-v0.1"
+---
+apiVersion: inferx.io/v1
+kind: ModelFunction
+metadata:
+  name: codellama-13b
+  namespace: inferx
+  labels:
+    model: codellama
+    size: 13b
+    framework: pytorch
+spec:
+  modelImage: "pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel"
+  gpuMemory: 26
+  maxConcurrency: 5
+  snapshotEnabled: true
+  gpuSlicing: true
+  multiTenant: true
+  framework: pytorch
+  openaiCompatible: true
+  timeout: 300
+  scaling:
+    minReplicas: 0
+    maxReplicas: 3
+    targetRequestsPerMinute: 25
+  resources:
+    cpu: "4"
+    memory: "8Gi"
+  env:
+    - name: MODEL_ID
+      value: "codellama/CodeLlama-13b-hf"
+---
+apiVersion: inferx.io/v1
+kind: ModelFunction
+metadata:
+  name: vllm-mistral-7b
+  namespace: inferx
+  labels:
+    model: mistral
+    size: 7b
+    framework: vllm
+spec:
+  modelImage: "vllm/vllm-openai:latest"
+  gpuMemory: 14
+  maxConcurrency: 20
+  snapshotEnabled: true
+  gpuSlicing: true
+  multiTenant: true
+  framework: vllm
+  openaiCompatible: true
+  timeout: 300
+  scaling:
+    minReplicas: 0
+    maxReplicas: 10
+    targetRequestsPerMinute: 200
+  resources:
+    cpu: "2"
+    memory: "4Gi"
+  env:
+    - name: MODEL_ID
+      value: "mistralai/Mistral-7B-v0.1"
+    - name: VLLM_ARGS
+      value: "--tensor-parallel-size 1 --gpu-memory-utilization 0.9"
+---
+# HuggingFace Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: huggingface-secrets
+  namespace: inferx
+type: Opaque
+data:
+  token: eW91ci1odWdnaW5nZmFjZS10b2tlbg== # your-huggingface-token
+---
+# Model Function Controller
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inferx-model-controller
+  namespace: inferx
+  labels:
+    app: inferx-model-controller
+    component: controller
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inferx-model-controller
+  template:
+    metadata:
+      labels:
+        app: inferx-model-controller
+        component: controller
+    spec:
+      serviceAccountName: inferx-model-controller
+      containers:
+        - name: controller
+          image: inferx/model-controller:v0.1.0
+          imagePullPolicy: Always
+          env:
+            - name: INFERX_NAMESPACE
+              value: "inferx"
+            - name: INFERX_PLATFORM_ENDPOINT
+              value: "http://inferx-gateway:8080"
+            - name: ETCD_ENDPOINTS
+              value: "etcd:2379"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: METRICS_ENABLED
+              value: "true"
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+# Service Account and RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: inferx-model-controller
+  namespace: inferx
+  labels:
+    app: inferx-model-controller
+    component: controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: inferx-model-controller
+  labels:
+    app: inferx-model-controller
+    component: controller
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["inferx.io"]
+  resources: ["modelfunctions", "modelfunctions/status", "modelfunctions/finalizers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses", "networkpolicies"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: inferx-model-controller
+  labels:
+    app: inferx-model-controller
+    component: controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: inferx-model-controller
+subjects:
+- kind: ServiceAccount
+  name: inferx-model-controller
+  namespace: inferx
+---
+# Model Controller Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: inferx-model-controller
+  namespace: inferx
+  labels:
+    app: inferx-model-controller
+    component: controller
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+    - port: 8443
+      targetPort: 8443
+      name: https
+  selector:
+    app: inferx-model-controller
+    component: controller
+---
+# KEDA Auto Scaling for Model Functions
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: inferx-model-scaling
+  namespace: inferx
+  labels:
+    platform: inferx
+    component: scaling
+spec:
+  scaleTargetRef:
+    name: inferx-platform
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        metricName: inferx_requests_per_minute
+        threshold: "100"
+        query: "sum(rate(inferx_requests_total[2m]))"
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        metricName: inferx_gpu_utilization
+        threshold: "80"
+        query: "avg(inferx_gpu_utilization_percent)"
+    - type: cpu
+      metadata:
+        value: "70"
+    - type: memory
+      metadata:
+        value: "70"
+---
+# Monitoring and Metrics
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: inferx-metrics
+  namespace: inferx
+  labels:
+    platform: inferx
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      platform: inferx
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inferx-grafana-dashboard
+  namespace: inferx
+  labels:
+    platform: inferx
+    component: monitoring
+data:
+  inferx-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "InferX Serverless Inference",
+        "panels": [
+          {
+            "title": "Cold Start Time",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(inferx_cold_start_duration_seconds)",
+                "legendFormat": "Average Cold Start"
+              }
+            ]
+          },
+          {
+            "title": "GPU Utilization",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(inferx_gpu_utilization_percent)",
+                "legendFormat": "GPU Utilization %"
+              }
+            ]
+          },
+          {
+            "title": "Models per GPU",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(inferx_models_per_gpu)",
+                "legendFormat": "Models per GPU"
+              }
+            ]
+          },
+          {
+            "title": "Requests per Minute",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(inferx_requests_total[1m]))",
+                "legendFormat": "Requests/min"
+              }
+            ]
+          },
+          {
+            "title": "Error Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(inferx_errors_total[1m])) / sum(rate(inferx_requests_total[1m])) * 100",
+                "legendFormat": "Error Rate %"
+              }
+            ]
+          }
+        ]
+      }
+    }

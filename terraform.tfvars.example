@@ -1,0 +1,50 @@
+# Terradev Configuration Example
+# Copy this file to terraform.tfvars and customize for your environment
+
+# Project Configuration
+project_name = "terradev"
+environment = "dev"
+
+# Cloud Provider Configuration
+aws_region = "us-west-2"
+gcp_region = "us-central1"
+gcp_project = "your-gcp-project-id"
+azure_location = "East US"
+
+# GPU Compute Configuration
+gpu_config = {
+  instance_type = "p3.2xlarge"  # Options: p3.2xlarge, p3.8xlarge, p3.16xlarge, g4dn.xlarge, g5.xlarge
+  gpu_count     = 1
+  gpu_type      = "V100"
+  min_instances = 1
+  max_instances = 5
+}
+
+# Data Feeds Configuration
+data_feeds = [
+  {
+    name        = "ml-datasets"
+    type        = "http"
+    source_url  = "https://example.com/datasets/ml-data.zip"
+    update_freq = "daily"
+    enabled     = true
+  },
+  {
+    name        = "financial-data"
+    type        = "api"
+    source_url  = "https://api.example.com/financial-data"
+    update_freq = "hourly"
+    enabled     = true
+  },
+  {
+    name        = "weather-data"
+    type        = "http"
+    source_url  = "https://api.weather.gov/data"
+    update_freq = "hourly"
+    enabled     = false
+  }
+]
+
+# Feature Flags
+enable_monitoring    = true
+enable_auto_scaling  = true

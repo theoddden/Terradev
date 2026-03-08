@@ -1,0 +1,231 @@
+# Helm Values — MoE Model Inference Template
+# Usage:
+#   helm upgrade --install moe-inf ./helm/terradev -f clusters/moe-template/helm/values-moe.yaml
+#   helm upgrade --install moe-inf ./helm/terradev -f clusters/moe-template/helm/values-moe.yaml \
+#     --set model.id=Qwen/Qwen3.5-397B-A17B --set model.name=qwen3.5
+
+replicaCount: 1
+
+image:
+  repository: vllm/vllm-openai
+  tag: nightly
+  pullPolicy: Always
+
+nameOverride: moe-vllm
+fullnameOverride: moe-inference
+
+# ─── Model Configuration (CHANGE THESE) ──────────────────────────────────────
+model:
+  id: zai-org/GLM-5-FP8           # HuggingFace model ID
+  name: moe-model                  # Served model name
+  cachePath: /models/weights
+  downloadOnInit: true
+  precision: fp8                   # fp8, bf16, fp16
+
+# ─── Serving Configuration ───────────────────────────────────────────────────
+serving:
+  backend: vllm                    # vllm or sglang
+  port: 8000
+  host: "0.0.0.0"
+
+  # MoE Expert Parallelism (EP) — distributes experts across DP ranks
+  expertParallel:
+    enabled: true
+    dataParallelSize: 8
+    enableEplb: true          # Expert Parallel Load Balancer — runtime rebalancing
+    enableDbo: true            # Dual-Batch Overlap — overlap compute with all-to-all
+    all2allBackend: "deepep_low_latency"  # DeepEP optimized all-to-all kernel
+
+  vllm:
+    tensorParallelSize: 8          # Must match gpu.count
+    gpuMemoryUtilization: 0.95     # Optimized: 0.90 → 0.95 (10% more VRAM)
+    maxModelLen: 32768
+    dtype: auto
+    trustRemoteCode: true
+    enableAutoToolChoice: true
+    
+    # ── Critical Throughput Optimizations (6 knobs most teams never touch) ─────
+    maxNumBatchedTokens: 16384     # Optimized: 2048 → 16384 (8x throughput)
+    maxNumSeqs: 1024               # Optimized: 256/1024 → 1024 (higher concurrency)
+    enablePrefixCaching: true      # Optimized: OFF → ON (free throughput win)
+    enableChunkedPrefill: true     # Optimized: OFF → ON (V0) / verify ON (V1)
+
+  # ── Multi-LoRA for MoE (vLLM ≥0.15.0) ─────────────────────────────────────
+  # Serve N fine-tuned LoRA adapters on one base MoE model.
+  # Uses fused_moe_lora kernel: 454% higher OTPS, 87% lower TTFT.
+  # Supported families: GPT-OSS, Qwen3-MoE, DeepSeek, Llama MoE.
+  lora:
+    enabled: false
+    maxLoras: 8                    # max concurrent adapters in GPU memory
+    maxLoraRank: 64                # LoRA rank (16-64 typical)
+    loraExtraVocabSize: 256
+    modules: []                    # [{name: "customer-a", path: "/adapters/customer-a"}]
+    tunedConfigDir: ""             # custom fused_moe_lora kernel tuning configs
+    # Adapter storage PVC (RWX for hot-upload while serving)
+    adapterStorage:
+      enabled: false
+      size: 50Gi
+      storageClass: efs-sc         # CHANGE: your shared filesystem StorageClass
+      mountPath: /adapters
+
+  # ── Auto-applied cost optimizations (Terradev defaults) ─────────────────────
+  # These are ON by default. Users don't configure them — they just save money.
+  flashinfer:
+    enabled: true                  # FlashInfer fused attention (~50% mem BW recovery)
+    backend: "FLASHINFER"          # FLASHINFER, FLASH_ATTN, XFORMERS
+  sleepMode:
+    enabled: true                  # 18-200x faster than restart on idle
+    level: 1
+  kvOffloading:
+    enabled: true                  # KV cache → CPU DRAM (up to 9x throughput)
+    connector: "offloading"
+  speculative:
+    enabled: true                  # MTP speculative decoding (up to 2.8x speed)
+    method: "mtp"
+    numTokens: 1
+
+  # ── LMCache Distributed KV Cache (Terradev extension) ─────────────────────
+  # Enables KV cache sharing across multiple vLLM instances for 3-10x TTFT reduction
+  lmcache:
+    enabled: true                  # Enable distributed KV cache sharing
+    backend: "redis"                # redis, s3, disk, cpu
+    redisUrl: "redis://lmcache-redis:6379"  # Redis service endpoint
+    chunkSize: 256                 # Chunk size for cache distribution
+    pipelined: true                # Pipelined backend for better performance
+    serde: "torch"                  # Serialization format (torch, cachegen)
+    
+    # Redis cluster configuration
+    redisCluster:
+      enabled: true                # Deploy Redis cluster
+      replicas: 3                   # Number of Redis nodes
+      memoryPerNode: "16Gi"        # Memory per Redis node
+      storagePerNode: "32Gi"       # Storage per Redis node
+
+  # ── vLLM Router (P/D-aware load balancer) ──────────────────────────────────
+  # Consistent hashing maximises KV cache reuse.  Native P/D disaggregation.
+  # Deploy when running >1 replica or using prefill/decode disaggregation.
+  router:
+    enabled: false
+    replicas: 2
+    port: 8080
+    policy: "consistent_hash"      # consistent_hash | power_of_two | round_robin
+    sessionKey: "x-session-id"
+    image:
+      repository: vllm/vllm-router
+      tag: latest
+    resources:
+      requests:
+        cpu: "1"
+        memory: "512Mi"
+      limits:
+        cpu: "2"
+        memory: "1Gi"
+
+  sglang:
+    tpSize: 8
+    memFractionStatic: 0.85
+    trustRemoteCode: true
+
+# ─── GPU Configuration ───────────────────────────────────────────────────────
+gpu:
+  type: H100_SXM
+  count: 8                         # 1, 2, 4, or 8 — must match serving.*.tensorParallelSize
+  memoryGb: 80
+  requireNvlink: true
+
+resources:
+  requests:
+    nvidia.com/gpu: "8"
+    cpu: "10"                      # Optimized: 2 + #GPUs = 10 for 8 GPUs (V1 busy loop)
+    memory: "256Gi"
+  limits:
+    nvidia.com/gpu: "8"
+    cpu: "16"                      # Extra headroom for V1 engine core busy loop
+    memory: "512Gi"
+
+nodeSelector:
+  nvidia.com/gpu.product: NVIDIA-H100-80GB-HBM3
+
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  - key: dedicated
+    operator: Equal
+    value: gpu-inference
+    effect: NoSchedule
+
+env:
+  CUDA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+  NCCL_P2P_DISABLE: "0"
+  NCCL_IB_DISABLE: "0"
+  NCCL_SOCKET_IFNAME: "eth0"
+  VLLM_ATTENTION_BACKEND: "FLASHINFER"
+  VLLM_USE_DEEP_GEMM: "1"
+  VLLM_ALL2ALL_BACKEND: "deepep_low_latency"
+  TRANSFORMERS_CACHE: "/models/cache"
+  VLLM_SERVER_DEV_MODE: "1"       # Required for auto-sleep/wake
+
+secrets:
+  hfToken: ""  # --set secrets.hfToken=hf_xxx
+
+# ─── Storage ─────────────────────────────────────────────────────────────────
+persistence:
+  modelCache:
+    enabled: true
+    size: 500Gi                    # Adjust per model size
+    storageClass: nvme-ssd
+    mountPath: /models
+  sharedMemory:
+    enabled: true
+    size: 32Gi                     # NCCL shared memory for MoE TP
+    mountPath: /dev/shm
+
+# ─── Networking ──────────────────────────────────────────────────────────────
+service:
+  type: LoadBalancer
+  port: 8000
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+
+# ─── Health Checks ───────────────────────────────────────────────────────────
+probes:
+  startup:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 30
+  liveness:
+    enabled: true
+    path: /health
+    periodSeconds: 15
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /health
+    periodSeconds: 5
+    failureThreshold: 2
+
+# ─── Autoscaling ─────────────────────────────────────────────────────────────
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 4
+  targetGPUUtilization: 80
+  targetQueueDepth: 10
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# ─── Monitoring ──────────────────────────────────────────────────────────────
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    path: /metrics
+
+strategy:
+  type: Recreate

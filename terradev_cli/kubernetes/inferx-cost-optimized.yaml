@@ -1,0 +1,630 @@
+# InferX Cost-Optimized Kubernetes Platform v2.9.6
+# Designed for 70% cost reduction while maintaining <2s cold starts
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: inferx
+  labels:
+    name: inferx
+    cost-optimized: "v2.9.6"
+    platform: inferx-serverless
+---
+# Cost-Optimized Storage Classes
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: inferx-cost-optimized
+  labels:
+    platform: inferx
+    cost-tier: economy
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  iops: "3000"        # Reduced from 16000
+  throughput: "125"   # Reduced from 1000
+  fsType: ext4
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer  # Delay provisioning
+reclaimPolicy: Delete  # Auto-delete unused volumes
+---
+# Ultra-Cheap Storage for Snapshots
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: inferx-snapshot-economy
+  labels:
+    platform: inferx
+    cost-tier: snapshot
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: sc1           # Cold HDD storage
+  iops: "50"          # Minimal IOPS
+  throughput: "50"
+  fsType: ext4
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+---
+# Spot-First GPU Node Pool (70% cost savings)
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: inferx-cost-optimized
+  labels:
+    platform: inferx
+    cost-tier: economy
+spec:
+  template:
+    metadata:
+      labels:
+        inferx.io/cost-optimized: "true"
+        nvidia.com/gpu: "present"
+    spec:
+      nodeClassRef:
+        name: inferx-cost-optimized
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+        - key: inferx.io/cost-optimized
+          value: "true"
+          effect: NoSchedule
+      requirements:
+        - key: karpenter.k8s.aws/capacity-type
+          operator: In
+          values: ["spot"]  # Spot-first strategy
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: ["g5", "g4dn"]  # Cost-effective GPUs
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    consolidateAfter: 30s
+    budgets:
+      - nodes: "20%"
+---
+apiVersion: karpenter.k8s.aws/v1beta1
+kind: EC2NodeClass
+metadata:
+  name: inferx-cost-optimized
+  labels:
+    platform: inferx
+    cost-tier: economy
+spec:
+  instanceTypes:
+    # Cost-effective GPU instances
+    - g5.xlarge      # 1x A10G - $1.006/hr
+    - g5.2xlarge     # 1x A10G - $2.012/hr
+    - g4dn.xlarge    # 1x T4    - $0.526/hr
+    - g4dn.2xlarge   # 1x T4    - $1.052/hr
+    - g4dn.4xlarge   # 1x T4    - $2.104/hr
+  requirements:
+    - key: karpenter.k8s.aws/capacity-type
+      operator: In
+      values: ["spot"]
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 100Gi    # Reduced from 500Gi
+        volumeType: gp3
+        iops: 3000
+        throughput: 125
+        deleteOnTermination: true
+  userData: |
+    #!/bin/bash
+    set -ex
+    
+    # Minimal GPU setup
+    apt-get update
+    apt-get install -y nvidia-driver-535 nvidia-docker2
+    
+    # Configure Docker for cost optimization
+    cat > /etc/docker/daemon.json <<EOF
+    {
+      "default-runtime": "nvidia",
+      "storage-driver": "overlay2",
+      "storage-opts": ["overlay2.override_kernel_check=true"],
+      "log-driver": "json-file",
+      "log-opts": {
+        "max-size": "10m",      # Reduced log size
+        "max-file": "3"
+      }
+    }
+    EOF
+    
+    systemctl restart docker
+    
+    # Label for cost optimization
+    kubectl label node $(hostname) inferx.io/cost-optimized=true nvidia.com/gpu=present --overwrite
+---
+# Resource-Optimized Platform Services
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inferx-platform
+  namespace: inferx
+  labels:
+    app: inferx-platform
+    cost-optimized: "v2.9.6"
+spec:
+  replicas: 2  # Reduced from 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: inferx-platform
+  template:
+    metadata:
+      labels:
+        app: inferx-platform
+        cost-optimized: "v2.9.6"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - inferx-platform
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: gateway
+          image: inferx/inferx_platform:v0.2.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4000
+              name: http
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: RUN_SERVICE
+              value: "Gateway"
+            - name: STATESVC_ADDR
+              value: "http://statesvc:1237"
+            - name: ETCD_ADDRS
+              value: "http://etcd:2379"
+            - name: COST_OPTIMIZATION
+              value: "true"
+            - name: RESOURCE_POOLING
+              value: "true"
+            - name: SHARED_GPU
+              value: "true"
+          resources:
+            requests:
+              cpu: "500m"      # Reduced from 2
+              memory: "1Gi"    # Reduced from 4Gi
+            limits:
+              cpu: "1"         # Reduced from 2
+              memory: "2Gi"    # Reduced from 4Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+        - name: scheduler
+          image: inferx/inferx_platform:v0.2.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 1238
+              name: scheduler
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: RUN_SERVICE
+              value: "Scheduler"
+            - name: STATESVC_ADDR
+              value: "http://statesvc:1237"
+            - name: ETCD_ADDRS
+              value: "http://etcd:2379"
+            - name: SCHEDULER_PORT
+              value: "1238"
+            - name: COST_OPTIMIZATION
+              value: "true"
+            - name: GPU_SHARING_ENABLED
+              value: "true"
+            - name: MAX_MODELS_PER_GPU
+              value: "50"  # Increased from 30
+          resources:
+            requests:
+              cpu: "250m"      # Reduced from 1
+              memory: "512Mi"  # Reduced from 2Gi
+            limits:
+              cpu: "500m"     # Reduced from 1
+              memory: "1Gi"    # Reduced from 2Gi
+---
+# Cost-Optimized Node Agent with Resource Sharing
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: inferx-nodeagent
+  namespace: inferx
+  labels:
+    app: inferx-nodeagent
+    cost-optimized: "v2.9.6"
+spec:
+  selector:
+    matchLabels:
+      app: inferx-nodeagent
+  template:
+    metadata:
+      labels:
+        app: inferx-nodeagent
+        cost-optimized: "v2.9.6"
+    spec:
+      nodeSelector:
+        inferx.io/cost-optimized: "true"
+        nvidia.com/gpu: "present"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: inferx.io/cost-optimized
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: nodeagent
+          image: inferx/inferx_na:v0.2.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN", "IPC_LOCK"]
+            runAsUser: 0
+            runAsGroup: 0
+          env:
+            - name: STATESVC_ADDR
+              value: "http://statesvc:1237"
+            - name: RUN_SERVICE
+              value: "NodeAgent"
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: COST_OPTIMIZATION
+              value: "true"
+            - name: GPU_SHARING_ENABLED
+              value: "true"
+            - name: MEMORY_OPTIMIZATION
+              value: "true"
+            - name: CACHE_SIZE_LIMIT
+              value: "10Gi"  # Reduced from default
+            - name: SNAPSHOT_COMPRESSION
+              value: "true"
+            - name: LAZY_LOADING
+              value: "true"
+          resources:
+            requests:
+              cpu: "2"         # Reduced from 15
+              memory: "8Gi"    # Reduced from 60Gi
+              hugepages-2Mi: "512Mi"  # Reduced from 1Gi
+            limits:
+              cpu: "4"         # Reduced from 20
+              memory: "16Gi"   # Reduced from 100Gi
+              hugepages-2Mi: "1Gi"
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - mountPath: /opt/inferx/data
+              name: inferx-data
+            - mountPath: /opt/inferx/cache
+              name: inferx-cache
+            - mountPath: /opt/inferx/snapshot
+              name: inferx-snapshot
+            - mountPath: /dev/shm
+              name: dshm
+            - mountPath: /var/lib/docker
+              name: docker-storage
+          livenessProbe:
+            exec:
+              command:
+                - /opt/inferx/bin/health-check
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command:
+                - /opt/inferx/bin/ready-check
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: inferx-data
+          persistentVolumeClaim:
+            claimName: inferx-data-pvc
+        - name: inferx-cache
+          emptyDir:
+            sizeLimit: 10Gi     # Reduced from 200Gi
+        - name: inferx-snapshot
+          persistentVolumeClaim:
+            claimName: inferx-snapshot-pvc
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi      # Reduced from 16Gi
+        - name: docker-storage
+          emptyDir:
+            sizeLimit: 20Gi    # Reduced from 500Gi
+---
+# Cost-Optimized Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: inferx-data-pvc
+  namespace: inferx
+  labels:
+    app: inferx
+    cost-tier: economy
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: "inferx-cost-optimized"
+  resources:
+    requests:
+      storage: 50Gi      # Reduced from 500Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: inferx-snapshot-pvc
+  namespace: inferx
+  labels:
+    app: inferx
+    cost-tier: snapshot
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: "inferx-snapshot-economy"
+  resources:
+    requests:
+      storage: 100Gi     # Reduced from 1TB
+---
+# Lightweight State Services
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: statesvc
+  namespace: inferx
+  labels:
+    app: statesvc
+    cost-optimized: "v2.9.6"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: statesvc
+  template:
+    metadata:
+      labels:
+        app: statesvc
+        cost-optimized: "v2.9.6"
+    spec:
+      containers:
+        - name: statesvc
+          image: inferx/inferx_platform:v0.2.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 1237
+              name: statesvc
+          env:
+            - name: RUN_SERVICE
+              value: "StateService"
+            - name: ETCD_ADDRS
+              value: "http://etcd:2379"
+            - name: COST_OPTIMIZATION
+              value: "true"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+---
+# Lightweight etcd
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: etcd
+  namespace: inferx
+  labels:
+    app: etcd
+    cost-optimized: "v2.9.6"
+spec:
+  replicas: 1  # Reduced from 3
+  serviceName: etcd
+  selector:
+    matchLabels:
+      app: etcd
+  template:
+    metadata:
+      labels:
+        app: etcd
+        cost-optimized: "v2.9.6"
+    spec:
+      containers:
+        - name: etcd
+          image: quay.io/coreos/etcd:v3.5.13
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 2379
+              name: client
+            - containerPort: 2380
+              name: peer
+          env:
+            - name: ETCD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: ETCD_DATA_DIR
+              value: /etcd-data
+            - name: ETCD_LISTEN_CLIENT_URLS
+              value: "http://0.0.0.0:2379"
+            - name: ETCD_LISTEN_PEER_URLS
+              value: "http://0.0.0.0:2380"
+            - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
+              value: "http://$(ETCD_NAME).etcd:2380"
+            - name: ETCD_INITIAL_CLUSTER
+              value: "etcd-0=http://etcd-0.etcd:2380"
+            - name: ETCD_INITIAL_CLUSTER_STATE
+              value: "new"
+            - name: ETCD_INITIAL_CLUSTER_TOKEN
+              value: "inferx-cost-optimized"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "200m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: etcd-data
+              mountPath: /etcd-data
+  volumeClaimTemplates:
+    - metadata:
+        name: etcd-data
+        labels:
+          app: etcd
+          cost-tier: economy
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "inferx-cost-optimized"
+        resources:
+          requests:
+            storage: 10Gi  # Reduced from 100Gi
+---
+# Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: inferx-gateway
+  namespace: inferx
+  labels:
+    app: inferx-platform
+    cost-optimized: "v2.9.6"
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 4000
+      name: http
+  selector:
+    app: inferx-platform
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: statesvc
+  namespace: inferx
+  labels:
+    app: statesvc
+    cost-optimized: "v2.9.6"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 1237
+      targetPort: 1237
+      name: statesvc
+  selector:
+    app: statesvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd
+  namespace: inferx
+  labels:
+    app: etcd
+    cost-optimized: "v2.9.6"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 2379
+      targetPort: 2379
+      name: client
+    - port: 2380
+      targetPort: 2380
+      name: peer
+  selector:
+    app: etcd
+---
+# Auto-Scaling based on cost optimization
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: inferx-cost-scaling
+  namespace: inferx
+  labels:
+    platform: inferx
+    cost-optimized: "v2.9.6"
+spec:
+  scaleTargetRef:
+    name: inferx-platform
+  minReplicaCount: 1  # Reduced from 2
+  maxReplicaCount: 5  # Reduced from 20
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        metricName: inferx_requests_per_minute
+        threshold: "50"  # Reduced from 100
+        query: "sum(rate(inferx_requests_total[2m]))"
+    - type: cpu
+      metadata:
+        value: "80"  # Increased utilization target
+    - type: memory
+      metadata:
+        value: "80"  # Increased utilization target
+---
+# Resource Quotas for cost control
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: inferx-cost-quota
+  namespace: inferx
+  labels:
+    platform: inferx
+    cost-optimized: "v2.9.6"
+spec:
+  hard:
+    requests.cpu: "10"      # Reduced from 50
+    requests.memory: "20Gi" # Reduced from 200Gi
+    limits.cpu: "20"        # Reduced from 100
+    limits.memory: "40Gi"   # Reduced from 400Gi
+    persistentvolumeclaims: "5"  # Reduced from 20
+    services: "5"           # Reduced from 20
+---
+# Cost Monitoring
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: inferx-cost-metrics
+  namespace: inferx
+  labels:
+    platform: inferx
+    cost-optimized: "v2.9.6"
+spec:
+  selector:
+    matchLabels:
+      platform: inferx
+  endpoints:
+    - port: metrics
+      interval: 60s  # Reduced frequency
+      path: /metrics

@@ -1,0 +1,722 @@
+{
+  "summary": {
+    "total_remaining_issues": 39,
+    "current_readiness": 75.0,
+    "target_readiness": 95.0,
+    "improvement_needed": 20.0,
+    "timestamp": "2026-02-09T05:05:24.275545"
+  },
+  "issues_by_type": {
+    "Hardcoded Secret": 15,
+    "SQL Injection": 2,
+    "Infinite loop": 2,
+    "Blocking subprocess": 3,
+    "Very Long Function": 3,
+    "God Class": 1,
+    "Duplicate Code Pattern": 1,
+    "Remaining Print Statements": 1,
+    "Excessive TODOs": 2,
+    "Missing Production File": 4,
+    "Insufficient Testing": 1,
+    "Missing Monitoring Config": 3,
+    "Missing CI/CD Pipeline": 1
+  },
+  "issues_by_severity": {
+    "CRITICAL": 15,
+    "HIGH": 15,
+    "MEDIUM": 8,
+    "LOW": 1
+  },
+  "prioritized_fixes": [
+    {
+      "phase": 1,
+      "title": "Critical Security Fixes",
+      "timeline": "24 hours",
+      "issues": [
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/production_readiness_assessment_fixed.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "secret\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/secure_gcp_setup.py",
+          "type": "Hardcoded Secret",
+          "count": 2,
+          "severity": "CRITICAL",
+          "pattern": "api_key\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/vast_gamma_engine.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "api_key\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/setup_oauth2_gcp.py",
+          "type": "Hardcoded Secret",
+          "count": 2,
+          "severity": "CRITICAL",
+          "pattern": "api_key\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_hf_write_token.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_integration.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/google_oauth_api.py",
+          "type": "Hardcoded Secret",
+          "count": 2,
+          "severity": "CRITICAL",
+          "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_battle_test.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_provider.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_cli.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_arbitrage_engine_all_providers.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "api_key\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_arbitrage_engine_all_providers.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_runpod_api.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "api_key\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/hf_integration.py",
+          "type": "Hardcoded Secret",
+          "count": 1,
+          "severity": "CRITICAL",
+          "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_tensordock.py",
+          "type": "Hardcoded Secret",
+          "count": 8,
+          "severity": "CRITICAL",
+          "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+        }
+      ],
+      "impact": 8,
+      "effort": "High"
+    },
+    {
+      "phase": 2,
+      "title": "High Priority Issues",
+      "timeline": "1 week",
+      "issues": [
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_saas_platform.py",
+          "type": "SQL Injection",
+          "count": 1,
+          "severity": "HIGH",
+          "pattern": "f[\"\\'][^\"\\']*SELECT[^\"\\']*\\{[^}]*\\}[^\"\\']*[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_terminal_dashboard.py",
+          "type": "SQL Injection",
+          "count": 1,
+          "severity": "HIGH",
+          "pattern": "f[\"\\'][^\"\\']*SELECT[^\"\\']*\\{[^}]*\\}[^\"\\']*[\"\\']"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/github_api_integration.py",
+          "type": "Blocking subprocess",
+          "count": 4,
+          "severity": "HIGH",
+          "recommendation": "Convert to async/await"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/secure_gcp_setup.py",
+          "type": "Blocking subprocess",
+          "count": 8,
+          "severity": "HIGH",
+          "recommendation": "Convert to async/await"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/simple_latency_oracle.py",
+          "type": "Blocking subprocess",
+          "count": 1,
+          "severity": "HIGH",
+          "recommendation": "Convert to async/await"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/microservices.py",
+          "type": "Very Long Function",
+          "function_name": "setup_provider_routes",
+          "line_count": 101,
+          "severity": "HIGH",
+          "recommendation": "Break into smaller functions"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_weakness_resolver.py",
+          "type": "Very Long Function",
+          "function_name": "_resolve_all_deployment_issues",
+          "line_count": 250,
+          "severity": "HIGH",
+          "recommendation": "Break into smaller functions"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_resolution_final_report.py",
+          "type": "Very Long Function",
+          "function_name": "generate_complete_resolution_report",
+          "line_count": 313,
+          "severity": "HIGH",
+          "recommendation": "Break into smaller functions"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_terminal_dashboard.py",
+          "type": "God Class",
+          "class_name": "KubernetesTerminalDashboard",
+          "method_count": 23,
+          "severity": "HIGH",
+          "recommendation": "Split into smaller classes"
+        },
+        {
+          "file": ".env.example",
+          "type": "Missing Production File",
+          "severity": "HIGH",
+          "recommendation": "Create .env.example"
+        },
+        {
+          "file": "LICENSE",
+          "type": "Missing Production File",
+          "severity": "HIGH",
+          "recommendation": "Create LICENSE"
+        },
+        {
+          "file": "CHANGELOG.md",
+          "type": "Missing Production File",
+          "severity": "HIGH",
+          "recommendation": "Create CHANGELOG.md"
+        },
+        {
+          "file": "CONTRIBUTING.md",
+          "type": "Missing Production File",
+          "severity": "HIGH",
+          "recommendation": "Create CONTRIBUTING.md"
+        },
+        {
+          "file": "test_infrastructure",
+          "type": "Insufficient Testing",
+          "count": 8,
+          "severity": "HIGH",
+          "recommendation": "Add comprehensive test suite"
+        },
+        {
+          "file": "CI/CD",
+          "type": "Missing CI/CD Pipeline",
+          "severity": "HIGH",
+          "recommendation": "Set up CI/CD pipeline"
+        }
+      ],
+      "impact": 6,
+      "effort": "Medium"
+    },
+    {
+      "phase": 3,
+      "title": "Architecture Refactoring",
+      "timeline": "2 weeks",
+      "issues": [
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/microservices.py",
+          "type": "Very Long Function",
+          "function_name": "setup_provider_routes",
+          "line_count": 101,
+          "severity": "HIGH",
+          "recommendation": "Break into smaller functions"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_weakness_resolver.py",
+          "type": "Very Long Function",
+          "function_name": "_resolve_all_deployment_issues",
+          "line_count": 250,
+          "severity": "HIGH",
+          "recommendation": "Break into smaller functions"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_resolution_final_report.py",
+          "type": "Very Long Function",
+          "function_name": "generate_complete_resolution_report",
+          "line_count": 313,
+          "severity": "HIGH",
+          "recommendation": "Break into smaller functions"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_terminal_dashboard.py",
+          "type": "God Class",
+          "class_name": "KubernetesTerminalDashboard",
+          "method_count": 23,
+          "severity": "HIGH",
+          "recommendation": "Split into smaller classes"
+        }
+      ],
+      "impact": 5,
+      "effort": "High"
+    },
+    {
+      "phase": 4,
+      "title": "Performance Optimization",
+      "timeline": "1 week",
+      "issues": [
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/github_api_integration.py",
+          "type": "Blocking subprocess",
+          "count": 4,
+          "severity": "HIGH",
+          "recommendation": "Convert to async/await"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/secure_gcp_setup.py",
+          "type": "Blocking subprocess",
+          "count": 8,
+          "severity": "HIGH",
+          "recommendation": "Convert to async/await"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/simple_latency_oracle.py",
+          "type": "Blocking subprocess",
+          "count": 1,
+          "severity": "HIGH",
+          "recommendation": "Convert to async/await"
+        }
+      ],
+      "impact": 4,
+      "effort": "Medium"
+    },
+    {
+      "phase": 5,
+      "title": "Production Infrastructure",
+      "timeline": "1 week",
+      "issues": [
+        {
+          "file": ".env.example",
+          "type": "Missing Production File",
+          "severity": "HIGH",
+          "recommendation": "Create .env.example"
+        },
+        {
+          "file": "LICENSE",
+          "type": "Missing Production File",
+          "severity": "HIGH",
+          "recommendation": "Create LICENSE"
+        },
+        {
+          "file": "CHANGELOG.md",
+          "type": "Missing Production File",
+          "severity": "HIGH",
+          "recommendation": "Create CHANGELOG.md"
+        },
+        {
+          "file": "CONTRIBUTING.md",
+          "type": "Missing Production File",
+          "severity": "HIGH",
+          "recommendation": "Create CONTRIBUTING.md"
+        },
+        {
+          "file": "CI/CD",
+          "type": "Missing CI/CD Pipeline",
+          "severity": "HIGH",
+          "recommendation": "Set up CI/CD pipeline"
+        }
+      ],
+      "impact": 7,
+      "effort": "Medium"
+    },
+    {
+      "phase": 6,
+      "title": "Code Quality Polish",
+      "timeline": "1 week",
+      "issues": [
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/production_readiness_assessment_fixed.py",
+          "type": "Infinite loop",
+          "count": 1,
+          "severity": "MEDIUM",
+          "recommendation": "Optimize loop pattern"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_terminal_dashboard.py",
+          "type": "Infinite loop",
+          "count": 1,
+          "severity": "MEDIUM",
+          "recommendation": "Optimize loop pattern"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_resolution_final_report.py",
+          "type": "Remaining Print Statements",
+          "count": 211,
+          "severity": "MEDIUM",
+          "recommendation": "Convert to logging"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/critical_weakness_fixer.py",
+          "type": "Excessive TODOs",
+          "count": 13,
+          "severity": "MEDIUM",
+          "recommendation": "Address or reduce TODOs"
+        },
+        {
+          "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_connect_card.py",
+          "type": "Excessive TODOs",
+          "count": 11,
+          "severity": "MEDIUM",
+          "recommendation": "Address or reduce TODOs"
+        },
+        {
+          "file": "prometheus.yml",
+          "type": "Missing Monitoring Config",
+          "severity": "MEDIUM",
+          "recommendation": "Create prometheus.yml"
+        },
+        {
+          "file": "grafana.ini",
+          "type": "Missing Monitoring Config",
+          "severity": "MEDIUM",
+          "recommendation": "Create grafana.ini"
+        },
+        {
+          "file": "alertmanager.yml",
+          "type": "Missing Monitoring Config",
+          "severity": "MEDIUM",
+          "recommendation": "Create alertmanager.yml"
+        }
+      ],
+      "impact": 3,
+      "effort": "Low"
+    }
+  ],
+  "effort_estimates": {
+    "total_hours": 98.5,
+    "total_days": 12.3125,
+    "effort_by_type": {
+      "Hardcoded Secret": 60,
+      "SQL Injection": 4,
+      "Infinite loop": 2,
+      "Blocking subprocess": 6,
+      "Very Long Function": 6,
+      "God Class": 2,
+      "Duplicate Code Pattern": 0.5,
+      "Remaining Print Statements": 1,
+      "Excessive TODOs": 2,
+      "Missing Production File": 8,
+      "Insufficient Testing": 2,
+      "Missing Monitoring Config": 3,
+      "Missing CI/CD Pipeline": 2
+    },
+    "team_size_needed": 2
+  },
+  "detailed_issues": [
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production_readiness_assessment_fixed.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "secret\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/terradev_saas_platform.py",
+      "type": "SQL Injection",
+      "count": 1,
+      "severity": "HIGH",
+      "pattern": "f[\"\\'][^\"\\']*SELECT[^\"\\']*\\{[^}]*\\}[^\"\\']*[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_terminal_dashboard.py",
+      "type": "SQL Injection",
+      "count": 1,
+      "severity": "HIGH",
+      "pattern": "f[\"\\'][^\"\\']*SELECT[^\"\\']*\\{[^}]*\\}[^\"\\']*[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/secure_gcp_setup.py",
+      "type": "Hardcoded Secret",
+      "count": 2,
+      "severity": "CRITICAL",
+      "pattern": "api_key\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/vast_gamma_engine.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "api_key\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/setup_oauth2_gcp.py",
+      "type": "Hardcoded Secret",
+      "count": 2,
+      "severity": "CRITICAL",
+      "pattern": "api_key\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_hf_write_token.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_integration.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/google_oauth_api.py",
+      "type": "Hardcoded Secret",
+      "count": 2,
+      "severity": "CRITICAL",
+      "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_battle_test.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_provider.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/tensordock_cli.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_arbitrage_engine_all_providers.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "api_key\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_arbitrage_engine_all_providers.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/real_runpod_api.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "api_key\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/hf_integration.py",
+      "type": "Hardcoded Secret",
+      "count": 1,
+      "severity": "CRITICAL",
+      "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/test_tensordock.py",
+      "type": "Hardcoded Secret",
+      "count": 8,
+      "severity": "CRITICAL",
+      "pattern": "token\\s*=\\s*[\"\\'][^\"\\']+[\"\\']"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/production_readiness_assessment_fixed.py",
+      "type": "Infinite loop",
+      "count": 1,
+      "severity": "MEDIUM",
+      "recommendation": "Optimize loop pattern"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/github_api_integration.py",
+      "type": "Blocking subprocess",
+      "count": 4,
+      "severity": "HIGH",
+      "recommendation": "Convert to async/await"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_terminal_dashboard.py",
+      "type": "Infinite loop",
+      "count": 1,
+      "severity": "MEDIUM",
+      "recommendation": "Optimize loop pattern"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/secure_gcp_setup.py",
+      "type": "Blocking subprocess",
+      "count": 8,
+      "severity": "HIGH",
+      "recommendation": "Convert to async/await"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/simple_latency_oracle.py",
+      "type": "Blocking subprocess",
+      "count": 1,
+      "severity": "HIGH",
+      "recommendation": "Convert to async/await"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/microservices.py",
+      "type": "Very Long Function",
+      "function_name": "setup_provider_routes",
+      "line_count": 101,
+      "severity": "HIGH",
+      "recommendation": "Break into smaller functions"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_weakness_resolver.py",
+      "type": "Very Long Function",
+      "function_name": "_resolve_all_deployment_issues",
+      "line_count": 250,
+      "severity": "HIGH",
+      "recommendation": "Break into smaller functions"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_resolution_final_report.py",
+      "type": "Very Long Function",
+      "function_name": "generate_complete_resolution_report",
+      "line_count": 313,
+      "severity": "HIGH",
+      "recommendation": "Break into smaller functions"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_terminal_dashboard.py",
+      "type": "God Class",
+      "class_name": "KubernetesTerminalDashboard",
+      "method_count": 23,
+      "severity": "HIGH",
+      "recommendation": "Split into smaller classes"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/microservices.py",
+      "type": "Duplicate Code Pattern",
+      "count": 6,
+      "severity": "LOW",
+      "recommendation": "Extract to function"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/complete_resolution_final_report.py",
+      "type": "Remaining Print Statements",
+      "count": 211,
+      "severity": "MEDIUM",
+      "recommendation": "Convert to logging"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/critical_weakness_fixer.py",
+      "type": "Excessive TODOs",
+      "count": 13,
+      "severity": "MEDIUM",
+      "recommendation": "Address or reduce TODOs"
+    },
+    {
+      "file": "/Users/theowolfenden/CascadeProjects/Terradev/kubernetes_connect_card.py",
+      "type": "Excessive TODOs",
+      "count": 11,
+      "severity": "MEDIUM",
+      "recommendation": "Address or reduce TODOs"
+    },
+    {
+      "file": ".env.example",
+      "type": "Missing Production File",
+      "severity": "HIGH",
+      "recommendation": "Create .env.example"
+    },
+    {
+      "file": "LICENSE",
+      "type": "Missing Production File",
+      "severity": "HIGH",
+      "recommendation": "Create LICENSE"
+    },
+    {
+      "file": "CHANGELOG.md",
+      "type": "Missing Production File",
+      "severity": "HIGH",
+      "recommendation": "Create CHANGELOG.md"
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "type": "Missing Production File",
+      "severity": "HIGH",
+      "recommendation": "Create CONTRIBUTING.md"
+    },
+    {
+      "file": "test_infrastructure",
+      "type": "Insufficient Testing",
+      "count": 8,
+      "severity": "HIGH",
+      "recommendation": "Add comprehensive test suite"
+    },
+    {
+      "file": "prometheus.yml",
+      "type": "Missing Monitoring Config",
+      "severity": "MEDIUM",
+      "recommendation": "Create prometheus.yml"
+    },
+    {
+      "file": "grafana.ini",
+      "type": "Missing Monitoring Config",
+      "severity": "MEDIUM",
+      "recommendation": "Create grafana.ini"
+    },
+    {
+      "file": "alertmanager.yml",
+      "type": "Missing Monitoring Config",
+      "severity": "MEDIUM",
+      "recommendation": "Create alertmanager.yml"
+    },
+    {
+      "file": "CI/CD",
+      "type": "Missing CI/CD Pipeline",
+      "severity": "HIGH",
+      "recommendation": "Set up CI/CD pipeline"
+    }
+  ]
+}

@@ -1,0 +1,385 @@
+# Grafana Dashboard Configuration for Kubernetes Training
+{
+  "dashboard": {
+    "id": null,
+    "title": "Kubernetes Training Workloads",
+    "tags": ["kubernetes", "training", "ml", "gpu"],
+    "style": "dark",
+    "timezone": "browser",
+    "editable": true,
+    "hideControls": false,
+    "graphTooltip": 1,
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1,
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Training Jobs",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "kube_job_status{status=~\"Running\", namespace=~\"default\"}",
+            "legendFormat": "{{job}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": ""
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Training Job Success Rate",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "kube_job_status_succeeded{namespace=~\"default\"} / kube_job_status_total{namespace=~\"default\"}",
+            "legendFormat": "Success Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 70
+                },
+                {
+                  "color": "green",
+                  "value": 90
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "GPU Utilization",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(nvidia_gpu_utilization_gpu{namespace=~\"default\"})",
+            "legendFormat": "{{pod}} - GPU{{gpu}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "GPU Utilization %",
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "xAxes": [
+          {
+            "mode": "time"
+          }
+        ],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2
+      },
+      {
+        "id": 4,
+        "title": "GPU Memory Usage",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "nvidia_gpu_memory_used_bytes{namespace=~\"default\"}",
+            "legendFormat": "{{pod}} - GPU{{gpu}}",
+            "refId": "A"
+          },
+          {
+            "expr": "nvidia_gpu_memory_total_bytes{namespace=~\"default\"}",
+            "legendFormat": "{{pod}} - GPU{{gpu}} Total",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Memory Bytes",
+            "format": "bytes"
+          }
+        ],
+        "xAxes": [
+          {
+            "mode": "time"
+          }
+        ],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2
+      },
+      {
+        "id": 5,
+        "title": "CPU Usage",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        },
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{namespace=~\"default\",pod=~\"training.*\"})",
+            "legendFormat": "{{pod}} - {{container}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "CPU Usage",
+            "format": "short"
+          }
+        ],
+        "xAxes": [
+          {
+            "mode": "time"
+          }
+        ],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2
+      },
+      {
+        "id": 6,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        },
+        "targets": [
+          {
+            "expr": "rate(container_memory_working_set_bytes{namespace=~\"default\",pod=~\"training.*\"})",
+            "legendFormat": "{{pod}} - {{container}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Memory Usage",
+            "format": "bytes"
+          }
+        ],
+        "xAxes": [
+          {
+            "mode": "time"
+          }
+        ],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2
+      },
+      {
+        "id": 7,
+        "title": "Training Job Duration",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 32
+        },
+        "targets": [
+          {
+            "expr": "kube_job_status_completion_time_seconds{namespace=~\"default\"}",
+            "legendFormat": "{{job}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Duration (seconds)",
+            "format": "seconds"
+          }
+        ],
+        "xAxes": [
+          {
+            "mode": "time"
+          }
+        ],
+        "lines": true,
+        "fill": 0,
+        "linewidth": 2
+      },
+      {
+        "id": 8,
+        "title": "Node GPU Status",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 40
+        },
+        "targets": [
+          {
+            "expr": "kube_node_info",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          },
+          {
+            "expr": "kube_node_status_condition{condition=\"Ready\", status=\"true\"}",
+            "format": "table",
+            "instant": true,
+            "refId": "B"
+          },
+          {
+            "expr": "nvidia_gpu_memory_total_bytes",
+            "format": "table",
+            "instant": true,
+            "refId": "C"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "merge",
+            "options": {}
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "__name__": true,
+                "job": true,
+                "instance": true
+              },
+              "indexByName": {
+                "node": 0
+              },
+              "renameByName": {
+                "node": "Node",
+                "instance_type": "Instance Type",
+                "zone": "Zone",
+                "region": "Region",
+                "kernel_version": "Kernel Version",
+                "os_image": "OS Image",
+                "container_runtime_version": "Container Runtime",
+                "kubelet_version": "Kubelet Version",
+                "kubeproxy_version": "KubeProxy Version"
+              }
+            }
+          }
+        ],
+        "styles": [
+          {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "short",
+            "mappingType": 1,
+            "valueMaps": [
+              {
+                "value": "null",
+                "text": "N/A"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "namespace",
+          "type": "query",
+          "datasource": "prometheus",
+          "query": "label_values(kube_job_status, namespace)",
+          "refresh": 1,
+          "includeAll": false,
+          "allValue": null,
+          "current": {
+            "text": "default",
+            "value": "default"
+          }
+        },
+        {
+          "name": "job",
+          "type": "query",
+          "datasource": "prometheus",
+          "query": "label_values(kube_job_status{namespace=~\"$namespace\"}, job)",
+          "refresh": 1,
+          "includeAll": false,
+          "allValue": null,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          }
+        }
+      ]
+    },
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}

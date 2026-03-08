@@ -1,0 +1,142 @@
+[
+  {
+    "company_size": "startup",
+    "current_costs": {
+      "breakdown": {
+        "a100": 1217.9999999999998,
+        "h100": 720.0,
+        "a10g": 121.0
+      },
+      "overhead_multiplier": 1.0,
+      "total": 2059.0
+    },
+    "terradev_costs": {
+      "breakdown": {
+        "a100": 445.19999999999993,
+        "h100": 264.0,
+        "a10g": 44.2
+      },
+      "spot_usage_percentage": 80,
+      "overhead_multiplier": 1.02,
+      "total": 768.47
+    },
+    "operational_savings": 4.8,
+    "monthly_savings": {
+      "infrastructure": 1290.53,
+      "operational": 4.8,
+      "total": 1295.33,
+      "percentage": 62.9
+    },
+    "annual_savings": 15543.96,
+    "roi": {
+      "subscription_cost": 499,
+      "payback_period_months": 0.4,
+      "annual_roi_percentage": 3115.0
+    }
+  },
+  {
+    "company_size": "smb",
+    "current_costs": {
+      "breakdown": {
+        "a100": 3247.9999999999995,
+        "h100": 5760.0,
+        "a10g": 484.0
+      },
+      "overhead_multiplier": 1.15,
+      "total": 10915.8
+    },
+    "terradev_costs": {
+      "breakdown": {
+        "a100": 1187.1999999999998,
+        "h100": 2112.0,
+        "a10g": 176.8
+      },
+      "spot_usage_percentage": 80,
+      "overhead_multiplier": 1.02,
+      "total": 3545.52
+    },
+    "operational_savings": 9.6,
+    "monthly_savings": {
+      "infrastructure": 7370.279999999999,
+      "operational": 9.6,
+      "total": 7379.879999999999,
+      "percentage": 67.6
+    },
+    "annual_savings": 88558.56,
+    "roi": {
+      "subscription_cost": 1999,
+      "payback_period_months": 0.3,
+      "annual_roi_percentage": 4430.1
+    }
+  },
+  {
+    "company_size": "enterprise",
+    "current_costs": {
+      "breakdown": {
+        "a100": 12179.999999999998,
+        "h100": 43200.0,
+        "a10g": 1210.0
+      },
+      "overhead_multiplier": 1.15,
+      "total": 65078.5
+    },
+    "terradev_costs": {
+      "breakdown": {
+        "a100": 4452.0,
+        "h100": 15840.0,
+        "a10g": 442.0
+      },
+      "spot_usage_percentage": 80,
+      "overhead_multiplier": 1.02,
+      "total": 21148.68
+    },
+    "operational_savings": 19.2,
+    "monthly_savings": {
+      "infrastructure": 43929.82,
+      "operational": 19.2,
+      "total": 43949.02,
+      "percentage": 67.5
+    },
+    "annual_savings": 527388.24,
+    "roi": {
+      "subscription_cost": 7999,
+      "payback_period_months": 0.2,
+      "annual_roi_percentage": 6593.2
+    }
+  },
+  {
+    "company_size": "ai_lab",
+    "current_costs": {
+      "breakdown": {
+        "a100": 30939.999999999996,
+        "h100": 205875.0,
+        "a10g": 2305.0
+      },
+      "overhead_multiplier": 1.05,
+      "total": 251076.0
+    },
+    "terradev_costs": {
+      "breakdown": {
+        "a100": 14840.0,
+        "h100": 99000.0,
+        "a10g": 1105.0
+      },
+      "spot_usage_percentage": 80,
+      "overhead_multiplier": 1.02,
+      "total": 117243.9
+    },
+    "operational_savings": 38.4,
+    "monthly_savings": {
+      "infrastructure": 133832.1,
+      "operational": 38.4,
+      "total": 133870.5,
+      "percentage": 53.3
+    },
+    "annual_savings": 1606446.0,
+    "roi": {
+      "subscription_cost": 19999,
+      "payback_period_months": 0.1,
+      "annual_roi_percentage": 8032.6
+    }
+  }
+]

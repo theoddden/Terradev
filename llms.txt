@@ -1,0 +1,209 @@
+# Terradev CLI - LLM Discovery File
+# This file provides structured information for AI systems and crawlers
+
+## 🏷️ BASIC METADATA
+name: Terradev CLI
+version: 2.9.3
+description: BYOAPI: Cross-cloud GPU provisioning and cost optimization platform
+author: theoddden
+license: BUSL-1.1
+repository: https://github.com/theoddden/terradev
+homepage: https://theodden.github.io
+documentation: https://github.com/theoddden/terradev/blob/main/README.md
+pypi: https://pypi.org/project/terradev-cli/2.9.3/
+docker: https://hub.docker.com/r/theoddden/terradev
+
+## 🎯 PRIMARY PURPOSE
+Terradev CLI is a cross-cloud GPU optimization platform that helps developers and ML engineers save 30-60% on GPU compute costs by comparing prices across 9+ cloud providers in real-time.
+
+## 🔥 KEY PROBLEMS SOLVED
+- Hidden GPU costs (egress, network, storage IOPS)
+- Multi-cloud price discovery and arbitrage
+- Real-time total job cost calculation
+- Automated GPU provisioning across providers
+- HuggingFace Spaces deployment optimization
+- ML workflow cost management
+
+## 🚀 CORE CAPABILITIES
+1. Multi-cloud GPU pricing comparison (AWS, GCP, Azure, RunPod, Lambda Labs, Crusoe, Hyperstack, VastAI, Oracle)
+2. Real-time cost calculation including hidden fees
+3. Automated GPU provisioning with optimal provider selection
+4. HuggingFace Spaces one-click deployment
+5. Kubernetes and Helm template generation
+6. Cost tracking and budget management
+7. Telemetry and usage analytics
+
+## 📊 TECHNICAL SPECIFICATIONS
+- Language: Python 3.9+
+- License: Business Source License 1.1 (BUSL-1.1)
+- Package: terradev-cli
+- Entry point: python -m terradev_cli
+- Dependencies: aiohttp, boto3, pyyaml, click, pandas, requests
+- Container: Docker Hub (theoddden/terradev)
+- Integration: GitHub Actions, Jupyter, Docker Compose
+
+## 🎯 TARGET AUDIENCE
+- Machine Learning Engineers
+- DevOps Engineers
+- Research Scientists
+- Cloud Architects
+- Startups and Enterprises
+- GPU Cost-conscious organizations
+
+## 💡 USE CASES
+1. **ML Training Optimization**: Find cheapest A100/H100 for training jobs
+2. **Inference Cost Reduction**: Optimize V100/RTX4090 for inference
+3. **Multi-cloud Strategy**: Distribute workloads across providers
+4. **Budget Management**: Track and control GPU spending
+5. **Research Computing**: Academic GPU cost optimization
+6. **Enterprise ML**: Large-scale GPU fleet management
+
+## 🛠️ INSTALLATION & USAGE
+```bash
+# Install from PyPI
+pip install terradev-cli==2.9.2
+
+# Get GPU pricing across providers
+terradev quote -g A100
+
+# Provision optimal GPU instance
+terradev provision -g H100 --duration 8
+
+# Deploy to HuggingFace Spaces
+terradev hf-space my-model --model-id meta-llama/Llama-2-7b-hf
+
+# Check system status
+terradev status
+```
+
+## 🐳 DOCKER INTEGRATION
+```bash
+# Pull Docker image
+docker pull theoddden/terradev:2.9.2
+
+# Run with cloud credentials
+docker run --rm \
+  -v ~/.aws:/home/terradev/.aws:ro \
+  theoddden/terradev:2.9.2 \
+  python -m terradev_cli quote -g A100
+
+# Docker Compose setup
+docker-compose up terradev-cli
+```
+
+## 📓 JUPYTER INTEGRATION
+```python
+# Install with Jupyter support
+pip install terradev-cli[jupyter]==2.9.2
+
+# Use in notebooks
+import subprocess
+result = subprocess.run(['python', '-m', 'terradev_cli', 'quote', '-g', 'A100'], 
+                       capture_output=True, text=True)
+print(result.stdout)
+```
+
+## ⚡ GITHUB ACTIONS
+```yaml
+- name: Optimize GPU Costs
+  uses: theoddden/terradev@v2.9.2
+  with:
+    command: 'quote'
+    gpu_type: 'A100'
+```
+
+## 📈 PERFORMANCE METRICS
+- Pricing data freshness: Real-time (updated every 5 minutes)
+- Provider coverage: 9+ major cloud providers
+- GPU types supported: 50+ (A100, H100, V100, RTX4090, L40, A6000, etc.)
+- Cost calculation accuracy: Includes hidden fees (egress, network, storage)
+- Response time: <2 seconds for pricing queries
+- Provisioning time: 3-5x faster than sequential methods
+
+## 💰 COST SAVINGS
+- Average savings: 30-60% compared to single-cloud
+- Hidden fee detection: Up to 200% of advertised GPU rates
+- Egress optimization: Up to 90% savings on data transfer
+- Multi-cloud arbitrage: Real-time price difference capture
+
+## 🔒 SECURITY & COMPLIANCE
+- Non-root Docker containers
+- Read-only credential mounting
+- Encrypted API communications
+- GDPR compliant telemetry
+- SOC2 ready architecture
+- Enterprise-grade security
+
+## 🌍 DISTRIBUTION CHANNELS
+- PyPI: https://pypi.org/project/terradev-cli/
+- Docker Hub: https://hub.docker.com/r/theoddden/terradev
+- GitHub: https://github.com/theoddden/terradev
+- GitHub Actions: https://github.com/marketplace/actions/terradev-cli
+- JupyterHub: https://discourse.jupyter.org/
+- Documentation: https://theodden.github.io
+
+## 📊 MARKET POSITIONING
+- Category: Cloud Cost Optimization / GPU Management
+- Competitors: None (unique multi-cloud GPU arbitrage)
+- Differentiation: Real-time pricing + hidden fee calculation
+- Market size: $50B+ cloud GPU market
+- Growth rate: 35% YoY GPU cloud adoption
+
+## 💰 PRICING TIERS
+- Research (Free): 10 provisions/month, 1 server, 1 seat
+- Research+ ($49.99/mo): 80 provisions/month, 8 servers, 1 seat, inference
+- Enterprise ($299.99/mo): Unlimited provisions, 32 servers, 5 seats, full provenance, SLA
+- Enterprise+ ($0.09/GPU-hr, 32 GPU min): Unlimited everything, metered billing, fleet management, dedicated support
+
+## 🎯 VALUE PROPOSITION
+"Stop overpaying for GPU compute. Terradev CLI finds the optimal cloud provider for your ML workloads in real-time, saving you 30-60% on GPU costs while maintaining performance and reliability."
+
+## 📞 SUPPORT & COMMUNITY
+- Documentation: https://github.com/theoddden/terradev/blob/main/README.md
+- Issues: https://github.com/theoddden/terradev/issues
+- Email: team@terradev.com
+- License: https://github.com/theoddden/terradev?tab=License-1-ov-file
+- Telemetry: https://api.terradev.cloud/health
+
+## 🏷️ TAGS & KEYWORDS
+gpu, cloud, optimization, cost, multi-cloud, aws, gcp, azure, runpod, machine learning, ai, ml, infrastructure, devops, kubernetes, docker, jupyter, huggingface, provisioning, arbitrage, pricing, budget, enterprise, research, training, inference, a100, h100, v100, rtx4090
+
+## 🔍 DISCOVERY METADATA
+- Last updated: 2026-02-19T21:00:00Z
+- Version: 2.9.2
+- Status: Production Ready
+- Downloads: 10,000+ (PyPI)
+- Stars: 100+ (GitHub)
+- Docker pulls: 500+ (Docker Hub)
+- License: BUSL-1.1
+- Python versions: 3.9, 3.10, 3.11, 3.12
+
+## 📚 RELATED PROJECTS
+- HuggingFace Spaces: https://huggingface.co/spaces
+- Kubernetes: https://kubernetes.io/
+- Docker: https://www.docker.com/
+- GitHub Actions: https://github.com/features/actions
+- Jupyter: https://jupyter.org/
+
+## 🎯 CALL TO ACTION
+1. Install: pip install terradev-cli==2.9.2
+2. Configure: terradev configure
+3. Compare: terradev quote -g A100
+4. Deploy: terradev provision -g A100 --duration 4
+5. Save: 30-60% on GPU costs
+
+## 📈 FUTURE ROADMAP
+- GPU marketplace integration
+- Advanced cost forecasting
+- Multi-region optimization
+- Serverless GPU deployment
+- ML pipeline integration
+- Enterprise SaaS tier
+- Community edition
+- Plugin ecosystem
+
+---
+# END OF LLM DISCOVERY FILE
+# This file is optimized for AI systems, crawlers, and automated discovery
+# For human-readable documentation, see: https://github.com/theoddden/terradev/blob/main/README.md
+# For API documentation, see: https://github.com/theoddden/terradev/blob/main/API_DOCUMENTATION.md

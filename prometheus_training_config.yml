@@ -1,0 +1,185 @@
+# Prometheus Configuration for Kubernetes Training
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "training_rules.yml"
+
+scrape_configs:
+  # Kubernetes API Server
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+    - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+      action: keep
+      regex: default;kubernetes;https
+
+  # Node Exporter
+  - job_name: 'kubernetes-nodes'
+    kubernetes_sd_configs:
+    - role: node
+    relabel_configs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - target_label: __address__
+      replacement: kubernetes.default.svc:443
+    - source_labels: [__meta_kubernetes_node_name]
+      regex: (.+)
+      target_label: __metrics_path__
+      replacement: /api/v1/nodes/${1}/proxy/metrics
+
+  # Kubelet
+  - job_name: 'kubernetes-kubelet'
+    kubernetes_sd_configs:
+    - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - target_label: __address__
+      replacement: kubernetes.default.svc:443
+    - source_labels: [__meta_kubernetes_node_name]
+      regex: (.+)
+      target_label: __metrics_path__
+      replacement: /api/v1/nodes/${1}/proxy/metrics
+
+  # cAdvisor
+  - job_name: 'kubernetes-cadvisor'
+    kubernetes_sd_configs:
+    - role: node
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - target_label: __address__
+      replacement: kubernetes.default.svc:443
+    - source_labels: [__meta_kubernetes_node_name]
+      regex: (.+)
+      target_label: __metrics_path__
+      replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+
+  # Training Jobs
+  - job_name: 'training-jobs'
+    kubernetes_sd_configs:
+    - role: pod
+    namespaces:
+      names:
+      - default
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+      action: keep
+      regex: true
+    - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+      action: replace
+      target_label: __metrics_path__
+      regex: (.+)
+    - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+      action: replace
+      regex: ([^:]+)(?::\d+)?;(\d+)
+      replacement: $1:$2
+      target_label: __address__
+    - action: labelmap
+      regex: __meta_kubernetes_pod_label_(.+)
+    - source_labels: [__meta_kubernetes_namespace]
+      action: replace
+      target_label: kubernetes_namespace
+    - source_labels: [__meta_kubernetes_pod_name]
+      action: replace
+      target_label: kubernetes_pod_name
+
+  # NVIDIA GPU Exporter
+  - job_name: 'nvidia-gpu-exporter'
+    kubernetes_sd_configs:
+    - role: pod
+    namespaces:
+      names:
+      - default
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_label_app]
+      action: keep
+      regex: nvidia-gpu-exporter
+    - source_labels: [__meta_kubernetes_pod_ip]
+      action: replace
+      target_label: __address__
+      regex: (.+)
+      replacement: $1:9445
+    - action: labelmap
+      regex: __meta_kubernetes_pod_label_(.+)
+
+  # HuggingFace Training Metrics
+  - job_name: 'huggingface-training'
+    kubernetes_sd_configs:
+    - role: pod
+    namespaces:
+      names:
+      - default
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_label_app]
+      action: keep
+      regex: huggingface-training
+    - source_labels: [__meta_kubernetes_pod_ip]
+      action: replace
+      target_label: __address__
+      regex: (.+)
+      replacement: $1:8080
+    - action: labelmap
+      regex: __meta_kubernetes_pod_label_(.+)
+
+  # Jupyter Notebooks
+  - job_name: 'jupyter-notebooks'
+    kubernetes_sd_configs:
+    - role: pod
+    namespaces:
+      names:
+      - default
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_label_app]
+      action: keep
+      regex: jupyter
+    - source_labels: [__meta_kubernetes_pod_ip]
+      action: replace
+      target_label: __address__
+      regex: (.+)
+      replacement: $1:8888
+    - action: labelmap
+      regex: __meta_kubernetes_pod_label_(.+)
+
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - alertmanager:9093
+
+# Recording Rules
+recording_rules:
+  - name: training_rules.yml
+    rules:
+    - record: kube_job_status_total
+      expr: sum(kube_job_status) by (job, namespace)
+    - record: kube_job_status_succeeded
+      expr: sum(kube_job_status{status="succeeded"}) by (job, namespace)
+    - record: kube_job_status_failed
+      expr: sum(kube_job_status{status="failed"}) by (job, namespace)
+    - record: kube_job_status_running
+      expr: sum(kube_job_status{status="running"}) by (job, namespace)
+    - record: training_gpu_utilization_avg
+      expr: avg(rate(nvidia_gpu_utilization_gpu{namespace="default"})) by (pod, gpu)
+    - record: training_gpu_memory_used_avg
+      expr: avg(nvidia_gpu_memory_used_bytes{namespace="default"}) by (pod, gpu)
+    - record: training_cpu_usage_avg
+      expr: avg(rate(container_cpu_usage_seconds_total{namespace="default",pod=~"training.*"})) by (pod, container)
+    - record: training_memory_usage_avg
+      expr: avg(rate(container_memory_working_set_bytes{namespace="default",pod=~"training.*"})) by (pod, container)

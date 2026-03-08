@@ -1,0 +1,84 @@
+{
+  "generated_at": "2026-02-09T22:15:59.702666",
+  "package_name": "terradev-cli",
+  "package_version": "1.0.4",
+  "package_description": "Terradev CLI - Cross-Cloud Compute Optimization Platform",
+  "author": "Terradev Team",
+  "license": "MIT",
+  "python_requires": ">=3.9",
+  "downloads": {
+    "last_day": -1,
+    "last_week": -1,
+    "last_month": -1
+  },
+  "releases": [
+    {
+      "version": "1.0.0",
+      "upload_time": "2026-02-09 21:16:00.734410+00:00",
+      "size_wheel": 6238,
+      "size_sdist": 7591,
+      "downloads": -1
+    },
+    {
+      "version": "1.0.1",
+      "upload_time": "2026-02-09 21:31:06.296068+00:00",
+      "size_wheel": 6238,
+      "size_sdist": 7581,
+      "downloads": -1
+    },
+    {
+      "version": "1.0.2",
+      "upload_time": "2026-02-09 21:44:55.876960+00:00",
+      "size_wheel": 6069,
+      "size_sdist": 7227,
+      "downloads": -1
+    },
+    {
+      "version": "1.0.3",
+      "upload_time": "2026-02-09 21:50:42.693703+00:00",
+      "size_wheel": 6074,
+      "size_sdist": 7248,
+      "downloads": -1
+    },
+    {
+      "version": "1.0.4",
+      "upload_time": "2026-02-09 22:07:54.197194+00:00",
+      "size_wheel": 6116,
+      "size_sdist": 7342,
+      "downloads": -1
+    }
+  ],
+  "metrics": {
+    "total_releases": 5,
+    "time_span_hours": 0.8648507733333333,
+    "first_release": "2026-02-09T21:16:00.734410+00:00",
+    "latest_release": "2026-02-09T22:07:54.197194+00:00",
+    "release_frequency_hours": 0.21621269333333332,
+    "avg_wheel_size": 6147.0,
+    "avg_sdist_size": 7397.8,
+    "wheel_size_trend": -122,
+    "sdist_size_trend": -249,
+    "versions": [
+      "1.0.0",
+      "1.0.1",
+      "1.0.2",
+      "1.0.3",
+      "1.0.4"
+    ],
+    "package_age_hours": 0.9997133941666666
+  },
+  "analysis": {
+    "status": "NEWLY_LAUNCHED",
+    "download_status": "NO_DOWNLOAD_DATA",
+    "release_activity": "ACTIVE",
+    "package_health": "GOOD",
+    "insights": [
+      "\ud83d\udcca Package is newly launched - PyPI shows -1 downloads for new packages",
+      "\u23f1\ufe0f Download data will be available after 24-48 hours",
+      "\ud83d\ude80 Very rapid release cycle - active development",
+      "\ud83c\udd95 Brand new package - launched today",
+      "\ud83d\udcc9 Package size decreasing - good optimization",
+      "\ud83d\udcc8 Rapid version progression - active development"
+    ]
+  }
+}
