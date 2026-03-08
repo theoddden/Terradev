@@ -45,7 +45,7 @@ def prompt_for_credentials():
             'name': 'AWS',
             'key_name': 'Access Key ID',
             'help': 'Get from: AWS IAM console',
-            'example': 'AKIAIOSFODNN7EXAMPLE'
+            'example': 'AKIAEXAMPLEKEY123456'
         },
         'gcp': {
             'name': 'Google Cloud',

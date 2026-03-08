@@ -672,7 +672,7 @@ def run_interactive_onboarding(api: TerradevAPI):
             'name': 'AWS',
             'key_name': 'Access Key ID',
             'help': 'Get from: AWS IAM console → Users → Security credentials',
-            'example': 'AKIAIOSFODNN7EXAMPLE',
+            'example': 'AKIAEXAMPLEKEY123456',
             'env_var': 'AWS_ACCESS_KEY_ID',
             'why': 'Enterprise cloud, reliable on-demand instances'
         },
@@ -1187,7 +1187,7 @@ def configure(provider):
                 'name': 'AWS',
                 'key_name': 'Access Key ID',
                 'help': 'Get from: AWS IAM console',
-                'example': 'AKIAIOSFODNN7EXAMPLE'
+                'example': 'AKIAEXAMPLEKEY123456'
             },
             'gcp': {
                 'name': 'Google Cloud',

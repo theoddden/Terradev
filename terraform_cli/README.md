@@ -65,8 +65,8 @@ terradev list
 ### **Provider Credentials**
 ```bash
 # AWS Configuration
-AWS Access Key ID: AKIAIOSFODNN7EXAMPLE
-AWS Secret Access Key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+AWS Access Key ID: AKIAEXAMPLEKEY123456
+AWS Secret Access Key: exampleSecretKey1234567890abcdef
 Default Region: us-west-2
 
 # Vast.AI Configuration
