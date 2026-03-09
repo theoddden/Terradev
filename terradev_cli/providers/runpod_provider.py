@@ -137,11 +137,16 @@ class RunPodProvider(BaseProvider):
             raise Exception("Rate limit exceeded - please wait before making more requests")
 
         try:
-            # Extract GPU ID from instance type
+            # Extract GPU ID from instance type (format: runpod-secure-A100 or runpod-community-H100)
             if "-" not in instance_type:
                 raise Exception(f"Invalid instance type format: {instance_type}")
             
-            cloud_type, gpu_id = instance_type.split("-", 1)
+            # Split on last hyphen to separate cloud_type from gpu_id
+            parts = instance_type.rsplit("-", 1)
+            if len(parts) != 2:
+                raise Exception(f"Invalid instance type format: {instance_type}")
+            
+            cloud_type, gpu_id = parts
             if cloud_type not in ["runpod-community", "runpod-secure"]:
                 raise Exception(f"Unsupported cloud type: {cloud_type}")
             
@@ -181,7 +186,7 @@ class RunPodProvider(BaseProvider):
                 "instance_type": instance_type,
                 "region": region,
                 "gpu_type": gpu_type,
-                "status": "starting",
+                "status": "provisioning",
                 "provider": "runpod",
                 "cloud_type": "secure" if is_secure else "community",
                 "volume_attached": attach_volume and volume_id is not None,
