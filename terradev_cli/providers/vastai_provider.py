@@ -42,9 +42,18 @@ class VastAIProvider(BaseProvider):
             return []
 
     async def _get_live_offers(self, gpu_type: str) -> List[Dict[str, Any]]:
+        # Vast.ai API requires POST /bundles/ with JSON filter body (not GET with query string)
         data = await self._make_request(
-            "GET",
-            f"{self.API_BASE}/bundles?q={{\"gpu_name\":\"{gpu_type}\",\"order\":[[\"dph_total\",\"asc\"]],\"type\":\"on-demand\"}}",
+            "POST",
+            f"{self.API_BASE}/bundles/",
+            json={
+                "limit": 10,
+                "type": "on-demand",
+                "gpu_name": {"in": [gpu_type]},
+                "rentable": {"eq": True},
+                "rented": {"eq": False},
+                "order": [["dph_total", "asc"]],
+            },
         )
         quotes = []
         for offer in data.get("offers", [])[:5]:

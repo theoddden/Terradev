@@ -45,7 +45,7 @@ class LambdaLabsProvider(BaseProvider):
             
         # Try live API first
         try:
-            live = await self._get_live_pricing(gpu_type)
+            live = await self._get_live_availability(gpu_type)
             if live:
                 # CRITICAL: Check capacity and add fallback routing
                 for quote in live:
@@ -169,18 +169,19 @@ class LambdaLabsProvider(BaseProvider):
                     "name": f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%H%M%S')}",
                     "file_system_name": "terradev-filesystem",
                     "container_image": container_image,  # CRITICAL: Use pinned image
-                }
-            },
-        )
-        ids = data.get("data", {}).get("instance_ids", [])
-        return {
-            "instance_id": ids[0] if ids else f"lambda-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            "instance_type": instance_type,
-            "region": region,
-            "gpu_type": gpu_type,
-            "status": "provisioning",
-            "provider": "lambda_labs",
-        }
+                },
+            )
+            ids = data.get("data", {}).get("instance_ids", [])
+            return {
+                "instance_id": ids[0] if ids else f"lambda-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "instance_type": instance_type,
+                "region": region,
+                "gpu_type": gpu_type,
+                "status": "provisioning",
+                "provider": "lambda_labs",
+            }
+        except Exception as e:
+            raise Exception(f"Lambda Labs provision failed: {e}")
 
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:

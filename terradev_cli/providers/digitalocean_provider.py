@@ -2,309 +2,250 @@
 """
 DigitalOcean Provider Integration for Terradev
 GPU Droplet provisioning and management
+
+CRITICAL FIX v4.0.5:
+- Converted from standalone class to BaseProvider subclass for factory compatibility
+- Auth: Authorization: Bearer (standard DO API)
+- API base: https://api.digitalocean.com/v2
 """
 
 import os
-import json
-import asyncio
-import aiohttp
+import logging
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
 from datetime import datetime
 
+from .base_provider import BaseProvider
 
-@dataclass
-class DigitalOceanConfig:
-    """DigitalOcean configuration"""
-    api_token: str
-    region: str = "tor1"  # Toronto has GPUs
-    ssh_key_ids: Optional[List[int]] = None
+logger = logging.getLogger(__name__)
 
 
-class DigitalOceanProvider:
+class DigitalOceanProvider(BaseProvider):
     """DigitalOcean GPU provider for Terradev"""
-    
-    def __init__(self, config: DigitalOceanConfig):
-        self.config = config
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.api_base = "https://api.digitalocean.com/v2"
-        
-    async def __aenter__(self):
-        headers = {
-            "Authorization": f"Bearer {self.config.api_token}",
-            "Content-Type": "application/json"
-        }
-        self.session = aiohttp.ClientSession(headers=headers)
-        return self
-        
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session:
-            await self.session.close()
-    
-    async def test_connection(self) -> Dict[str, Any]:
-        """Test DigitalOcean API connection"""
-        try:
-            if not self.session:
-                headers = {
-                    "Authorization": f"Bearer {self.config.api_token}",
-                    "Content-Type": "application/json"
-                }
-                self.session = aiohttp.ClientSession(headers=headers)
-            
-            # Test account info
-            url = f"{self.api_base}/account"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status == 200:
-                    account_data = await response.json()
-                    return {
-                        "status": "connected",
-                        "provider": "digitalocean",
-                        "account": account_data.get("account", {}),
-                        "region": self.config.region
-                    }
-                else:
-                    error_text = await response.text()
-                    return {
-                        "status": "failed",
-                        "error": f"API request failed: {response.status} - {error_text}"
-                    }
-                    
-        except Exception as e:
+
+    API_BASE = "https://api.digitalocean.com/v2"
+
+    def __init__(self, credentials: Dict[str, str]):
+        super().__init__(credentials)
+        self.name = "digitalocean"
+        self.api_key = credentials.get("api_key", credentials.get("api_token", ""))
+        self.default_region = credentials.get("region", "tor1")
+
+    GPU_PRICING = {
+        "H100": {"slug": "gpu-h100x1-80gb", "price": 3.52, "mem": 240, "vcpus": 20, "gpus": 1},
+        "H100-8x": {"slug": "gpu-h100x8-640gb", "price": 28.16, "mem": 1920, "vcpus": 160, "gpus": 8},
+    }
+
+    def _get_auth_headers(self) -> Dict[str, str]:
+        if self.api_key:
             return {
-                "status": "failed",
-                "error": str(e)
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
             }
-    
-    async def get_gpu_instances(self) -> List[Dict[str, Any]]:
-        """Get available GPU instance types"""
+        return {}
+
+    async def get_instance_quotes(
+        self, gpu_type: str, region: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        if not self.api_key:
+            return []
+
+        # Try live sizes API
         try:
-            if not self.session:
-                headers = {
-                    "Authorization": f"Bearer {self.config.api_token}",
-                    "Content-Type": "application/json"
-                }
-                self.session = aiohttp.ClientSession(headers=headers)
-            
-            # Get sizes with GPU filter
-            url = f"{self.api_base}/sizes"
-            params = {"filter": "gpu"}
-            async with self.session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    gpu_sizes = []
-                    
-                    for size in data.get("sizes", []):
-                        if "gpu" in size.get("slug", "").lower():
-                            gpu_sizes.append({
-                                "slug": size["slug"],
-                                "memory": size["memory"],
-                                "vcpus": size["vcpus"],
-                                "disk": size["disk"],
-                                "price_monthly": size.get("price_monthly", 0),
-                                "price_hourly": size.get("price_hourly", 0),
-                                "regions": size.get("regions", []),
-                                "description": size.get("description", "")
-                            })
-                    
-                    return gpu_sizes
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to get GPU sizes: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to get GPU instances: {e}")
-    
-    async def get_pricing(self, gpu_type: Optional[str] = None) -> Dict[str, Any]:
-        """Get GPU instance pricing"""
-        try:
-            gpu_instances = await self.get_gpu_instances()
-            
-            pricing_data = {}
-            for instance in gpu_instances:
-                if gpu_type and gpu_type not in instance["slug"]:
-                    continue
-                
-                pricing_data[instance["slug"]] = {
-                    "hourly_price": instance["price_hourly"],
-                    "monthly_price": instance["price_monthly"],
-                    "memory_gb": instance["memory"],
-                    "vcpus": instance["vcpus"],
-                    "disk_gb": instance["disk"],
-                    "regions": instance["regions"],
-                    "description": instance["description"]
-                }
-            
-            return {
-                "provider": "digitalocean",
+            live = await self._get_live_sizes(gpu_type, region)
+            if live:
+                return live
+        except Exception:
+            pass
+
+        # Static fallback
+        info = self.GPU_PRICING.get(gpu_type)
+        if not info:
+            return []
+        return [{
+            "instance_type": info["slug"],
+            "gpu_type": gpu_type,
+            "price_per_hour": info["price"],
+            "region": region or self.default_region,
+            "available": True,
+            "provider": "digitalocean",
+            "vcpus": info["vcpus"],
+            "memory_gb": info["mem"],
+            "gpu_count": info["gpus"],
+            "spot": False,
+        }]
+
+    async def _get_live_sizes(self, gpu_type: str, region: Optional[str] = None) -> List[Dict[str, Any]]:
+        data = await self._make_request("GET", f"{self.API_BASE}/sizes")
+        quotes = []
+        for size in data.get("sizes", []):
+            slug = size.get("slug", "")
+            if "gpu" not in slug.lower():
+                continue
+            if gpu_type.lower() not in slug.lower():
+                continue
+            r = region or self.default_region
+            regions = size.get("regions", [])
+            if r and regions and r not in regions:
+                continue
+            quotes.append({
+                "instance_type": slug,
                 "gpu_type": gpu_type,
-                "pricing": pricing_data,
-                "currency": "USD",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            raise Exception(f"Failed to get pricing: {e}")
-    
-    async def provision_instance(self, 
-                               name: str,
-                               gpu_type: str,
-                               region: Optional[str] = None,
-                               ssh_key_ids: Optional[List[int]] = None) -> Dict[str, Any]:
-        """Provision a GPU Droplet"""
-        try:
-            if not self.session:
-                headers = {
-                    "Authorization": f"Bearer {self.config.api_token}",
-                    "Content-Type": "application/json"
-                }
-                self.session = aiohttp.ClientSession(headers=headers)
-            
-            # Use provided region or default
-            target_region = region or self.config.region
-            target_ssh_keys = ssh_key_ids or self.config.ssh_key_ids or []
-            
-            # Create GPU Droplet
-            url = f"{self.api_base}/droplets"
-            payload = {
-                "name": name,
-                "region": target_region,
-                "size": gpu_type,
-                "image": "ubuntu-22-04-x64-gpu",  # AI/ML-ready image
-                "ssh_keys": target_ssh_keys,
-                "backups": False,
+                "price_per_hour": size.get("price_hourly", 0),
+                "region": r,
+                "available": size.get("available", True),
+                "provider": "digitalocean",
+                "vcpus": size.get("vcpus", 0),
+                "memory_gb": (size.get("memory", 0) or 0) // 1024 if (size.get("memory", 0) or 0) > 1024 else size.get("memory", 0),
+                "gpu_count": 1,
+                "spot": False,
+            })
+        return sorted(quotes, key=lambda q: q["price_per_hour"])
+
+    async def provision_instance(
+        self, instance_type: str, region: str, gpu_type: str
+    ) -> Dict[str, Any]:
+        if not self.api_key:
+            raise Exception("DigitalOcean API token not configured")
+
+        instance_name = f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%H%M%S')}"
+        data = await self._make_request(
+            "POST", f"{self.API_BASE}/droplets",
+            json={
+                "name": instance_name,
+                "region": region or self.default_region,
+                "size": instance_type,
+                "image": "gpu-h100-base",
+                "tags": ["terradev", "gpu"],
                 "monitoring": True,
-                "tags": ["terradev", "gpu", "ml"]
-            }
-            
-            async with self.session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                if response.status == 202:  # Accepted for provisioning
-                    droplet_data = await response.json()
-                    droplet_id = droplet_data["droplet"]["id"]
-                    
-                    return {
-                        "status": "provisioning",
-                        "instance_id": str(droplet_id),
-                        "name": name,
-                        "provider": "digitalocean",
-                        "gpu_type": gpu_type,
-                        "region": target_region,
-                        "image": "ubuntu-22-04-x64-gpu",
-                        "ssh_keys": target_ssh_keys,
-                        "created_at": datetime.now().isoformat(),
-                        "action_id": droplet_data.get("links", {}).get("actions", [{}])[0].get("id")
-                    }
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to provision instance: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to provision instance: {e}")
-    
+            },
+        )
+        droplet = data.get("droplet", data)
+        droplet_id = str(droplet.get("id", f"do-{datetime.now().strftime('%Y%m%d%H%M%S')}"))
+        return {
+            "instance_id": droplet_id,
+            "instance_type": instance_type,
+            "region": region or self.default_region,
+            "gpu_type": gpu_type,
+            "status": "provisioning",
+            "provider": "digitalocean",
+        }
+
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
-        """Get instance status"""
-        try:
-            if not self.session:
-                headers = {
-                    "Authorization": f"Bearer {self.config.api_token}",
-                    "Content-Type": "application/json"
-                }
-                self.session = aiohttp.ClientSession(headers=headers)
-            
-            url = f"{self.api_base}/droplets/{instance_id}"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status == 200:
-                    droplet_data = await response.json()
-                    droplet = droplet_data["droplet"]
-                    
-                    # Extract network info
-                    public_ip = None
-                    private_ip = None
-                    
-                    for network in droplet.get("networks", {}).get("v4", []):
-                        if network["type"] == "public":
-                            public_ip = network["ip_address"]
-                        elif network["type"] == "private":
-                            private_ip = network["ip_address"]
-                    
-                    return {
-                        "status": "active",
-                        "instance_id": instance_id,
-                        "name": droplet["name"],
-                        "provider": "digitalocean",
-                        "gpu_type": droplet["size"]["slug"],
-                        "region": droplet["region"]["slug"],
-                        "status": droplet["status"],
-                        "created_at": droplet["created_at"],
-                        "public_ip": public_ip,
-                        "private_ip": private_ip,
-                        "memory": droplet["memory"],
-                        "vcpus": droplet["vcpus"],
-                        "disk": droplet["disk"],
-                        "features": droplet.get("features", [])
-                    }
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to get instance status: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to get instance status: {e}")
-    
+        if not self.api_key:
+            raise Exception("DigitalOcean API token not configured")
+        data = await self._make_request("GET", f"{self.API_BASE}/droplets/{instance_id}")
+        droplet = data.get("droplet", data)
+        public_ip = None
+        for net in droplet.get("networks", {}).get("v4", []):
+            if net.get("type") == "public":
+                public_ip = net.get("ip_address")
+                break
+        status_map = {"active": "running", "new": "provisioning", "off": "stopped", "archive": "terminated"}
+        return {
+            "instance_id": instance_id,
+            "status": status_map.get(droplet.get("status", ""), droplet.get("status", "unknown")),
+            "provider": "digitalocean",
+            "public_ip": public_ip,
+        }
+
+    async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
+        if not self.api_key:
+            raise Exception("DigitalOcean API token not configured")
+        await self._make_request(
+            "POST", f"{self.API_BASE}/droplets/{instance_id}/actions",
+            json={"type": "shutdown"},
+        )
+        return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
+
+    async def start_instance(self, instance_id: str) -> Dict[str, Any]:
+        if not self.api_key:
+            raise Exception("DigitalOcean API token not configured")
+        await self._make_request(
+            "POST", f"{self.API_BASE}/droplets/{instance_id}/actions",
+            json={"type": "power_on"},
+        )
+        return {"instance_id": instance_id, "action": "start", "status": "starting"}
+
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
-        """Terminate a GPU Droplet"""
+        if not self.api_key:
+            raise Exception("DigitalOcean API token not configured")
+        await self._make_request("DELETE", f"{self.API_BASE}/droplets/{instance_id}")
+        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+
+    async def list_instances(self) -> List[Dict[str, Any]]:
+        if not self.api_key:
+            return []
         try:
-            if not self.session:
-                headers = {
-                    "Authorization": f"Bearer {self.config.api_token}",
-                    "Content-Type": "application/json"
-                }
-                self.session = aiohttp.ClientSession(headers=headers)
-            
-            url = f"{self.api_base}/droplets/{instance_id}"
-            async with self.session.delete(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status == 204:  # No Content - Success
-                    return {
-                        "status": "terminated",
-                        "instance_id": instance_id,
-                        "provider": "digitalocean",
-                        "terminated_at": datetime.now().isoformat()
-                    }
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to terminate instance: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to terminate instance: {e}")
-    
-    async def get_regions(self) -> List[Dict[str, Any]]:
-        """Get available regions"""
+            data = await self._make_request(
+                "GET", f"{self.API_BASE}/droplets?tag_name=terradev",
+            )
+            droplets = data.get("droplets", [])
+            instances = []
+            for d in droplets:
+                public_ip = None
+                for net in d.get("networks", {}).get("v4", []):
+                    if net.get("type") == "public":
+                        public_ip = net.get("ip_address")
+                        break
+                instances.append({
+                    "instance_id": str(d.get("id", "unknown")),
+                    "status": d.get("status", "unknown"),
+                    "instance_type": d.get("size", {}).get("slug", "unknown") if isinstance(d.get("size"), dict) else d.get("size_slug", "unknown"),
+                    "region": d.get("region", {}).get("slug", "unknown") if isinstance(d.get("region"), dict) else "unknown",
+                    "provider": "digitalocean",
+                    "public_ip": public_ip,
+                })
+            return instances
+        except Exception:
+            return []
+
+    async def execute_command(
+        self, instance_id: str, command: str, async_exec: bool
+    ) -> Dict[str, Any]:
+        if not self.api_key:
+            raise Exception("DigitalOcean API token not configured")
         try:
-            if not self.session:
-                headers = {
-                    "Authorization": f"Bearer {self.config.api_token}",
-                    "Content-Type": "application/json"
+            status = await self.get_instance_status(instance_id)
+            public_ip = status.get("public_ip")
+            if not public_ip:
+                return {
+                    "instance_id": instance_id,
+                    "command": command,
+                    "exit_code": 1,
+                    "output": "No public IP available — instance may still be provisioning",
+                    "async": async_exec,
                 }
-                self.session = aiohttp.ClientSession(headers=headers)
-            
-            url = f"{self.api_base}/regions"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    regions = []
-                    
-                    for region in data.get("regions", []):
-                        # Filter for regions with GPU support
-                        if region.get("slug") in ["tor1", "nyc3", "sfo3"]:
-                            regions.append({
-                                "slug": region["slug"],
-                                "name": region["name"],
-                                "available": region.get("available", False),
-                                "features": region.get("features", [])
-                            })
-                    
-                    return regions
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to get regions: {response.status} - {error_text}")
-                    
+            import subprocess
+            ssh_cmd = [
+                "ssh", "-o", "StrictHostKeyChecking=accept-new",
+                "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                "-o", "ConnectTimeout=10",
+                f"root@{public_ip}", command,
+            ]
+            if async_exec:
+                proc = subprocess.Popen(ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                return {
+                    "instance_id": instance_id,
+                    "command": command,
+                    "exit_code": 0,
+                    "job_id": str(proc.pid),
+                    "output": f"Async SSH process started (PID: {proc.pid})",
+                    "async": True,
+                }
+            result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=300)
+            return {
+                "instance_id": instance_id,
+                "command": command,
+                "exit_code": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "async": False,
+            }
         except Exception as e:
-            raise Exception(f"Failed to get regions: {e}")
+            return {
+                "instance_id": instance_id,
+                "command": command,
+                "exit_code": 1,
+                "output": f"DigitalOcean exec error: {e}",
+                "async": async_exec,
+            }

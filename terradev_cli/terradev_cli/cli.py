@@ -397,9 +397,20 @@ class TerradevAPI:
             pass  # Metering sync is best-effort
     
     def _provider_creds(self, provider_name: str) -> Dict[str, str]:
-        """Build credentials dict for a provider from stored BYOAPI keys"""
+        """Build credentials dict for a provider from stored BYOAPI keys.
+        
+        Supports two storage formats:
+        1. Flat: {"runpod_api_key": "xxx"} (from onboarding wizard)
+        2. Nested: {"runpod": {"api_key": "xxx"}} (from configure --provider)
+        """
         if not self.credentials:
             return {}
+        
+        # Check for nested dict format first (from configure --provider)
+        nested = self.credentials.get(provider_name, {})
+        if isinstance(nested, dict) and nested:
+            # Nested dict already has the right key names for the provider
+            return {k: str(v) for k, v in nested.items() if v}
         
         creds: Dict[str, str] = {}
         if provider_name == 'aws':
@@ -462,6 +473,17 @@ class TerradevAPI:
             creds['api_key'] = self.credentials.get('siliconflow_api_key', '')
             creds['region'] = self.credentials.get('siliconflow_region', 'global')
             creds['default_model'] = self.credentials.get('siliconflow_default_model', '')
+        elif provider_name == 'hyperstack':
+            creds['api_key'] = self.credentials.get('hyperstack_api_key', '')
+            creds['environment'] = self.credentials.get('hyperstack_environment', 'default-CANADA-1')
+            creds['ssh_key_name'] = self.credentials.get('hyperstack_ssh_key_name', '')
+        elif provider_name == 'digitalocean':
+            creds['api_key'] = self.credentials.get('digitalocean_api_token', '')
+            creds['region'] = self.credentials.get('digitalocean_region', 'tor1')
+        elif provider_name == 'inferx':
+            creds['api_key'] = self.credentials.get('inferx_api_key', '')
+            creds['api_endpoint'] = self.credentials.get('inferx_api_endpoint', 'https://api.inferx.net')
+            creds['region'] = self.credentials.get('inferx_region', 'us-west-2')
         # ML Services
         elif provider_name == 'kserve':
             creds['namespace'] = self.credentials.get('kserve_namespace', 'default')
@@ -1155,7 +1177,7 @@ def configure(provider):
     
     if provider:
         # Configure specific provider
-        from credential_prompt import prompt_for_credentials
+        from .credential_prompt import prompt_for_credentials
         
         print(f"   Configure {provider.upper()} credentials")
         
@@ -1339,7 +1361,7 @@ def configure(provider):
         
     else:
         # Interactive configuration for all providers
-        from credential_prompt import prompt_for_credentials
+        from .credential_prompt import prompt_for_credentials
         configured_providers = prompt_for_credentials()
         
         if configured_providers:

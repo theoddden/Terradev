@@ -220,7 +220,7 @@ class GCPProvider(BaseProvider):
                 project=self.project_id, zone=zone, instance_resource=instance_resource
             )
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             op = await loop.run_in_executor(None, self.instances_client.insert, request)
 
             return {
@@ -243,7 +243,7 @@ class GCPProvider(BaseProvider):
             request = compute_v1.GetInstanceRequest(
                 project=self.project_id, zone=self.zone, instance=instance_id
             )
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             inst = await loop.run_in_executor(None, self.instances_client.get, request)
             return {
                 "instance_id": instance_id,
@@ -262,7 +262,7 @@ class GCPProvider(BaseProvider):
         request = compute_v1.StopInstanceRequest(
             project=self.project_id, zone=self.zone, instance=instance_id
         )
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.instances_client.stop, request)
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
 
@@ -273,7 +273,7 @@ class GCPProvider(BaseProvider):
         request = compute_v1.StartInstanceRequest(
             project=self.project_id, zone=self.zone, instance=instance_id
         )
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.instances_client.start, request)
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
 
@@ -284,7 +284,7 @@ class GCPProvider(BaseProvider):
         request = compute_v1.DeleteInstanceRequest(
             project=self.project_id, zone=self.zone, instance=instance_id
         )
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.instances_client.delete, request)
         return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
 
@@ -297,7 +297,7 @@ class GCPProvider(BaseProvider):
                 project=self.project_id, zone=self.zone,
                 filter='labels.managed-by="terradev"',
             )
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             page = await loop.run_in_executor(None, self.instances_client.list, request)
             instances = []
             for inst in page:
@@ -339,7 +339,7 @@ class GCPProvider(BaseProvider):
                     "output": f"Async gcloud ssh started (PID: {proc.pid})",
                     "async": True,
                 }
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None,
                 lambda: subprocess.run(gcloud_cmd, capture_output=True, text=True, timeout=300),
@@ -431,7 +431,7 @@ class GCPProvider(BaseProvider):
             
             for zone in zones:
                 try:
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.get_running_loop()
                     await loop.run_in_executor(
                         None,
                         lambda: self.accelerator_client.get(
@@ -551,7 +551,7 @@ class GCPProvider(BaseProvider):
                 ),
             )
             
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             operation = await loop.run_in_executor(
                 None,
                 lambda: self.reservation_client.insert(

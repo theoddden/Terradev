@@ -15,7 +15,7 @@ from .base_provider import BaseProvider
 class TensorDockProvider(BaseProvider):
     """TensorDock provider for GPU instances"""
 
-    API_BASE = "https://marketplace.tensordock.com/api/v0"
+    API_BASE = "https://dashboard.tensordock.com/api/v2"
 
     def __init__(self, credentials: Dict[str, str]):
         super().__init__(credentials)
@@ -65,21 +65,29 @@ class TensorDockProvider(BaseProvider):
         }]
 
     async def _get_live_availability(self, gpu_type: str) -> List[Dict[str, Any]]:
-        data = await self._make_request("GET", f"{self.API_BASE}/client/deploy/hostnodes")
+        # TensorDock v2 API: GET /api/v2/locations
+        data = await self._make_request("GET", f"{self.API_BASE}/locations")
         quotes = []
-        for node in data.get("hostnodes", {}).values():
-            for gpu_model, gpu_data in node.get("specs", {}).get("gpu", {}).items():
-                if gpu_type.lower() in gpu_model.lower():
-                    price = gpu_data.get("price", {}).get("price", 0)
+        locations = data.get("data", {}).get("attributes", {}).get("locations", [])
+        if isinstance(locations, dict):
+            locations = list(locations.values())
+        for loc in locations:
+            gpus = loc.get("gpus", loc.get("gpu", {}))
+            if isinstance(gpus, dict):
+                gpus = [gpus]
+            for gpu_info in (gpus if isinstance(gpus, list) else []):
+                gpu_name = gpu_info.get("name", gpu_info.get("gpu_model", ""))
+                if gpu_type.lower() in gpu_name.lower():
+                    price = gpu_info.get("price", gpu_info.get("price_per_hour", 0))
                     quotes.append({
-                        "instance_type": gpu_model,
+                        "instance_type": gpu_name,
                         "gpu_type": gpu_type,
                         "price_per_hour": price,
-                        "region": node.get("location", {}).get("region", "unknown"),
-                        "available": gpu_data.get("amount", 0) > 0,
+                        "region": loc.get("region", loc.get("location", "unknown")),
+                        "available": gpu_info.get("available", gpu_info.get("amount", 0)) > 0,
                         "provider": "tensordock",
                         "vcpus": 8,
-                        "memory_gb": gpu_data.get("vram", 0),
+                        "memory_gb": gpu_info.get("vram", gpu_info.get("memory_gb", 0)),
                         "gpu_count": 1,
                         "spot": False,
                     })
@@ -93,10 +101,8 @@ class TensorDockProvider(BaseProvider):
 
         info = self.GPU_PRICING.get(gpu_type, {})
         data = await self._make_request(
-            "POST", f"{self.API_BASE}/client/deploy/single",
+            "POST", f"{self.API_BASE}/instances",
             json={
-                "api_key": self.api_key,
-                "api_token": self.api_token,
                 "gpu_model": info.get("model", instance_type),
                 "gpu_count": 1,
                 "vcpus": 8,
@@ -119,25 +125,21 @@ class TensorDockProvider(BaseProvider):
         if not self.api_key or not self.api_token:
             raise Exception("TensorDock credentials not configured")
         data = await self._make_request(
-            "POST", f"{self.API_BASE}/client/list",
-            json={"api_key": self.api_key, "api_token": self.api_token},
+            "GET", f"{self.API_BASE}/instances/{instance_id}",
         )
-        for vm in data.get("virtualmachines", {}).values():
-            if str(vm.get("id")) == str(instance_id):
-                return {
-                    "instance_id": instance_id,
-                    "status": "running" if vm.get("status") == "running" else vm.get("status", "unknown"),
-                    "provider": "tensordock",
-                    "public_ip": vm.get("ip"),
-                }
-        return {"instance_id": instance_id, "status": "not_found", "provider": "tensordock"}
+        inst = data.get("data", {}).get("attributes", data)
+        return {
+            "instance_id": instance_id,
+            "status": inst.get("status", "unknown"),
+            "provider": "tensordock",
+            "public_ip": inst.get("ip", inst.get("public_ip")),
+        }
 
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key or not self.api_token:
             raise Exception("TensorDock credentials not configured")
         await self._make_request(
-            "POST", f"{self.API_BASE}/client/stop",
-            json={"api_key": self.api_key, "api_token": self.api_token, "server": instance_id},
+            "POST", f"{self.API_BASE}/instances/{instance_id}/stop",
         )
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
 
@@ -145,8 +147,7 @@ class TensorDockProvider(BaseProvider):
         if not self.api_key or not self.api_token:
             raise Exception("TensorDock credentials not configured")
         await self._make_request(
-            "POST", f"{self.API_BASE}/client/start",
-            json={"api_key": self.api_key, "api_token": self.api_token, "server": instance_id},
+            "POST", f"{self.API_BASE}/instances/{instance_id}/start",
         )
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
 
@@ -154,29 +155,28 @@ class TensorDockProvider(BaseProvider):
         if not self.api_key or not self.api_token:
             raise Exception("TensorDock credentials not configured")
         await self._make_request(
-            "POST", f"{self.API_BASE}/client/delete",
-            json={"api_key": self.api_key, "api_token": self.api_token, "server": instance_id},
+            "DELETE", f"{self.API_BASE}/instances/{instance_id}",
         )
         return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
 
     async def list_instances(self) -> List[Dict[str, Any]]:
-        if not self.api_key or not self.api_token:
+        if not self.api_key:
             return []
         try:
             data = await self._make_request(
-                "POST", f"{self.API_BASE}/client/list",
-                json={"api_key": self.api_key, "api_token": self.api_token},
+                "GET", f"{self.API_BASE}/instances",
             )
+            instances = data.get("data", {}).get("attributes", {}).get("instances", [])
             return [
                 {
                     "instance_id": str(vm.get("id")),
                     "status": vm.get("status", "unknown"),
                     "instance_type": vm.get("gpu_model", "unknown"),
-                    "region": vm.get("location", "unknown"),
+                    "region": vm.get("region", vm.get("location", "unknown")),
                     "provider": "tensordock",
                     "public_ip": vm.get("ip"),
                 }
-                for vm in data.get("virtualmachines", {}).values()
+                for vm in (instances if isinstance(instances, list) else [])
             ]
         except Exception:
             return []
@@ -234,4 +234,7 @@ class TensorDockProvider(BaseProvider):
             }
 
     def _get_auth_headers(self) -> Dict[str, str]:
+        # TensorDock v2 API requires Bearer token auth on all endpoints
+        if self.api_key:
+            return {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         return {}

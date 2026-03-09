@@ -136,7 +136,7 @@ class CoreWeaveProvider(BaseProvider):
             return {
                 "instance_id": instance_name,
                 "instance_type": instance_type,
-                "region": region,
+                "region": region or "us-east-04e",
                 "gpu_type": gpu_type,
                 "status": "deploying",
                 "provider": "coreweave",
@@ -148,15 +148,6 @@ class CoreWeaveProvider(BaseProvider):
                     "manifest_applied": True,
                     "gpu_count": 1,
                 },
-            }
-            )
-            return {
-                "instance_id": instance_name,
-                "instance_type": instance_type,
-                "region": region or "us-east-04e",
-                "gpu_type": gpu_type,
-                "status": "provisioning",
-                "provider": "coreweave",
             }
         except Exception as e:
             raise Exception(f"CoreWeave provision failed: {e}")

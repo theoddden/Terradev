@@ -161,7 +161,7 @@ class AWSProvider(BaseProvider):
         """Get spot prices for instance type"""
         try:
             # Run in thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             def get_prices():
                 return self.ec2_client.describe_spot_price_history(
@@ -570,7 +570,7 @@ class AWSProvider(BaseProvider):
 
     async def _run_in_executor(self, func, *args):
         """Run blocking function in executor"""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, func, *args)
     
     def _detect_p5_nccl_degradation(self, instance_type: str) -> Optional[Dict[str, Any]]:

@@ -141,7 +141,7 @@ class AzureProvider(BaseProvider):
                 tags={"ManagedBy": "Terradev", "GPUType": gpu_type},
             )
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             poller = await loop.run_in_executor(
                 None,
                 lambda: self.compute_client.virtual_machines.begin_create_or_update(
@@ -169,7 +169,7 @@ class AzureProvider(BaseProvider):
         if not self.compute_client:
             raise Exception("Azure client not initialised")
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             vm = await loop.run_in_executor(
                 None,
                 lambda: self.compute_client.virtual_machines.get(
@@ -191,7 +191,7 @@ class AzureProvider(BaseProvider):
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.compute_client:
             raise Exception("Azure client not initialised")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             lambda: self.compute_client.virtual_machines.begin_deallocate(
@@ -203,7 +203,7 @@ class AzureProvider(BaseProvider):
     async def start_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.compute_client:
             raise Exception("Azure client not initialised")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             lambda: self.compute_client.virtual_machines.begin_start(
@@ -215,7 +215,7 @@ class AzureProvider(BaseProvider):
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.compute_client:
             raise Exception("Azure client not initialised")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             lambda: self.compute_client.virtual_machines.begin_delete(
@@ -228,7 +228,7 @@ class AzureProvider(BaseProvider):
         if not self.compute_client:
             return []
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             vms = await loop.run_in_executor(
                 None,
                 lambda: list(self.compute_client.virtual_machines.list(self.resource_group)),
@@ -263,7 +263,7 @@ class AzureProvider(BaseProvider):
                 script=[command],
             )
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             if async_exec:
                 # Fire and forget — start the poller but don't wait
@@ -368,7 +368,7 @@ class AzureProvider(BaseProvider):
                     "remaining": 0,
                 }
             
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             
             # Check subscription-level quota first
             sub_quota = await loop.run_in_executor(

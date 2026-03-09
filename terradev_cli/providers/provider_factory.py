@@ -47,6 +47,7 @@ _PROVIDER_LOADERS = {
     "fluidstack":   _lazy_import(".fluidstack_provider.FluidStackProvider"),
     "hetzner":      _lazy_import(".hetzner_provider.HetznerProvider"),
     "siliconflow":  _lazy_import(".siliconflow_provider.SiliconFlowProvider"),
+    "inferx":       _lazy_import(".inferx_provider.InferXProvider"),
     "demo":         _lazy_import(".demo_mode.DemoModeProvider"),
 }
 
