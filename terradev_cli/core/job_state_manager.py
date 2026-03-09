@@ -40,6 +40,7 @@ class JobStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    PREEMPTED = "preempted"
 
 
 class CheckpointStatus(Enum):

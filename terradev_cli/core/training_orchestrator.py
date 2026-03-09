@@ -28,6 +28,51 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Local spot-preemption sidecar (runs ON the instance — no SSH needed)
+# ---------------------------------------------------------------------------
+# This script is deployed to each training node and started as a background
+# process alongside the training job.  It polls the cloud metadata endpoint
+# for termination notices and sends SIGUSR1 to the training PID to trigger
+# a checkpoint save.  Works even if external network/SSH dies first.
+_SPOT_SIDECAR_SH = r"""#!/bin/bash
+# Terradev spot-preemption sidecar — auto-deployed, zero config
+TRAIN_PID="$1"
+[ -z "$TRAIN_PID" ] && exit 0
+
+# Provider metadata endpoints for spot/preemption notices
+AWS_META="http://169.254.169.254/latest/meta-data/spot/termination-time"
+GCP_META="http://metadata.google.internal/computeMetadata/v1/instance/preempted"
+AZURE_META="http://169.254.169.254/metadata/scheduledevents?api-version=2020-07-01"
+
+check_preemption() {
+    # AWS — returns termination time (HTTP 200) when preempted, 404 otherwise
+    if curl -sf -m 2 -H "Metadata: true" "$AWS_META" >/dev/null 2>&1; then
+        return 0
+    fi
+    # GCP — returns "TRUE" when preempted
+    resp=$(curl -sf -m 2 -H "Metadata-Flavor: Google" "$GCP_META" 2>/dev/null)
+    [ "$resp" = "TRUE" ] && return 0
+    # Azure — check for Preempt event in scheduled events
+    if curl -sf -m 2 -H "Metadata: true" "$AZURE_META" 2>/dev/null | grep -q '"EventType":"Preempt"'; then
+        return 0
+    fi
+    return 1
+}
+
+while kill -0 "$TRAIN_PID" 2>/dev/null; do
+    if check_preemption; then
+        echo "[terradev-sidecar] Preemption detected — signaling PID $TRAIN_PID to checkpoint"
+        kill -SIGUSR1 "$TRAIN_PID" 2>/dev/null
+        # Also signal the entire process group (covers torchrun child workers)
+        kill -SIGUSR1 -"$TRAIN_PID" 2>/dev/null || true
+        sleep 5
+        exit 0
+    fi
+    sleep 5
+done
+"""
+
+# ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
@@ -506,6 +551,24 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             start_new_session=True,
         )
+
+        # Deploy spot-preemption sidecar on every node (local process, no SSH needed at preemption time)
+        # Runs alongside training — polls cloud metadata and SIGUSR1s training PID if preempted
+        try:
+            sidecar_path = "/tmp/.terradev_spot_sidecar.sh"
+            node_list = config.nodes or [None]
+            for node in node_list:
+                _run_on(
+                    node,
+                    f"cat > {sidecar_path} << 'SIDECAR_EOF'\n{_SPOT_SIDECAR_SH}\nSIDECAR_EOF\n"
+                    f"chmod +x {sidecar_path} && "
+                    f"nohup {sidecar_path} {process.pid} > /tmp/.terradev_spot_sidecar.log 2>&1 &",
+                    config.ssh_user, config.ssh_key or None, timeout=15,
+                )
+            logger.info(f"Spot-preemption sidecar deployed to {len(node_list)} node(s)")
+        except Exception as sidecar_err:
+            logger.debug(f"Spot sidecar deploy failed (non-fatal): {sidecar_err}")
+
         return {
             "status": "launched",
             "pid": process.pid,
@@ -641,6 +704,14 @@ class TrainingOrchestrator:
         if not job:
             return {"status": "failed", "error": f"Job not found: {job_id}"}
 
+        preempted = job.status == JobStatus.PREEMPTED
+        if preempted:
+            logger.info(
+                f"Resuming preempted job {job_id} "
+                f"(was at step {job.current_step}/{job.total_steps}, "
+                f"reason: {job.error_message})"
+            )
+
         config = TrainingConfig.from_dict(job.config)
         config.resume_from_checkpoint = checkpoint_id or "latest"
 
@@ -649,7 +720,11 @@ class TrainingOrchestrator:
                 config.script_args.extend([
                     "--resume_from_checkpoint", config.checkpoint_dir])
 
-        return self.launch(config, skip_preflight=False)
+        result = self.launch(config, skip_preflight=False)
+        if preempted:
+            result["resumed_from_preemption"] = True
+            result["preemption_reason"] = job.error_message
+        return result
 
     def stop(self, job_id: str) -> Dict[str, Any]:
         """Stop a running job — kills processes on all nodes in parallel."""

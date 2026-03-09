@@ -670,20 +670,60 @@ class AWSProvider(BaseProvider):
         logger.info(f"Stopped spot interruption monitoring for {instance_id}")
     
     def _handle_spot_interruption(self, instance_id: str, termination_time: str):
-        """Handle spot interruption - trigger graceful checkpointing"""
+        """Handle spot interruption — signal checkpoint, mark job preempted."""
         logger.error(f"SPOT TERMINATION: {instance_id} terminating at {termination_time}")
-        
-        # In a real implementation, this would:
-        # 1. Signal training jobs to checkpoint
-        # 2. Save model state to S3
-        # 3. Notify monitoring systems
-        # 4. Attempt to relaunch on different instance
-        
-        # For now, just log the event
+
+        time_remaining_s = 120  # AWS default 2-minute warning
         try:
             from datetime import datetime
             term_dt = datetime.fromisoformat(termination_time.replace('Z', '+00:00'))
-            time_remaining = term_dt - datetime.now(term_dt.tzinfo)
-            logger.warning(f"Time remaining: {time_remaining.total_seconds():.0f} seconds")
+            time_remaining_s = max(0, (term_dt - datetime.now(term_dt.tzinfo)).total_seconds())
+            logger.warning(f"Time remaining: {time_remaining_s:.0f}s")
         except Exception:
             pass
+
+        # 1. Find running job(s) on this instance and mark as PREEMPTED
+        # NOTE: The primary checkpoint defense is the local sidecar script deployed
+        # by TrainingOrchestrator._launch_native() — it runs ON the instance and
+        # polls metadata locally, so it works even if SSH/network dies first.
+        # This SSH signal is a best-effort secondary path for redundancy.
+        try:
+            from core.job_state_manager import JobStateManager, JobStatus
+            state_mgr = JobStateManager()
+            running_jobs = state_mgr.list_jobs(status=JobStatus.RUNNING.value)
+            matched_jobs = [
+                j for j in running_jobs
+                if instance_id in (j.nodes or []) or
+                   instance_id in j.config.get("instance_ids", [])
+            ]
+
+            for job in matched_jobs:
+                # Best-effort SSH SIGUSR1 (may fail if provider killed network already)
+                ssh_user = job.config.get("ssh_user", "root")
+                ssh_key = job.config.get("ssh_key")
+                ssh_signaled = False
+                try:
+                    from core.training_orchestrator import _run_on
+                    host = instance_id if instance_id not in ("localhost", "127.0.0.1") else None
+                    rc, _, _ = _run_on(
+                        host,
+                        "pkill -SIGUSR1 -f 'torchrun|deepspeed|accelerate' 2>/dev/null || true",
+                        ssh_user, ssh_key, timeout=10,
+                    )
+                    ssh_signaled = rc == 0
+                    if ssh_signaled:
+                        logger.info(f"SSH SIGUSR1 sent to {instance_id} for job {job.id}")
+                except Exception as sig_err:
+                    logger.warning(f"SSH signal failed on {instance_id} (sidecar is primary defense): {sig_err}")
+
+                # 2. Mark job as PREEMPTED (distinguishes from user-initiated stop)
+                signal_note = "SSH+sidecar" if ssh_signaled else "sidecar only (SSH unreachable)"
+                state_mgr.update_job_status(
+                    job.id, JobStatus.PREEMPTED,
+                    error_message=f"Spot preemption on {instance_id}, termination at {termination_time}, "
+                                  f"{time_remaining_s:.0f}s warning. Checkpoint signal: {signal_note}."
+                )
+                logger.warning(f"Job {job.id} marked PREEMPTED (spot termination of {instance_id})")
+
+        except Exception as e:
+            logger.error(f"Failed to handle spot preemption for running jobs: {e}")

@@ -2190,12 +2190,36 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
                     )
                     elapsed = (time.monotonic() - t0) * 1000
                     iid = result.get('instance_id', f"{pname}_{int(time.time())}_{uuid.uuid4().hex[:6]}")
+                    # Verify instance actually started (provider 200 != GPU running)
+                    # Some providers (Vast.ai, TensorDock, Lambda) take 45-90s to boot
+                    verified = None
+                    actual = 'unknown'
+                    _poll_intervals = [10, 15, 20, 25, 30]  # total ~100s max wait
+                    try:
+                        for _wait in _poll_intervals:
+                            await asyncio.sleep(_wait)
+                            status_resp = await provider.get_instance_status(iid)
+                            actual = status_resp.get('status', 'unknown').lower()
+                            if actual in ('running', 'active', 'ready'):
+                                verified = True
+                                break
+                            if actual in ('error', 'failed', 'terminated', 'deleted'):
+                                verified = False
+                                break
+                            # still booting (pending/starting/provisioning) — keep polling
+                        else:
+                            verified = None  # timed out — still not running after ~100s
+                    except Exception:
+                        verified = None  # verification inconclusive
                     return {
-                        'status': 'active', 'instance_id': iid,
+                        'status': 'active' if verified is True else 'failed' if verified is False else 'pending',
+                        'instance_id': iid,
                         'provider': q['provider'], 'region': q.get('region', ''),
                         'price': result.get('price_per_hour', q['price']),
                         'spot': q.get('availability') == 'spot',
-                        'elapsed_ms': round(elapsed, 1), 'error': None,
+                        'elapsed_ms': round(elapsed, 1),
+                        'error': f'Instance entered {actual} state' if verified is False else None,
+                        'verified': verified,
                     }
                 except Exception as e:
                     elapsed = (time.monotonic() - t0) * 1000
@@ -2212,8 +2236,39 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     provision_time = (time.time() - provision_start) * 1000
 
     # ── Step 4: Record results to cost DB + usage file ──
-    succeeded = [r for r in results if r['status'] == 'active']
+    succeeded = [r for r in results if r['status'] in ('active', 'pending')]
     failed = [r for r in results if r['status'] == 'failed']
+
+    # ── Gang scheduling: for multi-node jobs, partial success = failure ──
+    if count > 1 and 0 < len(succeeded) < count:
+        print(f"\n{'='*60}")
+        print(f"PARTIAL FAILURE: Got {len(succeeded)}/{count} instances.")
+        print(f"   {len(failed)} instance(s) failed — cannot run distributed training with {len(succeeded)}/{count} nodes.")
+        print(f"   Cleaning up {len(succeeded)} successful provision(s) to avoid billing waste...")
+
+        async def _gang_cleanup():
+            from providers.provider_factory import ProviderFactory
+            _factory = ProviderFactory()
+            for r in succeeded:
+                try:
+                    _pname = r['provider'].lower().replace(' ', '_')
+                    _creds = api._provider_creds(_pname)
+                    _prov = _factory.create_provider(_pname, _creds)
+                    await _prov.terminate_instance(r['instance_id'])
+                    print(f"   [+] Terminated {r['instance_id']} on {r['provider']}")
+                except Exception as _e:
+                    print(f"   [!] FAILED to terminate {r['instance_id']} on {r['provider']}: {_e}")
+                    print(f"       MANUAL CLEANUP NEEDED — terminate in your {r['provider']} console")
+
+        asyncio.run(_gang_cleanup())
+
+        print(f"\n   Failed providers:")
+        for r in failed:
+            print(f"      {r['provider']}: {r['error']}")
+        failed_provs = set(r['provider'].lower().replace(' ', '_') for r in failed)
+        print(f"\n   Suggestion: retry with --providers excluding: {', '.join(failed_provs)}")
+        print(f"   Total cleanup time: {(time.time() - provision_start)*1000:.0f}ms")
+        return
 
     # Record provider reliability events for every provision attempt
     try:
@@ -2359,10 +2414,13 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     if succeeded:
         total_hr = sum(r['price'] for r in succeeded)
         print(f"{len(succeeded)}/{count} instances launched across {len(set(r['provider'] for r in succeeded))} cloud(s)")
-        print(f"{'Provider':<14} {'Instance ID':<36} {'$/hr':<8} {'ms':<8}")
-        print("-" * 70)
+        print(f"{'Provider':<14} {'Instance ID':<36} {'$/hr':<8} {'ms':<8} {'Status'}")
+        print("-" * 82)
         for r in succeeded:
-            print(f"{r['provider']:<14} {r['instance_id']:<36} ${r['price']:<7.2f} {r['elapsed_ms']:<.0f}ms")
+            v = r.get('verified')
+            tag = "verified" if v is True else "unverified" if v is None else "pending"
+            icon = "+" if v is True else "?" if v is None else "~"
+            print(f"{r['provider']:<14} {r['instance_id']:<36} ${r['price']:<7.2f} {r['elapsed_ms']:<.0f}ms  [{icon}] {tag}")
         print(f"\nTotal: ${total_hr:.2f}/hr  (${total_hr*24:.2f}/day)")
         print(f"Group: {group_id}")
         if wandb_injected:
@@ -2678,9 +2736,9 @@ def stage(dataset, target_regions, compression, plan_only):
 
 @cli.command()
 @click.option('--instance-id', '-i', required=True, help='Instance ID')
-@click.option('--command', '-c', required=True, help='Command to execute')
+@click.option('--cmd', required=True, help='Command to execute')
 @click.option('--async-exec', is_flag=True, help='Run asynchronously')
-def execute(instance_id, command, async_exec):
+def execute(instance_id, cmd, async_exec):
     """Execute commands on provisioned instances via provider APIs."""
     api = TerradevAPI()
 
@@ -2696,14 +2754,14 @@ def execute(instance_id, command, async_exec):
 
     pname = instance['provider'].lower().replace(' ', '_')
     print(f"Executing on {instance_id} ({instance['provider']}):")
-    print(f"   $ {command}")
+    print(f"   $ {cmd}")
 
     async def _exec():
         from providers.provider_factory import ProviderFactory
         factory = ProviderFactory()
         creds = api._provider_creds(pname)
         provider = factory.create_provider(pname, creds)
-        return await provider.execute_command(instance_id, command, async_exec)
+        return await provider.execute_command(instance_id, cmd, async_exec)
 
     try:
         result = asyncio.run(_exec())
@@ -3515,23 +3573,23 @@ def infer_deploy(model_path, name, provider, gpu_type, min_workers, max_workers,
 
 @cli.command()
 @click.option('--gpu', '-g', required=True, help='GPU type (A100, H100, RTX4090, etc.)')
-@click.option('--image', '-i', required=True, help='Docker image (e.g. pytorch/pytorch:latest)')
-@click.option('--command', '-c', default=None, help='Command to run inside the container')
+@click.option('--image', required=True, help='Docker image (e.g. pytorch/pytorch:latest)')
+@click.option('--cmd', default=None, help='Command to run inside the container')
 @click.option('--mount', '-m', multiple=True, help='Mount local path:container path (multiple allowed)')
-@click.option('--port', '-p', multiple=True, type=int, help='Ports to expose (multiple allowed)')
+@click.option('--port', multiple=True, type=int, help='Ports to expose (multiple allowed)')
 @click.option('--env', '-e', multiple=True, help='Environment variables KEY=VALUE (multiple allowed)')
 @click.option('--max-price', type=float, help='Maximum price per hour')
 @click.option('--providers', multiple=True, help='Specific providers (multiple allowed)')
 @click.option('--keep-alive', is_flag=True, help='Keep instance running after command completes')
 @click.option('--dry-run', is_flag=True, help='Show plan without executing')
-def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive, dry_run):
+def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry_run):
     """Provision a GPU instance, deploy a Docker container, and execute — all in one command.
 
     Combines provision + deploy + execute into a single step. Automatically
     selects the cheapest instance, pulls the Docker image, and runs your workload.
 
     Examples:
-        terradev run --gpu A100 --image pytorch/pytorch:latest -c "python train.py"
+        terradev run --gpu A100 --image pytorch/pytorch:latest --cmd "python train.py"
         terradev run --gpu H100 --image vllm/vllm-openai:latest --keep-alive --port 8000
         terradev run --gpu A100 --image my-training:latest -m ./data:/workspace/data -e WANDB_KEY=xxx
     """
@@ -3624,8 +3682,8 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
     print(f"Deploying terradev run")
     print(f"   GPU:     {gpu}")
     print(f"   Image:   {image}")
-    if command:
-        print(f"   Command: {command}")
+    if cmd:
+        print(f"   Command: {cmd}")
     if mount:
         for m in mount:
             print(f"   Mount:   {m}")
@@ -3694,7 +3752,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
 
     if dry_run:
         print(f"\nDRY RUN — would provision {best['provider']} {gpu} at ${best['price']:.2f}/hr")
-        print(f"   Then pull {image} and run: {command or '(interactive)'}")
+        print(f"   Then pull {image} and run: {cmd or '(interactive)'}")
         elapsed = (time.time() - run_start) * 1000
         print(f"   Plan built in {elapsed:.0f}ms")
         return
@@ -3771,8 +3829,8 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
 
     docker_cmd_parts.extend(["--name", f"terradev-{instance_id[:12]}"])
     docker_cmd_parts.append(image)
-    if command:
-        docker_cmd_parts.extend(["sh", "-c", command])
+    if cmd:
+        docker_cmd_parts.extend(["sh", "-c", cmd])
 
     docker_cmd = " ".join(docker_cmd_parts)
     print(f"   $ {docker_cmd}")
@@ -4465,9 +4523,9 @@ def k8s_info(cluster_name):
 @click.option('--workload', '-w',
               type=click.Choice(['training', 'inference', 'cost-optimized', 'high-performance']),
               default='training', help='Workload type (maps to Karpenter provisioner)')
-@click.option('--image', '-i', required=True, help='Docker image (e.g. pytorch/pytorch:latest)')
-@click.option('--command', '-c', default=None, help='Command to run inside the container')
-@click.option('--gpu-count', '-g', type=int, default=None, help='Number of GPUs (default: per workload profile)')
+@click.option('--image', required=True, help='Docker image (e.g. pytorch/pytorch:latest)')
+@click.option('--cmd', default=None, help='Command to run inside the container')
+@click.option('--gpu-count', '-G', type=int, default=None, help='Number of GPUs (default: per workload profile)')
 @click.option('--budget', '-b', type=float, default=None, help='Max $/hr budget — forces spot if < $2/hr')
 @click.option('--namespace', '-n', default='terradev-workloads', help='Kubernetes namespace')
 @click.option('--name', default=None, help='Job/Deployment name (auto-generated if omitted)')
@@ -4479,7 +4537,7 @@ def k8s_info(cluster_name):
 @click.option('--hours', type=float, default=1.0, help='Estimated runtime in hours')
 @click.option('--region', help='Preferred region')
 @click.option('--dry-run', is_flag=True, help='Show recommendation without deploying')
-def smart_deploy(image, workload, command, gpu_count, budget, namespace, name, env, mount, option, memory, storage, hours, region, dry_run):
+def smart_deploy(image, workload, cmd, gpu_count, budget, namespace, name, env, mount, option, memory, storage, hours, region, dry_run):
     """Smart deployment with automatic optimization"""
     try:
         from core.deployment_router import SmartDeploymentRouter
@@ -4666,7 +4724,7 @@ def budget_optimize(gpu_type, budget, gpu_count, hours, region, workload):
 @click.option('--storage', type=int, help='Storage in GB')
 @click.option('--budget', type=float, help='Budget constraint ($/hr)')
 @click.option('--region', help='Preferred region')
-@click.option('--port', '-p', type=int, multiple=True, help='Expose port(s) via Service (repeatable)')
+@click.option('--port', type=int, multiple=True, help='Expose port(s) via Service (repeatable)')
 @click.option('--stack', '-s', multiple=True, help='Stack integrations: qdrant, phoenix, guardrails (repeatable)')
 @click.option('--output', '-o', help='Output directory')
 @click.option('--name', help='Chart name')
@@ -7728,7 +7786,7 @@ def vllm():
 @click.option('--model', '-m', required=True, help='Model name')
 @click.option('--type', '-t', type=click.Choice(['throughput', 'latency']), 
               default='throughput', help='Optimization type')
-@click.option('--gpu-count', '-g', type=int, default=1, help='Number of GPUs')
+@click.option('--gpu-count', '-G', type=int, default=1, help='Number of GPUs')
 @click.option('--output', '-o', type=click.Choice(['args', 'config', 'helm']), 
               default='args', help='Output format')
 def vllm_optimize(model, type, gpu_count, output):
@@ -7794,7 +7852,7 @@ def vllm_optimize(model, type, gpu_count, output):
 @vllm.command('auto-optimize')
 @click.option('--endpoint', '-e', help='vLLM endpoint to analyze (if not provided, uses sample analysis)')
 @click.option('--samples', '-s', type=click.Path(exists=True), help='JSON file with sample requests')
-@click.option('--gpu-count', '-g', type=int, default=1, help='Number of GPUs available')
+@click.option('--gpu-count', '-G', type=int, default=1, help='Number of GPUs available')
 @click.option('--model', '-m', required=True, help='Model name')
 @click.option('--output', '-o', type=click.Choice(['config', 'args', 'helm']), 
               default='config', help='Output format')
@@ -8089,13 +8147,13 @@ def lora_list_cmd(endpoint, api_key):
 @lora.command('add')
 @click.option('--endpoint', '-e', required=True, help='vLLM endpoint')
 @click.option('--name', '-n', required=True, help='Adapter name (becomes the model name in API requests)')
-@click.option('--path', '-p', required=True, help='Path to adapter weights')
+@click.option('--path', required=True, help='Path to adapter weights')
 @click.option('--api-key', help='vLLM API key')
 def lora_add_cmd(endpoint, name, path, api_key):
     """Hot-load a LoRA adapter onto a running vLLM server.
 
     Examples:
-        terradev lora add -e http://10.0.0.1:8000 -n customer-a -p /adapters/customer-a
+        terradev lora add -e http://10.0.0.1:8000 -n customer-a --path /adapters/customer-a
     """
     from ml_services.vllm_service import VLLMConfig, VLLMService, LoRAModule
 
