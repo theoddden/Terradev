@@ -1174,7 +1174,7 @@ def configure(provider):
     
     if provider:
         # Configure specific provider
-        from credential_prompt import prompt_for_credentials
+        from terradev_cli.credential_prompt import prompt_for_credentials
         
         print(f"   Configure {provider.upper()} credentials")
         
@@ -1358,7 +1358,7 @@ def configure(provider):
         
     else:
         # Interactive configuration for all providers
-        from credential_prompt import prompt_for_credentials
+        from terradev_cli.credential_prompt import prompt_for_credentials
         configured_providers = prompt_for_credentials()
         
         if configured_providers:
