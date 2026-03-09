@@ -404,19 +404,50 @@ class SGLangService:
         """Apply workload-specific optimizations"""
         
         if config.workload_type == WorkloadType.AGENTIC_CHAT:
-            return self._optimize_agentic_chat(config, hardware)
+            config = self._optimize_agentic_chat(config, hardware)
         elif config.workload_type == WorkloadType.BATCH_INFERENCE:
-            return self._optimize_batch_inference(config, hardware)
+            config = self._optimize_batch_inference(config, hardware)
         elif config.workload_type == WorkloadType.LOW_LATENCY:
-            return self._optimize_low_latency(config, hardware)
+            config = self._optimize_low_latency(config, hardware)
         elif config.workload_type == WorkloadType.MOE_MODEL:
-            return self._optimize_moe_model(config, hardware)
+            config = self._optimize_moe_model(config, hardware)
         elif config.workload_type == WorkloadType.PD_DISAGGREGATED:
-            return self._optimize_pd_disaggregated(config, hardware)
+            config = self._optimize_pd_disaggregated(config, hardware)
         elif config.workload_type == WorkloadType.STRUCTURED_OUTPUT:
-            return self._optimize_structured_output(config, hardware)
+            config = self._optimize_structured_output(config, hardware)
         elif config.workload_type == WorkloadType.RAG_WORKLOAD:
-            return self._optimize_rag_workload(config, hardware)
+            config = self._optimize_rag_workload(config, hardware)
+        
+        # Layer MoE parallelism settings on top if model is MoE (regardless of workload)
+        if config.workload_type != WorkloadType.MOE_MODEL:
+            model_type, _ = self.optimizer.detect_model_type(config.model_path)
+            if model_type in ("deepseek", "kimi", "qwen_moe"):
+                config = self._apply_moe_parallelism(config, model_type, hardware)
+        
+        return config
+    
+    def _apply_moe_parallelism(self, config: SGLangConfig, model_type: str, hardware: HardwareProfile) -> SGLangConfig:
+        """Apply MoE parallelism settings without overriding workload-specific tuning"""
+        if model_type == "deepseek":
+            config.tp = 8
+            config.ep = 8
+            config.ep_num_redundant_experts = 32
+        elif model_type == "kimi":
+            config.tp = 4
+            config.ep = 8
+            config.ep_num_redundant_experts = 16
+        else:
+            config.tp = 4
+            config.ep = 4
+            config.ep_num_redundant_experts = 8
+        
+        config.enable_dp_attention = True
+        config.moe_a2a_backend = "deepep"
+        config.moe_runner_backend = "deep_gemm"
+        config.deepep_mode = DeepEPMode.AUTO
+        config.enable_eplb = True
+        config.enable_two_batch_overlap = True
+        config.enable_single_batch_overlap = True
         
         return config
     
@@ -603,8 +634,7 @@ class SGLangService:
         
         # CUDA graphs
         if config.cuda_graph_bs:
-            bs_str = " ".join(str(bs) for bs in config.cuda_graph_bs)
-            cmd_parts.extend(["--cuda-graph-bs"] + config.cuda_graph_bs)
+            cmd_parts.extend(["--cuda-graph-bs"] + [str(bs) for bs in config.cuda_graph_bs])
         
         # Radix cache
         if config.disable_radix_cache:
