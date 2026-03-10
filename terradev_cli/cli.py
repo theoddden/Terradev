@@ -9200,9 +9200,1495 @@ def test():
         print("💡 Run 'terradev sglang install' to install SGLang")
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Drift-Triggered Continuous Fine-Tuning
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@cli.group()
+def retrain():
+    """Drift-triggered continuous fine-tuning.
+
+    Watch Phoenix traces for quality degradation, auto-retrain LoRA adapters,
+    evaluate against holdout, and hot-swap onto vLLM — zero downtime.
+
+    Examples:
+        terradev retrain drift --model llama-70b-prod --source phoenix-traces
+        terradev retrain status
+        terradev retrain history
+    """
+    pass
+
+
+@retrain.command('drift')
+@click.option('--model', '-m', required=True, help='Model identifier (e.g. llama-70b-prod)')
+@click.option('--source', default='phoenix-traces', type=click.Choice(['phoenix-traces']),
+              help='Data source for drift detection')
+@click.option('--method', default='lora', type=click.Choice(['lora']),
+              help='Fine-tuning method')
+@click.option('--eval-threshold', default=0.85, type=float,
+              help='Minimum eval score to deploy (0.0-1.0)')
+@click.option('--deploy', default='canary', type=click.Choice(['canary', 'direct']),
+              help='Deployment strategy')
+@click.option('--auto-swap', is_flag=True, default=False,
+              help='Auto-deploy if eval passes (no manual approval)')
+@click.option('--phoenix-endpoint', default='http://localhost:6006',
+              help='Phoenix collector endpoint')
+@click.option('--phoenix-project', default='default', help='Phoenix project name')
+@click.option('--vllm-endpoint', '-e', default='', help='vLLM endpoint for eval and deploy')
+@click.option('--vllm-api-key', default=None, help='vLLM API key')
+@click.option('--baseline', default=0.90, type=float, help='Baseline quality score')
+@click.option('--threshold', default=0.85, type=float, help='Drift trigger threshold')
+@click.option('--min-samples', default=50, type=int, help='Min samples before triggering')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def retrain_drift(model, source, method, eval_threshold, deploy, auto_swap,
+                  phoenix_endpoint, phoenix_project, vllm_endpoint, vllm_api_key,
+                  baseline, threshold, min_samples, fmt):
+    """Run a drift-triggered retrain cycle.
+
+    Monitors Phoenix traces, detects quality drift, retrains a LoRA adapter,
+    evaluates it, and optionally hot-swaps it onto a running vLLM server.
+
+    Examples:
+        terradev retrain drift -m llama-70b-prod --auto-swap
+        terradev retrain drift -m llama-70b-prod -e http://10.0.0.1:8000
+        terradev retrain drift -m llama-70b-prod --eval-threshold 0.90
+    """
+    from ml_services.drift_retrain_service import DriftRetrainConfig, DriftRetrainService
+
+    config = DriftRetrainConfig(
+        model_id=model,
+        phoenix_endpoint=phoenix_endpoint,
+        phoenix_project=phoenix_project,
+        baseline_score=baseline,
+        degradation_threshold=threshold,
+        min_samples=min_samples,
+        method=method,
+        eval_threshold=eval_threshold,
+        vllm_endpoint=vllm_endpoint,
+        vllm_api_key=vllm_api_key,
+        deploy_strategy=deploy,
+        auto_swap=auto_swap,
+    )
+
+    svc = DriftRetrainService(config)
+
+    print(f"\n{'='*60}")
+    print(f"  Drift-Triggered Retrain: {model}")
+    print(f"  Cycle ID: {config.cycle_id}")
+    print(f"{'='*60}\n")
+
+    result = asyncio.get_event_loop().run_until_complete(svc.run_full_cycle())
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        outcome = result.get("outcome", "unknown")
+        stages = result.get("stages", {})
+
+        # Drift
+        drift = stages.get("drift_detection", {})
+        if drift:
+            icon = "\u26a0\ufe0f" if drift.get("drifted") else "\u2705"
+            print(f"  {icon} Drift Detection: score={drift.get('score', '?')} "
+                  f"(threshold={drift.get('threshold', '?')}, samples={drift.get('samples', 0)})")
+
+        if outcome == "no_drift":
+            print(f"\n  \u2705 No drift detected — model is healthy\n")
+            return
+
+        # Data
+        data = stages.get("data_extraction", {})
+        if data:
+            print(f"  \U0001f4ca Data: {data.get('train_count', 0)} train / "
+                  f"{data.get('holdout_count', 0)} holdout samples")
+
+        # Training
+        train = stages.get("training", {})
+        if train:
+            print(f"  \U0001f3cb Training: job_id={train.get('job_id', '?')} "
+                  f"status={train.get('status', '?')}")
+
+        # Eval
+        ev = stages.get("evaluation", {})
+        if ev:
+            icon = "\u2705" if ev.get("passed") else "\u274c"
+            print(f"  {icon} Eval: score={ev.get('score', '?')} "
+                  f"(threshold={ev.get('threshold', '?')}, metric={ev.get('metric', '?')})")
+
+        # Deploy
+        dep = stages.get("deployment", {})
+        if dep:
+            status = dep.get("status", "?")
+            if status == "deployed":
+                print(f"  \U0001f680 Deployed: adapter={dep.get('adapter_name')} "
+                      f"on {dep.get('endpoint')}")
+            elif status == "awaiting_approval":
+                print(f"  \u23f3 Awaiting approval — run: terradev retrain deploy "
+                      f"--cycle-id {config.cycle_id}")
+            else:
+                print(f"  \u274c Deploy: {dep.get('error', status)}")
+
+        # Summary
+        print(f"\n  Outcome: {outcome}")
+        if result.get("manifest_path"):
+            print(f"  Manifest: {result['manifest_path']}")
+        print()
+
+
+@retrain.command('detect')
+@click.option('--model', '-m', required=True, help='Model identifier')
+@click.option('--phoenix-endpoint', default='http://localhost:6006')
+@click.option('--phoenix-project', default='default')
+@click.option('--baseline', default=0.90, type=float)
+@click.option('--threshold', default=0.85, type=float)
+@click.option('--min-samples', default=50, type=int)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def retrain_detect(model, phoenix_endpoint, phoenix_project, baseline, threshold,
+                   min_samples, fmt):
+    """Check for drift without triggering a retrain.
+
+    Examples:
+        terradev retrain detect -m llama-70b-prod
+        terradev retrain detect -m llama-70b-prod --threshold 0.80
+    """
+    from ml_services.drift_retrain_service import DriftRetrainConfig, DriftRetrainService
+
+    config = DriftRetrainConfig(
+        model_id=model,
+        phoenix_endpoint=phoenix_endpoint,
+        phoenix_project=phoenix_project,
+        baseline_score=baseline,
+        degradation_threshold=threshold,
+        min_samples=min_samples,
+    )
+    svc = DriftRetrainService(config)
+    result = asyncio.get_event_loop().run_until_complete(svc.detect_drift())
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2))
+    else:
+        icon = "\u26a0\ufe0f  DRIFT DETECTED" if result.get("drifted") else "\u2705 No drift"
+        print(f"\n  {icon}")
+        print(f"  Score:     {result.get('score', '?')}")
+        print(f"  Baseline:  {result.get('baseline', '?')}")
+        print(f"  Threshold: {result.get('threshold', '?')}")
+        print(f"  Samples:   {result.get('samples', 0)}")
+        print(f"  Detail:    {result.get('detail', '')}\n")
+
+
+@retrain.command('deploy')
+@click.option('--cycle-id', required=True, help='Retrain cycle ID to deploy')
+@click.option('--vllm-endpoint', '-e', required=True, help='vLLM endpoint')
+@click.option('--vllm-api-key', default=None)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def retrain_deploy(cycle_id, vllm_endpoint, vllm_api_key, fmt):
+    """Manually deploy an adapter from a completed retrain cycle.
+
+    Use this when --auto-swap was not set and eval passed.
+
+    Examples:
+        terradev retrain deploy --cycle-id retrain-abc12345 -e http://10.0.0.1:8000
+    """
+    from ml_services.drift_retrain_service import DriftRetrainConfig, DriftRetrainService
+
+    manifest_path = Path.home() / ".terradev" / "retrain_manifests" / f"{cycle_id}.json"
+    if not manifest_path.exists():
+        print(f"ERROR: No manifest found for cycle {cycle_id}")
+        return
+
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+
+    adapter_dir = manifest.get("adapter_path", "")
+    if not adapter_dir:
+        adapter_dir = str(Path.home() / ".terradev" / "adapters" / cycle_id)
+
+    config = DriftRetrainConfig(
+        model_id=manifest.get("model_id", ""),
+        cycle_id=cycle_id,
+        vllm_endpoint=vllm_endpoint,
+        vllm_api_key=vllm_api_key,
+        adapter_output_dir=adapter_dir,
+        auto_swap=True,
+    )
+    svc = DriftRetrainService(config)
+    result = asyncio.get_event_loop().run_until_complete(svc.deploy_adapter())
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2))
+    else:
+        if result.get("status") == "deployed":
+            print(f"\n  \U0001f680 Adapter deployed!")
+            print(f"  Name:     {result.get('adapter_name')}")
+            print(f"  Endpoint: {result.get('endpoint')}")
+            print(f"  Path:     {result.get('adapter_path')}\n")
+        else:
+            print(f"\n  \u274c Deploy failed: {result.get('error', result.get('reason', '?'))}\n")
+
+
+@retrain.command('history')
+@click.option('--limit', '-n', default=20, type=int, help='Number of cycles to show')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def retrain_history(limit, fmt):
+    """Show retrain cycle history.
+
+    Examples:
+        terradev retrain history
+        terradev retrain history -n 5 -f json
+    """
+    from ml_services.drift_retrain_service import DriftRetrainService
+
+    manifests = DriftRetrainService.list_retrain_history(limit=limit)
+
+    if fmt == 'json':
+        print(json.dumps(manifests, indent=2, default=str))
+    else:
+        if not manifests:
+            print("\n  No retrain cycles found.\n")
+            return
+        print(f"\n  {'Cycle ID':<24} {'Model':<24} {'Status':<14} {'Eval':<8} {'Started'}")
+        print(f"  {'─'*22}  {'─'*22}  {'─'*12}  {'─'*6}  {'─'*20}")
+        for m in manifests:
+            cid = m.get("cycle_id", "?")[:22]
+            model = m.get("model_id", "?")[:22]
+            status = m.get("status", "?")[:12]
+            score = m.get("eval_score", 0)
+            started = m.get("started_at", "?")[:19]
+            print(f"  {cid:<24} {model:<24} {status:<14} {score:<8.4f} {started}")
+        print()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Langfuse — LLM Observability, Scoring & Dataset Management
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@cli.group()
+def langfuse():
+    """Langfuse LLM observability — traces, scores, datasets, prompts."""
+    pass
+
+
+@langfuse.command('configure')
+@click.option('--public-key', prompt='Langfuse Public Key (pk-lf-...)', hide_input=False)
+@click.option('--secret-key', prompt='Langfuse Secret Key (sk-lf-...)', hide_input=True)
+@click.option('--host', default='https://cloud.langfuse.com', help='Langfuse server URL')
+def langfuse_configure(public_key, secret_key, host):
+    """Configure Langfuse credentials."""
+    api = TerradevAPI()
+    api._save_provider_creds('langfuse', {
+        'public_key': public_key,
+        'secret_key': secret_key,
+        'base_url': host,
+    })
+    print(f"\u2705 Langfuse credentials saved (host: {host})")
+
+
+@langfuse.command('test')
+def langfuse_test():
+    """Test Langfuse connectivity."""
+    from ml_services.langfuse_service import create_langfuse_service_from_credentials
+    api = TerradevAPI()
+    svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
+    result = asyncio.run(svc.test_connection())
+    if result["status"] == "connected":
+        print(f"\u2705 Connected to Langfuse at {result['base_url']}")
+        print(f"\U0001f4c1 Projects: {result['projects']}")
+        for name in result.get("project_names", []):
+            print(f"   - {name}")
+    else:
+        print(f"\u274c Connection failed: {result.get('error')}")
+
+
+@langfuse.command('traces')
+@click.option('--limit', '-n', default=20, type=int)
+@click.option('--name', default=None, help='Filter by trace name')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def langfuse_traces(limit, name, fmt):
+    """List recent traces."""
+    from ml_services.langfuse_service import create_langfuse_service_from_credentials
+    api = TerradevAPI()
+    svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
+    result = asyncio.run(svc.list_traces(limit=limit, name=name))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        traces = result.get("data", [])
+        if not traces:
+            print("  No traces found.")
+            return
+        print(f"\n  {'ID':<40} {'Name':<24} {'Input':<30} {'Tokens'}")
+        print(f"  {'─'*38}  {'─'*22}  {'─'*28}  {'─'*8}")
+        for t in traces:
+            tid = t.get("id", "?")[:38]
+            tname = (t.get("name") or "?")[:22]
+            inp = str(t.get("input", ""))[:28]
+            tokens = t.get("totalTokens") or t.get("usage", {}).get("totalTokens", "?")
+            print(f"  {tid:<40} {tname:<24} {inp:<30} {tokens}")
+        print()
+
+
+@langfuse.command('trace')
+@click.argument('trace_id')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def langfuse_trace(trace_id, fmt):
+    """Get a single trace with observations."""
+    from ml_services.langfuse_service import create_langfuse_service_from_credentials
+    api = TerradevAPI()
+    svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
+    result = asyncio.run(svc.get_trace(trace_id))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        print(f"\n  Trace: {result.get('id', '?')}")
+        print(f"  Name:  {result.get('name', '?')}")
+        print(f"  Input: {str(result.get('input', ''))[:100]}")
+        print(f"  Output: {str(result.get('output', ''))[:100]}")
+        obs = result.get("observations", [])
+        if obs:
+            print(f"\n  Observations ({len(obs)}):")
+            for o in obs:
+                print(f"    [{o.get('type', '?')}] {o.get('name', '?')} — "
+                      f"{str(o.get('input', ''))[:60]}")
+        print()
+
+
+@langfuse.command('scores')
+@click.option('--trace-id', default=None, help='Filter by trace ID')
+@click.option('--name', default=None, help='Filter by score name')
+@click.option('--limit', '-n', default=50, type=int)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def langfuse_scores(trace_id, name, limit, fmt):
+    """List scores."""
+    from ml_services.langfuse_service import create_langfuse_service_from_credentials
+    api = TerradevAPI()
+    svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
+    result = asyncio.run(svc.list_scores(trace_id=trace_id, name=name, limit=limit))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        scores = result.get("data", [])
+        if not scores:
+            print("  No scores found.")
+            return
+        print(f"\n  {'Name':<20} {'Value':<10} {'Trace ID':<40} {'Comment'}")
+        print(f"  {'─'*18}  {'─'*8}  {'─'*38}  {'─'*20}")
+        for s in scores:
+            sname = (s.get("name") or "?")[:18]
+            val = s.get("value", "?")
+            tid = (s.get("traceId") or "?")[:38]
+            comment = (s.get("comment") or "")[:20]
+            print(f"  {sname:<20} {val:<10} {tid:<40} {comment}")
+        print()
+
+
+@langfuse.command('score')
+@click.option('--trace-id', required=True, help='Trace to score')
+@click.option('--name', required=True, help='Score name (e.g. accuracy, quality)')
+@click.option('--value', required=True, type=float, help='Score value (numeric)')
+@click.option('--observation-id', default=None, help='Specific observation to score')
+@click.option('--comment', default=None, help='Optional comment')
+def langfuse_score(trace_id, name, value, observation_id, comment):
+    """Create a score for a trace."""
+    from ml_services.langfuse_service import create_langfuse_service_from_credentials
+    api = TerradevAPI()
+    svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
+    result = asyncio.run(svc.create_score(
+        trace_id=trace_id, name=name, value=value,
+        observation_id=observation_id, comment=comment))
+    print(f"\u2705 Score created: {name}={value} on trace {trace_id[:20]}...")
+
+
+@langfuse.command('datasets')
+@click.option('--limit', '-n', default=20, type=int)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def langfuse_datasets(limit, fmt):
+    """List datasets."""
+    from ml_services.langfuse_service import create_langfuse_service_from_credentials
+    api = TerradevAPI()
+    svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
+    result = asyncio.run(svc.list_datasets(limit=limit))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        datasets = result.get("data", [])
+        if not datasets:
+            print("  No datasets found.")
+            return
+        for d in datasets:
+            print(f"  \U0001f4ca {d.get('name', '?')} — {d.get('description', '')[:60]}")
+        print()
+
+
+@langfuse.command('export-training-data')
+@click.option('--limit', '-n', default=500, type=int, help='Max pairs to export')
+@click.option('--name', default=None, help='Filter traces by name')
+@click.option('--min-score', default=None, type=float, help='Min quality score (0.0-1.0)')
+@click.option('--score-name', default='quality', help='Score name to filter on')
+@click.option('--output', '-o', default=None, help='Output file path (default: stdout)')
+def langfuse_export_training_data(limit, name, min_score, score_name, output):
+    """Export traces as instruction/response pairs for LoRA fine-tuning."""
+    from ml_services.langfuse_service import create_langfuse_service_from_credentials
+    api = TerradevAPI()
+    svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
+    pairs = asyncio.run(svc.export_training_data(
+        limit=limit, name_filter=name, min_score=min_score, score_name=score_name))
+
+    if not pairs:
+        print("  No training pairs extracted.")
+        return
+
+    data = json.dumps(pairs, indent=2)
+    if output:
+        with open(output, 'w') as f:
+            f.write(data)
+        print(f"\u2705 Exported {len(pairs)} pairs to {output}")
+    else:
+        print(data)
+
+
+@langfuse.command('quality')
+@click.option('--score-name', default='quality', help='Score name to aggregate')
+@click.option('--limit', '-n', default=200, type=int)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def langfuse_quality(score_name, limit, fmt):
+    """Get quality metrics for drift detection."""
+    from ml_services.langfuse_service import create_langfuse_service_from_credentials
+    api = TerradevAPI()
+    svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
+    result = asyncio.run(svc.get_quality_metrics(score_name=score_name, limit=limit))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2))
+    else:
+        print(f"\n  Quality Metrics ({score_name}):")
+        print(f"  Avg:     {result.get('avg_score', '?')}")
+        print(f"  Min:     {result.get('min_score', '?')}")
+        print(f"  Max:     {result.get('max_score', '?')}")
+        print(f"  Samples: {result.get('samples', 0)}\n")
+
+
+@langfuse.command('otel-env')
+@click.option('--project', '-p', default='default', help='Project name')
+def langfuse_otel_env(project):
+    """Print OTEL env vars for instrumenting LLM apps."""
+    from ml_services.langfuse_service import create_langfuse_service_from_credentials
+    api = TerradevAPI()
+    svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
+    env = svc.generate_otel_env(project_name=project)
+    print()
+    for k, v in env.items():
+        print(f"export {k}=\"{v}\"")
+    print()
+
+
+@langfuse.command('k8s')
+@click.option('--namespace', '-n', default='observability', help='K8s namespace')
+def langfuse_k8s(namespace):
+    """Print K8s deployment manifest for Langfuse."""
+    from ml_services.langfuse_service import create_langfuse_service_from_credentials
+    api = TerradevAPI()
+    svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
+    print(svc.generate_k8s_deployment(namespace=namespace))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Helicone — LLM Gateway & Observability
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@cli.group()
+def helicone():
+    """Helicone LLM gateway — request logs, costs, caching, rate limiting."""
+    pass
+
+
+@helicone.command('configure')
+@click.option('--api-key', prompt='Helicone API Key', hide_input=True)
+@click.option('--eu', is_flag=True, default=False, help='Use EU region')
+def helicone_configure(api_key, eu):
+    """Configure Helicone credentials."""
+    api = TerradevAPI()
+    api._save_provider_creds('helicone', {
+        'helicone_api_key': api_key,
+        'helicone_eu': str(eu).lower(),
+    })
+    region = "EU" if eu else "US"
+    print(f"\u2705 Helicone credentials saved (region: {region})")
+
+
+@helicone.command('test')
+def helicone_test():
+    """Test Helicone connectivity."""
+    from integrations.helicone_integration import test_connection
+    api = TerradevAPI()
+    creds = api._provider_creds('helicone')
+    result = asyncio.run(test_connection(creds))
+    if result["status"] == "connected":
+        print(f"\u2705 Connected to Helicone")
+        print(f"\U0001f310 API:     {result.get('api_url')}")
+        print(f"\U0001f310 Gateway: {result.get('gateway_url')}")
+        print(f"\U0001f30d Region:  {result.get('region')}")
+    else:
+        print(f"\u274c Connection failed: {result.get('error')}")
+
+
+@helicone.command('requests')
+@click.option('--model', default=None, help='Filter by model name')
+@click.option('--limit', '-n', default=20, type=int)
+@click.option('--user-id', default=None, help='Filter by user ID')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def helicone_requests(model, limit, user_id, fmt):
+    """Query request logs."""
+    from integrations.helicone_integration import query_requests
+    api = TerradevAPI()
+    creds = api._provider_creds('helicone')
+    result = asyncio.run(query_requests(creds, limit=limit, model=model, user_id=user_id))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if not result.get("success"):
+            print(f"\u274c {result.get('error')}")
+            return
+        data = result.get("data", [])
+        if isinstance(data, dict):
+            data = data.get("data", [])
+        if not data:
+            print("  No requests found.")
+            return
+        print(f"\n  {'Model':<24} {'Status':<8} {'Tokens':<10} {'Cost':<10} {'Latency'}")
+        print(f"  {'─'*22}  {'─'*6}  {'─'*8}  {'─'*8}  {'─'*8}")
+        for req in data[:limit]:
+            m = (req.get("model") or req.get("request_model") or "?")[:22]
+            status = req.get("status") or req.get("response_status") or "?"
+            tokens = req.get("total_tokens") or "?"
+            cost = req.get("cost_usd") or req.get("response_cost") or "?"
+            latency = req.get("latency") or req.get("delay_ms") or "?"
+            print(f"  {m:<24} {status:<8} {tokens:<10} {cost:<10} {latency}")
+        print()
+
+
+@helicone.command('costs')
+@click.option('--hours', default=24, type=int, help='Look-back period in hours')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def helicone_costs(hours, fmt):
+    """Aggregate LLM costs from Helicone logs."""
+    from integrations.helicone_integration import get_cost_summary
+    api = TerradevAPI()
+    creds = api._provider_creds('helicone')
+    result = asyncio.run(get_cost_summary(creds, hours=hours))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if not result.get("success"):
+            print(f"\u274c {result.get('error')}")
+            return
+        print(f"\n  Helicone Cost Summary (last {hours}h):")
+        print(f"  Total Cost:     ${result.get('total_cost_usd', 0):.4f}")
+        print(f"  Total Tokens:   {result.get('total_tokens', 0):,}")
+        print(f"  Total Requests: {result.get('total_requests', 0):,}")
+        by_model = result.get("by_model", {})
+        if by_model:
+            print(f"\n  {'Model':<30} {'Cost':<12} {'Tokens':<12} {'Reqs'}")
+            print(f"  {'─'*28}  {'─'*10}  {'─'*10}  {'─'*6}")
+            for m, v in by_model.items():
+                print(f"  {m[:28]:<30} ${v['cost']:<11.4f} {v['tokens']:<12,} {v['requests']}")
+        print()
+
+
+@helicone.command('gateway-config')
+@click.option('--provider-url', default='https://api.openai.com',
+              help='Target LLM provider URL')
+@click.option('--cache', is_flag=True, default=False, help='Enable response caching')
+@click.option('--retry', is_flag=True, default=False, help='Enable auto-retry')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def helicone_gateway_config(provider_url, cache, retry, fmt):
+    """Generate gateway configuration for routing LLM requests through Helicone."""
+    from integrations.helicone_integration import generate_gateway_config
+    api = TerradevAPI()
+    creds = api._provider_creds('helicone')
+    config = generate_gateway_config(
+        creds, provider_base_url=provider_url,
+        cache_enabled=cache, retry_enabled=retry)
+
+    if fmt == 'json':
+        print(json.dumps(config, indent=2))
+    else:
+        print(f"\n  Helicone Gateway Config:")
+        print(f"  Base URL: {config['base_url']}")
+        print(f"  Target:   {config['original_provider']}")
+        print(f"  Cache:    {config['features']['cache']}")
+        print(f"  Retry:    {config['features']['retry']}")
+        print(f"\n  Headers:")
+        for k, v in config['headers'].items():
+            display_v = v[:40] + "..." if len(v) > 40 else v
+            print(f"    {k}: {display_v}")
+        print()
+
+
+@helicone.command('snippet')
+@click.option('--provider', '-p', default='openai',
+              type=click.Choice(['openai', 'vllm']), help='Provider type')
+def helicone_snippet(provider):
+    """Generate a Python code snippet for using Helicone gateway."""
+    from integrations.helicone_integration import generate_gateway_snippet
+    api = TerradevAPI()
+    creds = api._provider_creds('helicone')
+    print(generate_gateway_snippet(creds, provider=provider))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Databricks — Jobs, Clusters, Model Serving, MLflow
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@cli.group()
+def databricks():
+    """Databricks MLOps — jobs, clusters, model serving, MLflow."""
+    pass
+
+
+@databricks.command('configure')
+@click.option('--host', prompt='Databricks workspace URL')
+@click.option('--token', prompt='Databricks PAT (dapi...)', hide_input=True)
+def databricks_configure(host, token):
+    """Configure Databricks credentials."""
+    api = TerradevAPI()
+    api._save_provider_creds('databricks', {
+        'databricks_host': host,
+        'databricks_token': token,
+    })
+    print(f"\u2705 Databricks credentials saved (host: {host})")
+
+
+@databricks.command('test')
+def databricks_test():
+    """Test Databricks connectivity."""
+    from integrations.databricks_integration import test_connection
+    api = TerradevAPI()
+    creds = api._provider_creds('databricks')
+    result = asyncio.run(test_connection(creds))
+    if result["status"] == "connected":
+        print(f"\u2705 Connected to Databricks at {result.get('host')}")
+        print(f"\U0001f5a5  Clusters: {result.get('clusters', 0)}")
+    else:
+        print(f"\u274c Connection failed: {result.get('error')}")
+
+
+@databricks.command('jobs')
+@click.option('--limit', '-n', default=25, type=int)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def databricks_jobs(limit, fmt):
+    """List Databricks jobs."""
+    from integrations.databricks_integration import list_jobs
+    api = TerradevAPI()
+    creds = api._provider_creds('databricks')
+    result = asyncio.run(list_jobs(creds, limit=limit))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if not result.get("success"):
+            print(f"\u274c {result.get('error')}")
+            return
+        jobs = result.get("data", {}).get("jobs", [])
+        if not jobs:
+            print("  No jobs found.")
+            return
+        print(f"\n  {'Job ID':<12} {'Name':<40} {'Created'}")
+        print(f"  {'─'*10}  {'─'*38}  {'─'*20}")
+        for j in jobs:
+            jid = j.get("job_id", "?")
+            name = j.get("settings", {}).get("name", "?")[:38]
+            created = j.get("created_time", "?")
+            if isinstance(created, int):
+                from datetime import datetime
+                created = datetime.fromtimestamp(created / 1000).strftime("%Y-%m-%d %H:%M")
+            print(f"  {jid:<12} {name:<40} {created}")
+        print()
+
+
+@databricks.command('run')
+@click.argument('job_id', type=int)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def databricks_run(job_id, fmt):
+    """Trigger a Databricks job run."""
+    from integrations.databricks_integration import run_job
+    api = TerradevAPI()
+    creds = api._provider_creds('databricks')
+    result = asyncio.run(run_job(creds, job_id))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if result.get("success"):
+            run_id = result.get("data", {}).get("run_id", "?")
+            print(f"\U0001f680 Job {job_id} triggered — run_id: {run_id}")
+        else:
+            print(f"\u274c {result.get('error')}")
+
+
+@databricks.command('run-status')
+@click.argument('run_id', type=int)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def databricks_run_status(run_id, fmt):
+    """Get status of a Databricks run."""
+    from integrations.databricks_integration import get_run
+    api = TerradevAPI()
+    creds = api._provider_creds('databricks')
+    result = asyncio.run(get_run(creds, run_id))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if not result.get("success"):
+            print(f"\u274c {result.get('error')}")
+            return
+        data = result.get("data", {})
+        state = data.get("state", {})
+        print(f"\n  Run {run_id}:")
+        print(f"  Life Cycle: {state.get('life_cycle_state', '?')}")
+        print(f"  Result:     {state.get('result_state', 'pending')}")
+        print(f"  Message:    {state.get('state_message', '')[:80]}")
+        task_name = data.get("task", {}).get("task_key") or data.get("run_name", "?")
+        print(f"  Task:       {task_name}\n")
+
+
+@databricks.command('clusters')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def databricks_clusters(fmt):
+    """List Databricks clusters."""
+    from integrations.databricks_integration import list_clusters
+    api = TerradevAPI()
+    creds = api._provider_creds('databricks')
+    result = asyncio.run(list_clusters(creds))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if not result.get("success"):
+            print(f"\u274c {result.get('error')}")
+            return
+        clusters = result.get("data", {}).get("clusters", [])
+        if not clusters:
+            print("  No clusters found.")
+            return
+        print(f"\n  {'Cluster ID':<24} {'Name':<30} {'State':<14} {'Node Type'}")
+        print(f"  {'─'*22}  {'─'*28}  {'─'*12}  {'─'*20}")
+        for c in clusters:
+            cid = c.get("cluster_id", "?")[:22]
+            name = c.get("cluster_name", "?")[:28]
+            state = c.get("state", "?")[:12]
+            ntype = c.get("node_type_id", "?")[:20]
+            print(f"  {cid:<24} {name:<30} {state:<14} {ntype}")
+        print()
+
+
+@databricks.command('serving-endpoints')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def databricks_serving_endpoints(fmt):
+    """List model serving endpoints."""
+    from integrations.databricks_integration import list_serving_endpoints
+    api = TerradevAPI()
+    creds = api._provider_creds('databricks')
+    result = asyncio.run(list_serving_endpoints(creds))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if not result.get("success"):
+            print(f"\u274c {result.get('error')}")
+            return
+        endpoints = result.get("data", {}).get("endpoints", [])
+        if not endpoints:
+            print("  No serving endpoints found.")
+            return
+        print(f"\n  {'Name':<30} {'State':<16} {'Creator'}")
+        print(f"  {'─'*28}  {'─'*14}  {'─'*24}")
+        for ep in endpoints:
+            name = ep.get("name", "?")[:28]
+            state = ep.get("state", {}).get("ready", "?")[:14]
+            creator = ep.get("creator", "?")[:24]
+            print(f"  {name:<30} {state:<16} {creator}")
+        print()
+
+
+@databricks.command('deploy-model')
+@click.option('--endpoint-name', required=True, help='Serving endpoint name')
+@click.option('--model-name', required=True, help='Registered model name')
+@click.option('--model-version', default='1', help='Model version')
+@click.option('--workload-size', default='Small',
+              type=click.Choice(['Small', 'Medium', 'Large']))
+@click.option('--scale-to-zero/--no-scale-to-zero', default=True)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def databricks_deploy_model(endpoint_name, model_name, model_version,
+                            workload_size, scale_to_zero, fmt):
+    """Deploy a model to a serving endpoint."""
+    from integrations.databricks_integration import create_serving_endpoint
+    api = TerradevAPI()
+    creds = api._provider_creds('databricks')
+    result = asyncio.run(create_serving_endpoint(
+        creds, endpoint_name, model_name, model_version,
+        workload_size=workload_size, scale_to_zero=scale_to_zero))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if result.get("success"):
+            print(f"\U0001f680 Serving endpoint '{endpoint_name}' created")
+            print(f"  Model:    {model_name} v{model_version}")
+            print(f"  Workload: {workload_size}")
+        else:
+            print(f"\u274c {result.get('error')}")
+
+
+@databricks.command('query')
+@click.option('--endpoint', required=True, help='Serving endpoint name')
+@click.option('--prompt', required=True, help='Prompt text')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def databricks_query(endpoint, prompt, fmt):
+    """Query a model serving endpoint."""
+    from integrations.databricks_integration import query_serving_endpoint
+    api = TerradevAPI()
+    creds = api._provider_creds('databricks')
+    inputs = [{"role": "user", "content": prompt}]
+    result = asyncio.run(query_serving_endpoint(creds, endpoint, inputs))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if result.get("success"):
+            data = result.get("data", {})
+            choices = data.get("choices", [])
+            if choices:
+                content = choices[0].get("message", {}).get("content", "")
+                print(f"\n{content}\n")
+            else:
+                print(json.dumps(data, indent=2, default=str))
+        else:
+            print(f"\u274c {result.get('error')}")
+
+
+@databricks.group()
+def mlflow():
+    """Databricks-hosted MLflow operations."""
+    pass
+
+
+@mlflow.command('experiments')
+@click.option('--limit', '-n', default=50, type=int)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def databricks_mlflow_experiments(limit, fmt):
+    """List MLflow experiments."""
+    from integrations.databricks_integration import mlflow_list_experiments
+    api = TerradevAPI()
+    creds = api._provider_creds('databricks')
+    result = asyncio.run(mlflow_list_experiments(creds, max_results=limit))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if not result.get("success"):
+            print(f"\u274c {result.get('error')}")
+            return
+        exps = result.get("data", {}).get("experiments", [])
+        if not exps:
+            print("  No experiments found.")
+            return
+        print(f"\n  {'ID':<12} {'Name':<44} {'Lifecycle'}")
+        print(f"  {'─'*10}  {'─'*42}  {'─'*12}")
+        for e in exps:
+            eid = e.get("experiment_id", "?")
+            name = e.get("name", "?")[:42]
+            lifecycle = e.get("lifecycle_stage", "?")
+            print(f"  {eid:<12} {name:<44} {lifecycle}")
+        print()
+
+
+@mlflow.command('models')
+@click.option('--limit', '-n', default=50, type=int)
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def databricks_mlflow_models(limit, fmt):
+    """List registered models in Databricks Model Registry."""
+    from integrations.databricks_integration import mlflow_list_registered_models
+    api = TerradevAPI()
+    creds = api._provider_creds('databricks')
+    result = asyncio.run(mlflow_list_registered_models(creds, max_results=limit))
+
+    if fmt == 'json':
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        if not result.get("success"):
+            print(f"\u274c {result.get('error')}")
+            return
+        models = result.get("data", {}).get("registered_models", [])
+        if not models:
+            print("  No registered models found.")
+            return
+        print(f"\n  {'Name':<40} {'Latest Version':<16} {'Description'}")
+        print(f"  {'─'*38}  {'─'*14}  {'─'*30}")
+        for m in models:
+            name = m.get("name", "?")[:38]
+            versions = m.get("latest_versions", [])
+            latest = versions[0].get("version", "?") if versions else "?"
+            desc = (m.get("description") or "")[:30]
+            print(f"  {name:<40} {latest:<16} {desc}")
+        print()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Agentic Serving — KV Cache TTL, Prefix Caching, LMCache, Priority Scheduling
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@cli.group('agentic-serving')
+def agentic_serving():
+    """Agentic inference serving — KV cache TTL, prefix caching, LMCache, priority scheduling."""
+    pass
+
+
+@agentic_serving.command('configure')
+@click.option('--engine', type=click.Choice(['vllm', 'sglang']), default='vllm', help='Inference engine')
+@click.option('--model', prompt='Model ID', default='meta-llama/Llama-3.1-8B-Instruct')
+@click.option('--tp', 'tensor_parallel_size', default=1, type=int, help='Tensor parallel size')
+@click.option('--max-model-len', default=32768, type=int)
+@click.option('--gpu-mem', 'gpu_memory_utilization', default=0.85, type=float)
+@click.option('--lmcache/--no-lmcache', 'lmcache_enabled', default=True, help='Enable LMCache KV offload')
+@click.option('--lmcache-backend', type=click.Choice(['cpu', 'disk', 'redis']), default='cpu')
+@click.option('--disaggregation/--no-disaggregation', default=False, help='Prefill-decode disaggregation')
+def agentic_serving_configure(engine, model, tensor_parallel_size, max_model_len,
+                               gpu_memory_utilization, lmcache_enabled, lmcache_backend,
+                               disaggregation):
+    """Configure agentic inference serving settings."""
+    api = TerradevAPI()
+    api._save_provider_creds('agentic_serving', {
+        'engine': engine,
+        'model': model,
+        'tensor_parallel_size': str(tensor_parallel_size),
+        'max_model_len': str(max_model_len),
+        'gpu_memory_utilization': str(gpu_memory_utilization),
+        'enable_prefix_caching': 'true',
+        'lmcache_enabled': str(lmcache_enabled).lower(),
+        'lmcache_backend': lmcache_backend,
+        'disaggregation_enabled': str(disaggregation).lower(),
+    })
+    print(f"\u2705 Agentic serving configured: {engine} + {model}")
+    print(f"   Prefix caching: enabled")
+    print(f"   LMCache: {'enabled (' + lmcache_backend + ')' if lmcache_enabled else 'disabled'}")
+    print(f"   PD disaggregation: {'enabled' if disaggregation else 'disabled'}")
+
+
+@agentic_serving.command('show-config')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def agentic_serving_show_config(fmt):
+    """Show current agentic serving configuration."""
+    from ml_services.agentic_serving import create_agentic_serving_from_credentials, generate_vllm_args, generate_sglang_args, generate_lmcache_config
+    api = TerradevAPI()
+    config, _ = create_agentic_serving_from_credentials(api._provider_creds('agentic_serving'))
+    engine_args = generate_vllm_args(config) if config.engine == "vllm" else generate_sglang_args(config)
+
+    if fmt == 'json':
+        print(json.dumps({
+            "engine": config.engine,
+            "model": config.model,
+            "engine_args": engine_args,
+            "lmcache": generate_lmcache_config(config),
+            "ttl": {"min": config.ttl_min, "max": config.ttl_max, "multiplier": config.ttl_multiplier},
+            "disaggregation": config.disaggregation_enabled,
+            "prefix_caching": config.enable_prefix_caching,
+        }, indent=2))
+    else:
+        print(f"\n  Agentic Serving Config:")
+        print(f"  Engine:            {config.engine}")
+        print(f"  Model:             {config.model}")
+        print(f"  TP:                {config.tensor_parallel_size}")
+        print(f"  Max Model Len:     {config.max_model_len}")
+        print(f"  GPU Mem Util:      {config.gpu_memory_utilization}")
+        print(f"  Prefix Caching:    {config.enable_prefix_caching}")
+        print(f"  LMCache:           {config.lmcache_enabled} ({config.lmcache_backend})")
+        print(f"  Disaggregation:    {config.disaggregation_enabled}")
+        print(f"  KV TTL Range:      {config.ttl_min}s - {config.ttl_max}s (x{config.ttl_multiplier})")
+        print(f"\n  Engine Args:")
+        for a in engine_args:
+            print(f"    {a}")
+        print()
+
+
+@agentic_serving.command('launch-args')
+def agentic_serving_launch_args():
+    """Print engine launch arguments for copy-paste."""
+    from ml_services.agentic_serving import create_agentic_serving_from_credentials, generate_vllm_args, generate_sglang_args
+    api = TerradevAPI()
+    config, _ = create_agentic_serving_from_credentials(api._provider_creds('agentic_serving'))
+    args = generate_vllm_args(config) if config.engine == "vllm" else generate_sglang_args(config)
+    if config.engine == "vllm":
+        print(f"\npython -m vllm.entrypoints.openai.api_server \\")
+    else:
+        print(f"\npython -m sglang.launch_server \\")
+    for i, a in enumerate(args):
+        sep = " \\" if i < len(args) - 1 else ""
+        print(f"  {a}{sep}")
+    print()
+
+
+@agentic_serving.command('lmcache-env')
+def agentic_serving_lmcache_env():
+    """Print LMCache environment variables."""
+    from ml_services.agentic_serving import create_agentic_serving_from_credentials, generate_lmcache_env
+    api = TerradevAPI()
+    config, _ = create_agentic_serving_from_credentials(api._provider_creds('agentic_serving'))
+    env = generate_lmcache_env(config)
+    if not env:
+        print("  LMCache is disabled.")
+        return
+    print()
+    for k, v in env.items():
+        print(f'export {k}="{v}"')
+    print()
+
+
+@agentic_serving.command('k8s')
+@click.option('--namespace', '-n', default='inference', help='K8s namespace')
+def agentic_serving_k8s(namespace):
+    """Print K8s deployment manifests for agentic inference."""
+    from ml_services.agentic_serving import create_agentic_serving_from_credentials, generate_k8s_deployment
+    api = TerradevAPI()
+    config, _ = create_agentic_serving_from_credentials(api._provider_creds('agentic_serving'))
+    print(generate_k8s_deployment(config, namespace=namespace))
+
+
+@agentic_serving.command('helm-values')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'yaml']), default='yaml')
+def agentic_serving_helm_values(fmt):
+    """Print Helm values for agentic inference deployment."""
+    from ml_services.agentic_serving import create_agentic_serving_from_credentials, generate_helm_values
+    api = TerradevAPI()
+    config, _ = create_agentic_serving_from_credentials(api._provider_creds('agentic_serving'))
+    values = generate_helm_values(config)
+    if fmt == 'json':
+        print(json.dumps(values, indent=2))
+    else:
+        import yaml
+        print(yaml.dump(values, default_flow_style=False))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Model Router — Cost/Quality Routing for Agentic Workloads
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@cli.group('model-router')
+def model_router():
+    """Model routing — cost/quality-aware routing between strong and weak models."""
+    pass
+
+
+@model_router.command('configure')
+@click.option('--strong-url', prompt='Strong model URL (e.g. https://api.openai.com)', help='Strong model endpoint')
+@click.option('--strong-model', prompt='Strong model ID', default='gpt-4')
+@click.option('--strong-api-key', prompt='Strong model API key', hide_input=True)
+@click.option('--weak-url', prompt='Weak model URL (e.g. http://localhost:8000)', help='Weak model endpoint')
+@click.option('--weak-model', prompt='Weak model ID', default='llama-3.1-8b')
+@click.option('--weak-api-key', default='', help='Weak model API key (if needed)')
+@click.option('--strategy', type=click.Choice(['step_type', 'threshold', 'cascade', 'strong_only', 'weak_only']),
+              default='step_type', help='Routing strategy')
+@click.option('--cost-threshold', default=0.5, type=float, help='Complexity threshold for threshold strategy')
+def model_router_configure(strong_url, strong_model, strong_api_key, weak_url,
+                            weak_model, weak_api_key, strategy, cost_threshold):
+    """Configure model routing endpoints and strategy."""
+    api = TerradevAPI()
+    api._save_provider_creds('model_router', {
+        'strong_url': strong_url,
+        'strong_model': strong_model,
+        'strong_api_key': strong_api_key,
+        'weak_url': weak_url,
+        'weak_model': weak_model,
+        'weak_api_key': weak_api_key,
+        'strategy': strategy,
+        'cost_threshold': str(cost_threshold),
+        'cascade_enabled': str(strategy == 'cascade').lower(),
+    })
+    print(f"\u2705 Model router configured:")
+    print(f"   Strong: {strong_model} @ {strong_url}")
+    print(f"   Weak:   {weak_model} @ {weak_url}")
+    print(f"   Strategy: {strategy}")
+
+
+@model_router.command('test')
+@click.option('--prompt', '-p', default='What is 2+2?', help='Test prompt')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def model_router_test(prompt, fmt):
+    """Test model routing with a sample prompt."""
+    from ml_services.model_router import create_router_from_credentials, StepClassifier
+    api = TerradevAPI()
+    router = create_router_from_credentials(api._provider_creds('model_router'))
+    messages = [{"role": "user", "content": prompt}]
+    endpoint, step_type, reason = router.route(messages)
+
+    if fmt == 'json':
+        print(json.dumps({
+            "model": endpoint.model_id,
+            "tier": endpoint.tier.value,
+            "endpoint_url": endpoint.url,
+            "step_type": step_type.value,
+            "reason": reason,
+        }, indent=2))
+    else:
+        print(f"\n  Routing Decision:")
+        print(f"  Model:     {endpoint.model_id}")
+        print(f"  Tier:      {endpoint.tier.value}")
+        print(f"  URL:       {endpoint.url}")
+        print(f"  Step Type: {step_type.value}")
+        print(f"  Reason:    {reason}\n")
+
+
+@model_router.command('classify')
+@click.argument('text')
+def model_router_classify(text):
+    """Classify a message's step type for routing."""
+    from ml_services.model_router import StepClassifier
+    messages = [{"role": "user", "content": text}]
+    step_type = StepClassifier.classify(messages)
+    print(f"  Step type: {step_type.value}")
+
+
+@model_router.command('stats')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+def model_router_stats(fmt):
+    """Show routing statistics (in-memory, current session)."""
+    from ml_services.model_router import create_router_from_credentials
+    api = TerradevAPI()
+    router = create_router_from_credentials(api._provider_creds('model_router'))
+    stats = router.get_routing_stats()
+
+    if fmt == 'json':
+        print(json.dumps(stats, indent=2))
+    else:
+        print(f"\n  Routing Stats:")
+        print(f"  Total Decisions: {stats['total_decisions']}")
+        if stats['total_decisions'] > 0:
+            print(f"  Strong %:        {stats['strong_pct']}%")
+            print(f"  Weak %:          {stats['weak_pct']}%")
+            by_step = stats.get('by_step_type', {})
+            if by_step:
+                print(f"\n  By Step Type:")
+                for st, counts in by_step.items():
+                    print(f"    {st}: {counts['total']} (strong={counts['strong']}, weak={counts['weak']})")
+        print()
+
+
+@model_router.command('llmd-config')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'yaml']), default='yaml')
+def model_router_llmd_config(fmt):
+    """Generate llm-d KV-cache-aware routing config."""
+    from ml_services.model_router import generate_llmd_routing_config, RouterConfig
+    config = generate_llmd_routing_config(RouterConfig())
+    if fmt == 'json':
+        print(json.dumps(config, indent=2))
+    else:
+        import yaml
+        print(yaml.dump(config, default_flow_style=False))
+
+
+# ── MIGRATE COMMAND GROUP ──
+
+@cli.group()
+def migrate():
+    """Cross-provider workload migration with dry-run analysis"""
+    pass
+
+
+@migrate.command()
+@click.option('--from', 'from_provider', required=True, help='Source provider')
+@click.option('--to', 'to_provider', required=True, help='Target provider')
+@click.option('--instance-id', help='Source instance ID')
+@click.option('--workload', help='Workload ID from JobStateManager')
+@click.option('--dry-run', is_flag=True, help='Show migration plan without executing')
+def migration(from_provider, to_provider, instance_id, workload, dry_run):
+    """Migrate workload between providers with detailed cost analysis"""
+    from core.migration_orchestrator import MigrationOrchestrator
+    
+    print(f"\n🔄 Migration Analysis: {from_provider} → {to_provider}")
+    if dry_run:
+        print("   📋 DRY RUN MODE - No changes will be made")
+    
+    try:
+        orchestrator = MigrationOrchestrator()
+        plan = orchestrator.plan_migration(
+            source_provider=from_provider,
+            target_provider=to_provider,
+            instance_id=instance_id,
+            workload_id=workload,
+            dry_run=True  # Always generate plan first
+        )
+        
+        # Display migration plan
+        print(f"\n📊 Migration Plan:")
+        print(f"   Source: {plan.source['provider']} ({plan.source['gpu_type']})")
+        print(f"   Target: {plan.target['provider']} ({plan.target['gpu_type']})")
+        print(f"   Confidence: {plan.confidence_score:.1%}")
+        
+        if plan.warnings:
+            print(f"\n⚠️  Warnings:")
+            for warning in plan.warnings:
+                print(f"   • {warning}")
+        
+        print(f"\n💰 Cost Analysis:")
+        print(f"   Data transfer: ${plan.costs['data_transfer']:.4f}")
+        print(f"   Target hourly: ${plan.costs['target_hourly']:.2f}")
+        print(f"   Hourly savings: ${plan.costs['hourly_savings']:+.2f}")
+        print(f"   Monthly savings: ${plan.costs['estimated_monthly_savings']:+.2f}")
+        
+        print(f"\n🔧 Compatibility:")
+        print(f"   GPU match: {plan.compatibility['gpu_match']}")
+        print(f"   Performance change: {plan.compatibility['performance_change']}")
+        
+        print(f"\n⏱️  Migration Steps:")
+        for step in plan.steps:
+            print(f"   {step}")
+        
+        print(f"\n⏱️  Estimated downtime: {plan.total_downtime}")
+        
+        if dry_run:
+            print(f"\n✅ Dry run complete. Use without --dry-run to execute migration.")
+        else:
+            # In lightweight version, just show plan and exit
+            print(f"\n🚧 Full migration execution not implemented in lightweight version.")
+            print(f"   This would involve:")
+            print(f"   • Checkpointing current job")
+            print(f"   • Transferring data via optimized route")
+            print(f"   • Provisioning target instance")
+            print(f"   • Restoring from checkpoint")
+            print(f"   • Validating migration success")
+        
+    except Exception as e:
+        print(f"❌ Migration planning failed: {e}")
+        return 1
+
+
+@migrate.command('list-workloads')
+@click.option('--provider', help='Filter by provider')
+@click.option('--format', 'fmt', type=click.Choice(['table', 'json']), default='table')
+def list_workloads(provider, fmt):
+    """List available workloads for migration"""
+    from core.migration_orchestrator import MigrationOrchestrator
+    
+    try:
+        orchestrator = MigrationOrchestrator()
+        workloads = orchestrator.discover_workloads()
+        
+        if provider:
+            workloads = [w for w in workloads if w.provider.lower() == provider.lower()]
+        
+        if fmt == 'json':
+            print(json.dumps([
+                {
+                    "job_id": w.job_id,
+                    "name": w.name,
+                    "provider": w.provider,
+                    "gpu_type": w.gpu_type,
+                    "progress": f"{w.current_step}/{w.total_steps}",
+                    "checkpoint_size_gb": w.checkpoint_size_gb
+                }
+                for w in workloads
+            ], indent=2))
+        else:
+            print(f"\n🔄 Available Workloads:")
+            if not workloads:
+                print(f"   No active workloads found")
+                return
+            
+            print(f"   {'Job ID':<20} {'Name':<15} {'Provider':<12} {'GPU':<8} {'Progress':<12} {'Size':<8}")
+            print(f"   {'─'*80}")
+            for w in workloads:
+                progress = f"{w.current_step}/{w.total_steps}"
+                size = f"{w.checkpoint_size_gb:.1f}GB"
+                print(f"   {w.job_id:<20} {w.name:<15} {w.provider:<12} {w.gpu_type:<8} {progress:<12} {size:<8}")
+        
+    except Exception as e:
+        print(f"❌ Failed to list workloads: {e}")
+        return 1
+
+
+# ── EVAL COMMAND GROUP ──
+
+@cli.group()
+def eval():
+    """Model and endpoint evaluation with baseline comparison"""
+    pass
+
+
+@eval.command()
+@click.option('--model', 'model_path', help='Model checkpoint path')
+@click.option('--endpoint', help='API endpoint URL')
+@click.option('--dataset', help='Dataset path for evaluation')
+@click.option('--metrics', multiple=True, default=['accuracy', 'latency'], help='Metrics to evaluate')
+@click.option('--baseline', help='Baseline result file for comparison')
+@click.option('--workload-type', default='general', help='Workload type classification')
+@click.option('--duration', type=int, default=300, help='Duration for endpoint evaluation (seconds)')
+@click.option('--output', help='Output file for results')
+@click.option('--format', 'fmt', type=click.Choice(['json', 'table']), default='table')
+def evaluation(model_path, endpoint, dataset, metrics, baseline, workload_type, duration, output, fmt):
+    """Run model or endpoint evaluation"""
+    from core.evaluation_orchestrator import EvaluationOrchestrator, EvaluationConfig
+    
+    if not model_path and not endpoint:
+        print("❌ Either --model or --endpoint must be specified")
+        return 1
+    
+    if model_path and not dataset:
+        print("❌ --dataset required when evaluating a model")
+        return 1
+    
+    try:
+        orchestrator = EvaluationOrchestrator()
+        config = EvaluationConfig(
+            model_path=model_path,
+            endpoint_url=endpoint,
+            dataset_path=dataset,
+            metrics=list(metrics),
+            baseline_path=baseline,
+            workload_type=workload_type,
+            duration_seconds=duration
+        )
+        
+        print(f"\n🔍 Running Evaluation...")
+        if model_path:
+            print(f"   Model: {model_path}")
+            print(f"   Dataset: {dataset}")
+        if endpoint:
+            print(f"   Endpoint: {endpoint}")
+            print(f"   Duration: {duration}s")
+        print(f"   Metrics: {', '.join(metrics)}")
+        
+        # Run evaluation
+        if model_path:
+            result = orchestrator.evaluate_model(config)
+        else:
+            result = orchestrator.evaluate_endpoint(config)
+        
+        # Display results
+        if fmt == 'json':
+            result_data = {
+                "evaluation_id": result.evaluation_id,
+                "model_path": result.model_path,
+                "endpoint_url": result.endpoint_url,
+                "workload_type": result.workload_type,
+                "metrics": result.metrics,
+                "baseline_comparison": result.baseline_comparison,
+                "timestamp": result.timestamp.isoformat(),
+                "duration_seconds": result.duration_seconds,
+                "metadata": result.metadata
+            }
+            print(json.dumps(result_data, indent=2))
+        else:
+            print(f"\n📊 Evaluation Results:")
+            print(f"   Evaluation ID: {result.evaluation_id}")
+            print(f"   Duration: {result.duration_seconds:.1f}s")
+            
+            print(f"\n📈 Metrics:")
+            for metric, value in result.metrics.items():
+                if isinstance(value, float):
+                    if metric in ['latency', 'error_rate']:
+                        print(f"   {metric:<15}: {value:.2f}ms")
+                    elif metric in ['throughput']:
+                        print(f"   {metric:<15}: {value:.1f} tokens/s")
+                    elif metric in ['cost_per_token']:
+                        print(f"   {metric:<15}: ${value:.6f}")
+                    else:
+                        print(f"   {metric:<15}: {value:.3f}")
+                else:
+                    print(f"   {metric:<15}: {value}")
+            
+            if result.baseline_comparison and 'differences' in result.baseline_comparison:
+                print(f"\n📊 Baseline Comparison:")
+                for metric, diff in result.baseline_comparison['differences'].items():
+                    print(f"   {metric:<15}: {diff['percentage']:+.1f}%")
+        
+        # Save results if output specified
+        if output:
+            orchestrator.save_result(result, output)
+            print(f"\n💾 Results saved to {output}")
+        
+    except Exception as e:
+        print(f"❌ Evaluation failed: {e}")
+        return 1
+
+
+@eval.command('compare')
+@click.argument('model_a')
+@click.argument('model_b')
+@click.option('--dataset', required=True, help='Dataset for comparison')
+@click.option('--metrics', multiple=True, default=['accuracy', 'perplexity'], help='Metrics to compare')
+@click.option('--output', help='Output file for comparison results')
+def compare_models(model_a, model_b, dataset, metrics, output):
+    """Compare two models side-by-side"""
+    from core.evaluation_orchestrator import EvaluationOrchestrator
+    
+    try:
+        orchestrator = EvaluationOrchestrator()
+        
+        print(f"\n🔄 Comparing Models:")
+        print(f"   Model A: {model_a}")
+        print(f"   Model B: {model_b}")
+        print(f"   Dataset: {dataset}")
+        print(f"   Metrics: {', '.join(metrics)}")
+        
+        comparison = orchestrator.compare_models(model_a, model_b, dataset, list(metrics))
+        
+        print(f"\n📊 Comparison Results:")
+        print(f"   {'Metric':<15} {'Model A':<12} {'Model B':<12} {'Winner':<10} {'Difference':<12}")
+        print(f"   {'─'*65}")
+        
+        for metric in metrics:
+            val_a = comparison['model_a']['metrics'].get(metric, 0)
+            val_b = comparison['model_b']['metrics'].get(metric, 0)
+            winner = comparison['winner'].get(metric, 'tie')
+            diff = comparison['differences'].get(metric, {}).get('percentage', 0)
+            
+            # Format values
+            if isinstance(val_a, float):
+                val_a_str = f"{val_a:.3f}"
+                val_b_str = f"{val_b:.3f}"
+            else:
+                val_a_str = str(val_a)
+                val_b_str = str(val_b)
+            
+            diff_str = f"{diff:+.1f}%"
+            
+            print(f"   {metric:<15} {val_a_str:<12} {val_b_str:<12} {winner:<10} {diff_str:<12}")
+        
+        # Save comparison if output specified
+        if output:
+            output_file = Path(output)
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            output_file.write_text(json.dumps(comparison, indent=2))
+            print(f"\n💾 Comparison saved to {output}")
+        
+    except Exception as e:
+        print(f"❌ Model comparison failed: {e}")
+        return 1
+
+
 # Add command groups to CLI
+cli.add_command(migrate)
+cli.add_command(eval)
 cli.add_command(sso)
 cli.add_command(sglang)
+cli.add_command(retrain)
+cli.add_command(langfuse)
+cli.add_command(helicone)
+cli.add_command(databricks)
+cli.add_command(agentic_serving)
+cli.add_command(model_router)
+
+# Register Karpenter and HF Spaces command groups
+from cli_karpenter import register_karpenter_commands
+register_karpenter_commands(cli, TerradevAPI)
+
+from cli_hf_spaces import register_hf_spaces_commands
+register_hf_spaces_commands(cli, TerradevAPI)
 
 
 if __name__ == '__main__':

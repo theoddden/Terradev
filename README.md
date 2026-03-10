@@ -1,12 +1,38 @@
-# Terradev CLI v4.0.9
+# Terradev CLI v4.0.10
 
-**NUMA-aware GPU provisioning and orchestration for stateless MoE workloads of all sizes**
+**Cross-Cloud Compute Optimization Platform with Migration & Evaluation**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
 
-## What's New in v4.0.9
+## What's New in v4.0.10
+
+**🔄 Migration & Evaluation Commands - The Biggest Missing Features**
+
+Revolutionary new capabilities that complete the ML lifecycle and deliver provider-agnostic orchestration:
+
+### 🔄 Cross-Provider Migration (`terradev migrate`)
+- **LinkedIn-Viral Command**: `terradev migrate --from runpod --to crusoe --dry-run`
+- **Cost Projection**: Detailed analysis with egress optimization
+- **GPU Compatibility**: Performance deltas and risk assessment  
+- **Dry-Run Analysis**: Complete migration plan without execution
+- **19-Provider Support**: Works across all cloud providers
+
+### 🔍 Model & Endpoint Evaluation (`terradev eval`)
+- **Model Evaluation**: `terradev eval --model model.pth --dataset test.json`
+- **Endpoint Testing**: `terradev eval --endpoint http://localhost:8000 --metrics latency`
+- **Baseline Comparison**: Automatic improvement/regression detection
+- **A/B Model Testing**: Side-by-side comparison with winner determination
+- **Multiple Metrics**: Accuracy, perplexity, latency, throughput, cost
+
+### 🎯 Complete ML Lifecycle
+- **Train → Eval → Deploy**: Full workflow now supported
+- **Risk Assessment**: Confidence scoring and migration warnings
+- **Cost Optimization**: Multi-hop data transfer routing
+- **Production Planning**: Detailed downtime and cost estimates
+
+## Previous Features (v4.0.9)
 
 **Critical Provider Bug Fixes**
 

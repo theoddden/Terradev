@@ -20,6 +20,10 @@ from .ollama_service import OllamaService
 from .phoenix_service import PhoenixService
 from .guardrails_service import GuardrailsService
 from .qdrant_service import QdrantService
+from .drift_retrain_service import DriftRetrainService
+from .langfuse_service import LangfuseService
+from .agentic_serving import AgenticServingConfig, ToolCallTracker
+from .model_router import ModelRouter, RouterConfig
 
 __all__ = [
     'KServeService',
@@ -38,4 +42,10 @@ __all__ = [
     'PhoenixService',
     'GuardrailsService',
     'QdrantService',
+    'DriftRetrainService',
+    'LangfuseService',
+    'AgenticServingConfig',
+    'ToolCallTracker',
+    'ModelRouter',
+    'RouterConfig',
 ]
