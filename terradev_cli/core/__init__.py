@@ -48,27 +48,28 @@ def get_default_cuda_graph_integrator() -> CUDAGraphIntegrator:
 def _enable_cuda_graph_optimization():
     """Automatically enable CUDA Graph optimization in the background"""
     try:
+        import asyncio
+
+        # Only schedule background tasks when an event loop is already running.
+        # At module-import time the loop is typically *not* running, so
+        # creating tasks here would produce "Task was destroyed but pending"
+        # warnings.  Instead, defer the start to the first running-loop check.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop — nothing to schedule yet.  The warm pool will
+            # be started explicitly by commands that need it.
+            return
+
         # Get default instances
         numa_scorer = get_default_numa_scorer()
         warm_pool = get_default_warm_pool()
         integrator = get_default_cuda_graph_integrator()
-        
-        # Start background optimization tasks
-        import asyncio
-        
-        # Create event loop if needed
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
+
         # Start warm pool with CUDA Graph optimization
         if not warm_pool._running:
             loop.create_task(warm_pool.start())
-        
-        print("CUDA Graph optimization enabled automatically")
-        
+
     except Exception as e:
         # Fail silently - CUDA Graph optimization is optional
         pass

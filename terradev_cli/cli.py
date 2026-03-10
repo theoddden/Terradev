@@ -764,6 +764,86 @@ def run_interactive_onboarding(api: TerradevAPI):
             'example': 'crusoe_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
             'env_var': 'CRUSOE_ACCESS_KEY',
             'why': 'Sustainable computing, unique GPU options'
+        },
+        'huggingface': {
+            'name': 'HuggingFace',
+            'key_name': 'API Token',
+            'help': 'Get from: https://huggingface.co/settings/tokens',
+            'example': 'hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+            'env_var': 'HF_TOKEN',
+            'why': 'ML model hub, inference endpoints'
+        },
+        'baseten': {
+            'name': 'Baseten',
+            'key_name': 'API Key',
+            'help': 'Get from: Baseten dashboard',
+            'example': 'bt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+            'env_var': 'BASETEN_API_KEY',
+            'why': 'Production model serving platform'
+        },
+        'siliconflow': {
+            'name': 'SiliconFlow',
+            'key_name': 'API Key',
+            'help': 'Get from: https://cloud.siliconflow.cn/account/ak',
+            'example': 'sf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+            'env_var': 'SILICONFLOW_API_KEY',
+            'why': 'GPU cloud with competitive pricing'
+        },
+        'fluidstack': {
+            'name': 'FluidStack',
+            'key_name': 'API Key',
+            'help': 'Get from: FluidStack dashboard → API Keys',
+            'example': 'fs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+            'env_var': 'FLUIDSTACK_API_KEY',
+            'why': 'Low-cost GPU instances for training'
+        },
+        'hetzner': {
+            'name': 'Hetzner',
+            'key_name': 'API Token',
+            'help': 'Get from: Hetzner Cloud Console → Security → API Tokens',
+            'example': 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+            'env_var': 'HETZNER_API_TOKEN',
+            'why': 'European cloud, excellent price/performance'
+        },
+        'ovhcloud': {
+            'name': 'OVHcloud',
+            'key_name': 'Application Key',
+            'help': 'Get from: https://api.ovh.com/createToken/',
+            'example': 'xxxxxxxxxxxxxxxx',
+            'env_var': 'OVH_APPLICATION_KEY',
+            'why': 'European sovereign cloud, GPU instances'
+        },
+        'alibaba': {
+            'name': 'Alibaba Cloud',
+            'key_name': 'Access Key ID',
+            'help': 'Get from: Alibaba Cloud Console → AccessKey Management',
+            'example': 'LTAIxxxxxxxxxxxxxxxxxx',
+            'env_var': 'ALIBABA_ACCESS_KEY_ID',
+            'why': 'Asia-Pacific GPU availability'
+        },
+        'hyperstack': {
+            'name': 'Hyperstack',
+            'key_name': 'API Key',
+            'help': 'Get from: Hyperstack dashboard → API Keys',
+            'example': 'hs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+            'env_var': 'HYPERSTACK_API_KEY',
+            'why': 'GPU-optimized cloud infrastructure'
+        },
+        'digitalocean': {
+            'name': 'DigitalOcean',
+            'key_name': 'API Token',
+            'help': 'Get from: DigitalOcean → API → Tokens',
+            'example': 'dop_v1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+            'env_var': 'DIGITALOCEAN_TOKEN',
+            'why': 'Simple cloud with GPU droplets'
+        },
+        'inferx': {
+            'name': 'InferX',
+            'key_name': 'API Key',
+            'help': 'Get from: InferX dashboard → API Keys',
+            'example': 'ix_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+            'env_var': 'INFERX_API_KEY',
+            'why': 'Serverless inference, <2s cold starts'
         }
     }
     
@@ -1283,6 +1363,54 @@ def configure(provider):
                 'key_name': 'API Key',
                 'help': 'Get from: Baseten dashboard',
                 'example': 'bt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+            },
+            'siliconflow': {
+                'name': 'SiliconFlow',
+                'key_name': 'API Key',
+                'help': 'Get from: https://cloud.siliconflow.cn/account/ak',
+                'example': 'sf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+            },
+            'fluidstack': {
+                'name': 'FluidStack',
+                'key_name': 'API Key',
+                'help': 'Get from: FluidStack dashboard → API Keys',
+                'example': 'fs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+            },
+            'hetzner': {
+                'name': 'Hetzner',
+                'key_name': 'API Token',
+                'help': 'Get from: Hetzner Cloud Console → Security → API Tokens',
+                'example': 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+            },
+            'ovhcloud': {
+                'name': 'OVHcloud',
+                'key_name': 'Application Key',
+                'help': 'Get from: https://api.ovh.com/createToken/',
+                'example': 'xxxxxxxxxxxxxxxx'
+            },
+            'alibaba': {
+                'name': 'Alibaba Cloud',
+                'key_name': 'Access Key ID',
+                'help': 'Get from: Alibaba Cloud Console → AccessKey Management',
+                'example': 'LTAIxxxxxxxxxxxxxxxxxx'
+            },
+            'hyperstack': {
+                'name': 'Hyperstack',
+                'key_name': 'API Key',
+                'help': 'Get from: Hyperstack dashboard → API Keys',
+                'example': 'hs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+            },
+            'digitalocean': {
+                'name': 'DigitalOcean',
+                'key_name': 'API Token',
+                'help': 'Get from: DigitalOcean → API → Tokens',
+                'example': 'dop_v1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+            },
+            'inferx': {
+                'name': 'InferX',
+                'key_name': 'API Key',
+                'help': 'Get from: InferX dashboard → API Keys',
+                'example': 'ix_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
             }
         }
         

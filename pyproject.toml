@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "4.0.7"
+version = "4.0.8"
 description = "NUMA-aware GPU provisioning and orchestration for stateless MoE workloads of all sizes"
 readme = "README.md"
 license = {text = "BUSL-1.1"}

@@ -1,4 +1,4 @@
-# Terradev CLI v3.7.7
+# Terradev CLI v4.0.8
 
 **NUMA-aware GPU provisioning and orchestration for stateless MoE workloads of all sizes**
 
@@ -6,7 +6,7 @@
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
 
-## What's New in v3.7.7
+## What's New in v4.0.8
 
 **Complete SGLang Optimization Stack**
 
