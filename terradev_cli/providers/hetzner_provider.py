@@ -105,7 +105,7 @@ class HetznerProvider(BaseProvider):
                 robot_quotes = await self._get_robot_gpu_products(gpu_type)
                 # CRITICAL: Add traffic allowance monitoring
                 for quote in robot_quotes:
-                    traffic_info = await self.traffic_monitor.get_traffic_allowance(quote["server_id"])
+                    traffic_info = await self.traffic_monitor.get_traffic_allowance(quote["instance_type"])
                     quote.update({
                         "traffic_allowance_gb": traffic_info["allowance_gb"],
                         "traffic_used_gb": traffic_info["used_gb"],
@@ -113,7 +113,7 @@ class HetznerProvider(BaseProvider):
                         "overage_cost_per_gb": 0.01,  # Hetzner overage cost
                         "overage_warning": traffic_info["remaining_gb"] < 100,  # Warn if < 100GB left
                         "gpu_enterprise_suitable": await self._check_gpu_enterprise_suitability(gpu_type),
-                        "order_fulfillment_days": await self._get_order_fulfillment_time(quote["server_type"]),
+                        "order_fulfillment_days": await self._get_order_fulfillment_time(quote["instance_type"]),
                         "public_ip_billing": "included_in_price",
                     })
                 quotes.extend(robot_quotes)

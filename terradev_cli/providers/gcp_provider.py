@@ -434,9 +434,9 @@ class GCPProvider(BaseProvider):
                     loop = asyncio.get_running_loop()
                     await loop.run_in_executor(
                         None,
-                        lambda: self.accelerator_client.get(
+                        lambda z=zone: self.accelerator_client.get(
                             project=self.project_id,
-                            zone=zone,
+                            zone=z,
                             accelerator_type=accelerator_name
                         )
                     )

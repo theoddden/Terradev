@@ -234,6 +234,8 @@ class AlibabaProvider(BaseProvider):
             }
         ]
 
+        return quotes
+
     async def _get_live_availability(
         self, gpu_type: str, region: Optional[str] = None
     ) -> List[Dict[str, Any]]:

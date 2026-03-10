@@ -40,28 +40,15 @@ class CoreWeaveProvider(BaseProvider):
     async def get_instance_quotes(
         self, gpu_type: str, region: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        # CRITICAL: Check permissions and account access first
+        # BYOAPI REQUIREMENT: No quotes without API key
         if not self.api_key:
-            return [{
-                "provider": "coreweave",
-                "gpu_type": gpu_type,
-                "available": False,
-                "reason": "API key not configured",
-                "action_required": "Configure CoreWeave API key",
-            }]
+            return []
         
         # CRITICAL: Check account permissions for new users
         if not self.account_checked:
             permissions_check = await self._check_account_permissions()
             if not permissions_check["full_access"]:
-                return [{
-                    "provider": "coreweave",
-                    "gpu_type": gpu_type,
-                    "available": False,
-                    "reason": permissions_check["reason"],
-                    "action_required": permissions_check["action_required"],
-                    "permissions_upgrade_required": True,
-                }]
+                return []
             self.account_checked = True
             
         info = self.GPU_PRICING.get(gpu_type)

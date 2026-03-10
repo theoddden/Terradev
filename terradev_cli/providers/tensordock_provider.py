@@ -55,7 +55,7 @@ class TensorDockProvider(BaseProvider):
             return []
 
         return [{
-            "instance_type": info["model"],
+            "instance_type": info["v0Name"],
             "gpu_type": gpu_type,
             "price_per_hour": info["price"],
             "region": region or "us-east",

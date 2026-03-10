@@ -1,4 +1,4 @@
-# Terradev CLI v4.0.8
+# Terradev CLI v4.0.9
 
 **NUMA-aware GPU provisioning and orchestration for stateless MoE workloads of all sizes**
 
@@ -6,9 +6,20 @@
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
 
-## What's New in v4.0.8
+## What's New in v4.0.9
 
-**Complete SGLang Optimization Stack**
+**Critical Provider Bug Fixes**
+
+Fixed 6 critical bugs across 20 cloud providers:
+
+- 🔴 **Alibaba** - Fixed missing `return` in `get_instance_quotes` (prevented quotes)
+- 🔴 **RunPod** - Fixed dead code + `volume_id` NameError in provisioning  
+- 🔴 **TensorDock** - Fixed `info["model"]` KeyError (should be `info["v0Name"]`)
+- 🔴 **Hetzner** - Fixed `quote["server_id"]` KeyError (should be `quote["instance_type"]`)
+- 🔴 **GCP** - Fixed lambda closure bug in zone availability checking
+- 🔴 **CoreWeave** - Fixed `$0.00` pricing when no API key configured
+
+**Complete SGLang Optimization Stack (v4.0.8)**
 
 Revolutionary workload-specific auto-optimization for SGLang serving with 7 workload types:
 

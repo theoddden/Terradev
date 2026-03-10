@@ -170,6 +170,7 @@ class RunPodProvider(BaseProvider):
             }
             
             # CRITICAL: Add volume if requested
+            volume_id = None
             if attach_volume:
                 volume_id = await self._create_and_attach_volume(pod_spec["name"], volume_size_gb)
                 if volume_id:
@@ -201,47 +202,6 @@ class RunPodProvider(BaseProvider):
                 },
             }
             
-        except Exception as e:
-            raise Exception(f"RunPod provision failed: {e}")
-            raise Exception(f"Unsupported GPU type: {gpu_type}")
-
-        mutation = """
-        mutation CreatePod($input: PodFindAndDeployOnDemandInput!) {
-            podFindAndDeployOnDemand(input: $input) {
-                id
-                name
-                gpuCount
-                machineId
-            }
-        }
-        """
-        variables = {
-            "input": {
-                "cloudType": "SECURE" if "secure" in instance_type else "COMMUNITY",
-                "gpuTypeId": gpu_info["id"],
-                "gpuCount": 1,
-                "volumeInGb": 50,
-                "containerDiskInGb": 20,
-                "templateId": "runpod-torch-v21",
-                "name": f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%H%M%S')}",
-            }
-        }
-
-        try:
-            data = await self._make_request(
-                "POST", self.API_BASE,
-                json={"query": mutation, "variables": variables},
-            )
-            pod = data.get("data", {}).get("podFindAndDeployOnDemand", {})
-            return {
-                "instance_id": pod.get("id", f"runpod-{datetime.now().strftime('%Y%m%d%H%M%S')}"),
-                "instance_type": instance_type,
-                "region": "us-east",
-                "gpu_type": gpu_type,
-                "status": "provisioning",
-                "provider": "runpod",
-                "metadata": {"machine_id": pod.get("machineId")},
-            }
         except Exception as e:
             raise Exception(f"RunPod provision failed: {e}")
 
