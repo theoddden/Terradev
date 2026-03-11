@@ -1,4 +1,4 @@
-# Terradev CLI v4.0.10
+# Terradev CLI v4.0.11
 
 **Cross-Cloud Compute Optimization Platform with Migration & Evaluation**
 
@@ -6,18 +6,38 @@
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
 
-## What's New in v4.0.10
+## What's New in v4.0.11
 
-**🔄 Migration & Evaluation Commands - The Biggest Missing Features**
+**🎯 Production-Grade Automation: Triggers, Environments & Lineage**
 
-Revolutionary new capabilities that complete the ML lifecycle and deliver provider-agnostic orchestration:
+The three critical missing pillars that transform Terradev from a CLI tool into an enterprise-grade ML platform:
 
-### 🔄 Cross-Provider Migration (`terradev migrate`)
-- **LinkedIn-Viral Command**: `terradev migrate --from runpod --to crusoe --dry-run`
-- **Cost Projection**: Detailed analysis with egress optimization
-- **GPU Compatibility**: Performance deltas and risk assessment  
-- **Dry-Run Analysis**: Complete migration plan without execution
+### 🔄 Event-Driven Triggers (`terradev triggers`)
+- **Zero-touch automation**: Dataset lands → auto-train, Model drifts → auto-retrain  
+- **Schedule-based**: Cron jobs for weekly evaluations and maintenance
+- **Condition-based**: Drift scores, performance thresholds, cost limits
 - **19-Provider Support**: Works across all cloud providers
+- **Manual override**: Full control when needed
+
+### 🏗️ Environment Promotion (`terradev environments`) 
+- **Dev → Staging → Prod**: Proper lifecycle management
+- **Approval workflow**: Request → Approve → Execute with audit trail
+- **Environment isolation**: Separate artifacts and configurations
+- **Promotion history**: Complete audit trail for compliance
+- **Automatic lineage**: Links artifacts across environments
+
+### 🔍 Auto Lineage System (`terradev lineage`)
+- **Zero manual tagging**: Automatic artifact tracking on every execution
+- **Complete provenance**: Data → Model → Deployment chain
+- **Execution diffing**: Compare any two pipeline runs
+- **Compliance export**: JSON/CSV for auditors and regulators
+- **Checkpoint tracing**: Work backwards from any artifact
+
+### 💰 Intelligent Spot/On-Demand Selection
+- **Smart auto-selection**: Training → on-demand, Inference → spot
+- **Cost transparency**: Real-time savings calculations (60-80%)
+- **Manual override**: `--spot` and `--on-demand` flags
+- **Safety features**: Automatic state checkpointing and recovery
 
 ### 🔍 Model & Endpoint Evaluation (`terradev eval`)
 - **Model Evaluation**: `terradev eval --model model.pth --dataset test.json`

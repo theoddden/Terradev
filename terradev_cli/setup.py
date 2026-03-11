@@ -12,10 +12,10 @@ long_description = readme_file.read_text() if readme_file.exists() else ""
 
 setup(
     name="terradev-cli",
-    version="4.0.10",
+    version="4.0.11",
     author="Terradev Team",
     author_email="team@terradev.com",
-    description="Cross-Cloud Compute Optimization Platform with Migration & Evaluation - v4.0.10",
+    description="Cross-Cloud Compute Optimization Platform with Migration & Evaluation - v4.0.11",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/theoddden/terradev",

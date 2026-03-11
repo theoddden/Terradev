@@ -1,0 +1,115 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: training-pipeline
+  namespace: default
+  annotations:
+    terradev.io/provider: runpod
+    terradev.io/gpu-type: A100
+    terradev.io/gpu-count: 4
+    terradev.io/tier: enterprise
+    terradev.io/cost-optimization: aggressive
+    terradev.io/monitoring: prometheus
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      steps:
+        - - name: provision
+            template: provision-instances
+        - - name: setup
+            template: setup-environment
+        - - name: train
+            template: training-job
+            arguments:
+              parameters:
+                - name: model-path
+                  value: "{{steps.provision.outputs.model-path}}"
+        - - name: evaluate
+            template: evaluation-job
+            when: "{{steps.train.succeeded}}"
+        - - name: deploy
+            template: deploy-model
+            when: "{{steps.evaluate.succeeded}}"
+
+    - name: provision-instances
+      annotations:
+        terradev.io/dry-run: "false"
+      container:
+        image: terradev/cli:latest
+        command: [terradev, provision]
+        args: [
+          "--provider", "{{workflow.annotations.terradev.io/provider}}",
+          "--gpu-type", "{{workflow.annotations.terradev.io/gpu-type}}",
+          "--gpu-count", "{{workflow.annotations.terradev.io/gpu-count}}",
+          "--cost-optimization", "{{workflow.annotations.terradev.io/cost-optimization}}"
+        ]
+
+    - name: setup-environment
+      container:
+        image: python:3.11-slim
+        command: [bash, -c]
+        args:
+          - |
+            apt-get update && apt-get install -y git
+            pip install torch torchvision transformers datasets
+            git clone https://github.com/huggingface/transformers.git
+            echo "Environment setup complete"
+
+    - name: training-job
+      container:
+        image: pytorch/pytorch:latest
+        command: [python, train.py]
+        env:
+          - name: MODEL_NAME
+            value: "meta-llama/Llama-2-7b-hf"
+          - name: DATASET_PATH
+            value: "/data/training"
+          - name: OUTPUT_DIR
+            value: "/outputs"
+        resources:
+          requests:
+            nvidia.com/gpu: "{{workflow.annotations.terradev.io/gpu-count}}"
+            memory: "32Gi"
+            cpu: "8"
+          limits:
+            nvidia.com/gpu: "{{workflow.annotations.terradev.io/gpu-count}}"
+            memory: "64Gi"
+            cpu: "16"
+        volumeMounts:
+          - name: data-volume
+            mountPath: /data
+          - name: output-volume
+            mountPath: /outputs
+
+    - name: evaluation-job
+      container:
+        image: pytorch/pytorch:latest
+        command: [python, evaluate.py]
+        args:
+          - "--model-path"
+          - "{{steps.training-job.outputs.model-path}}"
+          - "--dataset"
+          - "/data/validation"
+        env:
+          - name: METRICS_OUTPUT
+            value: "/outputs/metrics.json"
+        resources:
+          requests:
+            nvidia.com/gpu: "1"
+            memory: "16Gi"
+            cpu: "4"
+
+    - name: deploy-model
+      container:
+        image: terradev/cli:latest
+        command: [terradev, deploy]
+        args:
+          - "--model"
+          - "{{steps.training-job.outputs.model-path}}"
+          - "--provider"
+          - "{{workflow.annotations.terradev.io/provider}}"
+          - "--gpu-type"
+          - "RTX4090"
+          - "--instances"
+          - "2"
