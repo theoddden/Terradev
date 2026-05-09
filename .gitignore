@@ -87,6 +87,8 @@ checkpoints/
 *.db
 *.sqlite
 *.sqlite3
+*.db-shm
+*.db-wal
 
 # Secrets / tokens / payment sessions
 **/grafana_token*.json
