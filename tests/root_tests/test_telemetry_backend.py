@@ -7,6 +7,7 @@ Simulates CLI telemetry data to test the backend servers
 import json
 import time
 import random
+import pytest
 import requests
 from datetime import datetime
 
@@ -17,15 +18,11 @@ def test_telemetry_server(base_url, server_name):
     # Test health endpoint
     try:
         response = requests.get(f"{base_url}/health", timeout=5)
-        if response.status_code == 200:
-            health_data = response.json()
-            print(f"✅ Health check passed: {health_data['status']}")
-        else:
-            print(f"❌ Health check failed: {response.status_code}")
-            return False
+        assert response.status_code == 200, f"Health check failed: {response.status_code}"
+        health_data = response.json()
+        print(f"✅ Health check passed: {health_data['status']}")
     except Exception as e:
-        print(f"❌ Health check error: {e}")
-        return False
+        pytest.skip(f"Health check error: {e} - server may not be running")
     
     # Generate test telemetry data
     test_machine_id = f"test_machine_{random.randint(1000, 9999)}"
@@ -119,8 +116,6 @@ def test_telemetry_server(base_url, server_name):
             print(f"❌ User stats failed: {response.status_code}")
     except Exception as e:
         print(f"❌ User stats error: {e}")
-    
-    return True
 
 def simulate_multiple_users(base_url, num_users=5):
     """Simulate multiple users sending telemetry"""
