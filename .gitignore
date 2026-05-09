@@ -37,6 +37,15 @@ env.bak/
 venv.bak/
 test_env/
 
+# Build artifacts
+dist/
+build/
+*.egg-info/
+__pycache__/
+
+# Test cache
+.pytest_cache/
+
 # IDE
 .vscode/
 .idea/
@@ -81,7 +90,6 @@ checkpoints/
 .env
 .env.*
 !.env.example
-!.env.template
 
 # Database files
 *.db
