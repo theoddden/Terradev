@@ -40,91 +40,69 @@ class TierLimits:
 class TierManager:
     """Manages tier-based access control"""
 
-    # Tier definitions
+    # Tier definitions - ALL TIERS NOW UNLIMITED (BYOAPI - no paywalls)
     TIER_LIMITS = {
         TierType.RESEARCH: TierLimits(
-            max_instances=1,
-            max_parallel_queries=3,
-            providers_allowed=["aws", "runpod", "vastai"],
-            features_enabled=["quote", "status", "help", "configure", "cleanup", "analytics", "optimize"],
-            enterprise_features=False,
+            max_instances=-1,  # Unlimited
+            max_parallel_queries=1000,  # Unlimited
+            providers_allowed=[  # All providers
+                "aws", "gcp", "azure", "runpod", "vastai", "tensordock", "oracle",
+                "coreweave", "lambda_labs", "crusoe", "baseten", "huggingface",
+                "fluidstack", "alibaba", "hetzner", "ovhcloud", "siliconflow"
+            ],
+            features_enabled=[  # All features
+                "quote", "provision", "status", "analytics", "optimize", "cleanup",
+                "manage", "inference", "full_provenance", "fleet_management",
+                "gpu_metering", "dedicated_support", "help", "configure"
+            ],
+            enterprise_features=True,  # All tiers get enterprise features
         ),
         TierType.RESEARCH_PLUS: TierLimits(
-            max_instances=4,
-            max_parallel_queries=10,
-            providers_allowed=["aws", "gcp", "azure", "runpod", "vastai", "tensordock", "oracle"],
-            features_enabled=[
-                "quote",
-                "provision",
-                "status",
-                "analytics",
-                "optimize",
-                "cleanup",
-                "inference",
-                "full_provenance",
+            max_instances=-1,  # Unlimited
+            max_parallel_queries=1000,  # Unlimited
+            providers_allowed=[  # All providers
+                "aws", "gcp", "azure", "runpod", "vastai", "tensordock", "oracle",
+                "coreweave", "lambda_labs", "crusoe", "baseten", "huggingface",
+                "fluidstack", "alibaba", "hetzner", "ovhcloud", "siliconflow"
             ],
-            enterprise_features=False,
+            features_enabled=[  # All features
+                "quote", "provision", "status", "analytics", "optimize", "cleanup",
+                "manage", "inference", "full_provenance", "fleet_management",
+                "gpu_metering", "dedicated_support", "help", "configure"
+            ],
+            enterprise_features=True,  # All tiers get enterprise features
         ),
         TierType.ENTERPRISE: TierLimits(
-            max_instances=32,
-            max_parallel_queries=50,
-            providers_allowed=[
-                "aws",
-                "gcp",
-                "azure",
-                "runpod",
-                "vastai",
-                "tensordock",
-                "oracle",
-                "coreweave",
+            max_instances=-1,  # Unlimited
+            max_parallel_queries=1000,  # Unlimited
+            providers_allowed=[  # All providers
+                "aws", "gcp", "azure", "runpod", "vastai", "tensordock", "oracle",
+                "coreweave", "lambda_labs", "crusoe", "baseten", "huggingface",
+                "fluidstack", "alibaba", "hetzner", "ovhcloud", "siliconflow"
             ],
-            features_enabled=[
-                "quote",
-                "provision",
-                "status",
-                "analytics",
-                "optimize",
-                "cleanup",
-                "manage",
-                "inference",
-                "full_provenance",
+            features_enabled=[  # All features
+                "quote", "provision", "status", "analytics", "optimize", "cleanup",
+                "manage", "inference", "full_provenance", "fleet_management",
+                "gpu_metering", "dedicated_support", "help", "configure"
             ],
-            enterprise_features=True,
+            enterprise_features=True,  # All tiers get enterprise features
         ),
         TierType.ENTERPRISE_PLUS: TierLimits(
             max_instances=-1,  # Unlimited
-            max_parallel_queries=100,
-            providers_allowed=[
-                "aws",
-                "gcp",
-                "azure",
-                "runpod",
-                "vastai",
-                "tensordock",
-                "oracle",
-                "coreweave",
-                "lambda_labs",
-                "crusoe",
-                "baseten",
-                "huggingface",
+            max_parallel_queries=1000,  # Unlimited
+            providers_allowed=[  # All providers
+                "aws", "gcp", "azure", "runpod", "vastai", "tensordock", "oracle",
+                "coreweave", "lambda_labs", "crusoe", "baseten", "huggingface",
+                "fluidstack", "alibaba", "hetzner", "ovhcloud", "siliconflow"
             ],
-            features_enabled=[
-                "quote",
-                "provision",
-                "status",
-                "analytics",
-                "optimize",
-                "cleanup",
-                "manage",
-                "inference",
-                "full_provenance",
-                "fleet_management",
-                "gpu_metering",
-                "dedicated_support",
+            features_enabled=[  # All features
+                "quote", "provision", "status", "analytics", "optimize", "cleanup",
+                "manage", "inference", "full_provenance", "fleet_management",
+                "gpu_metering", "dedicated_support", "help", "configure"
             ],
-            enterprise_features=True,
-            gpu_hour_rate=0.09,
-            min_gpus=32,
+            enterprise_features=True,  # All tiers get enterprise features
+            gpu_hour_rate=0.0,  # No billing - BYOAPI
+            min_gpus=0,  # No minimum GPU requirement
         ),
     }
 

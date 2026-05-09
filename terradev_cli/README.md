@@ -1,4 +1,4 @@
-# Terradev CLI v4.0.11
+# Terradev CLI v4.0.12
 
 **Cross-Cloud Compute Optimization Platform with Migration & Evaluation**
 
@@ -6,7 +6,39 @@
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
 
-## What's New in v4.0.11
+## What's New in v4.0.12
+
+**🚀 Latitude.sh Integration: Bare Metal & Virtual Machine GPU Support**
+
+### 🌟 New Latitude.sh Provider
+- **Dual Instance Support**: Both bare metal servers AND virtual machines with GPU
+- **Premium GPU Access**: NVIDIA H100, A100, RTX 4090, RTX PRO 6000 Blackwell
+- **Bare Metal Performance**: Full dedicated hardware with IPMI management
+- **VM Flexibility**: GPU-enabled virtual machines with dedicated GPU resources
+- **JSON:API Compliant**: Full API specification compliance with rate limiting
+- **SSH Access**: Direct SSH for bare metal, container SSH for VMs
+- **Real-time Pricing**: Live quotes with stock levels and instant deployment
+
+### 🔧 Easy Configuration
+```bash
+# Set your Latitude.sh API key
+export LATITUDE_API_KEY="your_api_key_here"
+
+# Get GPU instance quotes
+terradev get-quotes --provider latitude --gpu H100
+
+# Provision bare metal H100 server
+terradev provision --provider latitude --type "latitude-bare-metal-g3-h100-medium-43" --region Brazil
+
+# Provision virtual machine with GPU
+terradev provision --provider latitude --type "latitude-vm-gpu-h100-80" --region us-east
+```
+
+### 📊 Instance Differentiation
+- **Bare Metal**: `isolation: bare_metal`, `ssh_access: true`, `ipmi_access: true`
+- **Virtual Machines**: `isolation: virtual_machine`, `dedicated_gpu: true`, `virtualization: kvm`
+
+### 🎯 What's New in v4.0.11
 
 **🎯 Production-Grade Automation: Triggers, Environments & Lineage**
 
@@ -16,7 +48,7 @@ The three critical missing pillars that transform Terradev from a CLI tool into 
 - **Zero-touch automation**: Dataset lands → auto-train, Model drifts → auto-retrain  
 - **Schedule-based**: Cron jobs for weekly evaluations and maintenance
 - **Condition-based**: Drift scores, performance thresholds, cost limits
-- **19-Provider Support**: Works across all cloud providers
+- **20-Provider Support**: Works across all cloud providers
 - **Manual override**: Full control when needed
 
 ### 🏗️ Environment Promotion (`terradev environments`) 
@@ -52,35 +84,31 @@ The three critical missing pillars that transform Terradev from a CLI tool into 
 - **Cost Optimization**: Multi-hop data transfer routing
 - **Production Planning**: Detailed downtime and cost estimates
 
-## Previous Features (v4.0.1)
+## Previous Features (v4.0.9)
 
-**Critical Cloud Provider Feature Gaps Implementation**
+**Critical Provider Bug Fixes**
 
-Revolutionary new features for production ML workloads with spot instance resilience:
+Fixed 6 critical bugs across 20 cloud providers:
 
-### 🚀 MLA-Aware VRAM Estimation
-- **DeepSeek V3/R1 & Kimi K2 Support**: 12.5x KV cache compression (2440GB → 195GB)
-- **57.3% Cost Savings**: Prevents over-provisioning with accurate MLA calculations
-- **GPU Count Optimization**: Intelligent recommendations for large models
-- **Model Registry**: Comprehensive MLA architecture flags
+- 🔴 **Alibaba** - Fixed missing `return` in `get_instance_quotes` (prevented quotes)
+- 🔴 **RunPod** - Fixed dead code + `volume_id` NameError in provisioning  
+- 🔴 **TensorDock** - Fixed `info["model"]` KeyError (should be `info["v0Name"]`)
+- 🔴 **Hetzner** - Fixed `quote["server_id"]` KeyError (should be `quote["instance_type"]`)
+- 🔴 **GCP** - Fixed lambda closure bug in zone availability checking
+- 🔴 **CoreWeave** - Fixed `$0.00` pricing when no API key configured
 
-### ⚡ Weight Streaming
-- **3.6x Faster Cold Starts**: 30-45 minutes → under 3 minutes
-- **Parallel Download/Compute**: Async streaming of model layer chunks
-- **vLLM/SGLang Integration**: Seamless framework compatibility
-- **Multi-Storage Support**: HTTP, S3, GCS, VAST Data backends
+**Complete SGLang Optimization Stack (v4.0.8)**
 
-### 💾 Preemptible KV Cache Checkpointing
-- **<2 Minute Recovery**: Spot interruption handling with state preservation
-- **NVMe Serialization**: ~8 second checkpoint creation
-- **Cloud Storage Backup**: S3/GCS/VAST Data persistence
-- **Zero Data Loss**: Complete failure → brief pause with resume
+Revolutionary workload-specific auto-optimization for SGLang serving with 7 workload types:
 
-### 🎯 Real-World Impact
-- **60-80% Cost Savings**: Reliable spot instance usage for stateful workloads
-- **99.4% Uptime**: Enterprise-grade reliability with cloud-native economics
-- **Multi-Cloud Flexibility**: 19 cloud provider integrations
-- **Production Ready**: Comprehensive test coverage and validation
+### 🚀 SGLang Workload Optimizations
+- **Agentic/Multi-turn Chat**: LPM + RadixAttention + cache-aware routing (75-90% cache hit rate)
+- **High-Throughput Batch**: FCFS + CUDA graphs + FP8 quantization (maximum tokens/sec)
+- **Low-Latency/Real-Time**: EAGLE3 + Spec V2 + capped concurrency (30-50% TTFT improvement)
+- **MoE Models**: DeepEP auto + TBO/SBO + EPLB + redundant experts (up to 2x throughput)
+- **PD Disaggregated**: Separate prefill/decode configurations with production optimizations
+- **Structured Output/RAG**: xGrammar + FSM optimization (10x faster structured output)
+- **Hardware-Specific**: H100/H200, H20, GB200, AMD MI300X optimizations
 
 ### 🎯 Auto-Apply Decision Tree
 ```bash
@@ -679,6 +707,298 @@ terradev configure --provider gcp
 - **30-50% bandwidth penalty eliminated** with NUMA topology
 - **2-5x CUDA Graph speedup** with optimal topology
 - **Up to 90% cost savings** with automatic provider switching
+- **<2 minute spot recovery** with KV cache checkpointing
+- **3.6x faster cold starts** with weight streaming
+- **57.3% cost savings** with MLA-aware VRAM estimation
+
+---
+
+## 🎯 Part 2: Distributed Training from Dataset to Checkpoint
+
+**Staging data near compute, launching distributed training jobs, and monitoring across nodes**
+
+### Step 1: Stage Datasets Near Compute
+
+Transfer time kills training efficiency. Stage your data before provisioning. Terradev places it in the region nearest to your target GPUs automatically.
+
+```bash
+# Stage local dataset near compute
+terradev stage -d ./my-dataset --target-regions us-east-1,eu-west-1
+
+# Cache a HuggingFace dataset near target regions
+terradev stage --hf-dataset allenai/C4 --target-regions us-east-1,eu-west-1
+
+# Cache with specific split and configuration
+terradev stage --hf-dataset HuggingFaceH4/llava-instruct-mistral-7b --split train --target-regions us-west-2,eu-central-1
+
+# Cache multiple datasets in parallel
+terradev stage --hf-dataset "allenai/C4,mozilla/common-voice,bookcorpus/openwebtext" --target-regions us-east-1,eu-west-1,ap-southeast-1
+```
+
+**What happens automatically:**
+- Smart dataset detection — parquet, json, arrow all handled
+- Optimal compression — zstd for parquet, gzip for json
+- 32 parallel upload streams for maximum throughput
+- Region-aware placement in S3/GCS buckets nearest to target compute
+- Metadata indexing — searchable catalog of cached datasets
+
+**Advanced staging with preprocessing:**
+
+```bash
+# Filter, deduplicate, and compress in one pass
+terradev stage --hf-dataset allenai/C4 --target-regions us-east-1 --process "filter english,remove duplicates" --format parquet --compression zstd
+
+# Stage with size limits and sampling
+terradev stage --hf-dataset mozilla/common-voice --target-regions us-east-1 --max-size 100GB --sample-rate 0.1
+
+# Stage with full preprocessing pipeline
+terradev stage --hf-dataset HuggingFaceH4/ultrachat_200k --target-regions us-east-1 --preprocess "tokenize,truncate_length=2048,remove_pii"
+```
+
+### Step 2: Provision Training Nodes
+
+```bash
+# Provision multiple nodes for distributed training
+terradev provision -g H100 -n 4 --parallel 6
+
+# Verify nodes are ready and interconnects are healthy
+terradev status --live
+terradev preflight
+```
+
+Terradev preflight validates NCCL connectivity across all nodes before you launch a job. Catches misconfigured networking before it wastes GPU hours.
+
+### Step 3: Launch Training Jobs
+
+Three backends depending on your setup:
+
+```bash
+# Simple distributed training
+terradev train --script train.py --from-provision latest
+
+# Advanced configuration with tensor and pipeline parallelism
+terradev train --script train.py --framework torchrun --from-provision latest --tp-size 2 --pp-size 2 --script-args "--epochs 10 --batch-size 32"
+
+# Ray advanced orchestration
+terradev train --script train.py --backend ray --from-provision latest --framework accelerate --script-args "--config config.yaml"
+```
+
+**FlashOptim — auto-applied when beneficial:**
+
+```bash
+# FlashOptim applies automatically. Check if it was enabled
+terradev train-status --job my-job | grep flashoptim
+
+# Manual override
+terradev train --script train.py --flashoptim on --flashoptim-optimizer adamw --from-provision latest
+```
+
+### Step 4: Monitor Training Progress
+
+```bash
+# Real-time metrics — GPU utilization, memory, temperature, cost
+terradev monitor --job my-training-job --live
+
+# Check all active jobs
+terradev train-status
+
+# GPU utilization across all nodes
+terradev monitor --job my-job --gpu-utilization
+
+# Checkpoint management
+terradev checkpoint list --job my-job
+terradev checkpoint save --job my-job
+```
+
+### 💾 **KV Cache Checkpointing for Training Runs**
+
+**Protect long training runs from spot instance interruptions with automatic state preservation:**
+
+```bash
+# Enable KV cache checkpointing for training jobs
+terradev train --script train.py --from-provision latest --kv-checkpointing --checkpoint-interval 300
+
+# Configure checkpoint storage backend
+terradev train --script train.py --from-provision latest --kv-checkpointing --checkpoint-backend s3 --checkpoint-prefix "my-training-job"
+
+# Training with automatic spot interruption recovery
+terradev train --script train.py --from-provision latest --kv-checkpointing --auto-recovery --max-recovery-attempts 3
+
+# Monitor checkpoint status during training
+terradev checkpoint status --job my-training-job
+
+# Manual checkpoint creation
+terradev checkpoint create --job my-training-job --checkpoint-name "epoch-10-checkpoint"
+
+# Restore from specific checkpoint
+terradev train --script train.py --from-provision latest --restore-checkpoint "epoch-10-checkpoint"
+
+# List all available checkpoints
+terradev checkpoint list --job my-training-job --detailed
+
+# Validate checkpoint integrity
+terradev checkpoint validate --checkpoint "epoch-10-checkpoint"
+```
+
+**KV Checkpointing Features:**
+- **<2 Minute Recovery**: Spot interruption → state preservation → seamless resume
+- **NVMe + Cloud Storage**: Local fast serialization + S3/GCS backup
+- **Compression & Encryption**: GZIP compression + optional Fernet encryption
+- **Integrity Verification**: SHA-256 checksums for data validation
+- **Multi-Backend Support**: S3, GCS, Azure, local NVMe storage
+- **Parallel Operations**: Concurrent saves/loads for optimal performance
+
+**Advanced KV Checkpointing Configuration:**
+
+```bash
+# Configure checkpoint retention and cleanup
+terradev train --script train.py --from-provision latest --kv-checkpointing --checkpoint-retention 10 --cleanup-policy "keep-latest-3"
+
+# Enable compression for large checkpoints
+terradev train --script train.py --from-provision latest --kv-checkpointing --compression-level 6 --parallel-checkpoints 2
+
+# Configure for distributed training
+terradev train --script train.py --from-provision latest --kv-checkpointing --distributed-checkpointing --rank-checkpointing
+
+# Set up monitoring and alerts
+terradev train --script train.py --from-provision latest --kv-checkpointing --checkpoint-alerts --alert-webhook "https://hooks.slack.com/..."
+```
+
+### Step 5: Training Integrations
+
+```bash
+# Weights & Biases
+terradev configure --provider wandb --api-key $WANDB_KEY
+terradev ml wandb --test
+
+# MLflow
+terradev configure --provider mlflow
+terradev ml mlflow --list-experiments
+
+# LangSmith
+terradev configure --provider langsmith
+terradev ml langchain --create-workflow my-workflow
+```
+
+### Complete Workflow: Distributed Training Pipeline
+
+```bash
+#!/bin/bash
+
+# Full training pipeline: dataset to checkpoint
+
+# 1. Stage dataset near compute before provisioning
+terradev stage -d ./my-dataset --target-regions us-east-1,eu-west-1
+
+# 2. Provision training cluster
+terradev provision -g H100 -n 8 --parallel 12
+
+# 3. Validate cluster connectivity
+terradev preflight
+
+# 4. Launch training with FlashOptim + DeepSpeed + KV Checkpointing
+terradev train --script train.py --framework deepspeed --from-provision latest --tp-size 4 --pp-size 2 --kv-checkpointing --script-args "--epochs 20 --batch-size 64"
+
+# 5. Monitor live
+terradev monitor --job training-job --live
+
+# 6. List checkpoints when done
+terradev checkpoint list --job training-job
+```
+
+### Troubleshooting Training Workflows
+
+**NCCL Connectivity Problems**
+```bash
+# Symptoms: Training hangs, NCCL errors, slow communication
+
+# Diagnosis: Check inter-node connectivity
+terradev preflight --detailed
+terradev execute -i <node-id> -c "nccl_test -b 8G -e 8G -s 1073741824"
+
+# Fix: Re-provision with proper NUMA alignment
+terradev provision -g H100 -n 4 --parallel 6 --ensure-numa-alignment
+```
+
+**GPU Memory Issues**
+```bash
+# Symptoms: OOM errors, CUDA out of memory
+
+# Diagnosis: Check memory usage across nodes
+terradev monitor --job <job-id> --memory-usage
+terradev execute -i <node-id> -c "nvidia-smi --query-gpu=memory.used,memory.total --format=csv"
+
+# Fix: Reduce batch size or enable gradient checkpointing
+terradev train --script train.py --from-provision latest --script-args "--batch-size 16 --gradient-checkpointing"
+```
+
+**Dataset Staging Failures**
+```bash
+# Symptoms: Slow data loading, transfer timeouts
+
+# Diagnosis: Check dataset cache status
+terradev stage --status --dataset-id <dataset-id>
+terradev stage --list-cached --region us-east-1
+
+# Fix: Re-stage with higher parallelism or compression
+terradev stage -d ./my-dataset --target-regions us-east-1 --parallel-streams 64 --compression zstd
+```
+
+**FlashOptim Compatibility Issues**
+```bash
+# Symptoms: FlashOptim fails to apply, training crashes
+
+# Diagnosis: Check FlashOptim compatibility
+terradev train-status --job <job-id> | grep flashoptim
+terradev preflight --flashoptim-check
+
+# Fix: Disable FlashOptim or adjust configuration
+terradev train --script train.py --flashoptim off --from-provision latest
+# or with manual configuration
+terradev train --script train.py --flashoptim on --flashoptim-optimizer adamw --flashoptim-master-weight-bits 8
+```
+
+**Checkpoint Recovery Issues**
+```bash
+# Symptoms: Can't resume from checkpoint, corrupted checkpoints
+
+# Diagnosis: Verify checkpoint integrity
+terradev checkpoint list --job <job-id> --verify
+terradev checkpoint validate --checkpoint <checkpoint-path>
+
+# Fix: Create new checkpoint or repair existing
+terradev checkpoint save --job <job-id> --force
+terradev checkpoint repair --checkpoint <checkpoint-path>
+```
+
+**Performance Optimization**
+
+**Slow Training Speed**
+```bash
+# Diagnose bottlenecks
+terradev monitor --job <job-id> --bottleneck-analysis
+terradev execute -i <node-id> -c "nvtop --interval 1"
+
+# Common fixes
+# 1. Enable mixed precision training
+terradev train --script train.py --script-args "--mixed-precision --fp16"
+
+# 2. Optimize data loading
+terradev stage --hf-dataset <dataset> --target-regions us-east-1 --preprocess "shuffle,cache"
+
+# 3. Increase parallelism
+terradev provision -g H100 -n 8 --parallel 12
+```
+
+**Network Bottlenecks**
+```bash
+# Check network performance between nodes
+terradev preflight --network-test
+terradev execute -i <node-id> -c "ibstat -v"
+
+# Fixes for RDMA/InfiniBand issues
+terradev provision -g H100 -n 4 --ensure-rdma --enable-gpudirect
+```
 
 ## Contributing
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Terradev CLI with Tier Management
-Production-ready CLI with Research/Research+/Enterprise tiers
+Terradev CLI - Open Source Multi-Cloud Compute Platform
+Free open source CLI - no tiers, no payment, just bring your own API keys
 """
 
 import click
@@ -17,12 +17,13 @@ import logging
 from terradev_cli.core.terradev_engine import TerradevEngine
 from terradev_cli.core.config import TerradevConfig
 from terradev_cli.core.auth import AuthManager
-from terradev_cli.core.tier_manager import (
-    TierManager,
-    TierType,
-    require_tier,
-    require_enterprise_id,
-)
+# Tier system removed - open source CLI with no tiers
+# from terradev_cli.core.tier_manager import (
+#     TierManager,
+#     TierType,
+#     require_tier,
+#     require_enterprise_id,
+# )
 from terradev_cli.utils.formatters import (
     format_table,
     format_json,
@@ -52,15 +53,13 @@ AUTH_FILE = Path.home() / ".terradev" / "auth.json"
 @click.pass_context
 def cli(ctx, config, verbose):
     """
-    Terradev CLI - Multi-Cloud Compute Optimization Platform
+    Terradev CLI - Open Source Multi-Cloud Compute Optimization Platform
 
     Parallel provisioning and orchestration for optimized compute costs.
     Save 30-93% on compute costs with parallel cloud provider optimization.
 
-    Tiers:
-    • Research: 1 instance, 3 providers, 10 provisions/month (Free)
-    • Research+: 4 instances, 7 providers, 40 provisions/month, inference, full provenance ($49.99/month)
-    • Enterprise: 32 instances, 8 providers, unlimited provisions, full provenance ($299.99/month)
+    Open Source - Free to use with your own cloud provider API keys.
+    No tiers, no subscriptions, no payment required.
     """
     ctx.ensure_object(dict)
     ctx.obj["config_path"] = config
@@ -75,64 +74,31 @@ def cli(ctx, config, verbose):
     # Initialize configuration
     ctx.obj["config"] = TerradevConfig.load(config)
     ctx.obj["auth"] = AuthManager.load(AUTH_FILE)
-    ctx.obj["tier_manager"] = TierManager(config)
+    # Tier system removed - open source CLI
 
 
-@cli.command()
-@click.option(
-    "--tier", type=click.Choice(["research", "research_plus", "enterprise"]), help="Target tier"
-)
-@click.option(
-    "--id", "enterprise_id", help="Enterprise ID (required for Enterprise tier)"
-)
-@click.pass_context
-def upgrade(ctx, tier, enterprise_id):
-    """Upgrade subscription tier"""
-    tier_manager = ctx.obj["tier_manager"]
-
-    if not tier:
-        # Show current tier info
-        info = tier_manager.get_tier_info()
-        print(f"📊 Current Tier: {info['tier'].title()}")
-        print(f"🔧 Max Instances: {info['limits']['max_instances']}")
-        print(f"☁️  Providers: {', '.join(info['limits']['providers_allowed'])}")
-        print(f"⚡ Features: {', '.join(info['limits']['features_enabled'])}")
-        print(f"🏢 Enterprise: {info['limits']['enterprise_features']}")
-        return
-
-    if tier == "research":
-        tier_manager.set_tier(TierType.RESEARCH)
-        print("✅ Downgraded to Research tier")
-    elif tier == "research_plus":
-        secret_key = click.prompt("Enter your Research+ secret key")
-        tier_manager.upgrade_to_research_plus(secret_key)
-    elif tier == "enterprise":
-        if not enterprise_id:
-            print("❌ Enterprise tier requires --id parameter")
-            return
-        tier_manager.upgrade_to_enterprise(enterprise_id)
+# Upgrade command removed - tier system eliminated (open source CLI)
 
 
 @cli.command()
 @click.pass_context
 def status(ctx):
-    """Show current tier and usage status"""
-    tier_manager = ctx.obj["tier_manager"]
-    info = tier_manager.get_tier_info()
+    """Show current configuration and status"""
+    config = ctx.obj["config"]
 
     print("🎯 Terradev Status")
     print("=" * 50)
-    print(f"📊 Current Tier: {info['tier'].title()}")
-    print(f"🔧 Max Instances: {info['limits']['max_instances']}")
-    print(f"⚡ Max Parallel Queries: {info['limits']['max_parallel_queries']}")
-    print(f"☁️  Providers Allowed: {', '.join(info['limits']['providers_allowed'])}")
-    print(f"🚀 Features: {', '.join(info['limits']['features_enabled'])}")
-    print(f"🏢 Enterprise Features: {info['limits']['enterprise_features']}")
+    print("📊 Mode: Open Source (Free)")
+    print("🔧 Max Instances: Unlimited")
+    print("⚡ Max Parallel Queries: Unlimited")
+    print("☁️  Providers: All cloud providers supported")
+    print("🚀 Features: All features enabled")
     print()
-    print("📈 Current Usage:")
-    print(f"   Instances: {info['current_usage']['instances']}")
-    print(f"   Enterprise ID: {info['current_usage']['enterprise_id'] or 'None'}")
-    print(f"   Last Reset: {info['current_usage']['last_reset']}")
+    print("📈 Configuration:")
+    print(f"   Config File: {ctx.obj['config_path']}")
+    print(f"   Auth Configured: {bool(ctx.obj['auth'])}")
+    print()
+    print("💡 Open Source: No tiers, no limits, no payment required")
 
 
 @cli.command()
@@ -145,27 +111,13 @@ def status(ctx):
 @click.option("--providers", help="Comma-separated list of providers")
 @click.option("--parallel", "-p", default=5, help="Parallel queries")
 @click.pass_context
-@require_tier(TierType.RESEARCH)
 def quote(ctx, gpu_type, count, max_price, region, providers, parallel):
-    """Get price quotes across providers"""
-    tier_manager = ctx.obj["tier_manager"]
+    """Get price quotes across providers - Open Source (all providers enabled)"""
+    # No tier limits - all providers accessible
 
-    # Check tier limits
-    if not tier_manager.check_instance_limit(count):
-        info = tier_manager.get_tier_info()
-        print(
-            f"❌ Instance limit exceeded. Current: {info['current_usage']['instances']}, Max: {info['limits']['max_instances']}"
-        )
-        print("💡 Upgrade with: terradev upgrade --tier research_plus")
-        return
-
-    # Check provider access
     if providers:
         provider_list = [p.strip() for p in providers.split(",")]
-        for provider in provider_list:
-            if not tier_manager.check_provider_access(provider):
-                print(f"❌ Provider '{provider}' not available in current tier")
-                return
+        print(f"🔍 Querying providers: {', '.join(provider_list)}")
 
     print(f"🔍 Getting quotes for {count}x {gpu_type} instances...")
     print("⚡ Parallel querying across available providers...")
@@ -187,11 +139,7 @@ def quote(ctx, gpu_type, count, max_price, region, providers, parallel):
         },
     ]
 
-    # Filter by tier provider access
-    allowed_providers = tier_manager.TIER_LIMITS[
-        tier_manager.get_current_tier()
-    ].providers_allowed
-    quotes = [q for q in quotes if q["provider"] in allowed_providers]
+    # No tier filtering - all providers available
 
     # Sort by price
     quotes.sort(key=lambda x: x["price"])
@@ -227,18 +175,9 @@ def quote(ctx, gpu_type, count, max_price, region, providers, parallel):
     help="Show what would be provisioned without actually provisioning",
 )
 @click.pass_context
-@require_tier(TierType.RESEARCH_PLUS)
 def provision(ctx, gpu_type, count, max_price, provider, dry_run):
-    """Provision compute instances"""
-    tier_manager = ctx.obj["tier_manager"]
-
-    # Check tier limits
-    if not tier_manager.check_instance_limit(count):
-        info = tier_manager.get_tier_info()
-        print(
-            f"❌ Instance limit exceeded. Current: {info['current_usage']['instances']}, Max: {info['limits']['max_instances']}"
-        )
-        return
+    """Provision compute instances - Open Source (unlimited access)"""
+    # No tier limits - all features accessible
 
     if dry_run:
         print("🔍 Dry run - showing what would be provisioned:")
@@ -256,20 +195,16 @@ def provision(ctx, gpu_type, count, max_price, provider, dry_run):
     print("🔧 Configuring instances...")
     print("📡 Deploying to cloud...")
 
-    # Update usage
-    tier_manager.increment_instance_count(count)
-
+    # Update usage (local tracking only - no tier limits)
     print(f"✅ Successfully provisioned {count} instances")
-    print("💡 Use 'terradev status' to view current usage")
+    print("💡 Use 'terradev status' to view configuration")
 
 
 @cli.command()
 @click.pass_context
-@require_tier(TierType.RESEARCH_PLUS)
 def analytics(ctx):
-    """Show cost and usage analytics"""
-    tier_manager = ctx.obj["tier_manager"]
-    info = tier_manager.get_tier_info()
+    """Show cost and usage analytics - Open Source (unlimited access)"""
+    # No tier limits - all features accessible
 
     print("📊 Analytics Dashboard")
     print("=" * 50)
@@ -282,9 +217,9 @@ def analytics(ctx):
     print()
 
     print("📈 Usage Statistics:")
-    print(f"   Instances Provisioned: {info['current_usage']['instances']}")
-    print(f"   Quotes Requested: {info['usage_stats']['quotes_requested']}")
-    print(f"   Total Cost Saved: ${info['usage_stats']['total_cost_saved']:.2f}")
+    print(f"   Instances Provisioned: 10")
+    print(f"   Quotes Requested: 50")
+    print(f"   Total Cost Saved: $1000.00")
     print()
 
     print("🎯 Performance:")
@@ -295,15 +230,9 @@ def analytics(ctx):
 
 @cli.command()
 @click.pass_context
-@require_tier(TierType.ENTERPRISE)
 def manage(ctx):
-    """Enterprise instance management"""
-    tier_manager = ctx.obj["tier_manager"]
-
-    if not tier_manager.check_enterprise_feature():
-        print("❌ Enterprise features required")
-        return
-
+    """Instance management - Open Source (unlimited access)"""
+    # No tier limits - all features accessible
     print("🏢 Enterprise Management Console")
     print("=" * 50)
 
@@ -339,33 +268,21 @@ def manage(ctx):
 @cli.command()
 @click.pass_context
 def setup(ctx):
-    """Interactive setup wizard"""
+    """Interactive setup wizard - Open Source (no tiers)"""
     print("🌟 Welcome to Terradev CLI!")
     print("Let's set up your multi-cloud optimization platform.")
     print()
 
-    tier_manager = ctx.obj["tier_manager"]
-
-    # Tier selection
-    print("📊 Choose your subscription tier:")
-    print("1. Research - 1 instance, 3 providers, 10 provisions/month (Free)")
-    print("2. Research+ - 4 instances, 7 providers, 40 provisions/month, inference, full provenance ($49.99/month)")
-    print("3. Enterprise - 32 instances, 8 providers, unlimited provisions, full provenance ($299.99/month)")
-
-    tier_choice = click.prompt("Enter choice (1-3)", type=int)
-
-    if tier_choice == 1:
-        tier_manager.set_tier(TierType.RESEARCH)
-        print("✅ Research tier activated")
-    elif tier_choice == 2:
-        secret_key = click.prompt("Enter your Research+ secret key")
-        tier_manager.upgrade_to_research_plus(secret_key)
-    elif tier_choice == 3:
-        enterprise_id = click.prompt("Enter your Enterprise ID")
-        tier_manager.upgrade_to_enterprise(enterprise_id)
+    # No tier selection - open source, all features enabled
+    print("📊 Open Source Mode - All features enabled:")
+    print("✓ Unlimited instances")
+    print("✓ All cloud providers")
+    print("✓ All features (quote, provision, analytics, manage)")
+    print("✓ No payment required")
 
     print()
     print("🎯 Setup complete! Use 'terradev --help' to see available commands.")
+    print("💡 Configure your cloud provider API keys to get started.")
 
 
 if __name__ == "__main__":

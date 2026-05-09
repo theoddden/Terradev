@@ -1,5 +1,7 @@
-stripe==14.9.0
-flask==3.0.0
-python-dotenv==1.0.0
-requests==2.31.0
-smtplib-ssl==1.0.0
+# Stripe billing disabled - BYOAPI mode
+# All billing functionality removed - users bring their own API keys
+# stripe==14.9.0
+# flask==3.0.0
+# python-dotenv==1.0.0
+# requests==2.31.0
+# smtplib-ssl==1.0.0

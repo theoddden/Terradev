@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.12] - 2026-03-12
+
+### 🚀 **New Latitude.sh Provider Integration**
+- **Dual Instance Support**: Full support for both bare metal servers AND virtual machines with GPU
+- **Premium GPU Access**: NVIDIA H100, A100, RTX 4090, RTX PRO 6000 Blackwell support
+- **Bare Metal Performance**: Dedicated hardware with IPMI out-of-band management
+- **VM Flexibility**: GPU-enabled virtual machines with dedicated GPU resources
+- **JSON:API Compliant**: Complete API specification compliance with built-in rate limiting
+- **SSH Access Patterns**: Direct SSH for bare metal, container SSH for VMs
+- **Real-time Pricing**: Live quotes with stock levels and instant deployment information
+
+### 🔧 **Provider Enhancements**
+- **Provider Count**: Updated to 20 supported cloud providers
+- **Instance Differentiation**: Clear categorization between bare metal and virtual machine instances
+- **Rate Limiting**: Automatic exponential backoff with 429 response handling
+- **Error Handling**: Graceful degradation with detailed error responses
+- **Test Coverage**: 13 comprehensive tests with 100% pass rate
+
+### 📊 **Configuration & Usage**
+- **Easy Setup**: Simple `LATITUDE_API_KEY` environment variable configuration
+- **CLI Integration**: Full integration with existing terradev CLI commands
+- **Instance Types**: Support for both `latitude-bare-metal-*` and `latitude-vm-*` instance types
+- **Regional Support**: Multi-region availability with real-time stock information
+
+### 🎯 **Technical Improvements**
+- **Async Support**: Full async/await implementation throughout provider
+- **Type Safety**: Complete type annotations for better IDE support
+- **Documentation**: Comprehensive integration guide and API reference
+- **Factory Registration**: Automatic provider registration in provider factory
+
+---
+
 ## [2.9.8] - 2026-02-20
 
 ### 🎯 **Documentation Corrections**

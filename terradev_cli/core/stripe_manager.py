@@ -31,105 +31,24 @@ class StripeManager:
     """Manages Stripe integration for Terradev CLI"""
     
     def __init__(self):
-        if stripe is None:
-            logger.warning("stripe package not installed — billing features unavailable. "
-                           "Install with: pip install stripe")
-            self.demo_mode = True
-            self.publishable_key = ""
-            self.secret_key = None
-            self._metering_file = Path.home() / '.terradev' / 'gpu_metering.json'
-            return
-
-        # Keys loaded from environment — never hardcoded
-        self.publishable_key = os.getenv(
-            'STRIPE_PUBLISHABLE_KEY',
-            'pk_live_51Sz5pwKDFO7eDloBQakbf5HBrurcPPiiiNrk4RREPRT64cBipJC8nmpaXh3sZzUv6redIbaAHh7f4nDEGb4ehQ2m00kvIdxiFP'
-        )
-        self.secret_key = os.getenv('STRIPE_SECRET_KEY')  # Set this in environment
-        
-        # Local metering state
+        # BYOAPI: Stripe billing permanently disabled
+        self.demo_mode = True
+        self.publishable_key = ""
+        self.secret_key = None
         self._metering_file = Path.home() / '.terradev' / 'gpu_metering.json'
-        
-        if not self.secret_key:
-            logging.warning("STRIPE_SECRET_KEY not set - using demo mode")
-            self.demo_mode = True
-        else:
-            stripe.api_key = self.secret_key
-            self.demo_mode = False
+        logger.info("Stripe billing disabled - BYOAPI mode active")
     
     # ── Flat-rate subscription checkout (Research+ / Enterprise) ──────
 
     def create_checkout_session(self, tier: str, customer_email: str, success_url: str, cancel_url: str) -> Dict[str, Any]:
-        """Create a dynamic Stripe checkout session"""
-        
-        if self.demo_mode:
-            return {
-                'session_id': f'cs_demo_{datetime.now().strftime("%Y%m%d_%H%M%S")}',
-                'checkout_url': f'https://checkout.stripe.com/demo/{datetime.now().strftime("%Y%m%d_%H%M%S")}',
-                'publishable_key': self.publishable_key
-            }
-        
-        # Handle Enterprise+ separately — metered billing
-        if tier == 'enterprise_plus':
-            return self._create_enterprise_plus_checkout(customer_email, success_url, cancel_url)
-        
-        # Product configuration for flat-rate tiers
-        products = {
-            'research_plus': {
-                'name': 'Terradev Research+',
-                'description': '80 provisions/month, 8 servers, inference support',
-                'price': 4999,  # $49.99 in cents
-                'currency': 'usd'
-            },
-            'enterprise': {
-                'name': 'Terradev Enterprise',
-                'description': 'Unlimited provisions, 32 servers, priority support',
-                'price': 29999,  # $299.99 in cents
-                'currency': 'usd'
-            }
+        """Create a dynamic Stripe checkout session - DISABLED (BYOAPI)"""
+        logger.info("Stripe checkout disabled - BYOAPI mode")
+        return {
+            'disabled': True,
+            'message': 'Billing disabled - BYOAPI mode active',
+            'session_id': None,
+            'checkout_url': None
         }
-        
-        if tier not in products:
-            raise ValueError(f"Unknown tier: {tier}")
-        
-        product_config = products[tier]
-        
-        try:
-            product = self._get_or_create_product(tier, product_config)
-            price = self._get_or_create_price(product.id, product_config)
-            
-            session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                line_items=[{
-                    'price': price.id,
-                    'quantity': 1,
-                }],
-                mode='subscription',
-                success_url=success_url,
-                cancel_url=cancel_url,
-                customer_email=customer_email,
-                metadata={
-                    'tier': tier,
-                    'product': 'terradev_cli',
-                    'version': '3.1.8'
-                },
-                subscription_data={
-                    'metadata': {
-                        'tier': tier,
-                        'product': 'terradev_cli'
-                    }
-                }
-            )
-            
-            return {
-                'session_id': session.id,
-                'checkout_url': session.url,
-                'publishable_key': self.publishable_key
-            }
-            
-        except Exception as e:
-            logging.error(f"Failed to create Stripe session: {e}")
-            raise
 
     # ── Enterprise+ metered subscription ─────────────────────────────
 
@@ -223,55 +142,13 @@ class StripeManager:
 
     # ── GPU-hour metering ────────────────────────────────────────────
 
-    def report_gpu_hours(self, subscription_item_id: str, gpu_hours: float, 
+    def report_gpu_hours(self, subscription_item_id: str, gpu_hours: float,
                          gpu_type: str = '', instance_id: str = '') -> Optional[Dict[str, Any]]:
-        """Report GPU-hour usage to Stripe for metered billing.
-        
-        Called periodically (sync) and at termination to report billable
-        GPU-hours.  Callers must apply the 32-GPU floor before calling:
-            billable_gpu_hours = max(gpu_count, 32) × hours
-        
-        Args:
-            subscription_item_id: The Stripe subscription item ID
-            gpu_hours: Billable GPU-hours (already floored to 32-GPU min)
-            gpu_type: GPU type for metadata
-            instance_id: Instance ID for metadata
-        """
-        if self.demo_mode:
-            logger.info(f"[demo] Would report {gpu_hours:.2f} GPU-hours to Stripe")
-            return {'demo': True, 'gpu_hours': gpu_hours}
-        
-        # Stripe metered usage requires integer quantities
-        quantity = max(1, math.ceil(gpu_hours))
-        
-        try:
-            usage_record = stripe.SubscriptionItem.create_usage_record(
-                subscription_item_id,
-                quantity=quantity,
-                timestamp=int(datetime.now().timestamp()),
-                action='increment',
-            )
-            
-            logger.info(
-                f"Reported {quantity} GPU-hours to Stripe "
-                f"(sub_item={subscription_item_id}, gpu={gpu_type}, instance={instance_id})"
-            )
-            
-            # Track locally
-            self._record_local_metering(gpu_hours, gpu_type, instance_id)
-            
-            return {
-                'usage_record_id': usage_record.id,
-                'quantity': quantity,
-                'gpu_hours_raw': gpu_hours,
-                'cost_usd': round(quantity * ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100, 2),
-            }
-            
-        except Exception as e:
-            logging.error(f"Failed to report GPU-hours to Stripe: {e}")
-            # Store locally for retry
-            self._record_local_metering(gpu_hours, gpu_type, instance_id, reported=False)
-            return None
+        """Report GPU-hour usage to Stripe for metered billing - DISABLED (BYOAPI)"""
+        logger.info(f"GPU-hour billing disabled - BYOAPI mode: {gpu_hours:.2f} hours tracked locally only")
+        # Track locally for audit trail only (no billing)
+        self._record_local_metering(gpu_hours, gpu_type, instance_id, reported=False)
+        return {'disabled': True, 'gpu_hours': gpu_hours, 'billed': False}
 
     def get_subscription_item_id(self, customer_email: str) -> Optional[str]:
         """Look up the Enterprise+ subscription item ID for a customer.

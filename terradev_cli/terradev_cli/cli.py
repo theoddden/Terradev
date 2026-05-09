@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Terradev CLI - Complete Production Version
-All 12 commands with real provider integration and tier limits (Research/Research+/Enterprise)
+Terradev CLI - Open Source Multi-Cloud Compute Platform
+Free open source CLI - no tiers, no payment, just bring your own API keys
 """
 
 import click
@@ -69,70 +69,26 @@ def validate_credentials(provider: str, credentials: Dict[str, str]) -> bool:
     return True
 
 class TerradevAPI:
-    """Real provider API integration with tier limits"""
-    
+    """Open source provider API integration - no tiers, no limits"""
+
     def __init__(self):
         self.config_dir = Path.home() / '.terradev'
         self.config_dir.mkdir(exist_ok=True)
         self.credentials_file = self.config_dir / 'credentials.json'
         self.usage_file = self.config_dir / 'usage.json'
-        self.tier_file = self.config_dir / 'tier.json'
-        
+        # Tier system removed - no tier file needed
+
         self.load_credentials()
         self.load_usage()
-        
-        # Tier configuration
-        self.tiers = {
-            'research': {
-                'name': 'Research',
-                'provisions_per_month': 10,
-                'max_instances': 1,
-                'user_seats': 1,
-                'providers': ['runpod', 'vastai', 'aws'],
-                'features': ['quote', 'status', 'configure', 'cleanup', 'analytics', 'optimize']
-            },
-            'research_plus': {
-                'name': 'Research+',
-                'provisions_per_month': 80,
-                'max_instances': 8,
-                'user_seats': 1,
-                'providers': ['runpod', 'vastai', 'aws', 'gcp', 'azure', 'tensordock', 'oracle'],
-                'features': ['all', 'inference', 'full_provenance']
-            },
-            'enterprise': {
-                'name': 'Enterprise',
-                'provisions_per_month': 'unlimited',
-                'max_instances': 32,
-                'user_seats': 5,
-                'providers': ['all'],
-                'features': ['all', 'inference', 'full_provenance', 'priority_support', 'sla_guarantee']
-            },
-            'enterprise_plus': {
-                'name': 'Enterprise+',
-                'provisions_per_month': 'unlimited',
-                'max_instances': 'unlimited',
-                'user_seats': 'unlimited',
-                'min_gpus_per_instance': 32,
-                'min_monthly_hours': 128,
-                'monthly_floor_gpu_hours': 4096,
-                'monthly_floor_usd': 368.64,
-                'gpu_hour_rate': 0.09,
-                'billing_model': 'metered',
-                'billing_formula': 'max(gpu_count, 32) × hours_used × $0.09, min 4096 GPU-hrs/mo',
-                'providers': ['all'],
-                'features': ['all', 'inference', 'full_provenance', 'priority_support', 'sla_guarantee', 'dedicated_support', 'gpu_metering', 'fleet_management']
-            }
-        }
-        
-        self.tier = self.tiers['research']  # Default to research tier
-        self._load_tier()
-        
+
+        # Tier configuration removed - open source, unlimited access
+        self.tier = None  # No tiers
+
         # Initialize usage tracking
         if "inference_endpoints" not in self.usage:
             self.usage["inference_endpoints"] = []
 
-        # Enterprise+ GPU-hour metering sync (best-effort, max once/hr)
-        self._maybe_sync_gpu_metering()
+        # GPU-hour metering sync removed - no billing
 
     def is_first_time_user(self) -> bool:
         """Check if this is a first-time user with no configured credentials"""
@@ -152,76 +108,12 @@ class TerradevAPI:
         
         return True  # All credentials appear to be placeholders
 
-    # Embedded Ed25519 public key for tier token verification
-    _TIER_VERIFY_KEY_B64 = "4lJY9uWYGfx2hZkJ6N4DO5plErRX+J/HD97Tx+Xrvms="
-
-    def _load_tier(self):
-        """Load and cryptographically verify tier from local config.
-
-        tier.json stores the full signed activation token (payload + Ed25519
-        signature).  On every CLI invocation we re-verify the signature and
-        reject expired tokens so that editing the file cannot escalate
-        privileges.
-        """
-        if not self.tier_file.exists():
-            return
-        try:
-            import base64
-            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-
-            with open(self.tier_file, 'r') as f:
-                tier_data = json.load(f)
-
-            payload = tier_data.get('payload')
-            signature = tier_data.get('signature')
-
-            # If the file has no signed token (legacy format), ignore it
-            if not payload or not signature:
-                return
-
-            # Verify Ed25519 signature
-            verify_key = Ed25519PublicKey.from_public_bytes(
-                base64.b64decode(self._TIER_VERIFY_KEY_B64)
-            )
-            payload_bytes = json.dumps(payload, sort_keys=True).encode()
-            sig_bytes = base64.b64decode(signature)
-            verify_key.verify(sig_bytes, payload_bytes)
-
-            # Reject expired tokens (>30 days — generous for subscription)
-            TOKEN_MAX_AGE = 30 * 24 * 3600
-            created_at = payload.get('created_at', 0)
-            if time.time() - created_at > TOKEN_MAX_AGE:
-                return
-
-            # Signature valid + not expired → activate tier
-            cached_tier = payload.get('tier', 'research')
-            if cached_tier in self.tiers:
-                self.tier = self.tiers[cached_tier]
-        except Exception:
-            pass
-    
-    # Real Stripe Payment Links — these are public checkout URLs, not secrets
-    STRIPE_PAYMENT_LINKS = {
-        'research_plus': 'https://buy.stripe.com/dRm7sM0r3eGUgJN3Nu18c00',
-        'enterprise': 'https://buy.stripe.com/7sYbJ24Hj0Q48dh6ZG18c01',
-        'enterprise_plus': 'https://buy.stripe.com/dRm7sM0r3eGUgJN3Nu18c02',
-    }
-
-    # Real Stripe Price IDs for subscription verification
-    STRIPE_PRICE_IDS = {
-        'research_plus': 'price_1SzK6gKDFO7eDloB38AN8Tyo',
-        'enterprise': 'price_1Sz6w2KDFO7eDloBswXFsZQU',
-        'enterprise_plus': 'price_1SzK7hKDFO7eDloBEntPlus',
-    }
-
-    def get_stripe_checkout_url(self, tier: str) -> str:
-        """Get the Stripe Payment Link URL for a tier.
-
-        Returns the live Stripe checkout page where users can subscribe.
-        Override with env vars STRIPE_RESEARCH_PLUS_LINK / STRIPE_ENTERPRISE_LINK.
-        """
-        env_key = f"STRIPE_{tier.upper()}_LINK"
-        return os.environ.get(env_key, self.STRIPE_PAYMENT_LINKS.get(tier, ''))
+    # Tier system removed - no tier verification keys or payment links
+    # _TIER_VERIFY_KEY_B64 removed
+    # def _load_tier(self): ... REMOVED
+    # STRIPE_PAYMENT_LINKS = {...} REMOVED
+    # STRIPE_PRICE_IDS = {...} REMOVED
+    # def get_stripe_checkout_url(self, tier: str) -> str: ... REMOVED
 
     def load_credentials(self):
         """Load user's cloud provider credentials (simple JSON for BYOAPI)"""
@@ -308,93 +200,11 @@ class TerradevAPI:
             self.usage['provisions_this_month'] = 0
             self.usage['month_start'] = now.replace(day=1).isoformat()
 
+    # Enterprise+ GPU metering removed - no tier system (open source)
     def _maybe_sync_gpu_metering(self):
-        """Enterprise+ only: report accrued GPU-hours for all active instances.
+        """No-op stub - metering removed in open source mode."""
+        return
 
-        Runs on every CLI invocation (lightweight — reads local state only,
-        reports to Stripe only if there are unreported hours since last sync).
-        This catches GPU-hours even if an instance was terminated outside the
-        CLI (e.g. directly on the provider dashboard or via MCP subprocess).
-
-        Billing model (metered, per-instance):
-            billable_gpus = max(instance.gpu_count, 32)
-            billable_gpu_hours += billable_gpus × hours_running
-            Monthly minimum: 32 × 128 = 4,096 GPU-hrs ($368.64/mo)
-
-        Examples:
-          - 8 GPUs for 0.75 hrs  → max(8, 32) × 0.75  = 24 GPU-hrs
-          - 72 GPUs for 32 hrs   → max(72, 32) × 32    = 2,304 GPU-hrs
-          - 0 instances running  → $0 (no idle charge)
-          - Month with only 500 GPU-hrs → billed 4,096 (shortfall top-up)
-        """
-        if self.tier.get('name') != 'Enterprise+':
-            return
-
-        try:
-            from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS
-            sm = StripeManager()
-            metering = sm._load_metering()
-            sub_item_id = metering.get('subscription_item_id')
-            if not sub_item_id:
-                return  # Not yet linked — will link on activation
-
-            # Monthly minimum reconciliation — once per month boundary
-            topup = sm.reconcile_monthly_minimum(sub_item_id)
-            if topup:
-                print(f"   Enterprise+ monthly min for {topup['month']}: "
-                      f"{topup['actual_gpu_hours']:.0f}/{topup['floor_gpu_hours']} GPU-hrs, "
-                      f"top-up {topup['shortfall_gpu_hours']:.0f} (${topup['topup_cost_usd']:.2f})")
-
-            instances = self.usage.get('instances_created', [])
-            if not instances:
-                metering = sm._load_metering()
-                metering['last_sync_ts'] = datetime.now().isoformat()
-                sm._save_metering(metering)
-                return
-
-            last_sync = metering.get('last_sync_ts', '')
-            now = datetime.now()
-
-            # Only sync once per hour to avoid hammering Stripe
-            if last_sync:
-                try:
-                    last_dt = datetime.fromisoformat(last_sync)
-                    if (now - last_dt).total_seconds() < 3600:
-                        return
-                except Exception:
-                    pass
-
-            billable_gpu_hours = 0.0
-            for inst in instances:
-                created = inst.get('created_at', '')
-                gpu_count = inst.get('gpu_count', 1)
-                # 32-GPU floor per instance: you always pay for at least 32 GPUs
-                billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
-                if created:
-                    try:
-                        start = datetime.fromisoformat(created)
-                        # Only bill hours since last sync (avoid double-counting)
-                        if last_sync:
-                            try:
-                                sync_dt = datetime.fromisoformat(last_sync)
-                                start = max(start, sync_dt)
-                            except Exception:
-                                pass
-                        hours = max((now - start).total_seconds() / 3600, 0)
-                        billable_gpu_hours += hours * billable_gpus
-                    except Exception:
-                        continue
-
-            if billable_gpu_hours > 0.01:
-                sm.report_gpu_hours(
-                    sub_item_id, billable_gpu_hours,
-                    gpu_type='mixed',
-                    instance_id=f'sync-{now.strftime("%Y%m%d%H")}',
-                )
-                metering['last_sync_ts'] = now.isoformat()
-                sm._save_metering(metering)
-        except Exception:
-            pass  # Metering sync is best-effort
     
     def _provider_creds(self, provider_name: str) -> Dict[str, str]:
         """Build credentials dict for a provider from stored BYOAPI keys.
@@ -945,14 +755,11 @@ def run_interactive_onboarding(api: TerradevAPI):
 def cli(config=None, verbose=False, skip_onboarding=False):
     """
     Terradev CLI - Cross-Cloud Compute Optimization Platform
-    
+
     Parallel provisioning and orchestration for cross-cloud cost optimization.
     Save 30% on end-to-end compute provisioning costs with real-time cloud arbitrage.
-    
-    Research Tier: 10 provisions/month, 1 server, 1 seat (Free)
-    Research+ Tier: 80 provisions/month, 8 servers, 1 seat, inference ($49.99/month)
-    Enterprise Tier: Unlimited provisions, 32 servers, 5 seats, full provenance ($299.99/month)
-    Enterprise+ Tier: Unlimited everything, 32 GPU min, metered at $0.09/GPU-hr
+
+    Open Source Mode: Unlimited provisions, unlimited servers, unlimited seats, all features (Free)
     """
     # Check for first-time user and trigger onboarding
     if not skip_onboarding and not os.environ.get("TERRADEV_SKIP_ONBOARDING"):
@@ -978,17 +785,9 @@ def onboarding(force):
               help='Activate after payment — verifies your Stripe subscription and unlocks your tier')
 @click.option('--email', help='Email used for Stripe checkout (for --activate)')
 def upgrade(tier, activate, email):
-    """Upgrade your Terradev subscription via Stripe.
-
-    Opens the Stripe checkout page in your browser. After payment completes,
-    run `terradev upgrade --activate --email you@example.com` to instantly
-    unlock your new tier.
-
-    \b
-    Research+ ($49.99/mo): 30 provisions/month, 4 servers, 1 seat, inference
-    Enterprise ($299.99/mo): Unlimited provisions, 32 servers, 5 seats, full provenance
-    Enterprise+ ($0.09/GPU-hr, 32 GPU min): Unlimited everything, metered billing, fleet mgmt
-    """
+    """Upgrade command removed - Terradev is now open source with unlimited access."""
+    print("Upgrade command removed - Terradev is now open source with unlimited access.")
+    return
     api = TerradevAPI()
 
     if activate:
@@ -1079,144 +878,34 @@ def upgrade(tier, activate, email):
                 'email': email,
                 'verified_at': datetime.now().isoformat(),
             }
-            api.tier_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(api.tier_file, 'w') as f:
-                json.dump(tier_data, f, indent=2)
+            # Tier file writing removed - no tier system (open source)
+            # api.tier_file.parent.mkdir(parents=True, exist_ok=True)
+            # with open(api.tier_file, 'w') as f:
+            #     json.dump(tier_data, f, indent=2)
 
-            # ── Graceful tier migration ──
-            old_tier = api.tier
-            tier_info = api.tiers[activated_tier]
             running = api.usage.get('instances_created', [])
             running_count = len(running)
             inference_eps = api.usage.get('inference_endpoints', [])
 
-            print(f"\nTier upgraded to {tier_info['name']}!")
-            print(f"   Concurrent servers: {tier_info['max_instances']}")
-            prov = tier_info['provisions_per_month']
-            print(f"   Provisions/month:   {prov}")
-            print(f"   User seats:         {tier_info['user_seats']}")
-            if 'full_provenance' in tier_info.get('features', []):
-                print(f"   Full provenance:    Enabled")
+            # Tier activation messaging removed - no tier system (open source)
+            print(f"\nOpen source mode - no tier activation needed!")
+            print(f"   All features are available with unlimited access.")
 
-            # Enterprise+ specific activation — resolve Stripe subscription item for metering
-            if activated_tier == 'enterprise_plus':
-                print(f"   Billing model:      Metered ($0.09/GPU-hr)")
-                print(f"   Minimum GPUs:       {tier_info.get('min_gpus', 32)}")
-                print(f"   Fleet management:   Enabled")
-                print(f"   GPU-hour metering:  Enabled")
-                try:
-                    from core.stripe_manager import StripeManager
-                    sm = StripeManager()
-                    sub_item_id = sm.get_subscription_item_id(email)
-                    if sub_item_id:
-                        print(f"   Stripe metering:    Linked ✓")
-                        print(f"   GPU-hours will be billed to your card monthly via Stripe.")
-                    else:
-                        print(f"   Stripe metering:    Pending (will link on first provision)")
-                except Exception:
-                    print(f"   Stripe metering:    Will link on first provision")
+            # Tier migration logic removed - no tier system (open source)
+            # print(f"   Inference endpoints fully supported on {tier_info['name']}")
 
-            # Migration report
-            if running_count > 0 or inference_eps:
-                print(f"\nGraceful migration:")
-                print(f"   Previous tier:      {old_tier['name']} (max {old_tier['max_instances']} servers)")
-                print(f"   New tier:           {tier_info['name']} (max {tier_info['max_instances']} servers)")
-                if running_count > 0:
-                    print(f"   Running instances:  {running_count} — all carried forward ✓")
-                    if activated_tier == 'enterprise_plus':
-                        print(f"   All {running_count} instances within new unlimited limit")
-                    elif isinstance(old_tier['max_instances'], int) and running_count > old_tier['max_instances']:
-                        print(f"   You had {running_count} instances (over old limit of {old_tier['max_instances']})")
-                    if isinstance(tier_info['max_instances'], int):
-                        if running_count <= tier_info['max_instances']:
-                            print(f"   All {running_count} instances within new limit of {tier_info['max_instances']}")
-                        else:
-                            print(f"   {running_count} instances exceeds new limit of {tier_info['max_instances']} — oldest will be grandfathered")
-                if inference_eps:
-                    print(f"   Inference endpoints: {len(inference_eps)} — migrated to new tier ✓")
-                    if 'inference' in tier_info.get('features', []) or 'all' in tier_info.get('features', []):
-                        print(f"   Inference endpoints fully supported on {tier_info['name']}")
-
-            print(f"\nYou're all set. Your new limits are active immediately.")
+            print(f"\nOpen source mode - no tier activation needed!")
             return
 
         except Exception as e:
             print(f"Activation check failed: {e}")
             return
 
-    # ── Show upgrade options and open Stripe checkout ──
-    current = api.tier['name']
-    print(f"Current tier: {current}")
-    print()
-    print("┌─────────────────────────────────────────────────────────────┐")
-    print("│  Research+ ($49.99/mo)                                     │")
-    print("│  • 80 provisions/month                                     │")
-    print("│  • 8 concurrent servers                                    │")
-    print("│  • 1 user seat                                             │")
-    print("│  • Inference endpoints                                     │")
-    print("│  • 7 cloud providers                                       │")
-    print("├─────────────────────────────────────────────────────────────┤")
-    print("│  Enterprise ($299.99/mo)                                   │")
-    print("│  • Unlimited provisions                                    │")
-    print("│  • 32 concurrent servers                                   │")
-    print("│  • 5 user seats                                            │")
-    print("│  • Full provenance & audit trail                           │")
-    print("│  • All 11+ cloud providers                                 │")
-    print("│  • Priority support + SLA guarantee                        │")
-    print("├─────────────────────────────────────────────────────────────┤")
-    print("│  Enterprise+ ($0.09/GPU-hr — metered, 32 GPU minimum)      │")
-    print("│  • Unlimited provisions, servers, and seats                 │")
-    print("│  • Minimum 32 GPUs under management                        │")
-    print("│  • $0.09 per GPU-hour (billed via Stripe metered usage)    │")
-    print("│  • All 11+ cloud providers + dedicated support              │")
-    print("│  • Full provenance, SLA guarantee, fleet management         │")
-    print("│  • GPU-hour metering + cost analytics dashboard             │")
-    print("└─────────────────────────────────────────────────────────────┘")
-    print()
+    # ── Upgrade command removed - no tier system (open source) ──
+    print("Upgrade command removed - Terradev is now open source with unlimited access")
+    return
 
-    if not tier:
-        if not sys.stdin.isatty():
-            print("❌ --tier is required in non-interactive mode")
-            print("   Usage: terradev upgrade --tier research_plus")
-            sys.exit(2)
-        tier = click.prompt(
-            'Which tier?',
-            type=click.Choice(['research_plus', 'enterprise', 'enterprise_plus']),
-        )
-
-    checkout_url = api.get_stripe_checkout_url(tier)
-    tier_labels = {'research_plus': 'Research+', 'enterprise': 'Enterprise', 'enterprise_plus': 'Enterprise+'}
-    tier_prices = {'research_plus': '$49.99/mo', 'enterprise': '$299.99/mo', 'enterprise_plus': '$0.09/GPU-hr (32 GPU min)'}
-    tier_label = tier_labels.get(tier, tier)
-    price = tier_prices.get(tier, '')
-
-    print(f"\nOpening Stripe checkout for {tier_label} ({price})...")
-    print(f"   {checkout_url}")
-
-    # Auto-open in browser
-    try:
-        import webbrowser
-        webbrowser.open(checkout_url)
-        
-        # Track Stripe checkout opened
-        try:
-            from core.telemetry import TelemetryClient
-            telemetry = TelemetryClient()
-            telemetry.log_usage("stripe_checkout_opened", {
-                        "tier": api.tier["name"],
-                        "stripe_session_id": stripe_session_id,
-                        "upgrade_url": checkout_url,
-                        "price_point": "49.99",
-                        "product": "research_plus"
-                    })
-        except Exception:
-            pass  # Telemetry is best-effort
-        print("   Opened in your browser")
-    except Exception:
-        print("   Could not open browser — please visit the URL above")
-
-    print(f"\nAfter payment, activate your tier:")
-    print(f"   terradev upgrade --activate --email YOUR_EMAIL")
+    # All browser opening and activation instructions removed - no tier system (open source)
 
 def validate_credentials(provider: str, credentials: Dict[str, str]) -> bool:
     """Validate that all required credentials are present for a provider"""
@@ -1664,15 +1353,17 @@ def configure(provider):
             print("   Ray configured — distributed computing")
     
     api.save_credentials()
-    
+
     print("\nCredentials saved successfully!")
     print(f"Stored in: {api.credentials_file}")
     print("Your keys are encrypted and stored locally only.")
-    prov_limit = api.tier['provisions_per_month']
-    prov_used = api.usage.get('provisions_this_month', 0)
-    print(f"\nCurrent tier: {api.tier['name']}")
-    print(f"Provisions this month: {prov_used}/{prov_limit}")
-    
+    # Tier info removed - open source unlimited access
+    # prov_limit = api.tier['provisions_per_month']
+    # prov_used = api.usage.get('provisions_this_month', 0)
+    # print(f"\nCurrent tier: {api.tier['name']}")
+    # print(f"Provisions this month: {prov_used}/{prov_limit}")
+    print(f"\nOpen Source Mode: Unlimited access to all features")
+
     # Show integration status
     try:
         from integrations.wandb_integration import is_configured as wandb_ok
@@ -2025,156 +1716,8 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             print(f"Model: {model_name or 'Not specified'}")
             print(f"Endpoint: {endpoint_name or 'Auto-generated'}")
 
-    # ── Tier gates ──
-    if count > api.tier['max_instances']:
-        max_i = api.tier['max_instances']
-        checkout_url = api.get_stripe_checkout_url('research_plus') if max_i < 8 else api.get_stripe_checkout_url('enterprise')
-        tier_name = "Research+" if max_i < 8 else "Enterprise"
-        tier_price = "$49.99" if max_i < 8 else "$299.99"
-        tier_servers = "8" if max_i < 8 else "32"
-        print(f"ERROR: {api.tier['name']} tier limited to {max_i} concurrent instance(s) — you requested {count}")
-        print(f"")
-        print(f"   ┌─────────────────────────────────────────────────────┐")
-        print(f"   │  Upgrade to {tier_name} — {tier_price}/mo{' ' * (22 - len(tier_name) - len(tier_price))}│")
-        print(f"   │     {tier_servers} concurrent servers · unlock full power{' ' * (14 - len(tier_servers))}│")
-        print(f"   │                                                     │")
-        print(f"   │  {checkout_url}  │")
-        
-        # Track Stripe checkout initiation
-        stripe_session_id = None
-        try:
-            # Extract session ID from checkout URL for tracking
-            import re
-            session_match = re.search(r"/cs_([a-zA-Z0-9]+)", checkout_url)
-            if session_match:
-                stripe_session_id = session_match.group(1)
-                
-            # Log Stripe checkout initiation
-            from core.telemetry import TelemetryClient
-            telemetry = TelemetryClient()
-            telemetry.log_usage("stripe_checkout_initiated", {
-                "tier": api.tier["name"],
-                "limit": limit,
-                "used": used,
-                "upgrade_url": checkout_url,
-                "stripe_session_id": stripe_session_id,
-                "reason": "monthly_provision_limit",
-                "price_point": "49.99",
-                "product": "research_plus"
-            })
-        except Exception:
-            pass  # Telemetry is best-effort        
-        # Log paywall hit to telemetry for visibility
-        try:
-            from core.telemetry import TelemetryClient
-            telemetry = TelemetryClient()
-            telemetry.log_usage("paywall_hit", {
-                "tier": api.tier["name"],
-                "limit": limit,
-                "used": used,
-                "upgrade_url": checkout_url,
-                "reason": "monthly_provision_limit"
-            })
-        except Exception:
-            pass  # Telemetry is best-effort
-        print(f"   └─────────────────────────────────────────────────────┘")
-        try:
-            if click.confirm('\n   Open checkout in browser?', default=True):
-                import webbrowser
-                webbrowser.open(checkout_url)
-                
-                # Track Stripe checkout opened
-                try:
-                    from core.telemetry import TelemetryClient
-                    telemetry = TelemetryClient()
-                    telemetry.log_usage("stripe_checkout_opened", {
-                        "tier": api.tier["name"],
-                        "stripe_session_id": stripe_session_id,
-                        "upgrade_url": checkout_url,
-                        "price_point": "49.99",
-                        "product": "research_plus"
-                    })
-                except Exception:
-                    pass  # Telemetry is best-effort
-                print(f"\n   OK: Opened in browser. After payment, run:")
-                print(f"      terradev upgrade --activate --email YOUR_EMAIL")
-        except click.Abort:
-            pass
-        return
-
-    if not api.check_provision_limit():
-        limit = api.tier['provisions_per_month']
-        used = api.usage.get('provisions_this_month', 0)
-        checkout_url = api.get_stripe_checkout_url('research_plus')
-        print(f"ERROR: Monthly provision limit reached ({used}/{limit} for {api.tier['name']} tier)")
-        print(f"")
-        print(f"   ┌─────────────────────────────────────────────────────┐")
-        print(f"   │  Upgrade to Research+ — $49.99/mo               │")
-        print(f"   │     80 provisions/month · 8 servers · inference     │")
-        print(f"   │                                                     │")
-        print(f"   │  {checkout_url}  │")
-        
-        # Track Stripe checkout initiation
-        stripe_session_id = None
-        try:
-            # Extract session ID from checkout URL for tracking
-            import re
-            session_match = re.search(r"/cs_([a-zA-Z0-9]+)", checkout_url)
-            if session_match:
-                stripe_session_id = session_match.group(1)
-                
-            # Log Stripe checkout initiation
-            from core.telemetry import TelemetryClient
-            telemetry = TelemetryClient()
-            telemetry.log_usage("stripe_checkout_initiated", {
-                "tier": api.tier["name"],
-                "limit": limit,
-                "used": used,
-                "upgrade_url": checkout_url,
-                "stripe_session_id": stripe_session_id,
-                "reason": "monthly_provision_limit",
-                "price_point": "49.99",
-                "product": "research_plus"
-            })
-        except Exception:
-            pass  # Telemetry is best-effort        
-        # Log paywall hit to telemetry for visibility
-        try:
-            from core.telemetry import TelemetryClient
-            telemetry = TelemetryClient()
-            telemetry.log_usage("paywall_hit", {
-                "tier": api.tier["name"],
-                "limit": limit,
-                "used": used,
-                "upgrade_url": checkout_url,
-                "reason": "monthly_provision_limit"
-            })
-        except Exception:
-            pass  # Telemetry is best-effort
-        print(f"   └─────────────────────────────────────────────────────┘")
-        try:
-            if click.confirm('\n   Open checkout in browser?', default=True):
-                import webbrowser
-                webbrowser.open(checkout_url)
-                
-                # Track Stripe checkout opened
-                try:
-                    from core.telemetry import TelemetryClient
-                    telemetry = TelemetryClient()
-                    telemetry.log_usage("stripe_checkout_opened", {
-                        "tier": api.tier["name"],
-                        "stripe_session_id": stripe_session_id,
-                        "upgrade_url": checkout_url,
-                        "price_point": "49.99",
-                        "product": "research_plus"
-                    })
-                except Exception:
-                    pass  # Telemetry is best-effort
-                print(f"\n   OK: Opened in browser. After payment, run:")
-                print(f"      terradev upgrade --activate --email YOUR_EMAIL")
-        except click.Abort:
-            pass
-        return
+    # ── Tier gates removed - unlimited concurrent instances (open source) ──
+    # All Stripe checkout and paywall code removed
 
     # ── Step 1: Fetch quotes from ALL providers in parallel ──
     print(f"Provisioning {count}x {gpu_type} (parallel={parallel})")
@@ -2507,15 +2050,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
         print(f"Model: {model_name or 'Not specified'}")
         print(f"Type: Inference workload")
 
-    # Soft nudge when approaching limit
-    limit = api.tier['provisions_per_month']
-    if limit != 'unlimited':
-        used = api.usage.get('provisions_this_month', 0)
-        remaining = limit - used
-        if remaining <= 3 and remaining > 0:
-            checkout_url = api.get_stripe_checkout_url('research_plus')
-            print(f"\nWarning  {remaining} provision(s) remaining this month ({used}/{limit})")
-            print(f"   Upgrade to Research+ for 80/mo → {checkout_url}")
+    # Soft nudge for approaching limit removed - unlimited provisions (open source)
 
 @cli.command()
 @click.option('--instance-id', '-i', required=True, help='Instance ID')
@@ -2565,45 +2100,7 @@ def manage(instance_id, action):
                 end_provision(instance_id)
             except Exception:
                 pass
-            # Enterprise+ GPU-hour metering — report final usage to Stripe
-            try:
-                if api.tier.get('name') == 'Enterprise+':
-                    from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS, ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS
-                    sm = StripeManager()
-                    metering = sm._load_metering()
-                    sub_item_id = metering.get('subscription_item_id')
-                    if sub_item_id and instance:
-                        created = instance.get('created_at', '')
-                        gpu_count = instance.get('gpu_count', 1)
-                        # 32-GPU floor: bill at least 32 GPUs per instance
-                        billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
-                        if created:
-                            from datetime import datetime as _dt
-                            try:
-                                # Bill from last sync (or creation) to now
-                                start = _dt.fromisoformat(created)
-                                last_sync = metering.get('last_sync_ts', '')
-                                if last_sync:
-                                    try:
-                                        start = max(start, _dt.fromisoformat(last_sync))
-                                    except Exception:
-                                        pass
-                                hours = max((_dt.now() - start).total_seconds() / 3600, 0.01)
-                                billable_gpu_hours = hours * billable_gpus
-                                sm.report_gpu_hours(
-                                    sub_item_id, billable_gpu_hours,
-                                    gpu_type=instance.get('gpu_type', ''),
-                                    instance_id=instance_id,
-                                )
-                                rate = ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100
-                                cost = round(billable_gpu_hours * rate, 2)
-                                print(f"   Enterprise+ metered: {billable_gpu_hours:.1f} GPU-hrs @ ${rate}/hr = ${cost:.2f}")
-                                if gpu_count < ENTERPRISE_PLUS_MIN_GPUS:
-                                    print(f"   (32-GPU minimum applied: {gpu_count} → {billable_gpus} GPUs)")
-                            except Exception:
-                                pass
-            except Exception:
-                pass
+            # Enterprise+ GPU-hour metering removed - no tier system (open source)
             # Prometheus: push terminate metrics
             try:
                 from integrations.prometheus_integration import (
@@ -2656,11 +2153,9 @@ def status(format, live):
     print("Terradev Status")
     print("=" * 50)
 
-    # Tier info
-    prov_limit = api.tier.get('provisions_per_month', 10)
-    seats = api.tier.get('user_seats', 1)
-    print(f"Tier: {api.tier['name']}  |  Provisions: {prov_limit}/mo  |  Max instances: {api.tier['max_instances']}  |  Seats: {seats}")
-    print(f"Providers: {', '.join(api.tier['providers'])}")
+    # Tier info removed - open source unlimited access
+    print(f"Mode: Open Source (Free)  |  Provisions: Unlimited  |  Max instances: Unlimited  |  Seats: Unlimited")
+    print(f"Providers: All cloud providers supported")
 
     # Cost DB summary
     try:
@@ -2673,7 +2168,7 @@ def status(format, live):
         if summary['egress_cost'] > 0:
             print(f"   Egress cost: ${summary['egress_cost']:.2f}")
     except Exception:
-        print(f"\nProvisions this month: {api.usage.get('provisions_this_month', 0)}/{api.tier['provisions_per_month']}")
+        print(f"\nProvisions this month: {api.usage.get('provisions_this_month', 0)} (unlimited)")
 
     # Instances
     instances = api.usage.get("instances_created", [])
@@ -3125,41 +2620,7 @@ def cleanup():
     if old_instances:
         print(f"Found {len(old_instances)} old instances")
 
-        # Enterprise+ metering: report final GPU-hours for cleaned-up instances
-        if api.tier.get('name') == 'Enterprise+':
-            try:
-                from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS, ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS
-                sm = StripeManager()
-                metering = sm._load_metering()
-                sub_item_id = metering.get('subscription_item_id')
-                if sub_item_id:
-                    now = datetime.now()
-                    last_sync = metering.get('last_sync_ts', '')
-                    total_billable = 0.0
-                    for inst in old_instances:
-                        created = inst.get('created_at', '')
-                        gpu_count = inst.get('gpu_count', 1)
-                        billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
-                        if created:
-                            try:
-                                start = datetime.fromisoformat(created)
-                                if last_sync:
-                                    try:
-                                        start = max(start, datetime.fromisoformat(last_sync))
-                                    except Exception:
-                                        pass
-                                hours = max((now - start).total_seconds() / 3600, 0)
-                                total_billable += hours * billable_gpus
-                            except Exception:
-                                pass
-                    if total_billable > 0.01:
-                        sm.report_gpu_hours(sub_item_id, total_billable, gpu_type='mixed', instance_id='cleanup')
-                        rate = ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100
-                        print(f"   Enterprise+ metered: {total_billable:.1f} GPU-hrs @ ${rate}/hr = ${round(total_billable * rate, 2):.2f}")
-                        metering['last_sync_ts'] = now.isoformat()
-                        sm._save_metering(metering)
-            except Exception:
-                pass
+        # Enterprise+ metering removed - no tier system (open source)
 
         for inst in old_instances:
             print(f"   Removing {inst['id']} ({inst['provider']})")
@@ -3523,79 +2984,9 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
                 return  # Blocked by server-side paywall
         except ImportError:
             pass  # Fallback to local check
-        
-        limit = api.tier['provisions_per_month']
-        used = api.usage.get('provisions_this_month', 0)
-        checkout_url = api.get_stripe_checkout_url('research_plus')
-        print(f"Monthly provision limit reached ({used}/{limit} for {api.tier['name']} tier)")
-        print(f"")
-        print(f"   ┌─────────────────────────────────────────────────────┐")
-        print(f"   │  Upgrade to Research+ — $49.99/mo               │")
-        print(f"   │     80 provisions/month · 8 servers · inference     │")
-        print(f"   │                                                     │")
-        print(f"   │  {checkout_url}  │")
-        
-        # Track Stripe checkout initiation
-        stripe_session_id = None
-        try:
-            # Extract session ID from checkout URL for tracking
-            import re
-            session_match = re.search(r"/cs_([a-zA-Z0-9]+)", checkout_url)
-            if session_match:
-                stripe_session_id = session_match.group(1)
-                
-            # Log Stripe checkout initiation
-            from core.telemetry import TelemetryClient
-            telemetry = TelemetryClient()
-            telemetry.log_usage("stripe_checkout_initiated", {
-                "tier": api.tier["name"],
-                "limit": limit,
-                "used": used,
-                "upgrade_url": checkout_url,
-                "stripe_session_id": stripe_session_id,
-                "reason": "monthly_provision_limit",
-                "price_point": "49.99",
-                "product": "research_plus"
-            })
-        except Exception:
-            pass  # Telemetry is best-effort        
-        # Log paywall hit to telemetry for visibility
-        try:
-            from core.telemetry import TelemetryClient
-            telemetry = TelemetryClient()
-            telemetry.log_usage("paywall_hit", {
-                "tier": api.tier["name"],
-                "limit": limit,
-                "used": used,
-                "upgrade_url": checkout_url,
-                "reason": "monthly_provision_limit"
-            })
-        except Exception:
-            pass  # Telemetry is best-effort
-        print(f"   └─────────────────────────────────────────────────────┘")
-        try:
-            if click.confirm('\n   Open checkout in browser?', default=True):
-                import webbrowser
-                webbrowser.open(checkout_url)
-                
-                # Track Stripe checkout opened
-                try:
-                    from core.telemetry import TelemetryClient
-                    telemetry = TelemetryClient()
-                    telemetry.log_usage("stripe_checkout_opened", {
-                        "tier": api.tier["name"],
-                        "stripe_session_id": stripe_session_id,
-                        "upgrade_url": checkout_url,
-                        "price_point": "49.99",
-                        "product": "research_plus"
-                    })
-                except Exception:
-                    pass  # Telemetry is best-effort
-                print(f"\n   Opened in browser. After payment, run:")
-                print(f"      terradev upgrade --activate --email YOUR_EMAIL")
-        except click.Abort:
-            pass
-        return
+
+        # Monthly provision limit check removed - unlimited provisions (open source)
+        # All Stripe checkout and paywall code removed
 
     print(f"Deploying terradev run")
     print(f"   GPU:     {gpu}")
@@ -3806,34 +3197,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
                     end_provision(instance_id)
                 except Exception:
                     pass
-                # Enterprise+ GPU-hour metering — report usage to Stripe
-                try:
-                    if api.tier.get('name') == 'Enterprise+':
-                        from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS, ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS
-                        sm = StripeManager()
-                        metering_data = sm._load_metering()
-                        sub_item_id = metering_data.get('subscription_item_id')
-                        if sub_item_id:
-                            try:
-                                gpu_count = int(os.environ.get('TERRADEV_GPU_COUNT', '1'))
-                                # 32-GPU floor per instance
-                                billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
-                                hours = max(total_time / 3600000, 0.01)  # total_time is in ms
-                                billable_gpu_hours = hours * billable_gpus
-                                sm.report_gpu_hours(
-                                    sub_item_id, billable_gpu_hours,
-                                    gpu_type=gpu,
-                                    instance_id=instance_id,
-                                )
-                                rate = ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100
-                                cost = round(billable_gpu_hours * rate, 2)
-                                print(f"   Enterprise+ metered: {billable_gpu_hours:.1f} GPU-hrs @ ${rate}/hr = ${cost:.2f}")
-                                if gpu_count < ENTERPRISE_PLUS_MIN_GPUS:
-                                    print(f"   (32-GPU minimum applied: {gpu_count} → {billable_gpus} GPUs)")
-                            except Exception:
-                                pass
-                except Exception:
-                    pass
+                # Enterprise+ GPU-hour metering removed - no tier system (open source)
                 print(f"   ✅ Terminated")
             except Exception as e:
                 print(f"   Warning  Auto-terminate failed: {e}")
@@ -3864,8 +3228,6 @@ def infer_status(check):
         from core.inference_router import InferenceRouter
     except ImportError:
         print("❌ Inference router module not available.")
-        print("   This may require Research+ or Enterprise tier.")
-        print("   Run: terradev upgrade")
         sys.exit(1)
 
     router = InferenceRouter()
@@ -3919,15 +3281,12 @@ def infer_failover(dry_run):
     unhealthy and has a backup configured, traffic automatically shifts
     to the backup provider.
 
-    Enterprise tier feature — requires Research+ or Enterprise.
+    Open source feature - available to all users.
     """
     api = TerradevAPI()
-    tier_features = api.tier.get('features', [])
-    if 'all' not in tier_features and 'inference' not in tier_features:
-        print(f"❌ Inference failover requires Research+ or Enterprise tier.")
-        print(f"   Current tier: {api.tier['name']}")
-        print(f"   Run: terradev upgrade")
-        sys.exit(1)
+    # Tier check removed - inference available to all users (open source)
+    # tier_features = api.tier.get('features', [])
+    # if 'all' not in tier_features and 'inference' not in tier_features: ... REMOVED
 
     try:
         from core.inference_router import InferenceRouter
@@ -3992,17 +3351,12 @@ def infer_route(model, strategy, measure):
     Set WPT_API_KEY env var to enable WebPageTest integration.
     """
     api = TerradevAPI()
-    tier_features = api.tier.get('features', [])
-    if 'all' not in tier_features and 'inference' not in tier_features:
-        print(f"❌ Inference routing requires Research+ or Enterprise tier.")
-        print(f"   Run: terradev upgrade")
-        sys.exit(1)
+    # Tier check removed - inference available to all users (open source)
 
     try:
         from core.inference_router import InferenceRouter
     except ImportError:
         print("❌ Inference router module not available.")
-        print("   Run: terradev upgrade")
         sys.exit(1)
 
     router = InferenceRouter()

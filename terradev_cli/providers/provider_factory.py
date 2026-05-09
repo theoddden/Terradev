@@ -48,6 +48,7 @@ _PROVIDER_LOADERS = {
     "hetzner":      _lazy_import(".hetzner_provider.HetznerProvider"),
     "siliconflow":  _lazy_import(".siliconflow_provider.SiliconFlowProvider"),
     "inferx":       _lazy_import(".inferx_provider.InferXProvider"),
+    "latitude":     _lazy_import(".latitude_provider.LatitudeProvider"),
     "demo":         _lazy_import(".demo_mode.DemoModeProvider"),
 }
 

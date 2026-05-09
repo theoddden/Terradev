@@ -1,4 +1,4 @@
-# Terradev CLI v4.0.11
+# Terradev CLI v4.0.12
 
 **Cross-Cloud Compute Optimization Platform with Migration & Evaluation**
 
@@ -6,7 +6,39 @@
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
 
-## What's New in v4.0.11
+## What's New in v4.0.12
+
+**🚀 Latitude.sh Integration: Bare Metal & Virtual Machine GPU Support**
+
+### 🌟 New Latitude.sh Provider
+- **Dual Instance Support**: Both bare metal servers AND virtual machines with GPU
+- **Premium GPU Access**: NVIDIA H100, A100, RTX 4090, RTX PRO 6000 Blackwell
+- **Bare Metal Performance**: Full dedicated hardware with IPMI management
+- **VM Flexibility**: GPU-enabled virtual machines with dedicated GPU resources
+- **JSON:API Compliant**: Full API specification compliance with rate limiting
+- **SSH Access**: Direct SSH for bare metal, container SSH for VMs
+- **Real-time Pricing**: Live quotes with stock levels and instant deployment
+
+### 🔧 Easy Configuration
+```bash
+# Set your Latitude.sh API key
+export LATITUDE_API_KEY="your_api_key_here"
+
+# Get GPU instance quotes
+terradev get-quotes --provider latitude --gpu H100
+
+# Provision bare metal H100 server
+terradev provision --provider latitude --type "latitude-bare-metal-g3-h100-medium-43" --region Brazil
+
+# Provision virtual machine with GPU
+terradev provision --provider latitude --type "latitude-vm-gpu-h100-80" --region us-east
+```
+
+### 📊 Instance Differentiation
+- **Bare Metal**: `isolation: bare_metal`, `ssh_access: true`, `ipmi_access: true`
+- **Virtual Machines**: `isolation: virtual_machine`, `dedicated_gpu: true`, `virtualization: kvm`
+
+### 🎯 What's New in v4.0.11
 
 **🎯 Production-Grade Automation: Triggers, Environments & Lineage**
 
@@ -16,7 +48,7 @@ The three critical missing pillars that transform Terradev from a CLI tool into 
 - **Zero-touch automation**: Dataset lands → auto-train, Model drifts → auto-retrain  
 - **Schedule-based**: Cron jobs for weekly evaluations and maintenance
 - **Condition-based**: Drift scores, performance thresholds, cost limits
-- **19-Provider Support**: Works across all cloud providers
+- **20-Provider Support**: Works across all cloud providers
 - **Manual override**: Full control when needed
 
 ### 🏗️ Environment Promotion (`terradev environments`) 

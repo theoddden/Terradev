@@ -2,7 +2,7 @@
 
 ## What is Terradev?
 
-Terradev is a command line tool that finds the cheapest GPU across 19 cloud providers and provisions it for you in one command. It queries prices in real time, runs those queries in parallel, and picks the lowest cost option automatically. You keep your own API keys on your own machine. Terradev never proxies, stores, or transmits your credentials through a third party.
+Terradev is a command line tool that finds the cheapest GPU across 19 cloud providers and provisions it for you in one command. Abstracting the infra in telligently, and generating savings. It queries prices in real time, runs those queries in parallel, and picks the lowest cost option automatically. You keep your own API keys on your own machine. Terradev never proxies, stores, or transmits your credentials through a third party.
 
 The problem it solves is straightforward. GPU prices for the same hardware vary by 3x or more across providers. Checking each dashboard manually takes time, and you almost always overpay. Terradev eliminates that.
 
