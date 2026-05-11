@@ -33,6 +33,15 @@ jobs:
         terradev --version
         terradev --help
 
+    - name: Check for legacy duplicate files
+      run: |
+        # Fail if any *_old.py, *_backup.py, *_fixed.py, *_simple.py, *_final.py, *_clean.py, *_tiered.py files exist
+        if find terradev_cli -type f -name "*_old.py" -o -name "*_backup.py" -o -name "*_fixed.py" -o -name "*_simple.py" -o -name "*_final.py" -o -name "*_clean.py" -o -name "*_tiered.py" | grep -q .; then
+          echo "ERROR: Legacy duplicate files found. These should be deleted and not committed."
+          find terradev_cli -type f \( -name "*_old.py" -o -name "*_backup.py" -o -name "*_fixed.py" -o -name "*_simple.py" -o -name "*_final.py" -o -name "*_clean.py" -o -name "*_tiered.py" \)
+          exit 1
+        fi
+
     - name: Run test suite
       run: pytest tests/ -v --tb=short
 

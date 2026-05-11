@@ -18,11 +18,8 @@ import time
 import sys
 import logging
 
-# Ensure sibling packages (core/, providers/, ml_services/, etc.) are importable
-# regardless of whether we were installed via repo-root pyproject.toml or terradev_cli/setup.py
-_cli_dir = os.path.dirname(os.path.abspath(__file__))
-if _cli_dir not in sys.path:
-    sys.path.insert(0, _cli_dir)
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Import telemetry - MANDATORY FOR USAGE TRACKING
 try:
@@ -1699,19 +1696,33 @@ def setup(provider, quick):
 @click.option('--on-demand', is_flag=True, help='Use on-demand instances (guaranteed, higher cost)')
 @click.option('--spot-strategy', type=click.Choice(['aggressive', 'balanced', 'conservative']), 
               default='balanced', help='Spot instance strategy')
-def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, model_name, endpoint_name, min_workers, max_workers, spot, on_demand, spot_strategy):
+@click.option('--backend', type=click.Choice(['vllm', 'sglang', 'dynamo', 'tensorrt_llm', 'llmd']),
+              default='vllm', help='Inference backend (vllm, sglang, dynamo, tensorrt_llm, llmd)')
+def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, model_name, endpoint_name, min_workers, max_workers, spot, on_demand, spot_strategy, backend):
     """Provision GPU instances across multiple clouds in parallel.
-    
+
     Real multi-cloud arbitrage: queries all providers, builds a cost-optimized
     allocation plan spread across clouds, then deploys simultaneously.
-    
+
     Spot vs On-Demand:
     - Spot: 60-80% savings but 2-minute termination notice
     - On-demand: Guaranteed availability, higher cost
     - Default: Auto-selects based on workload type and cost sensitivity
+
+    Backend Options:
+    - vllm: High-throughput inference engine (default)
+    - sglang: Workload-specific optimizations
+    - dynamo: NVIDIA Dynamo orchestration layer
+    - tensorrt_llm: NVIDIA TensorRT-LLM engine
+    - llmd: llm-d (KServe + Gateway API) for Kubernetes-native disaggregated serving
     """
     api = TerradevAPI()
     provision_start = time.time()
+
+    if backend:
+        print(f"Inference backend: {backend}")
+        if backend == 'llmd':
+            print("Note: llmd backend requires Kubernetes cluster with KServe + Gateway API")
 
     if type:
         print(f"Workload type: {type}")
@@ -7981,168 +7992,6 @@ def lora_remove_cmd(endpoint, name, api_key):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Datadog FinOps Integration
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@cli.group()
-def datadog():
-    """Datadog FinOps monitoring — metrics, monitors, dashboards."""
-    pass
-
-
-@datadog.command('configure')
-@click.option('--api-key', prompt='Datadog API Key', hide_input=True)
-@click.option('--app-key', prompt='Datadog App Key', hide_input=True)
-@click.option('--site', default='datadoghq.com')
-def datadog_configure(api_key, app_key, site):
-    """Configure Datadog credentials."""
-    from integrations.datadog_integration import save_credentials
-    save_credentials(api_key, app_key, site)
-    print(f"✅ Datadog credentials saved (site: {site})")
-
-
-@datadog.command('status')
-def datadog_status():
-    """Show Datadog integration status."""
-    from integrations.datadog_integration import (
-        load_credentials, validate_credentials)
-    creds = load_credentials()
-    if not creds:
-        print("❌ Not configured. Run: terradev datadog configure")
-        return
-    print(f"Site:    {creds.get('site', 'datadoghq.com')}")
-    print(f"API Key: ***{creds['api_key'][-4:]}")
-    print(f"App Key: ***{creds['app_key'][-4:]}")
-    ok, msg = validate_credentials(creds)
-    print(f"{'✅' if ok else '❌'} {msg}")
-
-
-@datadog.command('submit-metric')
-@click.option('--metric', '-m', required=True)
-@click.option('--value', '-v', required=True, type=float)
-@click.option('--tags', '-t', multiple=True)
-def datadog_submit_metric(metric, value, tags):
-    """Submit a custom metric to Datadog."""
-    from integrations.datadog_integration import (
-        load_credentials, submit_metric)
-    creds = load_credentials()
-    if not creds:
-        print("❌ Not configured"); return
-    r = submit_metric(creds, metric, value, list(tags))
-    if r.get('status') == 'ok':
-        print(f"✅ terradev.{metric} = {value}")
-    else:
-        print(f"❌ {r.get('error')}")
-
-
-@datadog.command('create-monitor')
-@click.option('--template', '-t', required=True,
-              type=click.Choice(['budget_alert', 'cost_spike', 'idle_gpu',
-                                 'spot_volatility', 'provider_degraded',
-                                 'egress_anomaly']))
-@click.option('--notify', default='@slack-terradev-alerts')
-def datadog_create_monitor(template, notify):
-    """Create a monitor from a FinOps template."""
-    from integrations.datadog_integration import (
-        load_credentials, create_monitor)
-    creds = load_credentials()
-    if not creds:
-        print("❌ Not configured"); return
-    r = create_monitor(creds, template, notify)
-    if r.get('id'):
-        print(f"✅ Monitor '{template}' created (id: {r['id']})")
-    else:
-        print(f"❌ {r.get('error')}")
-
-
-@datadog.command('list-monitors')
-def datadog_list_monitors():
-    """List Terradev monitors in Datadog."""
-    from integrations.datadog_integration import (
-        load_credentials, list_monitors)
-    creds = load_credentials()
-    if not creds:
-        print("❌ Not configured"); return
-    monitors = list_monitors(creds)
-    if not monitors:
-        print("No Terradev monitors found."); return
-    print(f"{'ID':<12} {'Name':<42} {'Status'}")
-    print("─" * 66)
-    for m in monitors:
-        mid = m['id']
-        name = m['name'][:40]
-        state = m.get('overall_state', '?')
-        print(f"{mid:<12} {name:<42} {state}")
-
-
-@datadog.command('delete-monitor')
-@click.option('--monitor-id', '-i', required=True, type=int)
-@click.confirmation_option(prompt='Delete this monitor?')
-def datadog_delete_monitor(monitor_id):
-    """Delete a Datadog monitor by ID."""
-    from integrations.datadog_integration import (
-        load_credentials, delete_monitor)
-    creds = load_credentials()
-    if not creds:
-        print("❌ Not configured"); return
-    r = delete_monitor(creds, monitor_id)
-    if r.get('deleted'):
-        print(f"✅ Monitor {monitor_id} deleted")
-    else:
-        print(f"❌ {r.get('error')}")
-
-
-@datadog.command('create-dashboard')
-@click.option('--title', default='Terradev GPU FinOps')
-def datadog_create_dashboard(title):
-    """Create the GPU FinOps dashboard."""
-    from integrations.datadog_integration import (
-        load_credentials, create_dashboard)
-    creds = load_credentials()
-    if not creds:
-        print("❌ Not configured"); return
-    r = create_dashboard(creds, title)
-    if r.get('id'):
-        print(f"✅ Dashboard: {r.get('url', r['id'])}")
-    else:
-        print(f"❌ {r.get('error')}")
-
-
-@datadog.command('push-costs')
-def datadog_push_costs():
-    """Push cost snapshot from cost tracker to Datadog."""
-    from integrations.datadog_integration import (
-        load_credentials, push_cost_snapshot)
-    creds = load_credentials()
-    if not creds:
-        print("❌ Not configured"); return
-    r = push_cost_snapshot(creds)
-    if r.get('status') == 'ok':
-        n = r.get('metrics_pushed', 0)
-        print(f"✅ {n} cost metrics pushed to Datadog")
-    else:
-        print(f"❌ {r.get('error')}")
-
-
-@datadog.command('export-tf')
-def datadog_export_tf():
-    """Export Terraform module config for Datadog."""
-    from integrations.datadog_integration import (
-        load_credentials, export_terraform_vars)
-    creds = load_credentials()
-    if not creds:
-        print("❌ Not configured"); return
-    tf = export_terraform_vars(creds)
-    print("# Add to your terraform.tfvars:\n")
-    for k, v in tf.items():
-        if isinstance(v, str):
-            print(f'{k} = "{v}"')
-        else:
-            print(f"{k} = {v}")
-    print(f"\n# Then: terraform apply -parallelism=20")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # Phoenix — LLM Trace Observability (Arize Phoenix, ELv2)
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -9338,152 +9187,6 @@ def langfuse_k8s(namespace):
     api = TerradevAPI()
     svc = create_langfuse_service_from_credentials(api._provider_creds('langfuse'))
     print(svc.generate_k8s_deployment(namespace=namespace))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Helicone — LLM Gateway & Observability
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@cli.group()
-def helicone():
-    """Helicone LLM gateway — request logs, costs, caching, rate limiting."""
-    pass
-
-
-@helicone.command('configure')
-@click.option('--api-key', prompt='Helicone API Key', hide_input=True)
-@click.option('--eu', is_flag=True, default=False, help='Use EU region')
-def helicone_configure(api_key, eu):
-    """Configure Helicone credentials."""
-    api = TerradevAPI()
-    api._save_provider_creds('helicone', {
-        'helicone_api_key': api_key,
-        'helicone_eu': str(eu).lower(),
-    })
-    region = "EU" if eu else "US"
-    print(f"\u2705 Helicone credentials saved (region: {region})")
-
-
-@helicone.command('test')
-def helicone_test():
-    """Test Helicone connectivity."""
-    from integrations.helicone_integration import test_connection
-    api = TerradevAPI()
-    creds = api._provider_creds('helicone')
-    result = asyncio.run(test_connection(creds))
-    if result["status"] == "connected":
-        print(f"\u2705 Connected to Helicone")
-        print(f"\U0001f310 API:     {result.get('api_url')}")
-        print(f"\U0001f310 Gateway: {result.get('gateway_url')}")
-        print(f"\U0001f30d Region:  {result.get('region')}")
-    else:
-        print(f"\u274c Connection failed: {result.get('error')}")
-
-
-@helicone.command('requests')
-@click.option('--model', default=None, help='Filter by model name')
-@click.option('--limit', '-n', default=20, type=int)
-@click.option('--user-id', default=None, help='Filter by user ID')
-@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
-def helicone_requests(model, limit, user_id, fmt):
-    """Query request logs."""
-    from integrations.helicone_integration import query_requests
-    api = TerradevAPI()
-    creds = api._provider_creds('helicone')
-    result = asyncio.run(query_requests(creds, limit=limit, model=model, user_id=user_id))
-
-    if fmt == 'json':
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if not result.get("success"):
-            print(f"\u274c {result.get('error')}")
-            return
-        data = result.get("data", [])
-        if isinstance(data, dict):
-            data = data.get("data", [])
-        if not data:
-            print("  No requests found.")
-            return
-        print(f"\n  {'Model':<24} {'Status':<8} {'Tokens':<10} {'Cost':<10} {'Latency'}")
-        print(f"  {'─'*22}  {'─'*6}  {'─'*8}  {'─'*8}  {'─'*8}")
-        for req in data[:limit]:
-            m = (req.get("model") or req.get("request_model") or "?")[:22]
-            status = req.get("status") or req.get("response_status") or "?"
-            tokens = req.get("total_tokens") or "?"
-            cost = req.get("cost_usd") or req.get("response_cost") or "?"
-            latency = req.get("latency") or req.get("delay_ms") or "?"
-            print(f"  {m:<24} {status:<8} {tokens:<10} {cost:<10} {latency}")
-        print()
-
-
-@helicone.command('costs')
-@click.option('--hours', default=24, type=int, help='Look-back period in hours')
-@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
-def helicone_costs(hours, fmt):
-    """Aggregate LLM costs from Helicone logs."""
-    from integrations.helicone_integration import get_cost_summary
-    api = TerradevAPI()
-    creds = api._provider_creds('helicone')
-    result = asyncio.run(get_cost_summary(creds, hours=hours))
-
-    if fmt == 'json':
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if not result.get("success"):
-            print(f"\u274c {result.get('error')}")
-            return
-        print(f"\n  Helicone Cost Summary (last {hours}h):")
-        print(f"  Total Cost:     ${result.get('total_cost_usd', 0):.4f}")
-        print(f"  Total Tokens:   {result.get('total_tokens', 0):,}")
-        print(f"  Total Requests: {result.get('total_requests', 0):,}")
-        by_model = result.get("by_model", {})
-        if by_model:
-            print(f"\n  {'Model':<30} {'Cost':<12} {'Tokens':<12} {'Reqs'}")
-            print(f"  {'─'*28}  {'─'*10}  {'─'*10}  {'─'*6}")
-            for m, v in by_model.items():
-                print(f"  {m[:28]:<30} ${v['cost']:<11.4f} {v['tokens']:<12,} {v['requests']}")
-        print()
-
-
-@helicone.command('gateway-config')
-@click.option('--provider-url', default='https://api.openai.com',
-              help='Target LLM provider URL')
-@click.option('--cache', is_flag=True, default=False, help='Enable response caching')
-@click.option('--retry', is_flag=True, default=False, help='Enable auto-retry')
-@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
-def helicone_gateway_config(provider_url, cache, retry, fmt):
-    """Generate gateway configuration for routing LLM requests through Helicone."""
-    from integrations.helicone_integration import generate_gateway_config
-    api = TerradevAPI()
-    creds = api._provider_creds('helicone')
-    config = generate_gateway_config(
-        creds, provider_base_url=provider_url,
-        cache_enabled=cache, retry_enabled=retry)
-
-    if fmt == 'json':
-        print(json.dumps(config, indent=2))
-    else:
-        print(f"\n  Helicone Gateway Config:")
-        print(f"  Base URL: {config['base_url']}")
-        print(f"  Target:   {config['original_provider']}")
-        print(f"  Cache:    {config['features']['cache']}")
-        print(f"  Retry:    {config['features']['retry']}")
-        print(f"\n  Headers:")
-        for k, v in config['headers'].items():
-            display_v = v[:40] + "..." if len(v) > 40 else v
-            print(f"    {k}: {display_v}")
-        print()
-
-
-@helicone.command('snippet')
-@click.option('--provider', '-p', default='openai',
-              type=click.Choice(['openai', 'vllm']), help='Provider type')
-def helicone_snippet(provider):
-    """Generate a Python code snippet for using Helicone gateway."""
-    from integrations.helicone_integration import generate_gateway_snippet
-    api = TerradevAPI()
-    creds = api._provider_creds('helicone')
-    print(generate_gateway_snippet(creds, provider=provider))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -11483,11 +11186,42 @@ cli.add_command(environments)
 cli.add_command(lineage)
 
 # Register Karpenter and HF Spaces command groups
-from cli_karpenter import register_karpenter_commands
+from terradev_cli.cli_karpenter import register_karpenter_commands
 register_karpenter_commands(cli, TerradevAPI)
 
-from cli_hf_spaces import register_hf_spaces_commands
+from terradev_cli.cli_hf_spaces import register_hf_spaces_commands
 register_hf_spaces_commands(cli, TerradevAPI)
+
+# MCP Server Command
+@cli.command('mcp')
+@click.argument('action', type=click.Choice(['serve', 'install', 'list-tools']))
+@click.option('--client', type=click.Choice(['claude-desktop', 'cursor', 'windsurf', 'continue', 'cline']), help='Client to install MCP config for')
+@click.option('--transport', type=click.Choice(['stdio', 'sse', 'http']), default='stdio', help='MCP transport protocol')
+def mcp(action, client, transport):
+    """Run Terradev as an MCP server for agent integration.
+
+    Makes Terradev callable from AI agents (Claude Desktop, Cursor, Windsurf, Continue, Cline).
+
+    Actions:
+      serve: Start MCP server (default: stdio transport)
+      install: Install MCP config for a specific client
+      list-tools: List all available MCP tools
+    """
+    try:
+        from terradev_cli.mcp import run_server, install_config, list_tools
+    except ImportError:
+        click.echo("Error: MCP module not found. Install with: pip install mcp", err=True)
+        return 1
+
+    if action == 'serve':
+        run_server(transport=transport)
+    elif action == 'install':
+        if not client:
+            click.echo("Error: --client is required for install action", err=True)
+            return 1
+        install_config(client)
+    elif action == 'list-tools':
+        list_tools()
 
 
 if __name__ == '__main__':

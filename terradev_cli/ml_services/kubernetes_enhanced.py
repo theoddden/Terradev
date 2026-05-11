@@ -28,6 +28,10 @@ class KubernetesConfig:
     prometheus_enabled: bool = False
     grafana_enabled: bool = False
     dashboard_port: int = 3000
+    # DRA (Dynamic Resource Allocation) - K8s 1.32+ GA
+    dra_enabled: bool = False
+    dra_driver_name: str = "nvidia.com/gpu"
+    device_plugin_enabled: bool = True  # Fallback to device plugin if DRA not available
 
 
 class EnhancedKubernetesService:
@@ -293,6 +297,7 @@ dashboardProviders:
             async with self.session.post(f"{grafana_url}/api/dashboards/db", json=dashboard_config) as response:
                 if response.status == 200:
                     return {
+
                         "status": "imported",
                         "dashboard_id": "karpenter-overview"
                     }
@@ -827,6 +832,158 @@ dashboardProviders:
             config["GRAFANA_PASSWORD"] = "prom-operator"
         
         return config
+
+    # ---------------------------------------------------------------------------
+    # DRA (Dynamic Resource Allocation) - K8s 1.32+ GA
+    # ---------------------------------------------------------------------------
+
+    async def install_dra_driver(self) -> Dict[str, Any]:
+        """Install NVIDIA DRA driver for K8s 1.32+.
+
+        DRA replaces device-plugin for GPU allocation.
+        Falls back to device plugin if DRA not supported.
+        """
+        if not self.config.dra_enabled:
+            return {
+                "status": "skipped",
+                "message": "DRA not enabled in configuration, using device plugin fallback"
+            }
+
+        try:
+            env = os.environ.copy()
+            if self.config.kubeconfig_path:
+                env["KUBECONFIG"] = self.config.kubeconfig_path
+
+            # Create ResourceClass for GPU
+            resource_class = f"""apiVersion: resource.k8s.io/v1beta1
+kind: ResourceClass
+metadata:
+  name: {self.config.dra_driver_name}
+driverName: {self.config.dra_driver_name}
+parameters:
+  - name: "count"
+    value: "1"
+  - name: "type"
+    value: "gpu"
+suitableNodeCount: 1
+"""
+
+            # Apply ResourceClass
+            result = subprocess.run(
+                ["kubectl", "apply", "-f", "-"],
+                input=resource_class,
+                text=True,
+                timeout=30,
+                env=env,
+            )
+
+            if result.returncode != 0:
+                raise Exception(f"Failed to apply ResourceClass: {result.stderr}")
+
+            return {
+                "status": "installed",
+                "driver": self.config.dra_driver_name,
+                "message": "DRA ResourceClass installed successfully"
+            }
+
+        except Exception as e:
+            logger.warning(f"DRA installation failed, falling back to device plugin: {e}")
+            # Fall back to device plugin
+            return await self.install_device_plugin()
+
+    async def install_device_plugin(self) -> Dict[str, Any]:
+        """Install NVIDIA device plugin (fallback for pre-DRA K8s)."""
+        if not self.config.device_plugin_enabled:
+            return {
+                "status": "skipped",
+                "message": "Device plugin not enabled"
+            }
+
+        try:
+            env = os.environ.copy()
+            if self.config.kubeconfig_path:
+                env["KUBECONFIG"] = self.config.kubeconfig_path
+
+            # Install NVIDIA device plugin via Helm
+            result = subprocess.run(
+                [
+                    "helm", "repo", "add", "nvidia", "https://nvidia.github.io/gpu-operator",
+                    "--force-update"
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=env,
+            )
+
+            if result.returncode != 0:
+                raise Exception(f"Failed to add NVIDIA Helm repo: {result.stderr}")
+
+            result = subprocess.run(
+                [
+                    "helm", "install", "nvidia-device-plugin", "nvidia/gpu-device-plugin",
+                    "--namespace", "kube-system", "--create-namespace"
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env=env,
+            )
+
+            if result.returncode != 0:
+                raise Exception(f"Failed to install device plugin: {result.stderr}")
+
+            return {
+                "status": "installed",
+                "message": "NVIDIA device plugin installed (DRA fallback)"
+            }
+
+        except Exception as e:
+            return {
+                "status": "failed",
+                "error": str(e)
+            }
+
+    async def configure_dra_mig(self) -> Dict[str, Any]:
+        """Configure MIG (Multi-Instance GPU) via DRA."""
+        try:
+            env = os.environ.copy()
+            if self.config.kubeconfig_path:
+                env["KUBECONFIG"] = self.config.kubeconfig_path
+
+            # MIG ResourceClass for DRA
+            mig_resource_class = f"""apiVersion: resource.k8s.io/v1beta1
+kind: ResourceClass
+metadata:
+  name: nvidia.com/mig
+driverName: nvidia.com/mig
+parameters:
+  - name: "mig-profile"
+    value: "1g.5gb"
+suitableNodeCount: 1
+"""
+
+            result = subprocess.run(
+                ["kubectl", "apply", "-f", "-"],
+                input=mig_resource_class,
+                text=True,
+                timeout=30,
+                env=env,
+            )
+
+            if result.returncode != 0:
+                raise Exception(f"Failed to configure MIG: {result.stderr}")
+
+            return {
+                "status": "configured",
+                "message": "MIG configured via DRA"
+            }
+
+        except Exception as e:
+            return {
+                "status": "failed",
+                "error": str(e)
+            }
 
 
 def create_enhanced_kubernetes_service_from_credentials(credentials: Dict[str, str]) -> EnhancedKubernetesService:

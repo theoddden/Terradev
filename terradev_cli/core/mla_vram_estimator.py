@@ -70,6 +70,32 @@ class VRAMBreakdown:
 
 class MLA_VRAMEstimator:
     """MLA-aware VRAM estimator for accurate memory planning"""
+
+    # Quantization support by GPU type
+    QUANTIZATION_SUPPORT = {
+        "H100": ["bf16", "fp8", "awq", "gptq"],
+        "H200": ["bf16", "fp8", "awq", "gptq", "nvfp4"],
+        "B200": ["bf16", "fp8", "awq", "gptq", "nvfp4", "mx-fp4"],
+        "GB200": ["bf16", "fp8", "awq", "gptq", "nvfp4", "mx-fp4"],
+        "A100": ["bf16", "fp16", "awq", "gptq"],
+        "A100-80GB": ["bf16", "fp16", "awq", "gptq"],
+        "A100-40GB": ["bf16", "fp16", "awq", "gptq"],
+        "V100": ["fp16", "awq", "gptq"],
+        "RTX4090": ["fp16", "awq", "gptq"],
+        "RTX6000": ["fp16", "awq", "gptq"],
+        "L40S": ["fp16", "awq", "gptq"],
+    }
+
+    # VRAM savings by quantization method (relative to bf16)
+    QUANTIZATION_SAVINGS = {
+        "bf16": 1.0,       # Baseline
+        "fp16": 1.0,       # Same as bf16
+        "fp8": 0.5,        # 2x savings
+        "awq": 0.4,        # 2.5x savings
+        "gptq": 0.4,       # 2.5x savings
+        "nvfp4": 0.25,     # 4x savings
+        "mx-fp4": 0.25,    # 4x savings
+    }
     
     # Model registry with MLA architecture detection
     MODEL_REGISTRY = {
@@ -221,7 +247,7 @@ class MLA_VRAMEstimator:
         # Calculate GPU requirements
         gpu_count = max(1, int(total_gb / target_gpu_vram_gb))
         per_gpu_gb = total_gb / gpu_count
-        
+
         return VRAMBreakdown(
             model_weights_gb=model_weights_gb,
             kv_cache_gb=kv_cache_gb,
@@ -234,7 +260,94 @@ class MLA_VRAMEstimator:
             context_tokens=context_tokens,
             batch_size=batch_size,
         )
-    
+
+    def auto_select_quantization(
+        self,
+        model_id: str,
+        gpu_type: str,
+        accuracy_budget: str = "high",  # high, medium, low
+        target_vram_gb: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Auto-select quantization method based on GPU type and accuracy budget.
+
+        Maps (model_id, gpu_type, accuracy_budget) → (AWQ | GPTQ | FP8 | NVFP4 | MX-FP4 | bf16)
+
+        Hardware support:
+        - H100: bf16, fp8, AWQ, GPTQ
+        - H200/B200/GB200: bf16, fp8, AWQ, GPTQ, NVFP4, MX-FP4
+        - A100: bf16, fp16, AWQ, GPTQ
+        - V100/RTX: fp16, AWQ, GPTQ
+
+        Accuracy budget:
+        - high: bf16 only (no quantization)
+        - medium: fp8, AWQ, GPTQ (2-2.5x savings)
+        - low: NVFP4, MX-FP4 (4x savings, requires H200+)
+        """
+        # Get model architecture
+        arch = self._get_model_architecture(model_id)
+        if not arch:
+            raise ValueError(f"Unknown model: {model_id}")
+
+        # Get supported quantization methods for this GPU
+        supported_methods = self.QUANTIZATION_SUPPORT.get(gpu_type, ["bf16"])
+
+        # Select based on accuracy budget
+        if accuracy_budget == "high":
+            # High accuracy: bf16 only
+            selected = "bf16"
+        elif accuracy_budget == "medium":
+            # Medium accuracy: prefer fp8 if supported, else AWQ/GPTQ
+            if "fp8" in supported_methods:
+                selected = "fp8"
+            elif "awq" in supported_methods:
+                selected = "awq"
+            elif "gptq" in supported_methods:
+                selected = "gptq"
+            else:
+                selected = "bf16"
+        elif accuracy_budget == "low":
+            # Low accuracy: prefer NVFP4/MX-FP4 if supported, else AWQ/GPTQ
+            if "nvfp4" in supported_methods:
+                selected = "nvfp4"
+            elif "mx-fp4" in supported_methods:
+                selected = "mx-fp4"
+            elif "awq" in supported_methods:
+                selected = "awq"
+            elif "gptq" in supported_methods:
+                selected = "gptq"
+            else:
+                selected = "fp8" if "fp8" in supported_methods else "bf16"
+        else:
+            selected = "bf16"
+
+        # Check if target VRAM constraint requires more aggressive quantization
+        if target_vram_gb:
+            baseline_vram = arch.total_params_b * 2  # bf16 baseline
+            if baseline_vram > target_vram_gb:
+                # Need more aggressive quantization
+                if "nvfp4" in supported_methods and selected != "nvfp4":
+                    selected = "nvfp4"
+                elif "mx-fp4" in supported_methods and selected != "mx-fp4":
+                    selected = "mx-fp4"
+                elif "awq" in supported_methods and selected not in ("awq", "nvfp4", "mx-fp4"):
+                    selected = "awq"
+
+        # Calculate VRAM savings
+        savings_factor = self.QUANTIZATION_SAVINGS.get(selected, 1.0)
+        estimated_vram = arch.total_params_b * 2 * savings_factor
+
+        return {
+            "selected_quantization": selected,
+            "supported_methods": supported_methods,
+            "accuracy_budget": accuracy_budget,
+            "gpu_type": gpu_type,
+            "savings_factor": savings_factor,
+            "estimated_vram_gb": estimated_vram,
+            "baseline_vram_gb": arch.total_params_b * 2,
+            "vram_savings_gb": arch.total_params_b * 2 * (1 - savings_factor),
+        }
+
     def _get_model_architecture(self, model_id: str) -> Optional[ModelArchitecture]:
         """Get model architecture from registry"""
         # Direct lookup

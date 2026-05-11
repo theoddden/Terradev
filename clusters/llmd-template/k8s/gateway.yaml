@@ -1,0 +1,41 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: llmd-gateway
+  namespace: default
+spec:
+  gatewayClassName: llmd-gateway-class
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    hostname: "*.llmd.local"
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: BackendTrafficPolicy
+metadata:
+  name: llmd-traffic-policy
+  namespace: default
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: llmd-gateway
+  loadBalancer:
+    mode: LeastRequest
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: BackendTLSPolicy
+metadata:
+  name: llmd-tls-policy
+  namespace: default
+spec:
+  targetRef:
+    group: ""
+    kind: Service
+    name: llmd-model
+    namespace: default
+  tls:
+    caCertRefs:
+    - name: llmd-ca-cert
+      namespace: default

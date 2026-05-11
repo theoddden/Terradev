@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "4.0.9"
+version = "4.0.12"
 description = "NUMA-aware GPU provisioning and orchestration for stateless MoE workloads of all sizes"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -96,7 +96,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Systems Administration",
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9", 

@@ -117,6 +117,8 @@ class TrainingConfig:
     flashoptim_master_weight_bits: int = 24  # 24 (default) | 32 | 0 (=None)
     flashoptim_compress_checkpoints: bool = False
     flashoptim_gradient_release: bool = False
+    # Workload type (for auto-optimization)
+    workload_type: str = "default"  # default | reasoning | chat | batch
 
     @classmethod
     def from_yaml(cls, path: str) -> "TrainingConfig":
@@ -268,6 +270,110 @@ def _flashoptim_auto_config(
             f"# FlashOptim: replace your optimizer with {flash_class}",
             f"# from flashoptim import {flash_class}, cast_model",
         ]
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Reasoning-workload auto-detection (pure function — no side effects)
+# ---------------------------------------------------------------------------
+
+def _reasoning_auto_config(
+    config: TrainingConfig,
+    topology: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Detect reasoning-model workloads and apply appropriate optimizations.
+
+    Reasoning models (o3, R1, Claude-thinking, Qwen-QwQ, DeepSeek-R1) have:
+    - 5-50× longer decode phases
+    - Low TPS-per-stream
+    - Massive KV cache growth
+    - Bursty TTFT tolerance
+
+    Returns a dict with:
+      - "enabled": bool
+      - "reason": str
+      - "env_vars": dict (env vars to inject)
+      - "recommendations": list (suggested config changes)
+
+    Decision rules:
+      1. OFF if user explicitly set workload_type != "reasoning"
+      2. ON if user explicitly set workload_type = "reasoning"
+      3. Auto-detect from script args (e.g., "o3", "r1", "thinking", "reasoning")
+      4. ON if detected and GPUs have sufficient VRAM
+    """
+    result = {
+        "enabled": False,
+        "reason": "",
+        "env_vars": {},
+        "recommendations": [],
+    }
+
+    # Rule 1: explicit non-reasoning
+    if config.workload_type in ("default", "chat", "batch"):
+        result["reason"] = f"workload_type set to {config.workload_type} (not reasoning)"
+        return result
+
+    # Gather GPU info from topology
+    nodes = topology.get("nodes", {})
+    all_gpus = []
+    for node_info in nodes.values():
+        all_gpus.extend(node_info.get("gpus", []))
+
+    if not all_gpus:
+        result["reason"] = "skipped: no GPUs detected"
+        return result
+
+    min_vram_mb = min((g.get("memory_mb", 0) for g in all_gpus), default=0)
+
+    # Rule 2: explicit reasoning
+    if config.workload_type == "reasoning":
+        result["enabled"] = True
+        result["reason"] = "enabled by user (workload_type=reasoning)"
+    # Rule 3: auto-detect from script args or model name
+    else:
+        args_str = " ".join(config.script_args).lower()
+        reasoning_keywords = [
+            "o3", "r1", "thinking", "reasoning", "deepseek-r1", "qwen-qq",
+            "claude-thinking", "qwen-thinking", "chain-of-thought", "cot",
+        ]
+        if any(kw in args_str for kw in reasoning_keywords):
+            result["enabled"] = True
+            result["reason"] = "auto-detected reasoning model from script args"
+        else:
+            result["reason"] = "skipped: no reasoning model detected"
+            return result
+
+    # Rule 4: require sufficient VRAM (reasoning needs large KV cache)
+    if min_vram_mb < 40000 and config.workload_type != "reasoning":
+        result["enabled"] = False
+        result["reason"] = f"skipped: smallest GPU has {min_vram_mb / 1000:.0f}GB VRAM (<40GB for reasoning)"
+        return result
+
+    # Build optimization payload
+    result["env_vars"] = {
+        # Allocate ≥70% VRAM to KV cache (not default ~35%)
+        "VLLM_KV_CACHE_GPU_MEMORY_FRACTION": "0.70",
+        # Auto-apply KV cache offloading
+        "VLLM_ENABLE_PREFIX_CACHING": "1",
+        # Enable speculative decoding for long generation
+        "VLLM_SPECULATIVE_DECODING": "1",
+        "VLLM_SPECULATIVE_MAX_MODEL_LENGTH": "32768",
+        # Cap max_num_seqs (reasoning is depth-not-breadth)
+        "VLLM_MAX_NUM_SEQS": "32",
+        # Enable chunked prefill for better throughput
+        "VLLM_ENABLE_CHUNKED_PREFILL": "1",
+    }
+
+    result["recommendations"] = [
+        "Reasoning-workload profile active:",
+        "  - KV cache: 70% VRAM allocation (vs 35% default)",
+        "  - Speculative decoding: enabled (2.8× on long generation)",
+        "  - Max sequences: capped at 32 (depth over breadth)",
+        "  - Chunked prefill: enabled for better throughput",
+        "  - Consider prefill:decode ratio of 1:8 (vs 1:4 for chat)",
+    ]
 
     return result
 
