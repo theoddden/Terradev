@@ -1,4 +1,4 @@
-# Terradev CLI v4.0.12
+# Terradev CLI v4.0.13
 
 **Cross-Cloud Compute Optimization Platform with Migration & Evaluation**
 
@@ -8,9 +8,9 @@ Terradev is a cross-cloud compute-provisioning CLI that compresses + stages data
 
 ## What's New in v4.0.12
 
-**🚀 Latitude.sh Integration: Bare Metal & Virtual Machine GPU Support**
+** Latitude.sh Integration: Bare Metal & Virtual Machine GPU Support**
 
-### 🌟 New Latitude.sh Provider
+###  New Latitude.sh Provider
 - **Dual Instance Support**: Both bare metal servers AND virtual machines with GPU
 - **Premium GPU Access**: NVIDIA H100, A100, RTX 4090, RTX PRO 6000 Blackwell
 - **Bare Metal Performance**: Full dedicated hardware with IPMI management
@@ -19,7 +19,7 @@ Terradev is a cross-cloud compute-provisioning CLI that compresses + stages data
 - **SSH Access**: Direct SSH for bare metal, container SSH for VMs
 - **Real-time Pricing**: Live quotes with stock levels and instant deployment
 
-### 🔧 Easy Configuration
+###  Easy Configuration
 ```bash
 # Set your Latitude.sh API key
 export LATITUDE_API_KEY="your_api_key_here"
@@ -34,51 +34,51 @@ terradev provision --provider latitude --type "latitude-bare-metal-g3-h100-mediu
 terradev provision --provider latitude --type "latitude-vm-gpu-h100-80" --region us-east
 ```
 
-### 📊 Instance Differentiation
+###  Instance Differentiation
 - **Bare Metal**: `isolation: bare_metal`, `ssh_access: true`, `ipmi_access: true`
 - **Virtual Machines**: `isolation: virtual_machine`, `dedicated_gpu: true`, `virtualization: kvm`
 
-### 🎯 What's New in v4.0.11
+###  What's New in v4.0.11
 
-**🎯 Production-Grade Automation: Triggers, Environments & Lineage**
+** Production-Grade Automation: Triggers, Environments & Lineage**
 
 The three critical missing pillars that transform Terradev from a CLI tool into an enterprise-grade ML platform:
 
-### 🔄 Event-Driven Triggers (`terradev triggers`)
+###  Event-Driven Triggers (`terradev triggers`)
 - **Zero-touch automation**: Dataset lands → auto-train, Model drifts → auto-retrain  
 - **Schedule-based**: Cron jobs for weekly evaluations and maintenance
 - **Condition-based**: Drift scores, performance thresholds, cost limits
 - **20-Provider Support**: Works across all cloud providers
 - **Manual override**: Full control when needed
 
-### 🏗️ Environment Promotion (`terradev environments`) 
+###  Environment Promotion (`terradev environments`) 
 - **Dev → Staging → Prod**: Proper lifecycle management
 - **Approval workflow**: Request → Approve → Execute with audit trail
 - **Environment isolation**: Separate artifacts and configurations
 - **Promotion history**: Complete audit trail for compliance
 - **Automatic lineage**: Links artifacts across environments
 
-### 🔍 Auto Lineage System (`terradev lineage`)
+###  Auto Lineage System (`terradev lineage`)
 - **Zero manual tagging**: Automatic artifact tracking on every execution
 - **Complete provenance**: Data → Model → Deployment chain
 - **Execution diffing**: Compare any two pipeline runs
 - **Compliance export**: JSON/CSV for auditors and regulators
 - **Checkpoint tracing**: Work backwards from any artifact
 
-### 💰 Intelligent Spot/On-Demand Selection
+###  Intelligent Spot/On-Demand Selection
 - **Smart auto-selection**: Training → on-demand, Inference → spot
 - **Cost transparency**: Real-time savings calculations (60-80%)
 - **Manual override**: `--spot` and `--on-demand` flags
 - **Safety features**: Automatic state checkpointing and recovery
 
-### 🔍 Model & Endpoint Evaluation (`terradev eval`)
+###  Model & Endpoint Evaluation (`terradev eval`)
 - **Model Evaluation**: `terradev eval --model model.pth --dataset test.json`
 - **Endpoint Testing**: `terradev eval --endpoint http://localhost:8000 --metrics latency`
 - **Baseline Comparison**: Automatic improvement/regression detection
 - **A/B Model Testing**: Side-by-side comparison with winner determination
 - **Multiple Metrics**: Accuracy, perplexity, latency, throughput, cost
 
-### 🎯 Complete ML Lifecycle
+###  Complete ML Lifecycle
 - **Train → Eval → Deploy**: Full workflow now supported
 - **Risk Assessment**: Confidence scoring and migration warnings
 - **Cost Optimization**: Multi-hop data transfer routing
@@ -90,18 +90,18 @@ The three critical missing pillars that transform Terradev from a CLI tool into 
 
 Fixed 6 critical bugs across 20 cloud providers:
 
-- 🔴 **Alibaba** - Fixed missing `return` in `get_instance_quotes` (prevented quotes)
-- 🔴 **RunPod** - Fixed dead code + `volume_id` NameError in provisioning  
-- 🔴 **TensorDock** - Fixed `info["model"]` KeyError (should be `info["v0Name"]`)
-- 🔴 **Hetzner** - Fixed `quote["server_id"]` KeyError (should be `quote["instance_type"]`)
-- 🔴 **GCP** - Fixed lambda closure bug in zone availability checking
-- 🔴 **CoreWeave** - Fixed `$0.00` pricing when no API key configured
+-  **Alibaba** - Fixed missing `return` in `get_instance_quotes` (prevented quotes)
+-  **RunPod** - Fixed dead code + `volume_id` NameError in provisioning  
+-  **TensorDock** - Fixed `info["model"]` KeyError (should be `info["v0Name"]`)
+-  **Hetzner** - Fixed `quote["server_id"]` KeyError (should be `quote["instance_type"]`)
+-  **GCP** - Fixed lambda closure bug in zone availability checking
+-  **CoreWeave** - Fixed `$0.00` pricing when no API key configured
 
 **Complete SGLang Optimization Stack (v4.0.8)**
 
 Revolutionary workload-specific auto-optimization for SGLang serving with 7 workload types:
 
-### 🚀 SGLang Workload Optimizations
+###  SGLang Workload Optimizations
 - **Agentic/Multi-turn Chat**: LPM + RadixAttention + cache-aware routing (75-90% cache hit rate)
 - **High-Throughput Batch**: FCFS + CUDA graphs + FP8 quantization (maximum tokens/sec)
 - **Low-Latency/Real-Time**: EAGLE3 + Spec V2 + capped concurrency (30-50% TTFT improvement)
@@ -110,7 +110,7 @@ Revolutionary workload-specific auto-optimization for SGLang serving with 7 work
 - **Structured Output/RAG**: xGrammar + FSM optimization (10x faster structured output)
 - **Hardware-Specific**: H100/H200, H20, GB200, AMD MI300X optimizations
 
-### 🎯 Auto-Apply Decision Tree
+###  Auto-Apply Decision Tree
 ```bash
 # Auto-optimize any model for workload type
 terradev sglang optimize deepseek-ai/DeepSeek-V3
@@ -122,14 +122,14 @@ terradev sglang detect meta-llama/Llama-2-7b-hf --user-description "Real-time AP
 terradev sglang router meta-llama/Llama-2-7b-hf --dp-size 8
 ```
 
-### 📊 Performance Gains
+###  Performance Gains
 - **Agentic Chat**: 1.9x throughput with multi-replica, 95-98% GPU utilization
 - **Batch Inference**: Maximum tokens/second with pre-compiled CUDA graphs
 - **Low Latency**: 30-50% TTFT improvement, 20-40% TPOT improvement
 - **MoE Models**: Up to 2x throughput with Two-Batch Overlap
 - **Cache-Aware Routing**: 3.8x higher cache hit rate
 
-### 🔧 Hardware Optimization
+###  Hardware Optimization
 - **H100/H200**: FlashInfer + FP8 KV cache optimization
 - **H20**: FA3 + MoE→QKV→FP8 stacking + swapAB runner
 - **GB200 NVL72**: Rack-scale TP + NUMA-aware placement
@@ -462,10 +462,10 @@ terradev inferx failover --endpoint glm-5-api --test-load 5000
 
 # Production deployment with cold start failover and multi-tenant LoRA adapters
 
-echo "🚀 Deploying InferX + LoRA Hybrid Inference Service"
+echo " Deploying InferX + LoRA Hybrid Inference Service"
 
 # 1. Deploy baseline reserved GPUs for steady traffic
-echo "📍 Step 1: Provision reserved baseline capacity"
+echo " Step 1: Provision reserved baseline capacity"
 terradev provision -g H100 -n 2 --parallel 4 \
   --tag baseline-llm \
   --max-price 2.50
@@ -473,7 +473,7 @@ terradev provision -g H100 -n 2 --parallel 4 \
 BASELINE_IP=$(terradev status --json | jq -r '.[] | select(.tags[] | contains("baseline-llm")) | .ip' | head -1)
 
 # 2. Deploy optimized vLLM with LoRA support on baseline
-echo "📍 Step 2: Deploy vLLM with LoRA adapter support"
+echo " Step 2: Deploy vLLM with LoRA adapter support"
 terradev ml vllm --start \
   --instance-ip $BASELINE_IP \
   --model meta-llama/Llama-2-7b-hf \
@@ -484,7 +484,7 @@ terradev ml vllm --start \
   --port 8000
 
 # 3. Load customer-specific LoRA adapters
-echo "📍 Step 3: Load multi-tenant LoRA adapters"
+echo " Step 3: Load multi-tenant LoRA adapters"
 terradev lora add -e http://$BASELINE_IP:8000 \
   -n customer-enterprise-a \
   -p ./adapters/customer-enterprise-a
@@ -498,7 +498,7 @@ terradev lora add -e http://$BASELINE_IP:8000 \
   -p ./adapters/customer-internal
 
 # 4. Configure InferX for cold start and burst handling
-echo "📍 Step 4: Configure InferX for serverless burst capacity"
+echo " Step 4: Configure InferX for serverless burst capacity"
 terradev inferx deploy \
   --endpoint burst-llm-api \
   --model-id meta-llama/Llama-2-7b-hf \
@@ -508,7 +508,7 @@ terradev inferx deploy \
   --failover-strategy active-passive
 
 # 5. Set up intelligent routing with semantic awareness
-echo "📍 Step 5: Configure semantic routing for multi-tenant requests"
+echo " Step 5: Configure semantic routing for multi-tenant requests"
 cat > routing-config.yaml << EOF
 rules:
   - name: "enterprise_customers"
@@ -544,7 +544,7 @@ EOF
 terradev semantic-router --deploy --config routing-config.yaml
 
 # 6. Configure warm pool for frequently used adapters
-echo "📍 Step 6: Configure warm pool for LoRA adapters"
+echo " Step 6: Configure warm pool for LoRA adapters"
 terradev ml warm-pool --configure \
   --strategy adapter_based \
   --max-warm-models 5 \
@@ -553,7 +553,7 @@ terradev ml warm-pool --configure \
   --enable-predictive-warming
 
 # 7. Set up comprehensive monitoring and alerting
-echo "📍 Step 7: Deploy monitoring stack"
+echo " Step 7: Deploy monitoring stack"
 terradev k8s monitoring-stack --cluster production
 
 # Configure W&B for ML observability
@@ -567,7 +567,7 @@ terradev inferx status --endpoint burst-llm-api --detailed
 terradev inferx failover --endpoint burst-llm-api --test-load 1000
 
 # 8. Test the complete setup
-echo "📍 Step 8: Testing complete deployment"
+echo " Step 8: Testing complete deployment"
 echo "Testing baseline endpoint with LoRA..."
 curl -X POST http://$BASELINE_IP:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -588,16 +588,16 @@ curl -X POST https://inferx.terradev.cloud/burst-llm-api/v1/chat/completions \
     "max_tokens": 100
   }'
 
-echo "📍 Step 9: Deployment summary"
-echo "✅ Baseline endpoint: http://$BASELINE_IP:8000"
-echo "✅ InferX endpoint: https://inferx.terradev.cloud/burst-llm-api"
-echo "✅ LoRA adapters loaded: $(terradev lora list -e http://$BASELINE_IP:8000 --count)"
-echo "✅ Semantic routing: Active"
-echo "✅ Warm pool: Configured for top adapters"
-echo "✅ Monitoring: W&B + Prometheus + Grafana"
+echo " Step 9: Deployment summary"
+echo " Baseline endpoint: http://$BASELINE_IP:8000"
+echo " InferX endpoint: https://inferx.terradev.cloud/burst-llm-api"
+echo " LoRA adapters loaded: $(terradev lora list -e http://$BASELINE_IP:8000 --count)"
+echo " Semantic routing: Active"
+echo " Warm pool: Configured for top adapters"
+echo " Monitoring: W&B + Prometheus + Grafana"
 
 # 10. Set up automated LoRA updates
-echo "📍 Step 10: Configure automated LoRA adapter updates"
+echo " Step 10: Configure automated LoRA adapter updates"
 cat > lora-update-config.yaml << EOF
 adapters:
   - name: "customer-enterprise-a"
@@ -620,9 +620,9 @@ EOF
 
 terradev lora auto-update --config lora-update-config.yaml
 
-echo "🎉 InferX + LoRA Hybrid Deployment Complete!"
+echo " InferX + LoRA Hybrid Deployment Complete!"
 echo ""
-echo "📊 Next Steps:"
+echo " Next Steps:"
 echo "1. Monitor performance: terradev monitor --endpoint hybrid-llm --live"
 echo "2. Check LoRA performance: terradev lora metrics --endpoint http://$BASELINE_IP:8000"
 echo "3. Test failover: terradev inferx failover --endpoint burst-llm-api --test-load 5000"
@@ -713,7 +713,7 @@ terradev configure --provider gcp
 
 ---
 
-## 🎯 Part 2: Distributed Training from Dataset to Checkpoint
+##  Part 2: Distributed Training from Dataset to Checkpoint
 
 **Staging data near compute, launching distributed training jobs, and monitoring across nodes**
 
@@ -810,7 +810,7 @@ terradev checkpoint list --job my-job
 terradev checkpoint save --job my-job
 ```
 
-### 💾 **KV Cache Checkpointing for Training Runs**
+###  **KV Cache Checkpointing for Training Runs**
 
 **Protect long training runs from spot instance interruptions with automatic state preservation:**
 
