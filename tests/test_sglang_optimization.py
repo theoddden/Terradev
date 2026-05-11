@@ -9,7 +9,7 @@ to ensure correct auto-detection and parameter application.
 import pytest
 import asyncio
 from unittest.mock import Mock, patch, MagicMock
-from ml_services.sglang_service import (
+from terradev_cli.ml_services.sglang_service import (
     SGLangService, SGLangConfig, WorkloadType, SchedulePolicy, 
     AttentionBackend, SpeculativeAlgorithm, DeepEPMode, HardwareProfile
 )
