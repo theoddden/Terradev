@@ -86,13 +86,12 @@ class ProviderConformanceTest:
         }
 
     @pytest.mark.asyncio
-    async def test_auth_headers_not_none(self, provider, mock_credentials):
+    async def test_auth_headers_not_none(self, provider):
         """Test that _get_auth_headers() returns bytes/str, not None"""
-        # Initialize provider with credentials
-        provider_instance = provider(mock_credentials)
+        # Provider is already instantiated with credentials via fixture
 
         # Get auth headers
-        headers = provider_instance._get_auth_headers()
+        headers = provider._get_auth_headers()
 
         # Assert headers is not None and is dict-like
         assert headers is not None, "_get_auth_headers() returned None"
@@ -104,14 +103,14 @@ class ProviderConformanceTest:
                 f"Header '{key}' has value of type {type(value)}, expected str or bytes"
 
     @pytest.mark.asyncio
-    async def test_quotes_returns_iterable(self, provider, mock_credentials):
+    async def test_quotes_returns_iterable(self, provider):
         """Test that get_instance_quotes() returns non-empty iterable of Quote-like objects"""
-        provider_instance = provider(mock_credentials)
+        # Provider is already instantiated with credentials via fixture
 
         # This test will likely fail for providers that need real API calls
         # In a real implementation, we'd use vcrpy/responses fixtures here
         try:
-            quotes = await provider_instance.get_instance_quotes(gpu_type="A100")
+            quotes = await provider.get_instance_quotes(gpu_type="A100")
             
             # Assert quotes is iterable
             assert hasattr(quotes, '__iter__'), "get_instance_quotes() did not return iterable"
@@ -131,9 +130,9 @@ class ProviderConformanceTest:
             pytest.skip(f"Provider requires real API call or mock fixtures: {e}")
 
     @pytest.mark.asyncio
-    async def test_429_triggers_backoff(self, provider, mock_credentials):
+    async def test_429_triggers_backoff(self, provider):
         """Test that 429 response triggers exponential backoff"""
-        provider_instance = provider(mock_credentials)
+        # Provider is already instantiated with credentials via fixture
 
         # Mock aiohttp session to return 429
         mock_response = AsyncMock()
@@ -149,7 +148,7 @@ class ProviderConformanceTest:
             # Provider should handle 429 gracefully
             # In a real implementation, we'd verify backoff behavior
             try:
-                quotes = await provider_instance.get_instance_quotes(gpu_type="A100")
+                quotes = await provider.get_instance_quotes(gpu_type="A100")
                 # If we get here, provider handled 429
             except Exception as e:
                 # Provider should have attempted retry or raised specific error
@@ -157,9 +156,9 @@ class ProviderConformanceTest:
                     f"Provider did not handle 429 gracefully: {e}"
 
     @pytest.mark.asyncio
-    async def test_401_raises_auth_error(self, provider, mock_credentials):
+    async def test_401_raises_auth_error(self, provider):
         """Test that 401 response raises AuthError"""
-        provider_instance = provider(mock_credentials)
+        # Provider is already instantiated with credentials via fixture
 
         # Mock aiohttp session to return 401
         mock_response = AsyncMock()
@@ -172,7 +171,7 @@ class ProviderConformanceTest:
 
         with patch('aiohttp.ClientSession', return_value=mock_session):
             try:
-                quotes = await provider_instance.get_instance_quotes(gpu_type="A100")
+                quotes = await provider.get_instance_quotes(gpu_type="A100")
                 # If we get here without error, test fails
                 pytest.fail("Provider did not raise error on 401 response")
             except Exception as e:
