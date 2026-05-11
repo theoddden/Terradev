@@ -89,8 +89,7 @@ class ProviderConformanceTest:
     async def test_auth_headers_not_none(self, provider, mock_credentials):
         """Test that _get_auth_headers() returns bytes/str, not None"""
         # Initialize provider with credentials
-        provider_instance = provider()
-        provider_instance.credentials = mock_credentials
+        provider_instance = provider(mock_credentials)
 
         # Get auth headers
         headers = provider_instance._get_auth_headers()
@@ -107,8 +106,7 @@ class ProviderConformanceTest:
     @pytest.mark.asyncio
     async def test_quotes_returns_iterable(self, provider, mock_credentials):
         """Test that get_instance_quotes() returns non-empty iterable of Quote-like objects"""
-        provider_instance = provider()
-        provider_instance.credentials = mock_credentials
+        provider_instance = provider(mock_credentials)
 
         # This test will likely fail for providers that need real API calls
         # In a real implementation, we'd use vcrpy/responses fixtures here
@@ -135,8 +133,7 @@ class ProviderConformanceTest:
     @pytest.mark.asyncio
     async def test_429_triggers_backoff(self, provider, mock_credentials):
         """Test that 429 response triggers exponential backoff"""
-        provider_instance = provider()
-        provider_instance.credentials = mock_credentials
+        provider_instance = provider(mock_credentials)
 
         # Mock aiohttp session to return 429
         mock_response = AsyncMock()
@@ -161,9 +158,8 @@ class ProviderConformanceTest:
 
     @pytest.mark.asyncio
     async def test_401_raises_auth_error(self, provider, mock_credentials):
-        """Test that 401 response raises typed AuthError"""
-        provider_instance = provider()
-        provider_instance.credentials = mock_credentials
+        """Test that 401 response raises AuthError"""
+        provider_instance = provider(mock_credentials)
 
         # Mock aiohttp session to return 401
         mock_response = AsyncMock()
@@ -195,7 +191,9 @@ for provider_class in ALL_PROVIDERS:
         class_name,
         (ProviderConformanceTest,),
         {
-            "provider": pytest.fixture(lambda self: provider_class),
+            "provider": pytest.fixture(
+                lambda self, mock_credentials: provider_class(mock_credentials)
+            ),
             "mock_credentials": pytest.fixture(
                 lambda self: {
                     "api_key": "test_api_key_12345",
@@ -217,8 +215,9 @@ async def test_all_providers_registered():
     assert len(ALL_PROVIDERS) >= 20, f"Expected at least 20 providers, got {len(ALL_PROVIDERS)}"
     
     # Verify each provider has required methods
+    mock_creds = {"api_key": "test_api_key_12345", "secret_key": "test_secret_key_67890"}
     for provider_class in ALL_PROVIDERS:
-        provider_instance = provider_class()
+        provider_instance = provider_class(mock_creds)
         assert hasattr(provider_instance, 'get_instance_quotes'), \
             f"{provider_class.__name__} missing get_instance_quotes method"
         assert hasattr(provider_instance, '_get_auth_headers'), \
