@@ -170,12 +170,11 @@ enterprise = [
 ]
 
 [project.urls]
-Homepage = "https://terradev.cloud"
-Documentation = "https://docs.terradev.com"
+Homepage = "https://github.com/theoddden/Terradev"
+Documentation = "https://github.com/theoddden/Terradev/blob/main/README.md"
 Repository = "https://github.com/theoddden/Terradev"
 "Bug Tracker" = "https://github.com/theoddden/Terradev/issues"
 Changelog = "https://github.com/theoddden/Terradev/blob/main/CHANGELOG.md"
-Analytics = "https://api.terradev.cloud/dashboard"
 
 [project.scripts]
 terradev = "terradev_cli.cli:cli"

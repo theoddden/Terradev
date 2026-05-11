@@ -96,8 +96,7 @@ class IntegrationTestFramework:
             self._test_cli_help,
             self._test_version_command,
             self._test_configuration_loading,
-            self._test_credential_management,
-            self._test_telemetry_integration
+            self._test_credential_management
         ]
         
         return await self._run_test_suite(tests)
@@ -148,7 +147,6 @@ class IntegrationTestFramework:
             self._test_prometheus_integration,
             self._test_grafana_dashboards,
             self._test_wandb_integration,
-            self._test_telemetry_collection,
             self._test_metrics_aggregation
         ]
         
@@ -278,20 +276,7 @@ class IntegrationTestFramework:
             print(f"Credential management test failed: {e}")
             return False
     
-    async def _test_telemetry_integration(self) -> bool:
-        """Test telemetry integration"""
-        try:
-            from terradev_cli.core.telemetry import get_mandatory_telemetry
-            
-            telemetry = get_mandatory_telemetry()
-            assert telemetry is not None
-            
-            # Test telemetry logging (should not fail)
-            telemetry.log_usage("test_action", {"test": True})
-            return True
-        except Exception as e:
-            print(f"Telemetry integration test failed: {e}")
-            return False
+    # Telemetry integration test removed for open source compliance
     
     async def _test_aws_integration(self) -> bool:
         """Test AWS provider integration"""

@@ -23,13 +23,6 @@ _cli_dir = os.path.dirname(os.path.abspath(__file__))
 if _cli_dir not in sys.path:
     sys.path.insert(0, _cli_dir)
 
-# Import telemetry - MANDATORY FOR USAGE TRACKING
-try:
-    from core.telemetry import get_mandatory_telemetry
-    _telemetry = get_mandatory_telemetry()
-except Exception:
-    _telemetry = None
-
 # Import Kubernetes wrapper
 try:
     from k8s.terraform_wrapper import TerraformWrapper
@@ -1948,23 +1941,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             })
         api.usage["instances_created"].append(inst_data)
 
-        # Log provision to telemetry for visibility
-        try:
-            from core.telemetry import TelemetryClient
-            telemetry = TelemetryClient()
-            telemetry.log_usage("provision", {
-                "instance_id": r['instance_id'],
-                "provider": r['provider'],
-                "gpu_type": gpu_type,
-                "region": r['region'],
-                "price_hr": r['price'],
-                "spot": r['spot'],
-                "type": type or "training",
-                "parallel_group": group_id,
-                "success": True
-            })
-        except Exception:
-            pass  # Telemetry is best-effort
+        # Telemetry removed for open source compliance
 
     api.save_usage()
 
@@ -2977,16 +2954,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
 
     # ── Tier gate with telemetry ──
     if not api.check_provision_limit():
-        # Check with telemetry server for server-side enforcement
-        try:
-            from core.telemetry import check_license
-            if not check_license('provision'):
-                return  # Blocked by server-side paywall
-        except ImportError:
-            pass  # Fallback to local check
-
-        # Monthly provision limit check removed - unlimited provisions (open source)
-        # All Stripe checkout and paywall code removed
+        # License checks removed for open source - unlimited provisions
 
     print(f"Deploying terradev run")
     print(f"   GPU:     {gpu}")
