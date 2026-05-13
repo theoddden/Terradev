@@ -12,6 +12,11 @@ members = [
     "terradev-gpu-topology",
     "terradev-authentication",
     "terradev-vram-estimator",
+    "terradev-cost-calculator",
+    "terradev-credential-vault",
+    "terradev-config-validator",
+    "terradev-artifact-verification",
+    "terradev-quota-manager",
 ]
 
 [workspace.dependencies]
@@ -41,3 +46,6 @@ sha2 = "0.10"
 percent-encoding = "2.3"
 hex = "0.4"
 pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
+rust_decimal = "1.33"
+zeroize = "1.7"
+jsonschema = "0.17"

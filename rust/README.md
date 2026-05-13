@@ -68,6 +68,33 @@ MLA-aware VRAM estimation for transformer models.
 - **Impact**: Accurate memory planning, prevents OOM errors
 - **Features**: Multi-head attention vs MLA compression, quantization support (FP32/FP16/BF16/FP8/INT8/INT4)
 
+### Safety & Credibility Modules
+
+#### 13. terradev-cost-calculator
+Type-safe financial calculations with decimal precision.
+- **Impact**: Eliminates floating-point cost calculation errors
+- **Features**: Compile-time arithmetic safety, spot pricing, multi-instance cost aggregation
+
+#### 14. terradev-credential-vault
+Secure credential storage with zeroization guarantees.
+- **Impact**: Prevents credential leaks, memory-safe secret handling
+- **Features**: RAII guarantees, automatic memory zeroization on drop, type-safe secret access
+
+#### 15. terradev-config-validator
+Compile-time configuration schema validation.
+- **Impact**: Prevents deployment failures from invalid configurations
+- **Features**: JSON schema validation, type checking, required field enforcement
+
+#### 16. terradev-artifact-verification
+Deterministic artifact integrity verification.
+- **Impact**: Ensures data integrity, prevents tampering
+- **Features**: SHA-256 checksums, constant-time comparisons, file verification
+
+#### 17. terradev-quota-manager
+Lock-free resource quota enforcement.
+- **Impact**: Prevents cost overruns, fair resource allocation
+- **Features**: Deterministic quota tracking, no GC pauses, leak-proof resource limits
+
 ## Installation
 
 ### Build all modules:
@@ -420,6 +447,155 @@ print(f"KV cache: {breakdown.kv_cache_gb:.2f} GB")
 print(f"Activation cache: {breakdown.activation_cache_gb:.2f} GB")
 print(f"Required GPUs: {breakdown.gpu_count}")
 print(f"Per GPU: {breakdown.per_gpu_gb:.2f} GB")
+```
+
+### Cost Calculator
+```python
+from terradev_cost_calculator import PyCostCalculator, PyInstanceType
+
+calculator = PyCostCalculator()
+
+# Add instance type
+instance = PyInstanceType(
+    name="p4d.24xlarge",
+    provider="aws",
+    region="us-east-1",
+    hourly_cost_usd="32.77",
+    spot_discount_percent="70",
+    gpu_count=8
+)
+calculator.add_instance_type(instance)
+
+# Calculate cost
+breakdown = calculator.calculate_cost(
+    instance_type_name="p4d.24xlarge",
+    hours="10",
+    use_spot=True
+)
+
+print(f"Hourly cost: ${breakdown.hourly_cost_usd}")
+print(f"Spot hourly: ${breakdown.spot_hourly_cost_usd}")
+print(f"Monthly savings: ${breakdown.spot_savings_usd}")
+```
+
+### Credential Vault
+```python
+from terradev_credential_vault import PyCredentialVault
+
+vault = PyCredentialVault()
+
+# Store credential
+vault.store(
+    name="aws-access-key",
+    value=b"AKIAIOSFODNN7EXAMPLE",
+    provider="aws"
+)
+
+# Retrieve credential
+credential = vault.retrieve("aws-access-key")
+print(f"Credential retrieved: {credential is not None}")
+
+# Get metadata
+metadata = vault.get_metadata("aws-access-key")
+if metadata:
+    print(f"Created: {metadata.created_at}")
+
+# List all credentials
+credentials = vault.list()
+print(f"Stored credentials: {len(credentials)}")
+
+# Delete credential
+vault.delete("aws-access-key")
+```
+
+### Config Validator
+```python
+from terradev_config_validator import PyConfigValidator
+
+schema = '''
+{
+    "type": "object",
+    "required": ["name", "gpu_type"],
+    "properties": {
+        "name": {"type": "string"},
+        "gpu_type": {"type": "string"},
+        "gpu_count": {"type": "number"}
+    }
+}
+'''
+
+validator = PyConfigValidator(schema_json=schema)
+
+config = '''
+{
+    "name": "training-job-1",
+    "gpu_type": "A100",
+    "gpu_count": 4
+}
+'''
+
+report = validator.validate(config_json=config)
+print(f"Valid: {report.is_valid}")
+if not report.is_valid:
+    for error in report.errors:
+        print(f"Error: {error}")
+```
+
+### Artifact Verification
+```python
+from terradev_artifact_verification import PyArtifactVerifier
+
+verifier = PyArtifactVerifier()
+
+# Compute checksum
+data = b"model weights data"
+checksum = verifier.compute_sha256(data)
+print(f"SHA-256: {checksum}")
+
+# Verify artifact
+result = verifier.verify_artifact(
+    data=data,
+    expected_checksum=checksum,
+    algorithm="sha256"
+)
+print(f"Valid: {result.is_valid}")
+
+# Verify file
+result = verifier.verify_file(
+    path="/path/to/model.bin",
+    expected_checksum="abc123...",
+    algorithm="sha256"
+)
+print(f"File valid: {result.is_valid}")
+```
+
+### Quota Manager
+```python
+from terradev_quota_manager import PyQuotaManager
+
+manager = PyQuotaManager()
+
+# Set quota
+manager.set_quota(resource="gpu-instances", limit=100)
+
+# Check quota
+manager.check_quota(resource="gpu-instances", amount=10)
+print("Quota check passed")
+
+# Consume quota
+manager.consume_quota(resource="gpu-instances", amount=10)
+quota = manager.get_quota("gpu-instances")
+print(f"Used: {quota.used}, Remaining: {quota.remaining}")
+
+# Release quota
+manager.release_quota(resource="gpu-instances", amount=5)
+quota = manager.get_quota("gpu-instances")
+print(f"After release - Used: {quota.used}, Remaining: {quota.remaining}")
+
+# List all quotas
+quotas = manager.list_quotas()
+for q in quotas:
+    print(f"{q.resource}: {q.used}/{q.limit}")
 ```
 
 ## Integration with Terradev
