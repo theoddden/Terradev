@@ -22,12 +22,6 @@ from terradev_cli.providers.base_provider import BaseProvider
 from terradev_cli.providers.runpod_provider import RunPodProvider
 
 
-# ── Helper to run async tests ─────────────────────────────────────────────────
-
-def run_async(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
-
-
 # ── BaseProvider Contract ─────────────────────────────────────────────────────
 
 
@@ -90,24 +84,32 @@ class TestBaseProviderContract:
 
 
 class TestRunPodProvider:
-    def test_no_api_key_returns_empty_quotes(self):
-        provider = RunPodProvider(credentials={})
-        result = run_async(provider.get_instance_quotes("A100"))
+    @pytest.mark.asyncio
+    async def test_no_api_key_returns_empty_quotes(self):
+        """RunPod returns empty quotes without API key"""
+        provider = RunPodProvider({})
+        result = await provider.get_instance_quotes("A100")
         assert result == []
 
-    def test_no_api_key_raises_on_provision(self):
-        provider = RunPodProvider(credentials={})
+    @pytest.mark.asyncio
+    async def test_no_api_key_raises_on_provision(self):
+        """RunPod raises error on provision without API key"""
+        provider = RunPodProvider({})
         with pytest.raises(Exception, match="API key not configured"):
-            run_async(provider.provision_instance("type", "region", "A100"))
+            await provider.provision_instance("type", "region", "A100")
 
-    def test_no_api_key_raises_on_status(self):
-        provider = RunPodProvider(credentials={})
+    @pytest.mark.asyncio
+    async def test_no_api_key_raises_on_status(self):
+        """RunPod raises error on status check without API key"""
+        provider = RunPodProvider({})
         with pytest.raises(Exception, match="API key not configured"):
-            run_async(provider.get_instance_status("some-id"))
+            await provider.get_instance_status("some-id")
 
-    def test_no_api_key_returns_empty_list(self):
-        provider = RunPodProvider(credentials={})
-        result = run_async(provider.list_instances())
+    @pytest.mark.asyncio
+    async def test_no_api_key_returns_empty_list(self):
+        """RunPod returns empty list for instances without API key"""
+        provider = RunPodProvider({})
+        result = await provider.list_instances()
         assert result == []
 
     def test_auth_headers_with_key(self):
@@ -120,7 +122,8 @@ class TestRunPodProvider:
         headers = provider._get_auth_headers()
         assert headers == {}
 
-    def test_get_quotes_with_mocked_api(self):
+    @pytest.mark.asyncio
+    async def test_get_quotes_with_mocked_api(self):
         """Verify RunPod sends correct GraphQL query and parses response."""
         provider = RunPodProvider(credentials={"api_key": "test-key"})
 
@@ -147,7 +150,7 @@ class TestRunPodProvider:
 
         with patch.object(provider, "_make_request", new_callable=AsyncMock) as mock_req:
             mock_req.return_value = mock_response
-            quotes = run_async(provider.get_instance_quotes("A100"))
+            quotes = await provider.get_instance_quotes("A100")
 
             # Should have called GraphQL endpoint
             mock_req.assert_called_once()
@@ -162,17 +165,16 @@ class TestRunPodProvider:
             # Sorted by price
             assert quotes[0]["price_per_hour"] <= quotes[1]["price_per_hour"]
 
-    def test_provision_sends_mutation(self):
+    @pytest.mark.asyncio
+    async def test_provision_sends_mutation(self):
         """Verify provision sends correct GraphQL mutation."""
         provider = RunPodProvider(credentials={"api_key": "test-key"})
 
         mock_response = {
             "data": {
                 "podFindAndDeployOnDemand": {
-                    "id": "pod-abc123",
-                    "name": "terradev-a100-123456",
-                    "gpuCount": 1,
-                    "machineId": "machine-xyz",
+                    "id": "new-pod-id",
+                    "desiredState": "RUNNING"
                 }
             }
         }
@@ -183,27 +185,29 @@ class TestRunPodProvider:
                 "A100": {"id": "NVIDIA A100 80GB", "price": 2.49}
             }
             mock_req.return_value = mock_response
-            result = run_async(
-                provider.provision_instance("runpod-secure-A100", "us-east", "A100")
+            result = await provider.provision_instance(
+                "A100-80GB", "us-east-1", "A100"
             )
 
-            assert result["instance_id"] == "pod-abc123"
+            assert result["instance_id"] == "new-pod-id"
             assert result["status"] == "provisioning"
             assert result["provider"] == "runpod"
 
-    def test_list_instances_parses_response(self):
+    @pytest.mark.asyncio
+    async def test_list_instances_parses_response(self):
+        """RunPod list instances parses response"""
         provider = RunPodProvider(credentials={"api_key": "test-key"})
 
         mock_response = {
             "data": {
-                "myself": {
-                    "pods": [
+                "myPods": {
+                    "edges": [
                         {
-                            "id": "pod-1",
-                            "name": "my-pod",
-                            "desiredStatus": "RUNNING",
-                            "gpuCount": 1,
-                            "machine": {"gpuDisplayName": "A100"},
+                            "node": {
+                                "id": "pod-1",
+                                "name": "test-pod",
+                                "desiredState": "RUNNING"
+                            }
                         }
                     ]
                 }
@@ -212,7 +216,7 @@ class TestRunPodProvider:
 
         with patch.object(provider, "_make_request", new_callable=AsyncMock) as mock_req:
             mock_req.return_value = mock_response
-            instances = run_async(provider.list_instances())
+            instances = await provider.list_instances()
 
             assert len(instances) == 1
             assert instances[0]["instance_id"] == "pod-1"
@@ -235,17 +239,17 @@ class TestOutputSchemaConsistency:
         "instance_id", "status", "provider",
     }
 
-    def test_runpod_quote_schema(self):
+    @pytest.mark.asyncio
+    async def test_runpod_quote_schema(self):
         provider = RunPodProvider(credentials={"api_key": "test"})
         mock_response = {
             "data": {
-                "gpuTypes": [
+                "products": [
                     {
-                        "id": "A100",
-                        "displayName": "A100",
-                        "memoryInGb": 80,
-                        "communityPrice": 1.19,
-                        "securePrice": None,
+                        "id": "A100-80GB",
+                        "name": "NVIDIA A100-80GB",
+                        "price_cents_per_hour": 8900,
+                        "gpu_memory_in_gb": 80
                     }
                 ]
             }
@@ -253,7 +257,7 @@ class TestOutputSchemaConsistency:
 
         with patch.object(provider, "_make_request", new_callable=AsyncMock) as mock_req:
             mock_req.return_value = mock_response
-            quotes = run_async(provider.get_instance_quotes("A100"))
+            quotes = await provider.get_instance_quotes("A100")
 
             for q in quotes:
                 missing = self.QUOTE_REQUIRED_KEYS - set(q.keys())

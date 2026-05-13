@@ -3833,36 +3833,36 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             
             # Handle local_scan tool separately (doesn't use terradev CLI)
             if tool_name == "local_scan":
-        local_info = await discover_local_gpus()
-        
-        output_text = "🔍 **Local GPU Scan Results**\n\n"
-        
-        if local_info['has_local_gpu']:
-            output_text += f"✅ **Found {local_info['device_count']} local GPU(s)**\n"
-            output_text += f"📊 **Total VRAM Pool:** {local_info['total_vram_gb']} GB\n\n"
+                local_info = await discover_local_gpus()
+                
+                output_text = "🔍 **Local GPU Scan Results**\n\n"
+                
+                if local_info['has_local_gpu']:
+                    output_text += f"✅ **Found {local_info['device_count']} local GPU(s)**\n"
+                    output_text += f"📊 **Total VRAM Pool:** {local_info['total_vram_gb']} GB\n\n"
+                    
+                    output_text += "**Devices:**\n"
+                    for device in local_info['local_devices']:
+                        output_text += f"\n• **{device['name']}**\n"
+                        output_text += f"  - Type: {device['type'].upper()}\n"
+                        output_text += f"  - VRAM: {device['vram_gb']} GB\n"
+                        if 'compute_capability' in device:
+                            output_text += f"  - Compute: {device['compute_capability']}\n"
+                        if 'platform' in device:
+                            output_text += f"  - Platform: {device['platform']}\n"
+                
+                output_text += "\n\n💡 **Usage:**\n"
+                output_text += "• Use `provision_gpu` with `--local-first` to prefer local GPUs\n"
+                output_text += "• Cloud overflow will be used if local pool is insufficient\n"
+            else:
+                output_text += "❌ **No local GPUs detected**\n\n"
+                output_text += "💡 **Tip:** Install PyTorch or nvidia-smi for GPU detection\n"
+                output_text += "   - CUDA: `pip install torch`\n"
+                output_text += "   - Apple Silicon: PyTorch with MPS support\n"
             
-            output_text += "**Devices:**\n"
-            for device in local_info['local_devices']:
-                output_text += f"\n• **{device['name']}**\n"
-                output_text += f"  - Type: {device['type'].upper()}\n"
-                output_text += f"  - VRAM: {device['vram_gb']} GB\n"
-                if 'compute_capability' in device:
-                    output_text += f"  - Compute: {device['compute_capability']}\n"
-                if 'platform' in device:
-                    output_text += f"  - Platform: {device['platform']}\n"
-            
-            output_text += "\n\n💡 **Usage:**\n"
-            output_text += "• Use `provision_gpu` with `--local-first` to prefer local GPUs\n"
-            output_text += "• Cloud overflow will be used if local pool is insufficient\n"
-        else:
-            output_text += "❌ **No local GPUs detected**\n\n"
-            output_text += "💡 **Tip:** Install PyTorch or nvidia-smi for GPU detection\n"
-            output_text += "   - CUDA: `pip install torch`\n"
-            output_text += "   - Apple Silicon: PyTorch with MPS support\n"
-        
-        return CallToolResult(
-            content=[TextContent(type="text", text=output_text)]
-        )
+            return CallToolResult(
+                content=[TextContent(type="text", text=output_text)]
+            )
     
     if tool_name == "quote_gpu":
         cmd_args.extend(["-g", arguments["gpu_type"]])
