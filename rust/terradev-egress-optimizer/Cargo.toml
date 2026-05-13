@@ -1,0 +1,16 @@
+[package]
+name = "terradev-egress-optimizer"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "terradev_egress_optimizer"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+petgraph = "0.6"
+priority-queue = "1.3"
