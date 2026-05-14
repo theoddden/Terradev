@@ -5377,7 +5377,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                       "--gpu-memory-utilization", str(mem), "--tensor-parallel-size", str(tp),
                       "--enable-sleep-mode", "--kv-connector", "offloading"]
                 if api_key:
-            cmd_parts.extend(["--api-key", api_key])
+                    cmd_parts.extend(["--api-key", api_key])
                 exec_line = " ".join(cmd_parts)
                 service = f"""[Unit]\nDescription=vLLM {model}\nAfter=network.target\n[Service]\nType=simple\nExecStart={exec_line}\nRestart=always\nRestartSec=10\nEnvironment=VLLM_SERVER_DEV_MODE=1\n[Install]\nWantedBy=multi-user.target"""
                 setup = f"echo '{service}' > /etc/systemd/system/vllm.service && systemctl daemon-reload && systemctl enable vllm && systemctl start vllm && sleep 5 && systemctl status vllm"
@@ -5385,10 +5385,10 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 full_cmd = f"{ssh_base} '{setup}'"
                 result = await execute_shell_command(full_cmd)
                 if result["success"]:
-            output_text = f"✅ **vLLM Server Started**\n\n**Model:** {model}\n**Endpoint:** http://{ip}:{port}/v1\n**TP:** {tp}\n**Sleep Mode:** enabled\n**KV Offloading:** enabled\n\n{result['stdout']}\n\n"
-            output_text += f"**suggest_action:** Test with `vllm_inference`. Manage power with `vllm_sleep`/`vllm_wake`."
+                    output_text = f"✅ **vLLM Server Started**\n\n**Model:** {model}\n**Endpoint:** http://{ip}:{port}/v1\n**TP:** {tp}\n**Sleep Mode:** enabled\n**KV Offloading:** enabled\n\n{result['stdout']}\n\n"
+                    output_text += f"**suggest_action:** Test with `vllm_inference`. Manage power with `vllm_sleep`/`vllm_wake`."
                 else:
-            output_text = f"❌ **Failed to start vLLM**\n\n{result['stderr']}"
+                    output_text = f"❌ **Failed to start vLLM**\n\n{result['stderr']}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "vllm_stop":
