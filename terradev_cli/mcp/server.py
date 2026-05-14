@@ -872,8 +872,11 @@ async def _ensure_tools_loaded():
         logger.info(f"Loaded {len(_ALL_TOOLS)} tools successfully")
 
 # Import optimizer for tool compression and parallel dispatch
-from terradev_mcp_optimizer import MCPOptimizer
-optimizer = MCPOptimizer(enable_compression=True, strip_optional=True, enable_parallel=True)
+try:
+    from terradev_mcp_optimizer import MCPOptimizer
+    optimizer = MCPOptimizer(enable_compression=True, strip_optional=True, enable_parallel=True)
+except ImportError:
+    optimizer = None
 
 # ── Pre-compiled Tool Schemas (built once at module load) ────────────────────
 _ALL_TOOLS = [
@@ -3550,11 +3553,11 @@ _ALL_TOOLS = [
             }
         ),
         # ── v5.3.0: New v4.0.11 Features - Karpenter, Triggers, Environments, Lineage, Migration ──
-        *ALL_NEW_TOOLS,
+        # Note: ALL_NEW_TOOLS removed - mcp_new_features_tools module not available
 ]
 
 # Pre-compress at module load — cached for all subsequent list_tools calls
-_COMPRESSED_TOOLS = optimizer.compress_tools(_ALL_TOOLS)
+_COMPRESSED_TOOLS = optimizer.compress_tools(_ALL_TOOLS) if optimizer else _ALL_TOOLS
 
 @server.list_tools()
 async def handle_list_tools() -> ListToolsResult:
@@ -3591,9 +3594,10 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             await _ensure_tools_loaded()
             
             # Expand compressed namespace tools back to original tool names
-            original_tool_name, original_arguments = optimizer.expand_call(tool_name, arguments)
-            tool_name = original_tool_name
-            arguments = original_arguments
+            if optimizer:
+                original_tool_name, original_arguments = optimizer.expand_call(tool_name, arguments)
+                tool_name = original_tool_name
+                arguments = original_arguments
 
             # Map tool names to terradev commands
             command_map = {
@@ -4074,62 +4078,62 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 use_terraform = arguments.get("use_terraform", True)
         
                 if use_terraform:
-            # Use persistent workspace so state survives for endpoint teardown
-            safe_ep = (endpoint_name or model).replace("/", "-").replace(":", "-")
-            ws_dir = _get_tf_workspace(f"infer-{safe_ep}")
-            try:
-                # Generate inference Terraform configuration
-                inference_config = generate_inference_terraform_config(model, gpu_type, endpoint_name)
-                
-                # Write configuration files
-                main_tf_path = os.path.join(ws_dir, "main.tf")
-                with open(main_tf_path, 'w') as f:
-                    f.write(inference_config)
-                
-                # Initialize and apply Terraform
-                init_result = await execute_terraform_command(["terraform", "init"], ws_dir)
-                if not init_result["success"]:
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=f"❌ Terraform init failed: {init_result['stderr']}")],
-                        isError=True
-                    )
-                
-                apply_result = await execute_terraform_command(["terraform", "apply", "-auto-approve"], ws_dir)
-                
-                if apply_result["success"]:
-                    output_text = f"✅ Inference endpoint deployed via Terraform!\n\n"
-                    output_text += f"**Model:** {model}\n"
-                    output_text += f"**GPU Type:** {gpu_type}\n"
-                    output_text += f"**Endpoint Name:** {endpoint_name or 'auto-generated'}\n"
-                    output_text += f"\n**Terraform State:** Persisted at {ws_dir}\n"
-                    output_text += f"**Full Output:**\n{apply_result['stdout']}"
-                    
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=output_text)]
-                    )
+                    # Use persistent workspace so state survives for endpoint teardown
+                    safe_ep = (endpoint_name or model).replace("/", "-").replace(":", "-")
+                    ws_dir = _get_tf_workspace(f"infer-{safe_ep}")
+                    try:
+                        # Generate inference Terraform configuration
+                        inference_config = generate_inference_terraform_config(model, gpu_type, endpoint_name)
+                        
+                        # Write configuration files
+                        main_tf_path = os.path.join(ws_dir, "main.tf")
+                        with open(main_tf_path, 'w') as f:
+                            f.write(inference_config)
+                        
+                        # Initialize and apply Terraform
+                        init_result = await execute_terraform_command(["terraform", "init"], ws_dir)
+                        if not init_result["success"]:
+                            return CallToolResult(
+                                content=[TextContent(type="text", text=f"❌ Terraform init failed: {init_result['stderr']}")],
+                                isError=True
+                            )
+                        
+                        apply_result = await execute_terraform_command(["terraform", "apply", "-auto-approve"], ws_dir)
+                        
+                        if apply_result["success"]:
+                            output_text = f"✅ Inference endpoint deployed via Terraform!\n\n"
+                            output_text += f"**Model:** {model}\n"
+                            output_text += f"**GPU Type:** {gpu_type}\n"
+                            output_text += f"**Endpoint Name:** {endpoint_name or 'auto-generated'}\n"
+                            output_text += f"\n**Terraform State:** Persisted at {ws_dir}\n"
+                            output_text += f"**Full Output:**\n{apply_result['stdout']}"
+                            
+                            return CallToolResult(
+                                content=[TextContent(type="text", text=output_text)]
+                            )
+                        else:
+                            return CallToolResult(
+                                content=[TextContent(type="text", text=f"❌ Terraform apply failed: {apply_result['stderr']}")],
+                                isError=True
+                            )
+                    except Exception as e:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=f"❌ Inference Terraform deployment failed: {str(e)}")],
+                            isError=True
+                        )
                 else:
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=f"❌ Terraform apply failed: {apply_result['stderr']}")],
-                        isError=True
-                    )
-            except Exception as e:
-                return CallToolResult(
-                    content=[TextContent(type="text", text=f"❌ Inference Terraform deployment failed: {str(e)}")],
-                    isError=True
-                )
-                else:
-            # Fall back to regular terradev command
-            cmd_args.extend(["--model", model])
-            cmd_args.extend(["--gpu-type", gpu_type])
+                    # Fall back to regular terradev command
+                    cmd_args.extend(["--model", model])
+                    cmd_args.extend(["--gpu-type", gpu_type])
     
             elif tool_name == "hf_space_deploy":
                 cmd_args.append(arguments["space_name"])
                 cmd_args.extend(["--model-id", arguments["model_id"]])
                 cmd_args.extend(["--template", arguments["template"]])
                 if "hardware" in arguments:
-            cmd_args.extend(["--hardware", arguments["hardware"]])
+                    cmd_args.extend(["--hardware", arguments["hardware"]])
                 if "sdk" in arguments:
-            cmd_args.extend(["--sdk", arguments["sdk"]])
+                    cmd_args.extend(["--sdk", arguments["sdk"]])
     
             elif tool_name == "terraform_status":
                 config_dir = arguments["config_dir"]
@@ -4139,38 +4143,38 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output_result = await execute_terraform_command(["terraform", "output", "-json"], config_dir)
         
                 if output_result["success"] and show_outputs:
-            try:
-                outputs = json.loads(output_result["stdout"])
-                output_text = f"✅ Terraform Status (from state):\n\n"
-                
-                for key, value in outputs.items():
-                    if isinstance(value, dict) and "value" in value:
-                        output_text += f"**{key}:** {value['value']}\n"
-                
-                # Also show state summary
-                state_result = await execute_terraform_command(["terraform", "show", "-json"], config_dir)
-                if state_result["success"]:
-                    state_data = json.loads(state_result["stdout"])
-                    resource_count = len(state_data.get("values", {}).get("root_module", {}).get("resources", []))
-                    output_text += f"\n**Resources Managed:** {resource_count}\n"
-                    output_text += f"**State File:** Terraform managed\n"
-                
-                return CallToolResult(
-                    content=[TextContent(type="text", text=output_text)]
-                )
-            except json.JSONDecodeError:
-                return CallToolResult(
-                    content=[TextContent(type="text", text=f"✅ Terraform Status:\n\n{output_result['stdout']}")]
-                )
+                    try:
+                        outputs = json.loads(output_result["stdout"])
+                        output_text = f"✅ Terraform Status (from state):\n\n"
+                        
+                        for key, value in outputs.items():
+                            if isinstance(value, dict) and "value" in value:
+                                output_text += f"**{key}:** {value['value']}\n"
+                        
+                        # Also show state summary
+                        state_result = await execute_terraform_command(["terraform", "show", "-json"], config_dir)
+                        if state_result["success"]:
+                            state_data = json.loads(state_result["stdout"])
+                            resource_count = len(state_data.get("values", {}).get("root_module", {}).get("resources", []))
+                            output_text += f"\n**Resources Managed:** {resource_count}\n"
+                            output_text += f"**State File:** Terraform managed\n"
+                        
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=output_text)]
+                        )
+                    except json.JSONDecodeError:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=f"✅ Terraform Status:\n\n{output_result['stdout']}")]
+                        )
                 else:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"❌ Terraform status query failed: {output_result['stderr']}")],
-                isError=True
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"❌ Terraform status query failed: {output_result['stderr']}")],
+                        isError=True
+                    )
     
             elif tool_name == "status":
                 if arguments.get("live"):
-            cmd_args.append("--live")
+                    cmd_args.append("--live")
     
             elif tool_name == "manage_instance":
                 cmd_args.extend(["-i", arguments["instance_id"]])
@@ -4178,12 +4182,12 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
     
             elif tool_name == "analytics":
                 if "days" in arguments:
-            cmd_args.extend(["--days", str(arguments["days"])])
+                    cmd_args.extend(["--days", str(arguments["days"])])
     
             elif tool_name == "setup_provider":
                 cmd_args.append(arguments["provider"])
                 if arguments.get("quick"):
-            cmd_args.append("--quick")
+                    cmd_args.append("--quick")
     
             elif tool_name == "configure_provider":
                 cmd_args.extend(["--provider", arguments["provider"]])
@@ -4194,30 +4198,30 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 # Semantic-aware inference routing via terradev inference route
                 cmd_args = ["inference", "route"]
                 if "model" in arguments:
-            cmd_args.extend(["--model", arguments["model"]])
+                    cmd_args.extend(["--model", arguments["model"]])
                 strategy = arguments.get("strategy", "latency")
                 cmd_args.extend(["--strategy", strategy])
                 if arguments.get("measure"):
-            cmd_args.append("--measure")
+                    cmd_args.append("--measure")
         
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
         
                 output_text = "🧠 **Semantic Inference Routing**\n\n"
                 if result["success"]:
-            output_text += f"**Strategy:** {strategy}\n"
-            output_text += f"**Signals:** modality, complexity, domain, language, safety, keywords\n"
-            output_text += f"**NUMA scoring:** enabled\n\n"
-            output_text += output
+                    output_text += f"**Strategy:** {strategy}\n"
+                    output_text += f"**Signals:** modality, complexity, domain, language, safety, keywords\n"
+                    output_text += f"**NUMA scoring:** enabled\n\n"
+                    output_text += output
                 else:
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "💡 **Tip:** Register inference endpoints first with:\n"
-            output_text += "   `terradev inference deploy --provider runpod --model <model>`\n"
-            output_text += "   Then route with: `terradev inference route --strategy latency`"
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "💡 **Tip:** Register inference endpoints first with:\n"
+                    output_text += "   `terradev inference deploy --provider runpod --model <model>`\n"
+                    output_text += "   Then route with: `terradev inference route --strategy latency`"
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             elif tool_name == "infer_route_disagg":
@@ -4225,109 +4229,109 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 cmd_args = ["inference", "route", "--disagg"]
                 cmd_args.extend(["--model", arguments["model"]])
                 if arguments.get("check_health", True):
-            cmd_args.append("--check")
+                    cmd_args.append("--check")
         
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
         
                 output_text = "⚡ **Disaggregated Prefill/Decode Routing (DistServe)**\n\n"
                 if result["success"]:
-            output_text += f"**Model:** {arguments['model']}\n"
-            output_text += "**Architecture:** DistServe — PREFILL (compute-bound) → DECODE (memory-bound)\n"
-            output_text += "**KV Cache Handoff:** tracked via PrefillDecodeTracker\n\n"
-            output_text += output
+                    output_text += f"**Model:** {arguments['model']}\n"
+                    output_text += "**Architecture:** DistServe — PREFILL (compute-bound) → DECODE (memory-bound)\n"
+                    output_text += "**KV Cache Handoff:** tracked via PrefillDecodeTracker\n\n"
+                    output_text += output
                 else:
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "💡 **Tip:** Disaggregated routing requires endpoints tagged with phase:\n"
-            output_text += "   PREFILL endpoints: high-FLOPS GPUs (H100 SXM)\n"
-            output_text += "   DECODE endpoints: high-bandwidth GPUs (H200, MI300X)\n"
-            output_text += "   Register with: `terradev inference deploy --phase prefill --gpu H100`"
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "💡 **Tip:** Disaggregated routing requires endpoints tagged with phase:\n"
+                    output_text += "   PREFILL endpoints: high-FLOPS GPUs (H100 SXM)\n"
+                    output_text += "   DECODE endpoints: high-bandwidth GPUs (H200, MI300X)\n"
+                    output_text += "   Register with: `terradev inference deploy --phase prefill --gpu H100`"
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             elif tool_name == "infer_status":
                 cmd_args = ["inference", "status"]
                 if arguments.get("check"):
-            cmd_args.append("--check")
+                    cmd_args.append("--check")
         
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
         
                 output_text = "📊 **Inference Endpoint Status**\n\n"
                 if result["success"]:
-            output_text += output
+                    output_text += output
                 else:
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "💡 No inference endpoints registered. Deploy one with:\n"
-            output_text += "   `terradev inference deploy --provider runpod --model <model> --gpu H100`"
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "💡 No inference endpoints registered. Deploy one with:\n"
+                    output_text += "   `terradev inference deploy --provider runpod --model <model> --gpu H100`"
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             elif tool_name == "infer_failover":
                 cmd_args = ["inference", "failover"]
                 if arguments.get("dry_run"):
-            cmd_args.append("--dry-run")
+                    cmd_args.append("--dry-run")
         
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
         
                 output_text = "🔄 **Inference Auto-Failover**\n\n"
                 if result["success"]:
-            output_text += output
+                    output_text += output
                 else:
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "💡 Register backup endpoints with:\n"
-            output_text += "   `terradev inference deploy --provider <backup> --model <model> --backup`"
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "💡 Register backup endpoints with:\n"
+                    output_text += "   `terradev inference deploy --provider <backup> --model <model> --backup`"
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             elif tool_name == "gpu_topology":
                 cmd_args = ["inference", "topology"]
                 gpu_arch = arguments.get("gpu_arch", "auto")
                 if gpu_arch and gpu_arch != "auto":
-            cmd_args.extend(["--arch", gpu_arch])
+                    cmd_args.extend(["--arch", gpu_arch])
                 if arguments.get("generate_env", True):
-            cmd_args.append("--env")
+                    cmd_args.append("--env")
         
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
         
                 output_text = "🔬 **GPU NUMA Topology Report**\n\n"
                 if result["success"]:
-            output_text += output
-            if arguments.get("generate_env", True):
-                output_text += "\n\n**XCD-Aware Environment Variables Generated**\n"
-                output_text += "Apply these to your vLLM/SGLang process for optimal attention kernel performance.\n"
+                    output_text += output
+                    if arguments.get("generate_env", True):
+                        output_text += "\n\n**XCD-Aware Environment Variables Generated**\n"
+                        output_text += "Apply these to your vLLM/SGLang process for optimal attention kernel performance.\n"
                 else:
-            # Provide useful topology info even without live GPUs
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "📋 **Reference: Intra-GPU NUMA Topology**\n\n"
-            output_text += "| GPU | XCDs | HBM | Architecture |\n"
-            output_text += "|-----|------|-----|-------------|\n"
-            output_text += "| MI300X | 8 XCDs | 192GB HBM3 | CDNA3 chiplet |\n"
-            output_text += "| MI300A | 6 XCDs | 128GB HBM3 | CDNA3 APU |\n"
-            output_text += "| H200 | 1 (unified) | 141GB HBM3e | Hopper |\n"
-            output_text += "| H100 SXM | 1 (unified) | 80GB HBM3 | Hopper |\n"
-            output_text += "| A100 | 1 (unified) | 80GB HBM2e | Ampere |\n\n"
-            output_text += "💡 **XCD-aware env vars for MI300X:**\n"
-            output_text += "```\n"
-            output_text += "AITER_XCD_AWARE_ATTENTION=1\n"
-            output_text += "CK_BLOCK_MAPPING_POLICY=xcd_aware\n"
-            output_text += "NCCL_INTRA_GPU_NUMA=1\n"
-            output_text += "```"
+                    # Provide useful topology info even without live GPUs
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "📋 **Reference: Intra-GPU NUMA Topology**\n\n"
+                    output_text += "| GPU | XCDs | HBM | Architecture |\n"
+                    output_text += "|-----|------|-----|-------------|\n"
+                    output_text += "| MI300X | 8 XCDs | 192GB HBM3 | CDNA3 chiplet |\n"
+                    output_text += "| MI300A | 6 XCDs | 128GB HBM3 | CDNA3 APU |\n"
+                    output_text += "| H200 | 1 (unified) | 141GB HBM3e | Hopper |\n"
+                    output_text += "| H100 SXM | 1 (unified) | 80GB HBM3 | Hopper |\n"
+                    output_text += "| A100 | 1 (unified) | 80GB HBM2e | Ampere |\n\n"
+                    output_text += "💡 **XCD-aware env vars for MI300X:**\n"
+                    output_text += "```\n"
+                    output_text += "AITER_XCD_AWARE_ATTENTION=1\n"
+                    output_text += "CK_BLOCK_MAPPING_POLICY=xcd_aware\n"
+                    output_text += "NCCL_INTRA_GPU_NUMA=1\n"
+                    output_text += "```"
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             elif tool_name == "price_intel":
@@ -4335,31 +4339,31 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 days = arguments.get("days", 7)
                 cmd_args = ["analytics", "--price-intel", "--gpu", gpu_type, "--days", str(days)]
                 if "provider" in arguments:
-            cmd_args.extend(["--provider", arguments["provider"]])
+                    cmd_args.extend(["--provider", arguments["provider"]])
         
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
         
                 output_text = f"📈 **GPU Price Intelligence — {gpu_type}**\n\n"
                 if result["success"]:
-            output_text += f"**Period:** {days} days\n"
-            output_text += "**Metrics:** delta (δ), gamma (γ), realized volatility (σ)\n\n"
-            output_text += output
+                    output_text += f"**Period:** {days} days\n"
+                    output_text += "**Metrics:** delta (δ), gamma (γ), realized volatility (σ)\n\n"
+                    output_text += output
                 else:
-            # Still useful — run a fresh quote to seed the price tick db
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "💡 **Tip:** Price intelligence requires historical data. Seed it with:\n"
-            output_text += f"   `terradev quote -g {gpu_type}` (run periodically to build history)\n\n"
-            output_text += "**Metrics available after seeding:**\n"
-            output_text += "- **Delta (δ):** Rate of price change ($/hr/day)\n"
-            output_text += "- **Gamma (γ):** Acceleration of price change\n"
-            output_text += "- **Realized Volatility (σ):** Annualized price volatility\n"
-            output_text += "- **Cheapest Window:** Best time to provision\n"
-            output_text += "- **Arbitrage Spread:** Max price difference across providers"
+                    # Still useful — run a fresh quote to seed the price tick db
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "💡 **Tip:** Price intelligence requires historical data. Seed it with:\n"
+                    output_text += f"   `terradev quote -g {gpu_type}` (run periodically to build history)\n\n"
+                    output_text += "**Metrics available after seeding:**\n"
+                    output_text += "- **Delta (δ):** Rate of price change ($/hr/day)\n"
+                    output_text += "- **Gamma (γ):** Acceleration of price change\n"
+                    output_text += "- **Realized Volatility (σ):** Annualized price volatility\n"
+                    output_text += "- **Cheapest Window:** Best time to provision\n"
+                    output_text += "- **Arbitrage Spread:** Max price difference across providers"
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             elif tool_name == "moe_deploy":
@@ -4377,7 +4381,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                      "--set", f"backend={backend}",
                      "--set", f"quantization={quantization}"]
                 if dry_run:
-            cmd_args.append("--dry-run")
+                    cmd_args.append("--dry-run")
         
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
@@ -4395,24 +4399,24 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output_text += "• Expert Load Balancing + DeepEP/DeepGEMM kernels\n\n"
         
                 if result["success"]:
-            output_text += output
+                    output_text += output
                 else:
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "💡 **Manual deployment:**\n"
-            output_text += f"```bash\n"
-            output_text += f"terradev provision --task clusters/moe-template/task.yaml \\\n"
-            output_text += f"  --set model_id={model_id} --set tp_size={tp_size}\n"
-            output_text += f"```\n\n"
-            output_text += "**Or via Kubernetes:**\n"
-            output_text += f"```bash\n"
-            output_text += f"kubectl apply -f clusters/moe-template/k8s/\n"
-            output_text += f"```"
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "💡 **Manual deployment:**\n"
+                    output_text += f"```bash\n"
+                    output_text += f"terradev provision --task clusters/moe-template/task.yaml \\\n"
+                    output_text += f"  --set model_id={model_id} --set tp_size={tp_size}\n"
+                    output_text += f"```\n\n"
+                    output_text += "**Or via Kubernetes:**\n"
+                    output_text += f"```bash\n"
+                    output_text += f"kubectl apply -f clusters/moe-template/k8s/\n"
+                    output_text += f"```"
         
                 output_text += "\n\n🔗 **Next:** Use `lora_add` to hot-load fine-tuned adapters onto this endpoint."
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             # ── v3.5.0 Handlers: Multi-LoRA ───────────────────────────────────
@@ -4422,7 +4426,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 api_key = arguments.get("api_key", "")
                 cmd_args = ["lora", "list", "-e", endpoint]
                 if api_key:
-            cmd_args.extend(["--api-key", api_key])
+                    cmd_args.extend(["--api-key", api_key])
         
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
@@ -4432,8 +4436,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output_text += "\n💡 Use `lora_add` to hot-load a fine-tuned adapter."
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             elif tool_name == "lora_add":
@@ -4443,24 +4447,24 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 api_key = arguments.get("api_key", "")
                 cmd_args = ["lora", "add", "-e", endpoint, "-n", name, "-p", path]
                 if api_key:
-            cmd_args.extend(["--api-key", api_key])
+                    cmd_args.extend(["--api-key", api_key])
         
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
         
                 if result["success"]:
-            output_text = f"✅ **Adapter '{name}' loaded on {endpoint}**\n\n"
-            output_text += f"Use in API requests: `\"model\": \"{name}\"`\n\n"
-            output_text += f"```bash\n"
-            output_text += f"curl {endpoint}/v1/chat/completions \\\n"
-            output_text += f"  -d '{{\"model\": \"{name}\", \"messages\": [...]}}' \n"
-            output_text += f"```"
+                    output_text = f"✅ **Adapter '{name}' loaded on {endpoint}**\n\n"
+                    output_text += f"Use in API requests: `\"model\": \"{name}\"`\n\n"
+                    output_text += f"```bash\n"
+                    output_text += f"curl {endpoint}/v1/chat/completions \\\n"
+                    output_text += f"  -d '{{\"model\": \"{name}\", \"messages\": [...]}}' \n"
+                    output_text += f"```"
                 else:
-            output_text = f"❌ **Failed to load adapter '{name}'**\n\n{output}"
+                    output_text = f"❌ **Failed to load adapter '{name}'**\n\n{output}"
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             elif tool_name == "lora_remove":
@@ -4469,20 +4473,20 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 api_key = arguments.get("api_key", "")
                 cmd_args = ["lora", "remove", "-e", endpoint, "-n", name]
                 if api_key:
-            cmd_args.extend(["--api-key", api_key])
+                    cmd_args.extend(["--api-key", api_key])
         
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
         
                 if result["success"]:
-            output_text = f"✅ **Adapter '{name}' unloaded from {endpoint}**\n"
-            output_text += "GPU memory freed for other adapters."
+                    output_text = f"✅ **Adapter '{name}' unloaded from {endpoint}**\n"
+                    output_text += "GPU memory freed for other adapters."
                 else:
-            output_text = f"❌ **Failed to unload adapter '{name}'**\n\n{output}"
+                    output_text = f"❌ **Failed to unload adapter '{name}'**\n\n{output}"
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             # ── v3.4.0 Handlers ──────────────────────────────────────────────────
@@ -4490,35 +4494,35 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "train":
                 cmd_args = ["train", "--script", arguments["script"]]
                 if "framework" in arguments:
-            cmd_args.extend(["--framework", arguments["framework"]])
+                    cmd_args.extend(["--framework", arguments["framework"]])
                 if "from_provision" in arguments:
-            cmd_args.extend(["--from-provision", arguments["from_provision"]])
+                    cmd_args.extend(["--from-provision", arguments["from_provision"]])
                 elif "nodes" in arguments:
-            for node in arguments["nodes"]:
-                cmd_args.extend(["--node", node])
+                    for node in arguments["nodes"]:
+                        cmd_args.extend(["--node", node])
                 if "gpus_per_node" in arguments:
-            cmd_args.extend(["--gpus-per-node", str(arguments["gpus_per_node"])])
+                    cmd_args.extend(["--gpus-per-node", str(arguments["gpus_per_node"])])
                 if "script_args" in arguments:
-            cmd_args.extend(["--", arguments["script_args"]])
+                    cmd_args.extend(["--", arguments["script_args"]])
 
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "🚀 **Training Launch**\n\n"
                 if result["success"]:
-            output_text += f"**Script:** {arguments['script']}\n"
-            output_text += f"**Framework:** {arguments.get('framework', 'torchrun')}\n\n"
-            output_text += output
+                    output_text += f"**Script:** {arguments['script']}\n"
+                    output_text += f"**Framework:** {arguments.get('framework', 'torchrun')}\n\n"
+                    output_text += output
                 else:
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "💡 **Tip:** Provision GPU nodes first:\n"
-            output_text += "   `terradev provision -g H100 -n 4`\n"
-            output_text += "   Then: `terradev train --script train.py --from-provision latest`"
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "💡 **Tip:** Provision GPU nodes first:\n"
+                    output_text += "   `terradev provision -g H100 -n 4`\n"
+                    output_text += "   Then: `terradev train --script train.py --from-provision latest`"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "train_status":
                 cmd_args = ["train-status"]
                 if "job_id" in arguments and arguments["job_id"]:
-            cmd_args.extend(["--job", arguments["job_id"]])
+                    cmd_args.extend(["--job", arguments["job_id"]])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "📋 **Training Jobs**\n\n" + output
@@ -4527,7 +4531,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "train_monitor":
                 cmd_args = ["monitor", "--job", arguments["job_id"]]
                 if "cost_rate" in arguments:
-            cmd_args.extend(["--cost-rate", str(arguments["cost_rate"])])
+                    cmd_args.extend(["--cost-rate", str(arguments["cost_rate"])])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "📊 **GPU Monitor**\n\n" + output
@@ -4543,7 +4547,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "checkpoint_save":
                 cmd_args = ["checkpoint", "save", "--job", arguments["job_id"]]
                 if "step" in arguments:
-            cmd_args.extend(["--step", str(arguments["step"])])
+                    cmd_args.extend(["--step", str(arguments["step"])])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "💾 **Checkpoint Save**\n\n" + output
@@ -4552,10 +4556,10 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "preflight":
                 cmd_args = ["preflight"]
                 if "from_provision" in arguments:
-            cmd_args.extend(["--from-provision", arguments["from_provision"]])
+                    cmd_args.extend(["--from-provision", arguments["from_provision"]])
                 elif "nodes" in arguments:
-            for node in arguments["nodes"]:
-                cmd_args.extend(["--node", node])
+                    for node in arguments["nodes"]:
+                        cmd_args.extend(["--node", node])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "✅ **Preflight Validation**\n\n" + output
@@ -4564,9 +4568,9 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "price_discovery":
                 cmd_args = ["price-discovery", "--gpu-type", arguments["gpu_type"]]
                 if "region" in arguments:
-            cmd_args.extend(["--region", arguments["region"]])
+                    cmd_args.extend(["--region", arguments["region"]])
                 if "hours" in arguments:
-            cmd_args.extend(["--hours", str(arguments["hours"])])
+                    cmd_args.extend(["--hours", str(arguments["hours"])])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = f"💰 **Price Discovery — {arguments['gpu_type']}**\n\n" + output
@@ -4589,21 +4593,21 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
         
                 output_text = f"🔧 **GitOps Repository Initialized**\n\n"
                 if result["success"]:
-            output_text += f"**Repository:** {repo}\n"
-            output_text += f"**Tool:** {tool}\n"
-            output_text += f"**Provider:** {provider}\n"
-            output_text += f"**Cluster:** {cluster}\n\n"
-            output_text += output
-            output_text += "\n\n**Next steps:**\n"
-            output_text += f"1. `terradev gitops bootstrap --tool {tool} --cluster {cluster}`\n"
-            output_text += f"2. `terradev gitops sync --cluster {cluster} --environment prod`\n"
-            output_text += f"3. `terradev gitops validate --dry-run --cluster {cluster}`"
+                    output_text += f"**Repository:** {repo}\n"
+                    output_text += f"**Tool:** {tool}\n"
+                    output_text += f"**Provider:** {provider}\n"
+                    output_text += f"**Cluster:** {cluster}\n\n"
+                    output_text += output
+                    output_text += "\n\n**Next steps:**\n"
+                    output_text += f"1. `terradev gitops bootstrap --tool {tool} --cluster {cluster}`\n"
+                    output_text += f"2. `terradev gitops sync --cluster {cluster} --environment prod`\n"
+                    output_text += f"3. `terradev gitops validate --dry-run --cluster {cluster}`"
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
         
                 return CallToolResult(
-            content=[TextContent(type="text", text=output_text)],
-            isError=not result["success"]
+                    content=[TextContent(type="text", text=output_text)],
+                    isError=not result["success"]
                 )
     
             # ── v2.0.0 Handlers — Complete Agentic Loop ────────────────────────
@@ -4614,42 +4618,42 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "⏹️ **Training Stop**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Check final status with `train_status`, then optionally `train_resume` later."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Check final status with `train_status`, then optionally `train_resume` later."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "train_resume":
                 cmd_args = ["train-resume", "--job-id", arguments["job_id"], "-f", "json"]
                 if arguments.get("checkpoint_id"):
-            cmd_args.extend(["--checkpoint-id", arguments["checkpoint_id"]])
+                    cmd_args.extend(["--checkpoint-id", arguments["checkpoint_id"]])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "▶️ **Training Resume**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Monitor progress with `train_monitor`. Check `train_status` for ETA."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Monitor progress with `train_monitor`. Check `train_status` for ETA."
                 else:
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "💡 **Tip:** Ensure the job has checkpoints: `checkpoint_list`"
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "💡 **Tip:** Ensure the job has checkpoints: `checkpoint_list`"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "checkpoint_restore":
                 cmd_args = ["checkpoint", "restore", "--job-id", arguments["job_id"], "-f", "json"]
                 if arguments.get("step"):
-            cmd_args.extend(["--step", str(arguments["step"])])
+                    cmd_args.extend(["--step", str(arguments["step"])])
                 if arguments.get("checkpoint_id"):
-            cmd_args.extend(["--checkpoint-id", arguments["checkpoint_id"]])
+                    cmd_args.extend(["--checkpoint-id", arguments["checkpoint_id"]])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "💾 **Checkpoint Restore**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Resume training with `train_resume` or promote with `checkpoint_promote`."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Resume training with `train_resume` or promote with `checkpoint_promote`."
                 else:
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "💡 List available checkpoints: `checkpoint_list`"
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "💡 List available checkpoints: `checkpoint_list`"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "checkpoint_promote":
@@ -4660,11 +4664,11 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "🏆 **Checkpoint Promoted**\n\n"
                 if result["success"]:
-            output_text += f"**Destination:** {arguments['dest']}\n\n"
-            output_text += output
-            output_text += "\n\n**suggest_action:** Deploy for inference with `infer_deploy` or `inferx_deploy`."
+                    output_text += f"**Destination:** {arguments['dest']}\n\n"
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Deploy for inference with `infer_deploy` or `inferx_deploy`."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "checkpoint_delete":
@@ -4678,19 +4682,19 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "stage":
                 cmd_args = ["stage", "--dataset", arguments["dataset"]]
                 if arguments.get("target_regions"):
-            cmd_args.extend(["--target-regions", arguments["target_regions"]])
+                    cmd_args.extend(["--target-regions", arguments["target_regions"]])
                 if arguments.get("compression"):
-            cmd_args.extend(["--compression", arguments["compression"]])
+                    cmd_args.extend(["--compression", arguments["compression"]])
                 if arguments.get("plan_only"):
-            cmd_args.append("--plan-only")
+                    cmd_args.append("--plan-only")
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "📦 **Data Staging**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Data is staged. Proceed with `train` to start training or `preflight` to validate nodes."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Data is staged. Proceed with `train` to start training or `preflight` to validate nodes."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "infer_deploy":
@@ -4703,57 +4707,57 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 est_cost = gpu_costs.get(gpu_type, 2.00) * arguments.get("max_workers", 3)
 
                 if arguments.get("dry_run"):
-            output_text = "📋 **Inference Deployment Plan (Dry Run)**\n\n"
-            output_text += f"**Model:** {model_path}\n"
-            output_text += f"**Endpoint:** {name}\n"
-            output_text += f"**GPU:** {gpu_type}\n"
-            output_text += f"**Workers:** {arguments.get('min_workers', 0)}-{arguments.get('max_workers', 3)}\n"
-            output_text += f"**Idle Timeout:** {arguments.get('idle_timeout', 300)}s\n"
-            output_text += f"**Estimated Max Cost:** ${est_cost:.2f}/hr\n\n"
-            output_text += "**requires_confirmation:** true\n"
-            output_text += f"**estimated_cost:** ${est_cost:.2f}/hr (max {arguments.get('max_workers', 3)} workers × ${gpu_costs.get(gpu_type, 2.00):.2f}/hr)\n\n"
-            budget_rate = gpu_costs.get(gpu_type, 2.00)
-            output_text += f"**suggest_action:** Dry run complete: ${est_cost:.2f}/hr for {arguments.get('max_workers', 3)} workers. This requires confirmation — the cost scaler enforces a ${budget_rate:.2f}/hr-per-worker guardrail. Call `infer_deploy` without `dry_run` to execute."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    output_text = "📋 **Inference Deployment Plan (Dry Run)**\n\n"
+                    output_text += f"**Model:** {model_path}\n"
+                    output_text += f"**Endpoint:** {name}\n"
+                    output_text += f"**GPU:** {gpu_type}\n"
+                    output_text += f"**Workers:** {arguments.get('min_workers', 0)}-{arguments.get('max_workers', 3)}\n"
+                    output_text += f"**Idle Timeout:** {arguments.get('idle_timeout', 300)}s\n"
+                    output_text += f"**Estimated Max Cost:** ${est_cost:.2f}/hr\n\n"
+                    output_text += "**requires_confirmation:** true\n"
+                    output_text += f"**estimated_cost:** ${est_cost:.2f}/hr (max {arguments.get('max_workers', 3)} workers × ${gpu_costs.get(gpu_type, 2.00):.2f}/hr)\n\n"
+                    budget_rate = gpu_costs.get(gpu_type, 2.00)
+                    output_text += f"**suggest_action:** Dry run complete: ${est_cost:.2f}/hr for {arguments.get('max_workers', 3)} workers. This requires confirmation — the cost scaler enforces a ${budget_rate:.2f}/hr-per-worker guardrail. Call `infer_deploy` without `dry_run` to execute."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
 
                 cmd_args = ["infer-deploy", model_path, "--name", name]
                 if arguments.get("provider"):
-            cmd_args.extend(["--provider", arguments["provider"]])
+                    cmd_args.extend(["--provider", arguments["provider"]])
                 if arguments.get("gpu_type"):
-            cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
+                    cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
                 if "idle_timeout" in arguments:
-            cmd_args.extend(["--idle-timeout", str(arguments["idle_timeout"])])
+                    cmd_args.extend(["--idle-timeout", str(arguments["idle_timeout"])])
                 if arguments.get("cost_optimize"):
-            cmd_args.append("--cost-optimize")
+                    cmd_args.append("--cost-optimize")
                 if "min_workers" in arguments:
-            cmd_args.extend(["--min-workers", str(arguments["min_workers"])])
+                    cmd_args.extend(["--min-workers", str(arguments["min_workers"])])
                 if "max_workers" in arguments:
-            cmd_args.extend(["--max-workers", str(arguments["max_workers"])])
+                    cmd_args.extend(["--max-workers", str(arguments["max_workers"])])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "🚀 **Inference Deployment**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += f"\n\n**estimated_cost:** ${est_cost:.2f}/hr (max)\n"
-            output_text += f"**suggest_action:** Deployment active at ${est_cost:.2f}/hr (max). The orchestrator will enforce idle timeout and auto-scale constraints. Monitor: `infer_status`."
+                    output_text += output
+                    output_text += f"\n\n**estimated_cost:** ${est_cost:.2f}/hr (max)\n"
+                    output_text += f"**suggest_action:** Deployment active at ${est_cost:.2f}/hr (max). The orchestrator will enforce idle timeout and auto-scale constraints. Monitor: `infer_status`."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "up":
                 cmd_args = ["up", "--job", arguments["job"]]
                 if arguments.get("gpu_type"):
-            cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
+                    cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
                 if arguments.get("gpu_count"):
-            cmd_args.extend(["--count", str(arguments["gpu_count"])])
+                    cmd_args.extend(["--count", str(arguments["gpu_count"])])
                 if arguments.get("ttl"):
-            cmd_args.extend(["--ttl", arguments["ttl"]])
+                    cmd_args.extend(["--ttl", arguments["ttl"]])
                 if arguments.get("budget"):
-            cmd_args.extend(["--budget", str(arguments["budget"])])
+                    cmd_args.extend(["--budget", str(arguments["budget"])])
                 if arguments.get("region"):
-            cmd_args.extend(["--region", arguments["region"]])
+                    cmd_args.extend(["--region", arguments["region"]])
                 if arguments.get("fix_drift"):
-            cmd_args.append("--fix-drift")
+                    cmd_args.append("--fix-drift")
                 # Cost guardrail
                 gpu_type = arguments.get("gpu_type", "A100")
                 gpu_count = arguments.get("gpu_count", 1)
@@ -4766,13 +4770,13 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "⬆️ **Manifest-Cached Provision**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += f"\n\n**estimated_cost:** ${est_hourly:.2f}/hr × {hours}h = ${est_total:.2f}\n"
-            if est_total > 50:
-                output_text += "⚠️ **Cost Warning:** Estimated spend exceeds $50. Monitor with `status`.\n"
-            output_text += f"**suggest_action:** Infrastructure provisioned via manifest-cached DAG ({gpu_count}× {gpu_type}, ${est_hourly:.2f}/hr). Drift detection is active. Next: `preflight` to validate nodes, then `train` to launch."
+                    output_text += output
+                    output_text += f"\n\n**estimated_cost:** ${est_hourly:.2f}/hr × {hours}h = ${est_total:.2f}\n"
+                    if est_total > 50:
+                        output_text += "⚠️ **Cost Warning:** Estimated spend exceeds $50. Monitor with `status`.\n"
+                    output_text += f"**suggest_action:** Infrastructure provisioned via manifest-cached DAG ({gpu_count}× {gpu_type}, ${est_hourly:.2f}/hr). Drift detection is active. Next: `preflight` to validate nodes, then `train` to launch."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "rollback":
@@ -4781,16 +4785,16 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "⏪ **Rollback**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Check current state with `manifests` and verify with `status`."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Check current state with `manifests` and verify with `status`."
                 else:
-            output_text += f"⚠️ {output}\n\n💡 List versions: `manifests`"
+                    output_text += f"⚠️ {output}\n\n💡 List versions: `manifests`"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "manifests":
                 cmd_args = ["manifests"]
                 if arguments.get("job"):
-            cmd_args.extend(["--job", arguments["job"]])
+                    cmd_args.extend(["--job", arguments["job"]])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "📋 **Cached Manifests**\n\n" + output
@@ -4799,37 +4803,37 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "smart_deploy":
                 cmd_args = ["smart-deploy", "--image", arguments["image"], "--workload", arguments["workload"]]
                 if arguments.get("gpu_type"):
-            cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
+                    cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
                 if arguments.get("budget"):
-            cmd_args.extend(["--budget", str(arguments["budget"])])
+                    cmd_args.extend(["--budget", str(arguments["budget"])])
                 if arguments.get("option") is not None:
-            cmd_args.extend(["--option", str(arguments["option"])])
+                    cmd_args.extend(["--option", str(arguments["option"])])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "🧠 **Smart Deployment**\n\n"
                 if result["success"]:
-            output_text += output
-            if arguments.get("option") is None:
-                output_text += "\n\n**requires_confirmation:** true\n"
-                output_text += "**suggest_action:** Options ranked by cost/risk. Selection requires confirmation — the deployment graph enforces manifest checksums and drift detection before applying. Execute with `smart_deploy` and `option` parameter."
+                    output_text += output
+                    if arguments.get("option") is None:
+                        output_text += "\n\n**requires_confirmation:** true\n"
+                    output_text += "**suggest_action:** Options ranked by cost/risk. Selection requires confirmation — the deployment graph enforces manifest checksums and drift detection before applying. Execute with `smart_deploy` and `option` parameter."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "helm_generate":
                 cmd_args = ["helm-generate", "--workload", arguments["workload"], "--image", arguments["image"]]
                 if arguments.get("gpu_type"):
-            cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
+                    cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
                 if arguments.get("replicas"):
-            cmd_args.extend(["--replicas", str(arguments["replicas"])])
+                    cmd_args.extend(["--replicas", str(arguments["replicas"])])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "⎈ **Helm Chart Generated**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Apply with `kubectl apply -f` or deploy to cluster with `k8s_create`."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Apply with `kubectl apply -f` or deploy to cluster with `k8s_create`."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "gitops_bootstrap":
@@ -4837,40 +4841,40 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 cluster = arguments["cluster"]
                 cmd_args = ["gitops", "bootstrap", "--tool", tool, "--cluster", cluster]
                 if arguments.get("namespace"):
-            cmd_args.extend(["--namespace", arguments["namespace"]])
+                    cmd_args.extend(["--namespace", arguments["namespace"]])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = f"🔧 **GitOps Bootstrap ({tool})**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += f"\n\n**suggest_action:** Sync with `gitops_sync --cluster {cluster}`. Validate with `gitops_validate`."
+                    output_text += output
+                    output_text += f"\n\n**suggest_action:** Sync with `gitops_sync --cluster {cluster}`. Validate with `gitops_validate`."
                 else:
-            output_text += f"⚠️ {output}\n\n💡 Initialize first: `gitops_init`"
+                    output_text += f"⚠️ {output}\n\n💡 Initialize first: `gitops_init`"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "gitops_sync":
                 cluster = arguments["cluster"]
                 cmd_args = ["gitops", "sync", "--cluster", cluster]
                 if arguments.get("environment"):
-            cmd_args.extend(["--environment", arguments["environment"]])
+                    cmd_args.extend(["--environment", arguments["environment"]])
                 if arguments.get("tool"):
-            cmd_args.extend(["--tool", arguments["tool"]])
+                    cmd_args.extend(["--tool", arguments["tool"]])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = f"🔄 **GitOps Sync — {cluster}**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Validate sync with `gitops_validate`."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Validate sync with `gitops_validate`."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "gitops_validate":
                 cmd_args = ["gitops", "validate"]
                 if arguments.get("cluster"):
-            cmd_args.extend(["--cluster", arguments["cluster"]])
+                    cmd_args.extend(["--cluster", arguments["cluster"]])
                 if arguments.get("dry_run", True):
-            cmd_args.append("--dry-run")
+                    cmd_args.append("--dry-run")
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "✅ **GitOps Validation**\n\n" + output
@@ -4879,50 +4883,50 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "orchestrator_start":
                 cmd_args = ["orchestrator-start"]
                 if arguments.get("gpu_id") is not None:
-            cmd_args.extend(["--gpu-id", str(arguments["gpu_id"])])
+                    cmd_args.extend(["--gpu-id", str(arguments["gpu_id"])])
                 if arguments.get("memory_gb"):
-            cmd_args.extend(["--memory-gb", str(arguments["memory_gb"])])
+                    cmd_args.extend(["--memory-gb", str(arguments["memory_gb"])])
                 if arguments.get("policy"):
-            cmd_args.extend(["--policy", arguments["policy"]])
+                    cmd_args.extend(["--policy", arguments["policy"]])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "🎛️ **Model Orchestrator Started**\n\n"
                 if result["success"]:
-            output_text += output
-            gpu_id = arguments.get('gpu_id', 0)
-            memory_gb = arguments.get('memory_gb', 80)
-            policy = arguments.get('policy', 'billing_optimized')
-            output_text += f"\n\n**suggest_action:** Orchestrator is enforcing memory invariants on GPU {gpu_id} ({memory_gb}GB, {policy} policy). Register models to enter the scheduling graph: `orchestrator_register`."
+                    output_text += output
+                    gpu_id = arguments.get('gpu_id', 0)
+                    memory_gb = arguments.get('memory_gb', 80)
+                    policy = arguments.get('policy', 'billing_optimized')
+                    output_text += f"\n\n**suggest_action:** Orchestrator is enforcing memory invariants on GPU {gpu_id} ({memory_gb}GB, {policy} policy). Register models to enter the scheduling graph: `orchestrator_register`."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "orchestrator_register":
                 cmd_args = ["orchestrator-register", arguments["model_id"], arguments["model_path"]]
                 if arguments.get("framework"):
-            cmd_args.extend(["--framework", arguments["framework"]])
+                    cmd_args.extend(["--framework", arguments["framework"]])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = f"📝 **Model Registered: {arguments['model_id']}**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += f"\n\n**suggest_action:** Model `{arguments['model_id']}` is now in the scheduling graph. The orchestrator will enforce memory and cost constraints on load. Next: `orchestrator_load`."
+                    output_text += output
+                    output_text += f"\n\n**suggest_action:** Model `{arguments['model_id']}` is now in the scheduling graph. The orchestrator will enforce memory and cost constraints on load. Next: `orchestrator_load`."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "orchestrator_load":
                 cmd_args = ["orchestrator-load", arguments["model_id"]]
                 if arguments.get("force"):
-            cmd_args.append("--force")
+                    cmd_args.append("--force")
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = f"📥 **Model Loaded: {arguments['model_id']}**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Model loaded within memory budget. The orchestrator will auto-evict if idle >15min under billing-optimized policy. Verify inference: `orchestrator_infer`."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Model loaded within memory budget. The orchestrator will auto-evict if idle >15min under billing-optimized policy. Verify inference: `orchestrator_infer`."
                 else:
-            output_text += f"⚠️ Load blocked: {output}\n\nThe cost scaler or memory invariant rejected this load. Use `--force` to override constraints, or free memory with `orchestrator_evict`."
+                    output_text += f"⚠️ Load blocked: {output}\n\nThe cost scaler or memory invariant rejected this load. Use `--force` to override constraints, or free memory with `orchestrator_evict`."
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "orchestrator_evict":
@@ -4935,23 +4939,23 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "orchestrator_status":
                 cmd_args = ["orchestrator-status"]
                 if arguments.get("model_id"):
-            cmd_args.append(arguments["model_id"])
+                    cmd_args.append(arguments["model_id"])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "🎛️ **Orchestrator Status**\n\n"
                 if result["success"]:
-            output_text += output
-            # Agent recommendations based on output
-            if "utilization" in output.lower():
-                output_text += "\n\n**recommend:** "
-                if "90%" in output or "95%" in output or "100%" in output:
-                    output_text += "Memory invariant near threshold. Eviction policy will auto-reclaim from lowest-priority idle models. Manual override: `orchestrator_evict`."
-                elif "10%" in output or "15%" in output or "20%" in output:
-                    output_text += "Memory underutilized — scheduling graph has capacity. Load more models with `orchestrator_load` to increase warm pool coverage."
+                    output_text += output
+                    # Agent recommendations based on output
+                    if "utilization" in output.lower():
+                        output_text += "\n\n**recommend:** "
+                        if "90%" in output or "95%" in output or "100%" in output:
+                            output_text += "Memory invariant near threshold. Eviction policy will auto-reclaim from lowest-priority idle models. Manual override: `orchestrator_evict`."
+                        elif "10%" in output or "15%" in output or "20%" in output:
+                            output_text += "Memory underutilized — scheduling graph has capacity. Load more models with `orchestrator_load` to increase warm pool coverage."
+                        else:
+                            output_text += "Memory utilization within policy bounds. The orchestrator is maintaining headroom for burst loads."
                 else:
-                    output_text += "Memory utilization within policy bounds. The orchestrator is maintaining headroom for burst loads."
-                else:
-            output_text += f"⚠️ {output}\n\n💡 Start orchestrator first: `orchestrator_start`"
+                    output_text += f"⚠️ {output}\n\n💡 Start orchestrator first: `orchestrator_start`"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "orchestrator_infer":
@@ -4964,22 +4968,22 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "warm_pool_start":
                 cmd_args = ["warm-pool-start"]
                 if arguments.get("strategy"):
-            cmd_args.extend(["--strategy", arguments["strategy"]])
+                    cmd_args.extend(["--strategy", arguments["strategy"]])
                 if arguments.get("max_warm"):
-            cmd_args.extend(["--max-warm", str(arguments["max_warm"])])
+                    cmd_args.extend(["--max-warm", str(arguments["max_warm"])])
                 if arguments.get("min_warm"):
-            cmd_args.extend(["--min-warm", str(arguments["min_warm"])])
+                    cmd_args.extend(["--min-warm", str(arguments["min_warm"])])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "🔥 **Warm Pool Started**\n\n"
                 if result["success"]:
-            output_text += output
-            strategy = arguments.get('strategy', 'traffic_based')
-            max_warm = arguments.get('max_warm', 10)
-            min_warm = arguments.get('min_warm', 3)
-            output_text += f"\n\n**suggest_action:** Warm pool enforcing [{min_warm}, {max_warm}] model bounds under {strategy} policy. Register models to enter the warming graph: `warm_pool_register`."
+                    output_text += output
+                    strategy = arguments.get('strategy', 'traffic_based')
+                    max_warm = arguments.get('max_warm', 10)
+                    min_warm = arguments.get('min_warm', 3)
+                    output_text += f"\n\n**suggest_action:** Warm pool enforcing [{min_warm}, {max_warm}] model bounds under {strategy} policy. Register models to enter the warming graph: `warm_pool_register`."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "warm_pool_status":
@@ -4988,35 +4992,35 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "🔥 **Warm Pool Status**\n\n"
                 if result["success"]:
-            output_text += output
-            # Agent recommendation
-            output_text += "\n\n**recommend:** "
-            if "hit rate" in output.lower():
-                output_text += "The warm pool enforces model bounds and eviction policy. If hit rate is below 80%, the pool's constraints may be too aggressive — consider increasing `max_warm` or switching strategy."
-            else:
-                output_text += "Warm pool is enforcing its scheduling invariants. Cold starts are being minimized within the configured bounds."
+                    output_text += output
+                    # Agent recommendation
+                    output_text += "\n\n**recommend:** "
+                    if "hit rate" in output.lower():
+                        output_text += "The warm pool enforces model bounds and eviction policy. If hit rate is below 80%, the pool's constraints may be too aggressive — consider increasing `max_warm` or switching strategy."
+                    else:
+                        output_text += "Warm pool is enforcing its scheduling invariants. Cold starts are being minimized within the configured bounds."
                 else:
-            output_text += f"⚠️ {output}\n\n💡 Start warm pool first: `warm_pool_start`"
+                    output_text += f"⚠️ {output}\n\n💡 Start warm pool first: `warm_pool_start`"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "cost_scaler_start":
                 cmd_args = ["cost-scaler-start"]
                 if arguments.get("strategy"):
-            cmd_args.extend(["--strategy", arguments["strategy"]])
+                    cmd_args.extend(["--strategy", arguments["strategy"]])
                 if arguments.get("budget"):
-            cmd_args.extend(["--budget", str(arguments["budget"])])
+                    cmd_args.extend(["--budget", str(arguments["budget"])])
                 if arguments.get("cost_per_gb"):
-            cmd_args.extend(["--cost-per-gb", str(arguments["cost_per_gb"])])
+                    cmd_args.extend(["--cost-per-gb", str(arguments["cost_per_gb"])])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "💰 **Cost Scaler Started**\n\n"
                 if result["success"]:
-            output_text += output
-            strategy = arguments.get('strategy', 'balance_cost_latency')
-            budget = arguments.get('budget', 15.0)
-            output_text += f"\n\n**suggest_action:** Cost scaler enforcing ${budget:.2f}/hr budget under {strategy} policy. The scaler will block loads that exceed budget constraints. Monitor: `cost_scaler_status`."
+                    output_text += output
+                    strategy = arguments.get('strategy', 'balance_cost_latency')
+                    budget = arguments.get('budget', 15.0)
+                    output_text += f"\n\n**suggest_action:** Cost scaler enforcing ${budget:.2f}/hr budget under {strategy} policy. The scaler will block loads that exceed budget constraints. Monitor: `cost_scaler_status`."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "cost_scaler_status":
@@ -5025,33 +5029,33 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "💰 **Cost Scaler Status**\n\n"
                 if result["success"]:
-            output_text += output
-            # Agent recommendations
-            output_text += "\n\n**recommend:** "
-            if "budget" in output.lower() and ("exceed" in output.lower() or "over" in output.lower()):
-                output_text += "⚠️ Budget constraint active: the scaler will block new model loads until utilization drops below 80%. Reduce spend with `orchestrator_evict` or switch to `minimize_cost` strategy."
-            elif "under" in output.lower():
-                output_text += "Budget constraint has headroom. The scaler permits new loads within the remaining budget envelope."
-            else:
-                output_text += "Cost invariants holding. The scaler is maintaining spend within configured bounds."
+                    output_text += output
+                    # Agent recommendations
+                    output_text += "\n\n**recommend:** "
+                    if "budget" in output.lower() and ("exceed" in output.lower() or "over" in output.lower()):
+                        output_text += "⚠️ Budget constraint active: the scaler will block new model loads until utilization drops below 80%. Reduce spend with `orchestrator_evict` or switch to `minimize_cost` strategy."
+                    elif "under" in output.lower():
+                        output_text += "Budget constraint has headroom. The scaler permits new loads within the remaining budget envelope."
+                    else:
+                        output_text += "Cost invariants holding. The scaler is maintaining spend within configured bounds."
                 else:
-            output_text += f"⚠️ {output}\n\n💡 Start cost scaler first: `cost_scaler_start`"
+                    output_text += f"⚠️ {output}\n\n💡 Start cost scaler first: `cost_scaler_start`"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "inferx_configure":
                 cmd_args = ["inferx", "configure", "--api-key", arguments["api_key"]]
                 if arguments.get("endpoint"):
-            cmd_args.extend(["--endpoint", arguments["endpoint"]])
+                    cmd_args.extend(["--endpoint", arguments["endpoint"]])
                 if arguments.get("region"):
-            cmd_args.extend(["--region", arguments["region"]])
+                    cmd_args.extend(["--region", arguments["region"]])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "🔑 **InferX Configured**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Deploy a model with `inferx_deploy` or check quotes with `inferx_quote`."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Deploy a model with `inferx_deploy` or check quotes with `inferx_quote`."
                 else:
-            output_text += f"⚠️ {output}"
+                    output_text += f"⚠️ {output}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "inferx_delete":
@@ -5067,26 +5071,26 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "📊 **InferX Usage**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Optimize costs with `inferx_optimize`."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Optimize costs with `inferx_optimize`."
                 else:
-            output_text += f"⚠️ {output}\n\n💡 Configure InferX first: `inferx_configure`"
+                    output_text += f"⚠️ {output}\n\n💡 Configure InferX first: `inferx_configure`"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "inferx_quote":
                 cmd_args = ["inferx", "quote"]
                 if arguments.get("gpu_type"):
-            cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
+                    cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
                 if arguments.get("region"):
-            cmd_args.extend(["--region", arguments["region"]])
+                    cmd_args.extend(["--region", arguments["region"]])
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "💰 **InferX Pricing Quote**\n\n"
                 if result["success"]:
-            output_text += output
-            output_text += "\n\n**suggest_action:** Deploy with `inferx_deploy` at these rates."
+                    output_text += output
+                    output_text += "\n\n**suggest_action:** Deploy with `inferx_deploy` at these rates."
                 else:
-            output_text += f"⚠️ {output}\n\n💡 Configure InferX first: `inferx_configure`"
+                    output_text += f"⚠️ {output}\n\n💡 Configure InferX first: `inferx_configure`"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "hf_space_status":
@@ -5099,29 +5103,29 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "run_workflow":
                 # Workflow primitives — runs a YAML pipeline or built-in template
                 if arguments.get("template"):
-            cmd_args = ["workflow", "run", "--template", arguments["template"]]
+                    cmd_args = ["workflow", "run", "--template", arguments["template"]]
                 elif arguments.get("workflow"):
-            cmd_args = ["workflow", "run", arguments["workflow"]]
+                    cmd_args = ["workflow", "run", arguments["workflow"]]
                 else:
-            return CallToolResult(
-                content=[TextContent(type="text", text="⚠️ Provide either `workflow` (YAML path) or `template` (built-in).")],
-                isError=True
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text="⚠️ Provide either `workflow` (YAML path) or `template` (built-in).")],
+                        isError=True
+                    )
                 if arguments.get("dry_run"):
-            cmd_args.append("--dry-run")
+                    cmd_args.append("--dry-run")
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "🔄 **Workflow Execution**\n\n"
                 if result["success"]:
-            output_text += output
-            if arguments.get("dry_run"):
-                output_text += "\n\n**requires_confirmation:** true\n"
-                output_text += "**suggest_action:** Review the plan above. Run again without `dry_run` to execute."
-            else:
-                output_text += "\n\n**suggest_action:** Monitor progress with `active_context` or `train_status`."
+                    output_text += output
+                    if arguments.get("dry_run"):
+                        output_text += "\n\n**requires_confirmation:** true\n"
+                        output_text += "**suggest_action:** Review the plan above. Run again without `dry_run` to execute."
+                    else:
+                        output_text += "\n\n**suggest_action:** Monitor progress with `active_context` or `train_status`."
                 else:
-            output_text += f"⚠️ {output}\n\n"
-            output_text += "**Available templates:** finetune-llama, inference-deploy, benchmark-gpu, cost-optimize"
+                    output_text += f"⚠️ {output}\n\n"
+                    output_text += "**Available templates:** finetune-llama, inference-deploy, benchmark-gpu, cost-optimize"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "active_context":
@@ -5131,33 +5135,33 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 # 1. Running training jobs
                 jobs_result = await execute_terradev_command(["train-status", "-f", "json"])
                 if jobs_result["success"]:
-            context_parts.append(f"**Training Jobs:**\n{jobs_result['stdout']}")
+                    context_parts.append(f"**Training Jobs:**\n{jobs_result['stdout']}")
                 else:
-            context_parts.append("**Training Jobs:** None running")
+                    context_parts.append("**Training Jobs:** None running")
 
                 # 2. Active instances
                 status_result = await execute_terradev_command(["status", "-f", "json"])
                 if status_result["success"]:
-            context_parts.append(f"\n**Active Instances:**\n{status_result['stdout']}")
+                    context_parts.append(f"\n**Active Instances:**\n{status_result['stdout']}")
                 else:
-            context_parts.append("\n**Active Instances:** None")
+                    context_parts.append("\n**Active Instances:** None")
 
                 # 3. Cost analytics (last 7 days)
                 analytics_result = await execute_terradev_command(["analytics", "--days", "7", "-f", "json"])
                 if analytics_result["success"]:
-            context_parts.append(f"\n**Spend (7 days):**\n{analytics_result['stdout']}")
+                    context_parts.append(f"\n**Spend (7 days):**\n{analytics_result['stdout']}")
                 else:
-            context_parts.append("\n**Spend:** No data")
+                    context_parts.append("\n**Spend:** No data")
 
                 output_text = "🏠 **Active Context — Terradev State**\n\n"
                 output_text += "\n".join(context_parts)
                 output_text += "\n\n**suggest_action:** "
                 if jobs_result["success"] and "running" in jobs_result["stdout"].lower():
-            output_text += "You have running jobs. Monitor with `train_monitor` or check `train_status`."
+                    output_text += "You have running jobs. Monitor with `train_monitor` or check `train_status`."
                 elif status_result["success"] and status_result["stdout"].strip() and status_result["stdout"].strip() != "[]":
-            output_text += "You have active instances. Consider `optimize` to find cheaper alternatives."
+                    output_text += "You have active instances. Consider `optimize` to find cheaper alternatives."
                 else:
-            output_text += "No active workloads. Start with `quote_gpu` to compare prices, then `provision_gpu` or `up`."
+                    output_text += "No active workloads. Start with `quote_gpu` to compare prices, then `provision_gpu` or `up`."
                 return CallToolResult(content=[TextContent(type="text", text=output_text)])
 
             # ── v4.0.0 Handlers: ML Services ────────────────────────────────────
@@ -5481,7 +5485,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
         
                 # Import SGLang service
                 import sys
-                sys.path.append("/Users/theowolfenden/CascadeProjects/Terradev/terradev_cli")
+                sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
                 from ml_services.sglang_service import SGLangService, WorkloadType
         
                 service = SGLangService()
