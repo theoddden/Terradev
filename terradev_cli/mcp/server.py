@@ -4004,62 +4004,62 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 use_terraform = arguments.get("use_terraform", True)
         
                 if use_terraform:
-            # Use persistent workspace so state survives for k8s_destroy
-            ws_dir = _get_tf_workspace(f"k8s-{cluster_name}")
-            try:
-                # Generate K8s Terraform configuration
-                k8s_config = generate_k8s_terraform_config(
-                    cluster_name, gpu_type, node_count, multi_cloud, prefer_spot
-                )
-                
-                # Write configuration files
-                main_tf_path = os.path.join(ws_dir, "main.tf")
-                with open(main_tf_path, 'w') as f:
-                    f.write(k8s_config)
-                
-                # Initialize and apply Terraform
-                init_result = await execute_terraform_command(["terraform", "init"], ws_dir)
-                if not init_result["success"]:
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=f"❌ Terraform init failed: {init_result['stderr']}")],
-                        isError=True
-                    )
-                
-                apply_result = await execute_terraform_command(["terraform", "apply", "-auto-approve"], ws_dir)
-                
-                if apply_result["success"]:
-                    output_text = f"✅ Kubernetes cluster created via Terraform!\n\n"
-                    output_text += f"**Cluster Name:** {cluster_name}\n"
-                    output_text += f"**GPU Type:** {gpu_type}\n"
-                    output_text += f"**Node Count:** {node_count}\n"
-                    output_text += f"**Multi-Cloud:** {multi_cloud}\n"
-                    output_text += f"**Spot Instances:** {prefer_spot}\n"
-                    output_text += f"\n**Terraform State:** Persisted at {ws_dir}\n"
-                    output_text += f"**Full Output:**\n{apply_result['stdout']}"
-                    
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=output_text)]
-                    )
+                    # Use persistent workspace so state survives for k8s_destroy
+                    ws_dir = _get_tf_workspace(f"k8s-{cluster_name}")
+                    try:
+                        # Generate K8s Terraform configuration
+                        k8s_config = generate_k8s_terraform_config(
+                            cluster_name, gpu_type, node_count, multi_cloud, prefer_spot
+                        )
+                        
+                        # Write configuration files
+                        main_tf_path = os.path.join(ws_dir, "main.tf")
+                        with open(main_tf_path, 'w') as f:
+                            f.write(k8s_config)
+                        
+                        # Initialize and apply Terraform
+                        init_result = await execute_terraform_command(["terraform", "init"], ws_dir)
+                        if not init_result["success"]:
+                            return CallToolResult(
+                                content=[TextContent(type="text", text=f"❌ Terraform init failed: {init_result['stderr']}")],
+                                isError=True
+                            )
+                        
+                        apply_result = await execute_terraform_command(["terraform", "apply", "-auto-approve"], ws_dir)
+                        
+                        if apply_result["success"]:
+                            output_text = f"✅ Kubernetes cluster created via Terraform!\n\n"
+                            output_text += f"**Cluster Name:** {cluster_name}\n"
+                            output_text += f"**GPU Type:** {gpu_type}\n"
+                            output_text += f"**Node Count:** {node_count}\n"
+                            output_text += f"**Multi-Cloud:** {multi_cloud}\n"
+                            output_text += f"**Spot Instances:** {prefer_spot}\n"
+                            output_text += f"\n**Terraform State:** Persisted at {ws_dir}\n"
+                            output_text += f"**Full Output:**\n{apply_result['stdout']}"
+                            
+                            return CallToolResult(
+                                content=[TextContent(type="text", text=output_text)]
+                            )
+                        else:
+                            return CallToolResult(
+                                content=[TextContent(type="text", text=f"❌ Terraform apply failed: {apply_result['stderr']}")],
+                                isError=True
+                            )
+                    except Exception as e:
+                        return CallToolResult(
+                            content=[TextContent(type="text", text=f"❌ K8s Terraform deployment failed: {str(e)}")],
+                            isError=True
+                        )
                 else:
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=f"❌ Terraform apply failed: {apply_result['stderr']}")],
-                        isError=True
-                    )
-            except Exception as e:
-                return CallToolResult(
-                    content=[TextContent(type="text", text=f"❌ K8s Terraform deployment failed: {str(e)}")],
-                    isError=True
-                )
-                else:
-            # Fall back to regular terradev command
-            cmd_args.extend([cluster_name])
-            cmd_args.extend(["--gpu", gpu_type])
-            if "count" in arguments:
-                cmd_args.extend(["--count", str(arguments["count"])])
-            if multi_cloud:
-                cmd_args.append("--multi-cloud")
-            if prefer_spot:
-                cmd_args.append("--prefer-spot")
+                    # Fall back to regular terradev command
+                    cmd_args.extend([cluster_name])
+                    cmd_args.extend(["--gpu", gpu_type])
+                    if "count" in arguments:
+                        cmd_args.extend(["--count", str(arguments["count"])])
+                    if multi_cloud:
+                        cmd_args.append("--multi-cloud")
+                    if prefer_spot:
+                        cmd_args.append("--prefer-spot")
     
             elif tool_name == "k8s_info":
                 cmd_args.append(arguments["cluster_name"])
