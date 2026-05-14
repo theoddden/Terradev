@@ -96,7 +96,10 @@ class OVHcloudProvider(BaseProvider):
     # ── OVH Signature Authentication ──────────────────────────────────
 
     def _get_auth_headers(self) -> Dict[str, str]:
-        return {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json"}
+        if self.consumer_key:
+            headers["X-Ovh-Consumer"] = self.consumer_key
+        return headers
 
     async def _get_time_delta(self) -> int:
         """Get server time delta for signature.
@@ -185,6 +188,10 @@ class OVHcloudProvider(BaseProvider):
     async def get_instance_quotes(
         self, gpu_type: str, region: Optional[str] = None
     ) -> List[Dict[str, Any]]:
+        # Return empty list if no valid credentials
+        if not (self.application_key and self.application_secret and self.consumer_key and self.project_id):
+            return []
+        
         if self.application_key and self.application_secret and self.consumer_key and self.project_id:
             try:
                 live = await self._get_live_flavors(gpu_type, region)

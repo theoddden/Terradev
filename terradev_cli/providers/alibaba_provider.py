@@ -190,6 +190,10 @@ class AlibabaProvider(BaseProvider):
     async def get_instance_quotes(
         self, gpu_type: str, region: Optional[str] = None
     ) -> List[Dict[str, Any]]:
+        # Return empty list if no valid credentials
+        if not self.access_key_id or not self.access_key_secret:
+            return []
+        
         if self.access_key_id and self.access_key_secret:
             try:
                 live = await self._get_live_availability(gpu_type, region)

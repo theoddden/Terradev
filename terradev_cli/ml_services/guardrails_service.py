@@ -80,9 +80,16 @@ class GuardrailsService:
             await self.session.close()
             self.session = None
 
+    def _get_auth_headers(self) -> Dict[str, str]:
+        """Get auth headers for Guardrails API."""
+        headers: Dict[str, str] = {}
+        if self.config.llm_api_key:
+            headers["Authorization"] = f"Bearer {self.config.llm_api_key}"
+        return headers
+
     def _ensure_session(self) -> aiohttp.ClientSession:
         if self.session is None or self.session.closed:
-            self.session = aiohttp.ClientSession()
+            self.session = aiohttp.ClientSession(headers=self._get_auth_headers())
         return self.session
 
     async def _request(

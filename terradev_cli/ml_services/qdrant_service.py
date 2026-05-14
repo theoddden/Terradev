@@ -75,12 +75,16 @@ class QdrantService:
             await self.session.close()
             self.session = None
 
+    def _get_auth_headers(self) -> Dict[str, str]:
+        """Get auth headers for Qdrant API."""
+        headers: Dict[str, str] = {"Content-Type": "application/json"}
+        if self.config.api_key:
+            headers["api-key"] = self.config.api_key
+        return headers
+
     def _ensure_session(self) -> aiohttp.ClientSession:
         if self.session is None or self.session.closed:
-            headers: Dict[str, str] = {"Content-Type": "application/json"}
-            if self.config.api_key:
-                headers["api-key"] = self.config.api_key
-            self.session = aiohttp.ClientSession(headers=headers)
+            self.session = aiohttp.ClientSession(headers=self._get_auth_headers())
         return self.session
 
     async def _request(

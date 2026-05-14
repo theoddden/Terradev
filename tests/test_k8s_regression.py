@@ -31,6 +31,10 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from terradev_cli.providers.gcp_provider import GCPProvider
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService, KubernetesConfig
 from terradev_cli.ml_services.kubernetes_service import KubernetesService
 

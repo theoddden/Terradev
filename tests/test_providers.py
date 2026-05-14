@@ -186,7 +186,7 @@ class TestRunPodProvider:
             }
             mock_req.return_value = mock_response
             result = await provider.provision_instance(
-                "A100-80GB", "us-east-1", "A100"
+                "runpod-community-A100", "us-east-1", "A100"
             )
 
             assert result["instance_id"] == "new-pod-id"
@@ -200,13 +200,15 @@ class TestRunPodProvider:
 
         mock_response = {
             "data": {
-                "myPods": {
-                    "edges": [
+                "myself": {
+                    "pods": [
                         {
-                            "node": {
-                                "id": "pod-1",
-                                "name": "test-pod",
-                                "desiredState": "RUNNING"
+                            "id": "pod-1",
+                            "name": "test-pod",
+                            "desiredStatus": "RUNNING",
+                            "gpuCount": 1,
+                            "machine": {
+                                "gpuDisplayName": "NVIDIA A100-80GB"
                             }
                         }
                     ]
@@ -244,19 +246,31 @@ class TestOutputSchemaConsistency:
         provider = RunPodProvider(credentials={"api_key": "test"})
         mock_response = {
             "data": {
-                "products": [
+                "gpuTypes": [
                     {
                         "id": "A100-80GB",
-                        "name": "NVIDIA A100-80GB",
-                        "price_cents_per_hour": 8900,
-                        "gpu_memory_in_gb": 80
+                        "displayName": "NVIDIA A100-80GB",
+                        "communityPrice": 2.49,
+                        "memoryInGb": 80
                     }
                 ]
             }
         }
 
-        with patch.object(provider, "_make_request", new_callable=AsyncMock) as mock_req:
-            mock_req.return_value = mock_response
+        with patch.object(provider, "_get_live_pricing", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = [
+                {
+                    "instance_type": "runpod-community-A100-80GB",
+                    "gpu_type": "A100",
+                    "price_per_hour": 2.49,
+                    "region": "us-east",
+                    "available": True,
+                    "provider": "runpod",
+                    "vcpus": 16,
+                    "memory_gb": 80,
+                    "gpu_count": 1
+                }
+            ]
             quotes = await provider.get_instance_quotes("A100")
 
             for q in quotes:

@@ -233,14 +233,20 @@ class TestAIServiceRetryLogic:
         """Services retry on 5xx errors"""
         config = config_class()
         service = service_class(config)
+        service._ensure_session()  # Initialize session
         
         with patch.object(service.session, 'request', new_callable=AsyncMock) as mock_req:
-            mock_req.side_effect = [
-                MagicMock(status=500, text="Internal Server Error"),
-                MagicMock(status=200, text="OK")
-            ]
+            mock_resp_500 = MagicMock()
+            mock_resp_500.status = 500
+            mock_resp_500.text = AsyncMock(return_value="Internal Server Error")
             
-            result = await service._make_request("GET", "/test")
+            mock_resp_200 = MagicMock()
+            mock_resp_200.status = 200
+            mock_resp_200.json = AsyncMock(return_value={"result": "ok"})
+            
+            mock_req.side_effect = [mock_resp_500, mock_resp_200]
+            
+            result = await service._request("GET", "/test")
             assert mock_req.call_count == 2
     
     @pytest.mark.parametrize("service_class,config_class", [
@@ -253,11 +259,19 @@ class TestAIServiceRetryLogic:
         """Services do not retry on 4xx errors"""
         config = config_class()
         service = service_class(config)
+        service._ensure_session()  # Initialize session
         
         with patch.object(service.session, 'request', new_callable=AsyncMock) as mock_req:
-            mock_req.return_value = MagicMock(status=404, text="Not Found")
+            mock_resp = MagicMock()
+            mock_resp.status = 404
+            mock_resp.text = AsyncMock(return_value="Not Found")
+            mock_req.return_value = mock_resp
             
-            result = await service._make_request("GET", "/test")
+            try:
+                result = await service._request("GET", "/test")
+                assert False, "Should have raised exception"
+            except Exception as e:
+                assert "404" in str(e)
             assert mock_req.call_count == 1
 
 

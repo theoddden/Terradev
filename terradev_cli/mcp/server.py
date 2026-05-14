@@ -3867,9 +3867,9 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             if tool_name == "quote_gpu":
                 cmd_args.extend(["-g", arguments["gpu_type"]])
                 if "providers" in arguments:
-            cmd_args.extend(["-p", arguments["providers"]])
+                    cmd_args.extend(["-p", arguments["providers"]])
                 if arguments.get("quick"):
-            cmd_args.append("--quick")
+                    cmd_args.append("--quick")
     
             if tool_name == "provision_gpu":
                 # Use Terraform for all GPU provisioning (core IP)

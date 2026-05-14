@@ -63,12 +63,16 @@ class PhoenixService:
             await self.session.close()
             self.session = None
 
+    def _get_auth_headers(self) -> Dict[str, str]:
+        """Get auth headers for Phoenix API."""
+        headers: Dict[str, str] = {}
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+        return headers
+
     def _ensure_session(self) -> aiohttp.ClientSession:
         if self.session is None or self.session.closed:
-            headers: Dict[str, str] = {}
-            if self.config.api_key:
-                headers["Authorization"] = f"Bearer {self.config.api_key}"
-            self.session = aiohttp.ClientSession(headers=headers)
+            self.session = aiohttp.ClientSession(headers=self._get_auth_headers())
         return self.session
 
     async def _request(

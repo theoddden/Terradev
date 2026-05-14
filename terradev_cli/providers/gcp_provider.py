@@ -97,6 +97,10 @@ class GCPProvider(BaseProvider):
         self, gpu_type: str, region: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get instance quotes with capacity and reservation checks"""
+        # Return empty list if no valid credentials
+        if not self.credentials:
+            return []
+        
         configs = self.GPU_INSTANCE_MAP.get(gpu_type, [])
         if not configs:
             return []

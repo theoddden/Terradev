@@ -321,9 +321,9 @@ class TestMCPToolBatches:
         assert batch_e_count == 10
     
     def test_total_tool_count(self):
-        """Total new tools in v5.0.0 should be 55"""
+        """Total new tools in v5.0.0 should be 52"""
         total_new = 11 + 9 + 11 + 11 + 10
-        assert total_new == 55
+        assert total_new == 52
 
 
 if __name__ == "__main__":
