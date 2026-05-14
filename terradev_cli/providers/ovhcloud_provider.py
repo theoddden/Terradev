@@ -97,6 +97,8 @@ class OVHcloudProvider(BaseProvider):
 
     def _get_auth_headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
+        if self.application_key:
+            headers["X-Ovh-Application"] = self.application_key
         if self.consumer_key:
             headers["X-Ovh-Consumer"] = self.consumer_key
         return headers

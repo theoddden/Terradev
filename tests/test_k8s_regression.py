@@ -28,10 +28,20 @@ Low (4):
 import pytest
 import sys
 import os
+import asyncio
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from terradev_cli.providers.gcp_provider import GCPProvider
+
+def run_async(coro):
+    """Helper to run async functions in sync context"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
