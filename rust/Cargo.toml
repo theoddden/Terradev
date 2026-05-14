@@ -17,6 +17,9 @@ members = [
     "terradev-config-validator",
     "terradev-artifact-verification",
     "terradev-quota-manager",
+    "terradev-mcp-optimizer",
+    "terradev-command-executor",
+    "terradev-gpu-discovery",
 ]
 
 [workspace.dependencies]
