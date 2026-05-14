@@ -3887,26 +3887,26 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     output_text += f"**Count:** {count}\n"
                     output_text += f"**Providers:** {', '.join(providers)}\n"
             
-            if result.get("terraform_outputs"):
-                outputs = result["terraform_outputs"]
-                if "instance_ids" in outputs:
-                    output_text += f"\n**Instance IDs:** {outputs['instance_ids']}\n"
-                if "instance_ips" in outputs:
-                    output_text += f"**Instance IPs:** {outputs['instance_ips']}\n"
-                if "provider_costs" in outputs:
-                    output_text += f"**Provider Costs:** {outputs['provider_costs']}\n"
+                    if result.get("terraform_outputs"):
+                        outputs = result["terraform_outputs"]
+                        if "instance_ids" in outputs:
+                            output_text += f"\n**Instance IDs:** {outputs['instance_ids']}\n"
+                        if "instance_ips" in outputs:
+                            output_text += f"**Instance IPs:** {outputs['instance_ips']}\n"
+                        if "provider_costs" in outputs:
+                            output_text += f"**Provider Costs:** {outputs['provider_costs']}\n"
             
-            output_text += f"\n**Terraform State:** Managed\n"
-            output_text += f"**Full Output:**\n{result['stdout']}"
+                    output_text += f"\n**Terraform State:** Managed\n"
+                    output_text += f"**Full Output:**\n{result['stdout']}"
             
-            return CallToolResult(
-                content=[TextContent(type="text", text=output_text)]
-            )
-        else:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"❌ Terraform provisioning failed: {result['stderr']}")],
-                isError=True
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=output_text)]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"❌ Terraform provisioning failed: {result['stderr']}")],
+                        isError=True
+                    )
     
             elif tool_name == "terraform_plan":
                 config_dir = arguments["config_dir"]
@@ -3915,85 +3915,85 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
         
                 cmd = ["terraform", "plan"]
                 if destroy:
-            cmd.append("-destroy")
+                    cmd.append("-destroy")
                 if var_file:
-            cmd.extend(["-var-file", var_file])
+                    cmd.extend(["-var-file", var_file])
                 cmd.append("-out=tfplan")
         
                 result = await execute_terraform_command(cmd, config_dir)
         
                 if result["success"]:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"✅ Terraform plan generated:\n\n{result['stdout']}")]
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"✅ Terraform plan generated:\n\n{result['stdout']}")]
+                    )
                 else:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"❌ Terraform plan failed: {result['stderr']}")],
-                isError=True
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"❌ Terraform plan failed: {result['stderr']}")],
+                        isError=True
+                    )
     
             elif tool_name == "terraform_apply":
                 config_dir = arguments["config_dir"]
                 try:
-            config_dir = _validate_config_dir(config_dir)
+                    config_dir = _validate_config_dir(config_dir)
                 except ValueError as e:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"❌ {str(e)}")],
-                isError=True
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"❌ {str(e)}")],
+                        isError=True
+                    )
                 plan_file = arguments.get("plan_file", "tfplan")
                 var_file = arguments.get("var_file")
                 auto_approve = arguments.get("auto_approve", True)
         
                 cmd = ["terraform", "apply"]
                 if auto_approve:
-            cmd.append("-auto-approve")
+                    cmd.append("-auto-approve")
                 if plan_file:
-            cmd.append(plan_file)
+                    cmd.append(plan_file)
                 if var_file:
-            cmd.extend(["-var-file", var_file])
+                    cmd.extend(["-var-file", var_file])
         
                 result = await execute_terraform_command(cmd, config_dir)
         
                 if result["success"]:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"✅ Terraform apply successful:\n\n{result['stdout']}")]
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"✅ Terraform apply successful:\n\n{result['stdout']}")]
+                    )
                 else:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"❌ Terraform apply failed: {result['stderr']}")],
-                isError=True
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"❌ Terraform apply failed: {result['stderr']}")],
+                        isError=True
+                    )
     
             elif tool_name == "terraform_destroy":
                 config_dir = arguments["config_dir"]
                 try:
-            config_dir = _validate_config_dir(config_dir)
+                    config_dir = _validate_config_dir(config_dir)
                 except ValueError as e:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"❌ {str(e)}")],
-                isError=True
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"❌ {str(e)}")],
+                        isError=True
+                    )
                 var_file = arguments.get("var_file")
                 auto_approve = arguments.get("auto_approve", True)
         
                 cmd = ["terraform", "destroy"]
                 if auto_approve:
-            cmd.append("-auto-approve")
+                    cmd.append("-auto-approve")
                 if var_file:
-            cmd.extend(["-var-file", var_file])
+                    cmd.extend(["-var-file", var_file])
         
                 result = await execute_terraform_command(cmd, config_dir)
         
                 if result["success"]:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"✅ Terraform destroy successful:\n\n{result['stdout']}")]
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"✅ Terraform destroy successful:\n\n{result['stdout']}")]
+                    )
                 else:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"❌ Terraform destroy failed: {result['stderr']}")],
-                isError=True
-            )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"❌ Terraform destroy failed: {result['stderr']}")],
+                        isError=True
+                    )
     
             elif tool_name == "k8s_create":
                 cluster_name = arguments["cluster_name"]
