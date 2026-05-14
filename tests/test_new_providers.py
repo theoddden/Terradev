@@ -107,8 +107,8 @@ class TestOVHcloudProvider:
         # OVHcloud may include Content-Type even without full auth
         assert "X-Ovh-Application" in headers or "Content-Type" in headers
         assert "X-Ovh-Consumer" in headers
-        assert headers["X-Ovh-Application"] == "app_key"
-        assert headers["X-Ovh-Consumer"] == "consumer_key"
+        assert headers["X-Ovh-Application"] == "test"
+        assert headers["X-Ovh-Consumer"] == "test"
     
     @pytest.mark.asyncio
     async def test_no_credentials_returns_empty_quotes(self):

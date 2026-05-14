@@ -3902,7 +3902,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             return CallToolResult(
                 content=[TextContent(type="text", text=output_text)]
             )
-                else:
+        else:
             return CallToolResult(
                 content=[TextContent(type="text", text=f"❌ Terraform provisioning failed: {result['stderr']}")],
                 isError=True

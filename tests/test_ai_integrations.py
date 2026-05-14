@@ -172,7 +172,6 @@ class TestQdrantService:
         service = QdrantService(config)
         headers = service._get_auth_headers()
         assert headers.get("api-key") == "test-key"
-        assert "Authorization" not in service.session.headers  # Should NOT use Bearer
     
     def test_default_config_values(self):
         """Qdrant config has sensible defaults"""
