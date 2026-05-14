@@ -5190,92 +5190,92 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "ray_status":
                 cmd = ["ray", "status"]
                 if arguments.get("detailed", True):
-            cmd.append("--details")
+                    cmd.append("--details")
                 try:
-            result = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
-            output = stdout.decode() if result.returncode == 0 else stderr.decode()
-            output_text = "🔵 **Ray Cluster Status**\n\n"
-            if result.returncode == 0:
-                output_text += output
-            else:
-                output_text += f"⚠️ {output}\n\n💡 Start a cluster with `ray_start`."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
+                    result = await asyncio.create_subprocess_exec(
+                        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
+                    output = stdout.decode() if result.returncode == 0 else stderr.decode()
+                    output_text = "🔵 **Ray Cluster Status**\n\n"
+                    if result.returncode == 0:
+                        output_text += output
+                    else:
+                        output_text += f"⚠️ {output}\n\n💡 Start a cluster with `ray_start`."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
                 except FileNotFoundError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Ray not installed. Run: `pip install ray[default]`")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Ray not installed. Run: `pip install ray[default]`")], isError=True)
                 except asyncio.TimeoutError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Ray status timed out.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Ray status timed out.")], isError=True)
 
             elif tool_name == "ray_start":
                 head = arguments.get("head", True)
                 port = arguments.get("port", 6379)
                 if head:
-            cmd = ["ray", "start", "--head", "--port", str(port), "--dashboard-host", "0.0.0.0"]
-            if arguments.get("num_gpus"):
-                cmd.extend(["--num-gpus", str(arguments["num_gpus"])])
+                    cmd = ["ray", "start", "--head", "--port", str(port), "--dashboard-host", "0.0.0.0"]
+                    if arguments.get("num_gpus"):
+                        cmd.extend(["--num-gpus", str(arguments["num_gpus"])])
                 else:
-            addr = arguments.get("head_address", f"localhost:{port}")
-            cmd = ["ray", "start", "--address", addr]
+                    addr = arguments.get("head_address", f"localhost:{port}")
+                    cmd = ["ray", "start", "--address", addr]
                 try:
-            result = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=30)
-            output = stdout.decode() if result.returncode == 0 else stderr.decode()
-            mode = "head" if head else "worker"
-            if result.returncode == 0:
-                output_text = f"✅ **Ray {mode} node started**\n\n{output}\n\n"
-                output_text += "**suggest_action:** Check cluster with `ray_status`. Submit jobs with `ray_submit_job`."
-            else:
-                output_text = f"❌ **Failed to start Ray {mode} node**\n\n{output}"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
+                    result = await asyncio.create_subprocess_exec(
+                        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=30)
+                    output = stdout.decode() if result.returncode == 0 else stderr.decode()
+                    mode = "head" if head else "worker"
+                    if result.returncode == 0:
+                        output_text = f"✅ **Ray {mode} node started**\n\n{output}\n\n"
+                        output_text += "**suggest_action:** Check cluster with `ray_status`. Submit jobs with `ray_submit_job`."
+                    else:
+                        output_text = f"❌ **Failed to start Ray {mode} node**\n\n{output}"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
                 except FileNotFoundError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Ray not installed. Run: `pip install ray[default]`")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Ray not installed. Run: `pip install ray[default]`")], isError=True)
 
             elif tool_name == "ray_stop":
                 try:
-            result = await asyncio.create_subprocess_exec(
-                "ray", "stop", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
-            output = stdout.decode()
-            return CallToolResult(content=[TextContent(type="text", text=f"⏹️ **Ray Cluster Stopped**\n\n{output}")])
+                    result = await asyncio.create_subprocess_exec(
+                        "ray", "stop", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
+                    output = stdout.decode()
+                    return CallToolResult(content=[TextContent(type="text", text=f"⏹️ **Ray Cluster Stopped**\n\n{output}")])
                 except FileNotFoundError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Ray not installed.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Ray not installed.")], isError=True)
 
             elif tool_name == "ray_submit_job":
                 script = arguments["script"]
                 cmd = ["ray", "job", "submit", "--", "python", script]
                 if arguments.get("job_name"):
-            cmd = ["ray", "job", "submit", "--submission-id", arguments["job_name"], "--", "python", script]
+                    cmd = ["ray", "job", "submit", "--submission-id", arguments["job_name"], "--", "python", script]
                 try:
-            result = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=60)
-            output = stdout.decode() if result.returncode == 0 else stderr.decode()
-            if result.returncode == 0:
-                output_text = f"🚀 **Ray Job Submitted**\n\n**Script:** {script}\n\n{output}\n\n"
-                output_text += "**suggest_action:** Monitor with `ray_list_jobs` or check dashboard with `ray_status`."
-            else:
-                output_text = f"❌ **Job submission failed**\n\n{output}"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
+                    result = await asyncio.create_subprocess_exec(
+                        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=60)
+                    output = stdout.decode() if result.returncode == 0 else stderr.decode()
+                    if result.returncode == 0:
+                        output_text = f"🚀 **Ray Job Submitted**\n\n**Script:** {script}\n\n{output}\n\n"
+                        output_text += "**suggest_action:** Monitor with `ray_list_jobs` or check dashboard with `ray_status`."
+                    else:
+                        output_text = f"❌ **Job submission failed**\n\n{output}"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
                 except FileNotFoundError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Ray not installed.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Ray not installed.")], isError=True)
 
             elif tool_name == "ray_list_jobs":
                 try:
-            result = await asyncio.create_subprocess_exec(
-                "ray", "job", "list", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
-            output = stdout.decode() if result.returncode == 0 else stderr.decode()
-            output_text = "📋 **Ray Jobs**\n\n" + (output or "No jobs found.")
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
+                    result = await asyncio.create_subprocess_exec(
+                        "ray", "job", "list", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
+                    output = stdout.decode() if result.returncode == 0 else stderr.decode()
+                    output_text = "📋 **Ray Jobs**\n\n" + (output or "No jobs found.")
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
                 except FileNotFoundError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Ray not installed.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Ray not installed.")], isError=True)
 
             elif tool_name == "ray_wide_ep_deploy":
                 # Use EnhancedRayService to generate Wide-EP config
@@ -5285,82 +5285,82 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 mem_util = arguments.get("gpu_memory_utilization", 0.85)
                 max_len = arguments.get("max_model_len", 32768)
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.ray_enhanced import EnhancedRayService, EnhancedRayConfig
-            svc = EnhancedRayService(EnhancedRayConfig(
-                model_id=model_id, tp_size=tp, dp_size=dp,
-                gpu_memory_utilization=mem_util, max_model_len=max_len
-            ))
-            config = svc.generate_wide_ep_deployment(model_id, tp, dp, mem_util, max_len)
-            output_text = f"🧬 **Wide-EP Deployment Config — {model_id}**\n\n"
-            output_text += f"**Pattern:** Wide Expert Parallelism\n"
-            output_text += f"**TP:** {config['engine_config']['tensor_parallel_size']}, **DP:** {config['engine_config']['data_parallel_size']}\n"
-            output_text += f"**Experts/rank:** {config['model_profile']['experts_per_rank']}\n"
-            output_text += f"**EPLB:** {config['engine_config']['enable_eplb']}, **DBO:** {config['engine_config']['enable_dbo']}\n\n"
-            output_text += f"**Engine Config:**\n```json\n{json.dumps(config['engine_config'], indent=2)}\n```\n\n"
-            output_text += f"**Env Vars:**\n```json\n{json.dumps(config['env_vars'], indent=2)}\n```\n"
-            if arguments.get("generate_script", True):
-                script = svc.generate_wide_ep_script(model_id, tp, dp)
-                output_text += f"\n**Executable Script:**\n```python\n{script}\n```\n"
-            output_text += "\n**suggest_action:** Save the script and run it on a Ray cluster with `ray_submit_job`."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.ray_enhanced import EnhancedRayService, EnhancedRayConfig
+                    svc = EnhancedRayService(EnhancedRayConfig(
+                        model_id=model_id, tp_size=tp, dp_size=dp,
+                        gpu_memory_utilization=mem_util, max_model_len=max_len
+                    ))
+                    config = svc.generate_wide_ep_deployment(model_id, tp, dp, mem_util, max_len)
+                    output_text = f"🧬 **Wide-EP Deployment Config — {model_id}**\n\n"
+                    output_text += f"**Pattern:** Wide Expert Parallelism\n"
+                    output_text += f"**TP:** {config['engine_config']['tensor_parallel_size']}, **DP:** {config['engine_config']['data_parallel_size']}\n"
+                    output_text += f"**Experts/rank:** {config['model_profile']['experts_per_rank']}\n"
+                    output_text += f"**EPLB:** {config['engine_config']['enable_eplb']}, **DBO:** {config['engine_config']['enable_dbo']}\n\n"
+                    output_text += f"**Engine Config:**\n```json\n{json.dumps(config['engine_config'], indent=2)}\n```\n\n"
+                    output_text += f"**Env Vars:**\n```json\n{json.dumps(config['env_vars'], indent=2)}\n```\n"
+                    if arguments.get("generate_script", True):
+                        script = svc.generate_wide_ep_script(model_id, tp, dp)
+                        output_text += f"\n**Executable Script:**\n```python\n{script}\n```\n"
+                    output_text += "\n**suggest_action:** Save the script and run it on a Ray cluster with `ray_submit_job`."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found in path. Ensure terradev_cli is installed.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found in path. Ensure terradev_cli is installed.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ Wide-EP generation failed: {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ Wide-EP generation failed: {e}")], isError=True)
 
             elif tool_name == "ray_disagg_pd_deploy":
                 model_id = arguments["model_id"]
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.ray_enhanced import EnhancedRayService, EnhancedRayConfig
-            svc = EnhancedRayService(EnhancedRayConfig(
-                model_id=model_id,
-                prefill_tp=arguments.get("prefill_tp", 1), prefill_dp=arguments.get("prefill_dp", 4),
-                decode_tp=arguments.get("decode_tp", 1), decode_dp=arguments.get("decode_dp", 4),
-                kv_connector=arguments.get("kv_connector", "NixlConnector"),
-            ))
-            config = svc.generate_disaggregated_pd_deployment(model_id)
-            pc = config["prefill_config"]
-            dc = config["decode_config"]
-            output_text = f"⚡ **Disaggregated P/D Deployment — {model_id}**\n\n"
-            output_text += f"**Prefill:** TP={pc['tensor_parallel_size']}, DP={pc['data_parallel_size']} (compute-bound)\n"
-            output_text += f"**Decode:** TP={dc['tensor_parallel_size']}, DP={dc['data_parallel_size']} (memory-bound)\n"
-            output_text += f"**KV Connector:** {config['kv_connector']['type']}\n\n"
-            output_text += f"**Config:**\n```json\n{json.dumps(config, indent=2, default=str)}\n```\n"
-            if arguments.get("generate_script", True):
-                script = svc.generate_disaggregated_pd_script(model_id)
-                output_text += f"\n**Executable Script:**\n```python\n{script}\n```\n"
-            output_text += "\n**suggest_action:** Deploy on a Ray cluster: save the script, then `ray_submit_job`."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.ray_enhanced import EnhancedRayService, EnhancedRayConfig
+                    svc = EnhancedRayService(EnhancedRayConfig(
+                        model_id=model_id,
+                        prefill_tp=arguments.get("prefill_tp", 1), prefill_dp=arguments.get("prefill_dp", 4),
+                        decode_tp=arguments.get("decode_tp", 1), decode_dp=arguments.get("decode_dp", 4),
+                        kv_connector=arguments.get("kv_connector", "NixlConnector"),
+                    ))
+                    config = svc.generate_disaggregated_pd_deployment(model_id)
+                    pc = config["prefill_config"]
+                    dc = config["decode_config"]
+                    output_text = f"⚡ **Disaggregated P/D Deployment — {model_id}**\n\n"
+                    output_text += f"**Prefill:** TP={pc['tensor_parallel_size']}, DP={pc['data_parallel_size']} (compute-bound)\n"
+                    output_text += f"**Decode:** TP={dc['tensor_parallel_size']}, DP={dc['data_parallel_size']} (memory-bound)\n"
+                    output_text += f"**KV Connector:** {config['kv_connector']['type']}\n\n"
+                    output_text += f"**Config:**\n```json\n{json.dumps(config, indent=2, default=str)}\n```\n"
+                    if arguments.get("generate_script", True):
+                        script = svc.generate_disaggregated_pd_script(model_id)
+                        output_text += f"\n**Executable Script:**\n```python\n{script}\n```\n"
+                    output_text += "\n**suggest_action:** Deploy on a Ray cluster: save the script, then `ray_submit_job`."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ Disagg P/D generation failed: {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ Disagg P/D generation failed: {e}")], isError=True)
 
             elif tool_name == "ray_parallelism_strategy":
                 model_id = arguments["model_id"]
                 gpu_count = arguments.get("gpu_count", 8)
                 gpu_mem = arguments.get("gpu_memory_gb", 80.0)
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.ray_enhanced import EnhancedRayService, EnhancedRayConfig
-            svc = EnhancedRayService(EnhancedRayConfig(model_id=model_id, gpu_count=gpu_count))
-            strategy = svc.compute_parallelism_strategy(gpu_count, gpu_mem)
-            output_text = f"🧠 **Parallelism Strategy — {model_id}**\n\n"
-            output_text += f"**Model:** {strategy['total_params_b']}B params ({strategy['active_params_b']}B active), {strategy['num_experts']} experts\n"
-            output_text += f"**Weight:** {strategy['total_weight_gb']}GB total, {strategy['active_memory_gb']}GB active\n"
-            output_text += f"**GPUs:** {strategy['gpu_count']}× {gpu_mem}GB\n\n"
-            output_text += f"**Recommended:** TP={strategy['recommended_tp']}, DP={strategy['recommended_dp']}\n"
-            output_text += f"**Expert Parallel:** {strategy['expert_parallel']} ({strategy['experts_per_rank']} experts/rank)\n"
-            output_text += f"**EPLB:** {strategy['eplb_enabled']}\n\n"
-            output_text += f"**Rationale:** {strategy['rationale']}\n\n"
-            output_text += "**suggest_action:** Apply with `ray_wide_ep_deploy` or `moe_deploy`."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.ray_enhanced import EnhancedRayService, EnhancedRayConfig
+                    svc = EnhancedRayService(EnhancedRayConfig(model_id=model_id, gpu_count=gpu_count))
+                    strategy = svc.compute_parallelism_strategy(gpu_count, gpu_mem)
+                    output_text = f"🧠 **Parallelism Strategy — {model_id}**\n\n"
+                    output_text += f"**Model:** {strategy['total_params_b']}B params ({strategy['active_params_b']}B active), {strategy['num_experts']} experts\n"
+                    output_text += f"**Weight:** {strategy['total_weight_gb']}GB total, {strategy['active_memory_gb']}GB active\n"
+                    output_text += f"**GPUs:** {strategy['gpu_count']}× {gpu_mem}GB\n\n"
+                    output_text += f"**Recommended:** TP={strategy['recommended_tp']}, DP={strategy['recommended_dp']}\n"
+                    output_text += f"**Expert Parallel:** {strategy['expert_parallel']} ({strategy['experts_per_rank']} experts/rank)\n"
+                    output_text += f"**EPLB:** {strategy['eplb_enabled']}\n\n"
+                    output_text += f"**Rationale:** {strategy['rationale']}\n\n"
+                    output_text += "**suggest_action:** Apply with `ray_wide_ep_deploy` or `moe_deploy`."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ Strategy computation failed: {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ Strategy computation failed: {e}")], isError=True)
 
             # ── vLLM Lifecycle Handlers ──────────────────────────────────────────
 
