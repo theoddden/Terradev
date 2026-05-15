@@ -1,0 +1,17 @@
+[package]
+name = "terradev-warm-pool"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "terradev_warm_pool"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+moka = { workspace = true }
+parking_lot = { workspace = true }

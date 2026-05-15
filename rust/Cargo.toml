@@ -20,6 +20,16 @@ members = [
     "terradev-mcp-optimizer",
     "terradev-command-executor",
     "terradev-gpu-discovery",
+    "terradev-dag-executor",
+    "terradev-price-intelligence",
+    "terradev-cost-scaler",
+    "terradev-semantic-router",
+    "terradev-warm-pool",
+    "terradev-mcp-codec",
+    "terradev-tool-registry",
+    "terradev-result-compressor",
+    "terradev-governance",
+    "terradev-helm-generator",
 ]
 
 [workspace.dependencies]
@@ -52,3 +62,8 @@ pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
 rust_decimal = "1.33"
 zeroize = "1.7"
 jsonschema = "0.17"
+simd-json = "0.13"
+lz4 = "1.24"
+tera = "1.19"
+phf = { version = "0.11", features = ["macros"] }
+num_cpus = "1.16"

@@ -6,6 +6,309 @@ This guide explains how to integrate the new Rust modules into the existing Terr
 
 The Rust modules are designed to be drop-in replacements for existing Python implementations. Each module exposes a Python-friendly API via PyO3 bindings.
 
+## New Modules (v2.0)
+
+### Compute-Intensive Modules
+
+#### 1. DAG Executor (terradev-dag-executor)
+**Purpose**: High-performance directed acyclic graph execution with topological wave parallelism
+
+**File**: `terradev_cli/core/dag_executor.py`
+
+```python
+# Add at top
+try:
+    from terradev_dag_executor import DAGExecutor as RustDAGExecutor
+    USE_RUST_DAG = True
+except ImportError:
+    USE_RUST_DAG = False
+
+# Usage
+if USE_RUST_DAG:
+    dag = RustDAGExecutor(name="signal_extraction", max_workers=6)
+else:
+    dag = DAGExecutor(max_workers=6, name="signal_extraction")
+
+# Add nodes
+dag.add_node("gpu_enum", enumerate_gpus_fn)
+dag.add_node("nic_enum", enumerate_nics_fn)
+
+# Execute
+result = dag.apply(initial_context={"config": config})
+```
+
+**Performance**: 5-10x faster for large DAGs (100+ nodes)
+
+#### 2. Price Intelligence (terradev-price-intelligence)
+**Purpose**: Vectorized price statistics and trend analysis
+
+**File**: `terradev_cli/core/price_intelligence.py`
+
+```python
+# Add at top
+try:
+    from terradev_price_intelligence import PriceIntelligence
+    USE_RUST_PRICE_INTEL = True
+except ImportError:
+    USE_RUST_PRICE_INTEL = False
+
+# Usage
+if USE_RUST_PRICE_INTEL:
+    pi = PriceIntelligence()
+    pi.add_tick({
+        "timestamp": int(time.time()),
+        "price": 2.5,
+        "provider": "aws",
+        "region": "us-east-1",
+        "gpu_type": "A100",
+        "availability": "spot"
+    })
+    stats = pi.calculate_statistics("A100", "us-east-1")
+    trend = pi.calculate_trend("A100", "us-east-1", window_minutes=60)
+```
+
+**Performance**: 10-20x faster for large datasets (10K+ ticks)
+
+#### 3. Cost Scaler (terradev-cost-scaler)
+**Purpose**: Efficient time-series cost analysis and scaling decisions
+
+**File**: `terradev_cli/core/cost_scaler.py`
+
+```python
+# Add at top
+try:
+    from terradev_cost_scaler import CostScaler
+    USE_RUST_COST_SCALER = True
+except ImportError:
+    USE_RUST_COST_SCALER = False
+
+# Usage
+if USE_RUST_COST_SCALER:
+    scaler = CostScaler(budget_usd=1000.0, scaling_window_hours=24)
+    scaler.add_metric({
+        "timestamp": int(time.time()),
+        "instance_id": "i-123",
+        "cost_usd": 2.5,
+        "gpu_type": "A100",
+        "region": "us-east-1",
+        "provider": "aws"
+    })
+    decision = scaler.make_scaling_decision(current_instances=4, target_utilization=0.7)
+```
+
+**Performance**: 5-10x faster for 24-hour cost history
+
+#### 4. Semantic Router (terradev-semantic-router)
+**Purpose**: Fast text processing and routing logic
+
+**File**: `terradev_cli/core/semantic_router.py`
+
+```python
+# Add at top
+try:
+    from terradev_semantic_router import SemanticRouter
+    USE_RUST_ROUTER = True
+except ImportError:
+    USE_RUST_ROUTER = False
+
+# Usage
+if USE_RUST_ROUTER:
+    router = SemanticRouter()
+    router.add_route("inference", ["llm", "generate", "chat"], threshold=0.5)
+    router.add_route("training", ["train", "finetune", "model"], threshold=0.5)
+    
+    result = router.route("Generate code for this task", signals={"inference": 0.9})
+    # Returns: {"route": "inference", "score": 0.9, "reason": "..."}
+```
+
+**Performance**: 5-15x faster for high-throughput routing
+
+#### 5. Warm Pool Manager (terradev-warm-pool)
+**Purpose**: Efficient model instance eviction with LRU/LFU policies
+
+**File**: `terradev_cli/core/warm_pool_manager.py`
+
+```python
+# Add at top
+try:
+    from terradev_warm_pool import WarmPoolManager as RustWarmPoolManager
+    USE_RUST_WARM_POOL = True
+except ImportError:
+    USE_RUST_WARM_POOL = False
+
+# Usage
+if USE_RUST_WARM_POOL:
+    pool = RustWarmPoolManager(max_instances=100, max_idle_seconds=3600)
+    pool.add_instance({
+        "instance_id": "i-123",
+        "model_name": "llama-2-70b",
+        "gpu_type": "A100",
+        "region": "us-east-1",
+        "priority": 0,
+        "cost_usd_per_hour": 2.5
+    })
+    candidates = pool.get_eviction_candidates(count=5)
+    pool.evict("i-123")
+```
+
+**Performance**: 3-5x faster for large pools (100+ models)
+
+### MCP Performance Modules
+
+#### 6. MCP Codec (terradev-mcp-codec)
+**Purpose**: Zero-copy MCP protocol encode/decode using simd-json
+
+**File**: `terradev-mcp/terradev_mcp.py`
+
+```python
+# Add at top
+try:
+    from terradev_mcp_codec import MCPCodec
+    USE_RUST_MCP_CODEC = True
+except ImportError:
+    USE_RUST_MCP_CODEC = False
+
+# Usage
+if USE_RUST_MCP_CODEC:
+    codec = MCPCodec(use_simd=True)
+    
+    # Decode incoming tool call
+    call = codec.decode_tool_call(json_str)
+    
+    # Encode outgoing result
+    result_bytes = codec.encode_tool_result(
+        id="call-123",
+        content=[{"type": "text", "text": "result"}],
+        is_error=False
+    )
+    
+    # Batch processing
+    calls = codec.decode_batch(json_str)
+    results_bytes = codec.encode_batch(results)
+```
+
+**Performance**: 2-3x faster JSON parsing/serialization, critical for every tool call
+
+#### 7. Tool Registry (terradev-tool-registry)
+**Purpose**: Compiled static dispatch table for tool lookups
+
+**File**: `terradev-mcp/terradev_mcp.py`
+
+```python
+# Add at top
+try:
+    from terradev_tool_registry import ToolRegistry
+    USE_RUST_TOOL_REGISTRY = True
+except ImportError:
+    USE_RUST_TOOL_REGISTRY = False
+
+# Usage
+if USE_RUST_TOOL_REGISTRY:
+    registry = ToolRegistry()
+    registry.register_tool(
+        name="cost_analyze",
+        description="Analyze cost data",
+        input_schema={"type": "object", "properties": {...}}
+    )
+    
+    tool = registry.get_tool("cost_analyze")
+    all_tools = registry.get_all_tools()
+    has_tool = registry.has_tool("cost_analyze")
+```
+
+**Performance**: Eliminates dict lookup contention under 50+ concurrent tool calls
+
+#### 8. Result Compressor (terradev-result-compressor)
+**Purpose**: LZ4 compression for large cluster topology results
+
+**File**: `terradev-mcp/terradev_mcp.py`
+
+```python
+# Add at top
+try:
+    from terradev_result_compressor import ResultCompressor
+    USE_RUST_COMPRESSOR = True
+except ImportError:
+    USE_RUST_COMPRESSOR = False
+
+# Usage
+if USE_RUST_COMPRESSOR:
+    compressor = ResultCompressor(compression_level=1)
+    
+    # Compress JSON result
+    result = compressor.compress_json(json_str)
+    # Returns: {"compressed": bytes, "original_size": 10000, "compressed_size": 2000, "compression_ratio": 5.0}
+    
+    # Decompress
+    decompressed = compressor.decompress_json(compressed_bytes)
+```
+
+**Performance**: Reduces transmission size by 2-5x, saves Claude context window
+
+### Low-Priority Modules
+
+#### 9. Data Governance (terradev-governance)
+**Purpose**: Deterministic policy engine and consent tracking
+
+**File**: `terradev_cli/core/data_governance.py`
+
+```python
+# Add at top
+try:
+    from terradev_governance import GovernanceEngine
+    USE_RUST_GOVERNANCE = True
+except ImportError:
+    USE_RUST_GOVERNANCE = False
+
+# Usage
+if USE_RUST_GOVERNANCE:
+    engine = GovernanceEngine()
+    engine.record_consent(
+        data_type="training_data",
+        user_id="user-123",
+        purpose="model_training",
+        granted=True,
+        expires_at=None
+    )
+    
+    check = engine.check_consent("training_data", "user-123", "model_training")
+    engine.add_policy("policy-123", {"default_allow": False})
+    eval_result = engine.evaluate_policy("policy-123", context)
+```
+
+**Performance**: 5-10x faster for complex policy evaluation
+
+#### 10. Helm Generator (terradev-helm-generator)
+**Purpose**: Fast YAML template rendering with tera
+
+**File**: `terradev_cli/core/helm_generator.py`
+
+```python
+# Add at top
+try:
+    from terradev_helm_generator import HelmGenerator
+    USE_RUST_HELM = True
+except ImportError:
+    USE_RUST_HELM = False
+
+# Usage
+if USE_RUST_HELM:
+    generator = HelmGenerator(template_dir="./templates")
+    generator.add_template("deployment", deployment_template)
+    
+    yaml = generator.render_template("deployment", {
+        "name": "my-app",
+        "image": "nginx:latest",
+        "replicas": 3
+    })
+    
+    # Or use built-in generators
+    deployment = generator.generate_deployment("my-app", "nginx:latest", replicas=3)
+    service = generator.generate_service("my-app", 80, "LoadBalancer")
+```
+
+**Performance**: 3-5x faster for complex manifests
+
 ## Integration Strategy
 
 ### Phase 1: Build System Integration

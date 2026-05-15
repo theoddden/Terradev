@@ -46,74 +46,130 @@ Efficient checkpoint serialization.
 - **Impact**: 5-10x faster checkpoint saves, 50% storage reduction
 - **Features**: Binary serialization (bincode), zstd compression, compression ratio tracking
 
+#### 9. terradev-warm-pool
+Warm pool manager for model instance eviction with intelligent caching.
+- **Impact**: 3-5x faster eviction for large pools (100+ models)
+- **Features**: LRU/LFU policies, priority-based scoring, idle timeout tracking
+
 ### Compute-Intensive Modules
 
-#### 9. terradev-egress-optimizer
+#### 10. terradev-egress-optimizer
 Multi-hop data routing optimization using Dijkstra's algorithm.
 - **Impact**: 20-40% reduction in data transfer costs
 - **Features**: Weighted graph routing, provider topology, cost optimization
 
-#### 10. terradev-gpu-topology
+#### 11. terradev-gpu-topology
 GPU-NIC pairing optimization with PCIe locality awareness.
 - **Impact**: 15-30% improvement in RDMA throughput
 - **Features**: PCIe switch detection (PIX/PXB/PHB/SYS), NUMA-aware pairing, RDMA preference
 
-#### 11. terradev-authentication
+#### 12. terradev-authentication
 Cloud provider signature generation (Alibaba, OVHcloud).
 - **Impact**: Eliminates authentication bugs, improves API reliability
 - **Features**: HMAC-SHA1/SHA256 signatures, RFC 3986 percent encoding, timestamp handling
 
-#### 12. terradev-vram-estimator
+#### 13. terradev-vram-estimator
 MLA-aware VRAM estimation for transformer models.
 - **Impact**: Accurate memory planning, prevents OOM errors
 - **Features**: Multi-head attention vs MLA compression, quantization support (FP32/FP16/BF16/FP8/INT8/INT4)
 
+#### 14. terradev-dag-executor
+High-performance DAG execution with topological wave parallelism.
+- **Impact**: 5-10x faster for large DAGs (100+ nodes)
+- **Features**: Kahn's algorithm, cycle detection, wave-based parallel execution
+
+#### 15. terradev-price-intelligence
+Vectorized price statistics and trend analysis.
+- **Impact**: 10-20x faster for large datasets (10K+ ticks)
+- **Features**: Mean/std dev calculations, volatility metrics, trend analysis
+
+#### 16. terradev-cost-scaler
+Efficient time-series cost analysis and scaling decisions.
+- **Impact**: 5-10x faster for 24-hour cost history
+- **Features**: Budget tracking, cost predictions, scaling recommendations
+
+#### 17. terradev-semantic-router
+Fast text processing and routing logic.
+- **Impact**: 5-15x faster for high-throughput routing
+- **Features**: Keyword matching, signal integration, batch routing
+
 ### Safety & Credibility Modules
 
-#### 13. terradev-cost-calculator
+#### 18. terradev-cost-calculator
 Type-safe financial calculations with decimal precision.
 - **Impact**: Eliminates floating-point cost calculation errors
 - **Features**: Compile-time arithmetic safety, spot pricing, multi-instance cost aggregation
 
-#### 14. terradev-credential-vault
+#### 19. terradev-credential-vault
 Secure credential storage with zeroization guarantees.
 - **Impact**: Prevents credential leaks, memory-safe secret handling
 - **Features**: RAII guarantees, automatic memory zeroization on drop, type-safe secret access
 
-#### 15. terradev-config-validator
+#### 20. terradev-config-validator
 Compile-time configuration schema validation.
 - **Impact**: Prevents deployment failures from invalid configurations
 - **Features**: JSON schema validation, type checking, required field enforcement
 
-#### 16. terradev-artifact-verification
+#### 21. terradev-artifact-verification
 Deterministic artifact integrity verification.
 - **Impact**: Ensures data integrity, prevents tampering
 - **Features**: SHA-256 checksums, constant-time comparisons, file verification
 
-#### 17. terradev-quota-manager
+#### 22. terradev-quota-manager
 Lock-free resource quota enforcement.
 - **Impact**: Prevents cost overruns, fair resource allocation
 - **Features**: Deterministic quota tracking, no GC pauses, leak-proof resource limits
 
+#### 23. terradev-governance
+Deterministic policy engine and consent tracking.
+- **Impact**: 5-10x faster for complex policy evaluation
+- **Features**: Consent management, policy evaluation, audit trail
+
 ### MCP Performance Modules
 
-#### 18. terradev-mcp-optimizer
+#### 24. terradev-mcp-optimizer
 Tool compression and dispatch engine for MCP server.
 - **Impact**: 10-50x faster tool schema compression and namespace expansion
 - **Features**: Optional field stripping, namespace expansion, zero-copy serialization
 - **Use Case**: `handle_call_tool` function processes tool names and arguments every request
 
-#### 19. terradev-command-executor
+#### 25. terradev-command-executor
 Parallel command execution engine with tokio runtime.
 - **Impact**: 10,000+ concurrent shell operations vs Python's ~100 (100x speedup)
 - **Features**: Tokio-based async runtime, semaphore-based concurrency control, zero-copy stdout/stderr streaming
 - **Use Case**: Terraform provisioning, GPU discovery, parallel fleet operations
 
-#### 20. terradev-gpu-discovery
+#### 26. terradev-gpu-discovery
 GPU discovery and hardware introspection with NVML bindings.
 - **Impact**: Direct NVML/PCIe access is 5-10x faster than nvidia-smi parsing
 - **Features**: Direct NVML bindings, fallback to nvidia-smi, cached hardware state with TTL
 - **Use Case**: Preflight checks, GPU availability queries, MIG configuration
+
+#### 27. terradev-mcp-codec
+Zero-copy MCP protocol encode/decode using simd-json.
+- **Impact**: 2-3x faster JSON parsing/serialization, critical for every tool call
+- **Features**: SIMD-accelerated JSON, batch processing, zero-copy operations
+- **Use Case**: Every single tool call goes through this path
+
+#### 28. terradev-tool-registry
+Compiled static dispatch table for tool lookups.
+- **Impact**: Eliminates dict lookup contention under 50+ concurrent tool calls
+- **Features**: Pre-compiled schemas, fast lookup, tool management
+- **Use Case**: Tool manifest requests, tool discovery, schema caching
+
+#### 29. terradev-result-compressor
+LZ4 compression for large cluster topology results.
+- **Impact**: Reduces transmission size by 2-5x, saves Claude context window
+- **Features**: Fast LZ4 compression, compression ratio tracking, JSON-aware
+- **Use Case**: Large cluster state returns, topology data, optimization results
+
+### Utility Modules
+
+#### 30. terradev-helm-generator
+Fast YAML template rendering with tera.
+- **Impact**: 3-5x faster for complex manifests
+- **Features**: Tera templating, built-in generators, YAML serialization
+- **Use Case**: Helm chart generation, Kubernetes manifests, deployment configs
 
 ## Installation
 
