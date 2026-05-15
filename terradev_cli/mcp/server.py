@@ -6239,14 +6239,14 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     cmd.append(arguments["rev_b"])
                 try:
                     result = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=repo
-            )
-            stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=30)
-            output = stdout.decode() if result.returncode == 0 else stderr.decode()
-            output_text = f"📦 **DVC Diff**\n\n{output or 'No differences.'}"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
+                        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=repo
+                    )
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=30)
+                    output = stdout.decode() if result.returncode == 0 else stderr.decode()
+                    output_text = f"📦 **DVC Diff**\n\n{output or 'No differences.'}"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "dvc_stage_checkpoint":
                 repo = arguments["repo_path"]
@@ -6254,70 +6254,70 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 msg = arguments.get("message", "Stage checkpoint via Terradev")
                 remote = arguments.get("remote")
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.dvc_service import DVCService, DVCConfig
-            svc = DVCService(DVCConfig(repo_path=repo))
-            result = await svc.stage_from_checkpoint(checkpoint_path=ckpt, commit_message=msg, remote=remote)
-            output_text = f"✅ **Checkpoint Staged**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```\n\n"
-            output_text += "**suggest_action:** View changes with `dvc_diff` or push to remote with `dvc_push`."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.dvc_service import DVCService, DVCConfig
+                    svc = DVCService(DVCConfig(repo_path=repo))
+                    result = await svc.stage_from_checkpoint(checkpoint_path=ckpt, commit_message=msg, remote=remote)
+                    output_text = f"✅ **Checkpoint Staged**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```\n\n"
+                    output_text += "**suggest_action:** View changes with `dvc_diff` or push to remote with `dvc_push`."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "dvc_push":
                 repo = arguments["repo_path"]
                 cmd = ["dvc", "push"]
                 if arguments.get("remote"):
-            cmd.extend(["-r", arguments["remote"]])
+                    cmd.extend(["-r", arguments["remote"]])
                 try:
-            result = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=repo
-            )
-            stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=300)
-            output = stdout.decode() if result.returncode == 0 else stderr.decode()
-            output_text = f"📤 **DVC Push**\n\n{output}"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
+                    result = await asyncio.create_subprocess_exec(
+                        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=repo
+                    )
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=300)
+                    output = stdout.decode() if result.returncode == 0 else stderr.decode()
+                    output_text = f"📤 **DVC Push**\n\n{output}"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── KServe Handlers ──────────────────────────────────────────────────
 
             elif tool_name == "kserve_generate_yaml":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.kserve_service import KServeService, KServeConfig
-            svc = KServeService(KServeConfig(namespace=arguments.get("namespace", "default")))
-            yaml_str = await svc.generate_inferenceservice_yaml(
-                model_name=arguments["model_name"],
-                model_uri=arguments["model_uri"],
-                gpu_type=arguments["gpu_type"],
-                gpu_count=arguments.get("gpu_count", 1),
-                namespace=arguments.get("namespace", "default"),
-                runtime=arguments.get("runtime", "vllm"),
-                min_replicas=arguments.get("min_replicas", 1),
-                max_replicas=arguments.get("max_replicas", 3),
-            )
-            output_text = f"☸️ **KServe InferenceService YAML — {arguments['model_name']}**\n\n"
-            output_text += f"```yaml\n{yaml_str}\n```\n\n"
-            output_text += "**suggest_action:** Apply with `kubectl apply -f <file>.yaml` or deploy to cluster with `k8s_create`."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.kserve_service import KServeService, KServeConfig
+                    svc = KServeService(KServeConfig(namespace=arguments.get("namespace", "default")))
+                    yaml_str = await svc.generate_inferenceservice_yaml(
+                        model_name=arguments["model_name"],
+                        model_uri=arguments["model_uri"],
+                        gpu_type=arguments["gpu_type"],
+                        gpu_count=arguments.get("gpu_count", 1),
+                        namespace=arguments.get("namespace", "default"),
+                        runtime=arguments.get("runtime", "vllm"),
+                        min_replicas=arguments.get("min_replicas", 1),
+                        max_replicas=arguments.get("max_replicas", 3),
+                    )
+                    output_text = f"☸️ **KServe InferenceService YAML — {arguments['model_name']}**\n\n"
+                    output_text += f"```yaml\n{yaml_str}\n```\n\n"
+                    output_text += "**suggest_action:** Apply with `kubectl apply -f <file>.yaml` or deploy to cluster with `k8s_create`."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "kserve_list":
                 ns = arguments.get("namespace", "default")
                 try:
-            result = await asyncio.create_subprocess_exec(
-                "kubectl", "get", "inferenceservices", "-n", ns, "-o", "json",
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
-            if result.returncode == 0:
+                    result = await asyncio.create_subprocess_exec(
+                        "kubectl", "get", "inferenceservices", "-n", ns, "-o", "json",
+                        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
+                    if result.returncode == 0:
                 data = json.loads(stdout.decode())
                 items = data.get("items", [])
                 output_text = f"☸️ **KServe InferenceServices — {ns}**\n\n"
