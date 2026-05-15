@@ -6318,16 +6318,16 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     )
                     stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
                     if result.returncode == 0:
-                data = json.loads(stdout.decode())
-                items = data.get("items", [])
-                output_text = f"☸️ **KServe InferenceServices — {ns}**\n\n"
-                if items:
-                    for item in items:
-                        name = item.get("metadata", {}).get("name", "?")
-                        ready = "✅" if any(c.get("status") == "True" for c in item.get("status", {}).get("conditions", [])) else "⏳"
-                        url = item.get("status", {}).get("url", "N/A")
-                        output_text += f"  - {ready} **{name}** → {url}\n"
-                else:
+                        data = json.loads(stdout.decode())
+                        items = data.get("items", [])
+                        output_text = f"☸️ **KServe InferenceServices — {ns}**\n\n"
+                        if items:
+                            for item in items:
+                                name = item.get("metadata", {}).get("name", "?")
+                                ready = "✅" if any(c.get("status") == "True" for c in item.get("status", {}).get("conditions", [])) else "⏳"
+                                url = item.get("status", {}).get("url", "N/A")
+                                output_text += f"  - {ready} **{name}** → {url}\n"
+                        else:
                     output_text += "No InferenceServices found."
                 return CallToolResult(content=[TextContent(type="text", text=output_text)])
             else:
