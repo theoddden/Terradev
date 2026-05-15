@@ -5408,101 +5408,101 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 api_key = arguments.get("api_key")
                 headers = {"Content-Type": "application/json"}
                 if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+                    headers["Authorization"] = f"Bearer {api_key}"
                 if arguments.get("messages"):
-            url = f"{endpoint}/v1/chat/completions"
-            payload = {"model": model, "messages": arguments["messages"], "max_tokens": max_tokens, "stream": False}
+                    url = f"{endpoint}/v1/chat/completions"
+                    payload = {"model": model, "messages": arguments["messages"], "max_tokens": max_tokens, "stream": False}
                 elif arguments.get("prompt"):
-            url = f"{endpoint}/v1/completions"
-            payload = {"model": model, "prompt": arguments["prompt"], "max_tokens": max_tokens, "stream": False}
+                    url = f"{endpoint}/v1/completions"
+                    payload = {"model": model, "prompt": arguments["prompt"], "max_tokens": max_tokens, "stream": False}
                 else:
-            return CallToolResult(content=[TextContent(type="text", text="⚠️ Provide either `prompt` or `messages`.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="⚠️ Provide either `prompt` or `messages`.")], isError=True)
                 try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        if "choices" in data and data["choices"]:
-                            if "message" in data["choices"][0]:
-                                text = data["choices"][0]["message"]["content"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                if "choices" in data and data["choices"]:
+                                    if "message" in data["choices"][0]:
+                                        text = data["choices"][0]["message"]["content"]
+                                    else:
+                                        text = data["choices"][0].get("text", "")
+                                    output_text = f"⚡ **vLLM Inference — {model}**\n\n{text}\n\n"
+                                    if data.get("usage"):
+                                        u = data["usage"]
+                                        output_text += f"**Tokens:** {u.get('prompt_tokens', '?')} in → {u.get('completion_tokens', '?')} out"
+                                else:
+                                    output_text = f"⚡ **Response:**\n```json\n{json.dumps(data, indent=2)}\n```"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
                             else:
-                                text = data["choices"][0].get("text", "")
-                            output_text = f"⚡ **vLLM Inference — {model}**\n\n{text}\n\n"
-                            if data.get("usage"):
-                                u = data["usage"]
-                                output_text += f"**Tokens:** {u.get('prompt_tokens', '?')} in → {u.get('completion_tokens', '?')} out"
-                        else:
-                            output_text = f"⚡ **Response:**\n```json\n{json.dumps(data, indent=2)}\n```"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ vLLM returned {resp.status}: {body}")], isError=True)
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ vLLM returned {resp.status}: {body}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ Inference failed: {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ Inference failed: {e}")], isError=True)
 
             elif tool_name == "vllm_info":
                 endpoint = arguments["endpoint"].rstrip("/")
                 api_key = arguments.get("api_key")
                 headers = {}
                 if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+                    headers["Authorization"] = f"Bearer {api_key}"
                 try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"{endpoint}/v1/models", headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        models = data.get("data", [])
-                        output_text = f"ℹ️ **vLLM Server Info — {endpoint}**\n\n"
-                        output_text += f"**Models loaded:** {len(models)}\n"
-                        for m in models:
-                            parent = m.get("parent")
-                            tag = " (LoRA)" if parent else " (base)"
-                            output_text += f"  - **{m.get('id', 'unknown')}**{tag}\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ Server returned {resp.status}")], isError=True)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(f"{endpoint}/v1/models", headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                models = data.get("data", [])
+                                output_text = f"ℹ️ **vLLM Server Info — {endpoint}**\n\n"
+                                output_text += f"**Models loaded:** {len(models)}\n"
+                                for m in models:
+                                    parent = m.get("parent")
+                                    tag = " (LoRA)" if parent else " (base)"
+                                    output_text += f"  - **{m.get('id', 'unknown')}**{tag}\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ Server returned {resp.status}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "vllm_sleep":
                 endpoint = arguments["endpoint"].rstrip("/")
                 level = arguments.get("level", 1)
                 try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(f"{endpoint}/sleep?level={level}", timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        return CallToolResult(content=[TextContent(type="text", text=f"😴 **vLLM Server Sleeping** (level {level})\n\nGPU memory freed. Wake with `vllm_wake`.")])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ Sleep failed: {resp.status} {body}")], isError=True)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(f"{endpoint}/sleep?level={level}", timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                            if resp.status == 200:
+                                return CallToolResult(content=[TextContent(type="text", text=f"😴 **vLLM Server Sleeping** (level {level})\n\nGPU memory freed. Wake with `vllm_wake`.")])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ Sleep failed: {resp.status} {body}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "vllm_wake":
                 endpoint = arguments["endpoint"].rstrip("/")
                 level = arguments.get("sleep_level", 1)
                 try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(f"{endpoint}/wake_up", timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                    if resp.status != 200:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ Wake failed: {resp.status} {body}")], isError=True)
-                if level == 2:
-                    async with session.post(f"{endpoint}/collective_rpc", json={"method": "reload_weights"}, timeout=aiohttp.ClientTimeout(total=120)) as resp:
-                        if resp.status != 200:
-                            return CallToolResult(content=[TextContent(type="text", text="❌ reload_weights failed")], isError=True)
-                    async with session.post(f"{endpoint}/reset_prefix_cache", timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                        pass
-                return CallToolResult(content=[TextContent(type="text", text=f"☀️ **vLLM Server Awake** (from level {level})\n\nReady for inference.")])
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(f"{endpoint}/wake_up", timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                            if resp.status != 200:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ Wake failed: {resp.status} {body}")], isError=True)
+                            if level == 2:
+                                async with session.post(f"{endpoint}/collective_rpc", json={"method": "reload_weights"}, timeout=aiohttp.ClientTimeout(total=120)) as resp:
+                                    if resp.status != 200:
+                                        return CallToolResult(content=[TextContent(type="text", text="❌ reload_weights failed")], isError=True)
+                                async with session.post(f"{endpoint}/reset_prefix_cache", timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                                    pass
+                            return CallToolResult(content=[TextContent(type="text", text=f"☀️ **vLLM Server Awake** (from level {level})\n\nReady for inference.")])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: SGLang Optimization Stack Handlers ──────────────────────────────────────────────────
 
             elif tool_name == "sglang":
                 action = arguments.get("action")
                 if not action:
-            return CallToolResult(content=[TextContent(type="text", text="❌ 'action' parameter required. Use: optimize, detect, router, install, start, stop, inference, metrics, test")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ 'action' parameter required. Use: optimize, detect, router, install, start, stop, inference, metrics, test")], isError=True)
         
                 # Import SGLang service
                 import sys
@@ -5512,321 +5512,321 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 service = SGLangService()
         
                 if action == "optimize":
-            model_path = arguments.get("model_path")
-            if not model_path:
-                return CallToolResult(content=[TextContent(type="text", text="❌ 'model_path' required for optimize action")], isError=True)
-            
-            workload_type_str = arguments.get("workload_type")
-            user_description = arguments.get("user_description")
-            host = arguments.get("host", "0.0.0.0")
-            port = arguments.get("port", 8000)
-            dry_run = arguments.get("dry_run", False)
-            
-            # Convert string to enum if provided
-            workload_type = None
-            if workload_type_str:
-                workload_type = WorkloadType(workload_type_str)
-            
-            # Create optimized configuration
-            config = service.create_optimized_config(
-                model_path=model_path,
-                workload_type=workload_type,
-                user_description=user_description,
-                host=host,
-                port=port
-            )
-            
-            # Get optimization summary
-            summary = service.get_optimization_summary(config)
-            
-            output_text = f"🚀 **SGLang Optimization Configuration**\n\n"
-            output_text += f"**Model:** {model_path}\n"
-            output_text += f"**Workload Type:** {summary['workload_type']}\n"
-            output_text += f"**Hardware Detected:** {summary['hardware_detected']}\n"
-            output_text += f"**Schedule Policy:** {summary['schedule_policy']}\n"
-            output_text += f"**Attention Backend:** {summary['attention_backend']}\n\n"
-            
-            output_text += "**Applied Optimizations:**\n"
-            for opt in summary['optimizations_applied']:
-                output_text += f"  ✅ {opt}\n"
-            output_text += "\n"
-            
-            if summary['performance_expectations']:
-                output_text += "**Performance Expectations:**\n"
-                for key, value in summary['performance_expectations'].items():
-                    output_text += f"  📊 {key.replace('_', ' ').title()}: {value}\n"
-                output_text += "\n"
-            
-            if summary['hardware_tuned']:
-                output_text += "🔧 **Hardware-specific optimizations applied**\n\n"
-            
-            # Validate configuration
-            warnings = service.validate_config(config)
-            if warnings:
-                output_text += "⚠️ **Configuration Warnings:**\n"
-                for warning in warnings:
-                    output_text += f"  ⚠️ {warning}\n"
-                output_text += "\n"
-            
-            if dry_run:
-                output_text += "🔍 **Dry run** - configuration generated but not launched\n"
-            else:
-                # Generate and display launch command
-                launch_cmd = service.generate_launch_command(config)
-                output_text += "**🚀 Launch Command:**\n```\n" + launch_cmd + "\n```\n\n"
-                output_text += "**💡 To start the server:**\n```\n" + launch_cmd + "\n```"
-            
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
-        
-                elif action == "detect":
-            model_path = arguments.get("model_path")
-            if not model_path:
-                return CallToolResult(content=[TextContent(type="text", text="❌ 'model_path' required for detect action")], isError=True)
-            
-            workload_type_str = arguments.get("workload_type")
-            user_description = arguments.get("user_description")
-            
-            # Detect workload type
-            detected_type = service.detect_workload_type(model_path, user_description)
-            
-            output_text = f"🔍 **Workload Detection Results**\n\n"
-            output_text += f"**Model:** {model_path}\n"
-            output_text += f"**Detected Workload Type:** {detected_type.value}\n"
-            
-            if workload_type_str:
-                manual_type = WorkloadType(workload_type_str)
-                output_text += f"**Manual Workload Type:** {manual_type.value}\n"
-                if detected_type != manual_type:
-                    output_text += "⚠️ Manual and detected types differ - using manual specification\n"
-                    final_type = manual_type
-                else:
-                    output_text += "✅ Manual and detected types match\n"
-                    final_type = detected_type
-            else:
-                final_type = detected_type
-            
-            output_text += "\n"
-            
-            # Show optimization recommendations
-            config = service.create_optimized_config(
-                model_path=model_path,
-                workload_type=final_type,
-                user_description=user_description
-            )
-            
-            summary = service.get_optimization_summary(config)
-            
-            output_text += "**🎯 Optimization Recommendations:**\n"
-            for opt in summary['optimizations_applied']:
-                output_text += f"  ✅ {opt}\n"
-            output_text += "\n"
-            
-            if summary['performance_expectations']:
-                output_text += "**📊 Expected Performance:**\n"
-                for key, value in summary['performance_expectations'].items():
-                    output_text += f"  📈 {key.replace('_', ' ').title()}: {value}\n"
-            
-            output_text += "\n💡 **Next step:** Use sglang action='optimize' to generate the full launch command"
-            
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
-        
-                elif action == "router":
-            model_path = arguments.get("model_path")
-            if not model_path:
-                return CallToolResult(content=[TextContent(type="text", text="❌ 'model_path' required for router action")], isError=True)
-            
-            dp_size = arguments.get("dp_size", 8)
-            workload_type_str = arguments.get("workload_type")
-            
-            # Convert string to enum if provided
-            workload_type = None
-            if workload_type_str:
-                workload_type = WorkloadType(workload_type_str)
-            
-            # Create optimized configuration
-            config = service.create_optimized_config(
-                model_path=model_path,
-                workload_type=workload_type
-            )
-            
-            # Generate router command
-            router_cmd = service.generate_multi_replica_command(config, dp_size)
-            
-            output_text = f"🔄 **Cache-Aware Router Configuration**\n\n"
-            output_text += f"**Model:** {model_path}\n"
-            output_text += f"**DP Size:** {dp_size}\n"
-            output_text += f"**Workload Type:** {config.workload_type.value}\n\n"
-            output_text += "**🚀 Router Launch Command:**\n```\n" + router_cmd + "\n```\n\n"
-            output_text += "**💡 This router provides:**\n"
-            output_text += "  📈 Up to 1.9x throughput increase\n"
-            output_text += "  🎯 3.8x higher cache hit rate\n"
-            output_text += "  🧠 Intelligent request routing based on cache predictions"
-            
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
-        
-                elif action == "install":
-            instance_ip = arguments.get("instance_ip")
-            ssh_user = arguments.get("ssh_user", "root")
-            ssh_key = arguments.get("ssh_key")
-            
-            if instance_ip:
-                # Remote installation
-                result = await service.install_on_instance(
-                    instance_ip=instance_ip,
-                    ssh_user=ssh_user,
-                    ssh_key=ssh_key
-                )
+                    model_path = arguments.get("model_path")
+                    if not model_path:
+                        return CallToolResult(content=[TextContent(type="text", text="❌ 'model_path' required for optimize action")], isError=True)
+                    
+                    workload_type_str = arguments.get("workload_type")
+                    user_description = arguments.get("user_description")
+                    host = arguments.get("host", "0.0.0.0")
+                    port = arguments.get("port", 8000)
+                    dry_run = arguments.get("dry_run", False)
+                    
+                    # Convert string to enum if provided
+                    workload_type = None
+                    if workload_type_str:
+                        workload_type = WorkloadType(workload_type_str)
+                    
+                    # Create optimized configuration
+                    config = service.create_optimized_config(
+                        model_path=model_path,
+                        workload_type=workload_type,
+                        user_description=user_description,
+                        host=host,
+                        port=port
+                    )
+                    
+                    # Get optimization summary
+                    summary = service.get_optimization_summary(config)
+                    
+                    output_text = f"🚀 **SGLang Optimization Configuration**\n\n"
+                    output_text += f"**Model:** {model_path}\n"
+                    output_text += f"**Workload Type:** {summary['workload_type']}\n"
+                    output_text += f"**Hardware Detected:** {summary['hardware_detected']}\n"
+                    output_text += f"**Schedule Policy:** {summary['schedule_policy']}\n"
+                    output_text += f"**Attention Backend:** {summary['attention_backend']}\n\n"
+                    
+                    output_text += "**Applied Optimizations:**\n"
+                    for opt in summary['optimizations_applied']:
+                        output_text += f"  ✅ {opt}\n"
+                    output_text += "\n"
+                    
+                    if summary['performance_expectations']:
+                        output_text += "**Performance Expectations:**\n"
+                        for key, value in summary['performance_expectations'].items():
+                            output_text += f"  📊 {key.replace('_', ' ').title()}: {value}\n"
+                        output_text += "\n"
+                    
+                    if summary['hardware_tuned']:
+                        output_text += "🔧 **Hardware-specific optimizations applied**\n\n"
+                    
+                    # Validate configuration
+                    warnings = service.validate_config(config)
+                    if warnings:
+                        output_text += "⚠️ **Configuration Warnings:**\n"
+                        for warning in warnings:
+                            output_text += f"  ⚠️ {warning}\n"
+                    output_text += "\n"
+                    
+                    if dry_run:
+                        output_text += "🔍 **Dry run** - configuration generated but not launched\n"
+                    else:
+                        # Generate and display launch command
+                        launch_cmd = service.generate_launch_command(config)
+                        output_text += "**🚀 Launch Command:**\n```\n" + launch_cmd + "\n```\n\n"
+                        output_text += "**💡 To start the server:**\n```\n" + launch_cmd + "\n```"
+                    
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 
-                if result["status"] == "installed":
-                    output_text = f"✅ **SGLang installed successfully** on {instance_ip}\n\n📋 **Output:**\n{result['output']}"
-                else:
-                    output_text = f"❌ **Installation failed:** {result['error']}"
-            else:
-                # Local installation
-                output_text = "📦 **Installing SGLang locally...**\n\n"
-                output_text += "**Command to run:**\n"
-                output_text += "```bash\n"
-                output_text += "pip install \"sglang[all]\" --find-links https://flashinfer.ai/whl/cu124/torch2.5/flashinfer-python\n"
-                output_text += "```"
-            
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError="failed" in result.get("status", ""))
+                elif action == "detect":
+                    model_path = arguments.get("model_path")
+                    if not model_path:
+                        return CallToolResult(content=[TextContent(type="text", text="❌ 'model_path' required for detect action")], isError=True)
+                    
+                    workload_type_str = arguments.get("workload_type")
+                    user_description = arguments.get("user_description")
+                    
+                    # Detect workload type
+                    detected_type = service.detect_workload_type(model_path, user_description)
+                    
+                    output_text = f"🔍 **Workload Detection Results**\n\n"
+                    output_text += f"**Model:** {model_path}\n"
+                    output_text += f"**Detected Workload Type:** {detected_type.value}\n"
+                    
+                    if workload_type_str:
+                        manual_type = WorkloadType(workload_type_str)
+                        output_text += f"**Manual Workload Type:** {manual_type.value}\n"
+                        if detected_type != manual_type:
+                            output_text += "⚠️ Manual and detected types differ - using manual specification\n"
+                            final_type = manual_type
+                        else:
+                            output_text += "✅ Manual and detected types match\n"
+                            final_type = detected_type
+                    else:
+                        final_type = detected_type
+                    
+                    output_text += "\n"
+                    
+                    # Show optimization recommendations
+                    config = service.create_optimized_config(
+                        model_path=model_path,
+                        workload_type=final_type,
+                        user_description=user_description
+                    )
+                    
+                    summary = service.get_optimization_summary(config)
+                    
+                    output_text += "**🎯 Optimization Recommendations:**\n"
+                    for opt in summary['optimizations_applied']:
+                        output_text += f"  ✅ {opt}\n"
+                    output_text += "\n"
+                    
+                    if summary['performance_expectations']:
+                        output_text += "**📊 Expected Performance:**\n"
+                        for key, value in summary['performance_expectations'].items():
+                            output_text += f"  📈 {key.replace('_', ' ').title()}: {value}\n"
+                    
+                    output_text += "\n💡 **Next step:** Use sglang action='optimize' to generate the full launch command"
+                    
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                
+                elif action == "router":
+                    model_path = arguments.get("model_path")
+                    if not model_path:
+                        return CallToolResult(content=[TextContent(type="text", text="❌ 'model_path' required for router action")], isError=True)
+                    
+                    dp_size = arguments.get("dp_size", 8)
+                    workload_type_str = arguments.get("workload_type")
+                    
+                    # Convert string to enum if provided
+                    workload_type = None
+                    if workload_type_str:
+                        workload_type = WorkloadType(workload_type_str)
+                    
+                    # Create optimized configuration
+                    config = service.create_optimized_config(
+                        model_path=model_path,
+                        workload_type=workload_type
+                    )
+                    
+                    # Generate router command
+                    router_cmd = service.generate_multi_replica_command(config, dp_size)
+                    
+                    output_text = f"🔄 **Cache-Aware Router Configuration**\n\n"
+                    output_text += f"**Model:** {model_path}\n"
+                    output_text += f"**DP Size:** {dp_size}\n"
+                    output_text += f"**Workload Type:** {config.workload_type.value}\n\n"
+                    output_text += "**🚀 Router Launch Command:**\n```\n" + router_cmd + "\n```\n\n"
+                    output_text += "**💡 This router provides:**\n"
+                    output_text += "  📈 Up to 1.9x throughput increase\n"
+                    output_text += "  🎯 3.8x higher cache hit rate\n"
+                    output_text += "  🧠 Intelligent request routing based on cache predictions"
+                    
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                
+                elif action == "install":
+                    instance_ip = arguments.get("instance_ip")
+                    ssh_user = arguments.get("ssh_user", "root")
+                    ssh_key = arguments.get("ssh_key")
+                    
+                    if instance_ip:
+                        # Remote installation
+                        result = await service.install_on_instance(
+                            instance_ip=instance_ip,
+                            ssh_user=ssh_user,
+                            ssh_key=ssh_key
+                        )
+                        
+                        if result["status"] == "installed":
+                            output_text = f"✅ **SGLang installed successfully** on {instance_ip}\n\n📋 **Output:**\n{result['output']}"
+                        else:
+                            output_text = f"❌ **Installation failed:** {result['error']}"
+                    else:
+                        # Local installation
+                        output_text = "📦 **Installing SGLang locally...**\n\n"
+                        output_text += "**Command to run:**\n"
+                        output_text += "```bash\n"
+                        output_text += "pip install \"sglang[all]\" --find-links https://flashinfer.ai/whl/cu124/torch2.5/flashinfer-python\n"
+                        output_text += "```"
+                    
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError="failed" in result.get("status", ""))
         
                 elif action == "start":
-            model_path = arguments.get("model_path")
-            if not model_path:
-                return CallToolResult(content=[TextContent(type="text", text="❌ 'model_path' required for start action")], isError=True)
-            
-            instance_ip = arguments.get("instance_ip")
-            ssh_user = arguments.get("ssh_user", "root")
-            ssh_key = arguments.get("ssh_key")
-            workload_type_str = arguments.get("workload_type")
-            port = arguments.get("port", 8000)
-            
-            # Create optimized configuration
-            workload_type = None
-            if workload_type_str:
-                workload_type = WorkloadType(workload_type_str)
-            
-            config = service.create_optimized_config(
-                model_path=model_path,
-                workload_type=workload_type,
-                port=port
-            )
-            
-            if instance_ip:
-                # Remote deployment
-                result = await service.start_server(
-                    instance_ip=instance_ip,
-                    ssh_user=ssh_user,
-                    ssh_key=ssh_key
-                )
-                
-                if result["status"] == "started":
-                    output_text = f"✅ **SGLang server started successfully**\n\n🌐 **Endpoint:** http://{instance_ip}:{port}"
-                else:
-                    output_text = f"❌ **Failed to start server:** {result['error']}"
-            else:
-                # Local launch
-                launch_cmd = service.generate_launch_command(config)
-                output_text = f"🚀 **Starting SGLang server locally...**\n\n"
-                output_text += f"🌐 **Endpoint:** http://localhost:{port}\n\n"
-                output_text += "**💡 Launch command:**\n```\n" + launch_cmd + "\n```\n\n"
-                output_text += "⚠️ **Run the command above to start the server**"
-            
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError="failed" in result.get("status", ""))
+                    model_path = arguments.get("model_path")
+                    if not model_path:
+                        return CallToolResult(content=[TextContent(type="text", text="❌ 'model_path' required for start action")], isError=True)
+                    
+                    instance_ip = arguments.get("instance_ip")
+                    ssh_user = arguments.get("ssh_user", "root")
+                    ssh_key = arguments.get("ssh_key")
+                    workload_type_str = arguments.get("workload_type")
+                    port = arguments.get("port", 8000)
+                    
+                    # Create optimized configuration
+                    workload_type = None
+                    if workload_type_str:
+                        workload_type = WorkloadType(workload_type_str)
+                    
+                    config = service.create_optimized_config(
+                        model_path=model_path,
+                        workload_type=workload_type,
+                        port=port
+                    )
+                    
+                    if instance_ip:
+                        # Remote deployment
+                        result = await service.start_server(
+                            instance_ip=instance_ip,
+                            ssh_user=ssh_user,
+                            ssh_key=ssh_key
+                        )
+                        
+                        if result["status"] == "started":
+                            output_text = f"✅ **SGLang server started successfully**\n\n🌐 **Endpoint:** http://{instance_ip}:{port}"
+                        else:
+                            output_text = f"❌ **Failed to start server:** {result['error']}"
+                    else:
+                        # Local launch
+                        launch_cmd = service.generate_launch_command(config)
+                        output_text = f"🚀 **Starting SGLang server locally...**\n\n"
+                        output_text += f"🌐 **Endpoint:** http://localhost:{port}\n\n"
+                        output_text += "**💡 Launch command:**\n```\n" + launch_cmd + "\n```\n\n"
+                        output_text += "⚠️ **Run the command above to start the server**"
+                    
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError="failed" in result.get("status", ""))
         
                 elif action == "test":
-            output_text = "🔍 **Testing SGLang installation...**\n\n"
-            result = await service.test_connection()
-            
-            if result["status"] == "connected":
-                output_text += f"✅ **SGLang is installed and available**\n\n📦 **Version:** {result['sglang_version']}"
-            else:
-                output_text += f"❌ **SGLang test failed:** {result['error']}\n\n💡 **Run:** `sglang action='install'` to install SGLang"
-            
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result["status"] != "connected")
-        
+                    output_text = "🔍 **Testing SGLang installation...**\n\n"
+                    result = await service.test_connection()
+                    
+                    if result["status"] == "connected":
+                        output_text += f"✅ **SGLang is installed and available**\n\n📦 **Version:** {result['sglang_version']}"
+                    else:
+                        output_text += f"❌ **SGLang test failed:** {result['error']}\n\n💡 **Run:** `sglang action='install'` to install SGLang"
+                    
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result["status"] != "connected")
+                
                 elif action == "stop":
-            # Legacy stop functionality
-            instance_ip = arguments.get("instance_ip")
-            if not instance_ip:
-                return CallToolResult(content=[TextContent(type="text", text="❌ 'instance_ip' required for stop action")], isError=True)
-            
-            ssh_user = arguments.get("ssh_user", "root")
-            ssh_key = arguments.get("ssh_key")
-            ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + ssh_key if ssh_key else ''} {ssh_user}@{instance_ip}"
-            result = await execute_shell_command(f"{ssh_base} 'systemctl stop sglang && systemctl disable sglang && rm -f /etc/systemd/system/sglang.service && systemctl daemon-reload'")
-            output_text = f"⏹️ **SGLang Server Stopped** on {instance_ip}" if result["success"] else f"❌ {result['stderr']}"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
+                    # Legacy stop functionality
+                    instance_ip = arguments.get("instance_ip")
+                    if not instance_ip:
+                        return CallToolResult(content=[TextContent(type="text", text="❌ 'instance_ip' required for stop action")], isError=True)
+                    
+                    ssh_user = arguments.get("ssh_user", "root")
+                    ssh_key = arguments.get("ssh_key")
+                    ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + ssh_key if ssh_key else ''} {ssh_user}@{instance_ip}"
+                    result = await execute_shell_command(f"{ssh_base} 'systemctl stop sglang && systemctl disable sglang && rm -f /etc/systemd/system/sglang.service && systemctl daemon-reload'")
+                    output_text = f"⏹️ **SGLang Server Stopped** on {instance_ip}" if result["success"] else f"❌ {result['stderr']}"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
         
                 elif action == "inference":
-            # Legacy inference functionality
-            endpoint = arguments.get("endpoint")
-            if not endpoint:
-                return CallToolResult(content=[TextContent(type="text", text="❌ 'endpoint' required for inference action")], isError=True)
-            
-            model = arguments.get("model")
-            if not model:
-                return CallToolResult(content=[TextContent(type="text", text="❌ 'model' required for inference action")], isError=True)
-            
-            max_tokens = arguments.get("max_tokens", 100)
-            api_key = arguments.get("api_key")
-            headers = {"Content-Type": "application/json"}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-            
-            if arguments.get("messages"):
-                url = f"{endpoint.rstrip('/')}/v1/chat/completions"
-                payload = {"model": model, "messages": arguments["messages"], "max_tokens": max_tokens, "stream": False}
-            elif arguments.get("prompt"):
-                url = f"{endpoint.rstrip('/')}/v1/completions"
-                payload = {"model": model, "prompt": arguments["prompt"], "max_tokens": max_tokens, "stream": False}
-            else:
-                return CallToolResult(content=[TextContent(type="text", text="⚠️ Provide either `prompt` or `messages`.")], isError=True)
-            
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            if "choices" in data and data["choices"]:
-                                if "message" in data["choices"][0]:
-                                    text = data["choices"][0]["message"]["content"]
+                    # Legacy inference functionality
+                    endpoint = arguments.get("endpoint")
+                    if not endpoint:
+                        return CallToolResult(content=[TextContent(type="text", text="❌ 'endpoint' required for inference action")], isError=True)
+                    
+                    model = arguments.get("model")
+                    if not model:
+                        return CallToolResult(content=[TextContent(type="text", text="❌ 'model' required for inference action")], isError=True)
+                    
+                    max_tokens = arguments.get("max_tokens", 100)
+                    api_key = arguments.get("api_key")
+                    headers = {"Content-Type": "application/json"}
+                    if api_key:
+                        headers["Authorization"] = f"Bearer {api_key}"
+                    
+                    if arguments.get("messages"):
+                        url = f"{endpoint.rstrip('/')}/v1/chat/completions"
+                        payload = {"model": model, "messages": arguments["messages"], "max_tokens": max_tokens, "stream": False}
+                    elif arguments.get("prompt"):
+                        url = f"{endpoint.rstrip('/')}/v1/completions"
+                        payload = {"model": model, "prompt": arguments["prompt"], "max_tokens": max_tokens, "stream": False}
+                    else:
+                        return CallToolResult(content=[TextContent(type="text", text="⚠️ Provide either `prompt` or `messages`.")], isError=True)
+                    
+                    try:
+                        async with aiohttp.ClientSession() as session:
+                            async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                                if resp.status == 200:
+                                    data = await resp.json()
+                                    if "choices" in data and data["choices"]:
+                                        if "message" in data["choices"][0]:
+                                            text = data["choices"][0]["message"]["content"]
+                                        else:
+                                            text = data["choices"][0].get("text", "")
+                                        output_text = f"⚡ **SGLang Inference — {model}**\n\n{text}\n\n"
+                                        if data.get("usage"):
+                                            u = data["usage"]
+                                            output_text += f"**Tokens:** {u.get('prompt_tokens', '?')} in → {u.get('completion_tokens', '?')} out"
+                                    else:
+                                        output_text = f"⚡ **Response:**\n```json\n{json.dumps(data, indent=2)}\n```"
+                                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                                 else:
-                                    text = data["choices"][0].get("text", "")
-                                output_text = f"⚡ **SGLang Inference — {model}**\n\n{text}\n\n"
-                                if data.get("usage"):
-                                    u = data["usage"]
-                                    output_text += f"**Tokens:** {u.get('prompt_tokens', '?')} in → {u.get('completion_tokens', '?')} out"
-                            else:
-                                output_text = f"⚡ **Response:**\n```json\n{json.dumps(data, indent=2)}\n```"
-                            return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                        else:
-                            body = await resp.text()
-                            return CallToolResult(content=[TextContent(type="text", text=f"❌ SGLang returned {resp.status}: {body}")], isError=True)
-            except Exception as e:
-                return CallToolResult(content=[TextContent(type="text", text=f"❌ Inference failed: {e}")], isError=True)
+                                    body = await resp.text()
+                                    return CallToolResult(content=[TextContent(type="text", text=f"❌ SGLang returned {resp.status}: {body}")], isError=True)
+                    except Exception as e:
+                        return CallToolResult(content=[TextContent(type="text", text=f"❌ Inference failed: {e}")], isError=True)
         
                 elif action == "metrics":
-            # Legacy metrics functionality
-            endpoint = arguments.get("endpoint")
-            if not endpoint:
-                return CallToolResult(content=[TextContent(type="text", text="❌ 'endpoint' required for metrics action")], isError=True)
-            
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(f"{endpoint.rstrip('/')}/metrics", timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                        if resp.status == 200:
-                            raw = await resp.text()
-                            output_text = f"📊 **SGLang Metrics — {endpoint}**\n\n```\n{raw[:3000]}\n```"
-                            return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                        else:
-                            return CallToolResult(content=[TextContent(type="text", text=f"❌ Metrics endpoint returned {resp.status}")], isError=True)
-            except Exception as e:
-                return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
-        
+                    # Legacy metrics functionality
+                    endpoint = arguments.get("endpoint")
+                    if not endpoint:
+                        return CallToolResult(content=[TextContent(type="text", text="❌ 'endpoint' required for metrics action")], isError=True)
+                    
+                    try:
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(f"{endpoint.rstrip('/')}/metrics", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                                if resp.status == 200:
+                                    raw = await resp.text()
+                                    output_text = f"📊 **SGLang Metrics — {endpoint}**\n\n```\n{raw[:3000]}\n```"
+                                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                                else:
+                                    return CallToolResult(content=[TextContent(type="text", text=f"❌ Metrics endpoint returned {resp.status}")], isError=True)
+                    except Exception as e:
+                        return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                
                 else:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ Unknown action '{action}'. Use: optimize, detect, router, install, start, stop, inference, metrics, test")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ Unknown action '{action}'. Use: optimize, detect, router, install, start, stop, inference, metrics, test")], isError=True)
 
             # ── Legacy SGLang Handlers (deprecated) ──────────────────────────────────────────────────
 
@@ -5843,17 +5843,17 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                       "--host", "0.0.0.0", "--port", str(port),
                       "--tp-size", str(tp), "--dp-size", str(dp), "--trust-remote-code"]
                 if ep:
-            cmd_parts.append("--enable-expert-parallel")
+                    cmd_parts.append("--enable-expert-parallel")
                 exec_line = " ".join(cmd_parts)
                 service = f"""[Unit]\nDescription=SGLang {model}\nAfter=network.target\n[Service]\nType=simple\nExecStart={exec_line}\nRestart=always\nRestartSec=10\nEnvironment=VLLM_USE_DEEP_GEMM=1\nEnvironment=VLLM_ALL2ALL_BACKEND=deepep_low_latency\n[Install]\nWantedBy=multi-user.target"""
                 setup = f"echo '{service}' > /etc/systemd/system/sglang.service && systemctl daemon-reload && systemctl enable sglang && systemctl start sglang && sleep 5 && systemctl status sglang"
                 ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + key if key else ''} {user}@{ip}"
                 result = await execute_shell_command(f"{ssh_base} '{setup}'")
                 if result["success"]:
-            output_text = f"✅ **SGLang Server Started**\n\n**Model:** {model}\n**Endpoint:** http://{ip}:{port}/v1\n**TP:** {tp}, **DP:** {dp}\n**Expert Parallel:** {ep}\n\n{result['stdout']}\n\n"
-            output_text += "**suggest_action:** Test with `sglang_inference`. Check metrics with `sglang_metrics`."
+                    output_text = f"✅ **SGLang Server Started**\n\n**Model:** {model}\n**Endpoint:** http://{ip}:{port}/v1\n**TP:** {tp}, **DP:** {dp}\n**Expert Parallel:** {ep}\n\n{result['stdout']}\n\n"
+                    output_text += "**suggest_action:** Test with `sglang_inference`. Check metrics with `sglang_metrics`."
                 else:
-            output_text = f"❌ **Failed to start SGLang**\n\n{result['stderr']}"
+                    output_text = f"❌ **Failed to start SGLang**\n\n{result['stderr']}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "sglang_stop":
@@ -5872,74 +5872,74 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 api_key = arguments.get("api_key")
                 headers = {"Content-Type": "application/json"}
                 if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+                    headers["Authorization"] = f"Bearer {api_key}"
                 if arguments.get("messages"):
-            url = f"{endpoint}/v1/chat/completions"
-            payload = {"model": model, "messages": arguments["messages"], "max_tokens": max_tokens, "stream": False}
+                    url = f"{endpoint}/v1/chat/completions"
+                    payload = {"model": model, "messages": arguments["messages"], "max_tokens": max_tokens, "stream": False}
                 elif arguments.get("prompt"):
-            url = f"{endpoint}/v1/completions"
-            payload = {"model": model, "prompt": arguments["prompt"], "max_tokens": max_tokens, "stream": False}
+                    url = f"{endpoint}/v1/completions"
+                    payload = {"model": model, "prompt": arguments["prompt"], "max_tokens": max_tokens, "stream": False}
                 else:
-            return CallToolResult(content=[TextContent(type="text", text="⚠️ Provide either `prompt` or `messages`.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="⚠️ Provide either `prompt` or `messages`.")], isError=True)
                 try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        if "choices" in data and data["choices"]:
-                            if "message" in data["choices"][0]:
-                                text = data["choices"][0]["message"]["content"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                if "choices" in data and data["choices"]:
+                                    if "message" in data["choices"][0]:
+                                        text = data["choices"][0]["message"]["content"]
+                                    else:
+                                        text = data["choices"][0].get("text", "")
+                                    output_text = f"⚡ **SGLang Inference — {model}**\n\n{text}\n\n"
+                                    if data.get("usage"):
+                                        u = data["usage"]
+                                        output_text += f"**Tokens:** {u.get('prompt_tokens', '?')} in → {u.get('completion_tokens', '?')} out"
+                                else:
+                                    output_text = f"⚡ **Response:**\n```json\n{json.dumps(data, indent=2)}\n```"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
                             else:
-                                text = data["choices"][0].get("text", "")
-                            output_text = f"⚡ **SGLang Inference — {model}**\n\n{text}\n\n"
-                            if data.get("usage"):
-                                u = data["usage"]
-                                output_text += f"**Tokens:** {u.get('prompt_tokens', '?')} in → {u.get('completion_tokens', '?')} out"
-                        else:
-                            output_text = f"⚡ **Response:**\n```json\n{json.dumps(data, indent=2)}\n```"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ SGLang returned {resp.status}: {body}")], isError=True)
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ SGLang returned {resp.status}: {body}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ Inference failed: {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ Inference failed: {e}")], isError=True)
 
             elif tool_name == "sglang_metrics":
                 endpoint = arguments["endpoint"].rstrip("/")
                 try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"{endpoint}/metrics", timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        raw = await resp.text()
-                        output_text = f"📊 **SGLang Metrics — {endpoint}**\n\n```\n{raw[:3000]}\n```"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ Metrics endpoint returned {resp.status}")], isError=True)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(f"{endpoint}/metrics", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                            if resp.status == 200:
+                                raw = await resp.text()
+                                output_text = f"📊 **SGLang Metrics — {endpoint}**\n\n```\n{raw[:3000]}\n```"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ Metrics endpoint returned {resp.status}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── Ollama Handlers ──────────────────────────────────────────────────
 
             elif tool_name == "ollama_list":
                 endpoint = arguments.get("endpoint", "http://localhost:11434")
                 try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"{endpoint}/api/tags", timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        models = data.get("models", [])
-                        output_text = f"🦙 **Ollama Models — {endpoint}**\n\n"
-                        if models:
-                            for m in models:
-                                size_gb = m.get("size", 0) / (1024**3)
-                                output_text += f"  - **{m['name']}** ({size_gb:.1f}GB)\n"
-                        else:
-                            output_text += "No models found. Pull one with `ollama_pull`."
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ Ollama returned {resp.status}")], isError=True)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(f"{endpoint}/api/tags", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                models = data.get("models", [])
+                                output_text = f"🦙 **Ollama Models — {endpoint}**\n\n"
+                                if models:
+                                    for m in models:
+                                        size_gb = m.get("size", 0) / (1024**3)
+                                        output_text += f"  - **{m['name']}** ({size_gb:.1f}GB)\n"
+                                else:
+                                    output_text += "No models found. Pull one with `ollama_pull`."
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ Ollama returned {resp.status}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ Cannot connect to Ollama: {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ Cannot connect to Ollama: {e}")], isError=True)
 
             elif tool_name == "ollama_pull":
                 model = arguments["model"]
@@ -5949,10 +5949,10 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + key if key else ''} {user}@{ip}"
                 result = await execute_shell_command(f"{ssh_base} 'ollama pull {model}'", timeout=600)
                 if result["success"]:
-            output_text = f"📥 **Model Pulled: {model}** on {ip}\n\n{result['stdout']}\n\n"
-            output_text += f"**suggest_action:** Generate with `ollama_generate` or chat with `ollama_chat`."
+                    output_text = f"📥 **Model Pulled: {model}** on {ip}\n\n{result['stdout']}\n\n"
+                    output_text += f"**suggest_action:** Generate with `ollama_generate` or chat with `ollama_chat`."
                 else:
-            output_text = f"❌ **Pull failed**\n\n{result['stderr']}"
+                    output_text = f"❌ **Pull failed**\n\n{result['stderr']}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
             elif tool_name == "ollama_generate":
@@ -5960,50 +5960,50 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 model = arguments["model"]
                 prompt = arguments["prompt"]
                 try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(f"{endpoint}/api/generate", json={"model": model, "prompt": prompt, "stream": False}, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        output_text = f"🦙 **Ollama Generate — {model}**\n\n{data.get('response', '')}"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ {resp.status}: {body}")], isError=True)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(f"{endpoint}/api/generate", json={"model": model, "prompt": prompt, "stream": False}, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                output_text = f"🦙 **Ollama Generate — {model}**\n\n{data.get('response', '')}"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ {resp.status}: {body}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "ollama_chat":
                 endpoint = arguments.get("endpoint", "http://localhost:11434")
                 model = arguments["model"]
                 messages = arguments["messages"]
                 try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(f"{endpoint}/api/chat", json={"model": model, "messages": messages, "stream": False}, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        reply = data.get("message", {}).get("content", "")
-                        output_text = f"🦙 **Ollama Chat — {model}**\n\n{reply}"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ {resp.status}: {body}")], isError=True)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(f"{endpoint}/api/chat", json={"model": model, "messages": messages, "stream": False}, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                reply = data.get("message", {}).get("content", "")
+                                output_text = f"🦙 **Ollama Chat — {model}**\n\n{reply}"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ {resp.status}: {body}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "ollama_model_info":
                 endpoint = arguments.get("endpoint", "http://localhost:11434")
                 model = arguments["model"]
                 try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(f"{endpoint}/api/show", json={"name": model}, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        output_text = f"ℹ️ **Ollama Model Info — {model}**\n\n```json\n{json.dumps(data, indent=2)[:3000]}\n```"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ Model not found: {resp.status}")], isError=True)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(f"{endpoint}/api/show", json={"name": model}, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                output_text = f"ℹ️ **Ollama Model Info — {model}**\n\n```json\n{json.dumps(data, indent=2)[:3000]}\n```"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ Model not found: {resp.status}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── W&B Handlers ─────────────────────────────────────────────────────
 
@@ -6011,24 +6011,24 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 api_key = arguments["api_key"]
                 entity = arguments.get("entity", "me")
                 try:
-            async with aiohttp.ClientSession(headers={"Authorization": f"Bearer {api_key}"}) as session:
-                async with session.get(f"https://api.wandb.ai/v1/entities/{entity}/projects", timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        projects = data.get("projects", data) if isinstance(data, dict) else data
-                        output_text = f"📊 **W&B Projects — {entity}**\n\n"
-                        if isinstance(projects, list):
-                            for p in projects[:50]:
-                                name = p.get("name", p) if isinstance(p, dict) else str(p)
-                                output_text += f"  - **{name}**\n"
-                        else:
-                            output_text += f"```json\n{json.dumps(data, indent=2)[:2000]}\n```"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ W&B API returned {resp.status}: {body[:500]}")], isError=True)
+                    async with aiohttp.ClientSession(headers={"Authorization": f"Bearer {api_key}"}) as session:
+                        async with session.get(f"https://api.wandb.ai/v1/entities/{entity}/projects", timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                projects = data.get("projects", data) if isinstance(data, dict) else data
+                                output_text = f"📊 **W&B Projects — {entity}**\n\n"
+                                if isinstance(projects, list):
+                                    for p in projects[:50]:
+                                        name = p.get("name", p) if isinstance(p, dict) else str(p)
+                                        output_text += f"  - **{name}**\n"
+                                else:
+                                    output_text += f"```json\n{json.dumps(data, indent=2)[:2000]}\n```"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ W&B API returned {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "wandb_list_runs":
                 api_key = arguments["api_key"]
@@ -6036,100 +6036,100 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 project = arguments["project"]
                 limit = arguments.get("limit", 50)
                 try:
-            async with aiohttp.ClientSession(headers={"Authorization": f"Bearer {api_key}"}) as session:
-                async with session.get(f"https://api.wandb.ai/v1/entities/{entity}/projects/{project}/runs", params={"limit": limit}, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        runs = data.get("runs", data) if isinstance(data, dict) else data
-                        output_text = f"📋 **W&B Runs — {project}**\n\n"
-                        if isinstance(runs, list):
-                            for r in runs[:limit]:
-                                name = r.get("name", r.get("id", "?")) if isinstance(r, dict) else str(r)
-                                state = r.get("state", "?") if isinstance(r, dict) else ""
-                                output_text += f"  - **{name}** ({state})\n"
-                        else:
-                            output_text += f"```json\n{json.dumps(data, indent=2)[:2000]}\n```"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ {resp.status}: {body[:500]}")], isError=True)
+                    async with aiohttp.ClientSession(headers={"Authorization": f"Bearer {api_key}"}) as session:
+                        async with session.get(f"https://api.wandb.ai/v1/entities/{entity}/projects/{project}/runs", params={"limit": limit}, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                runs = data.get("runs", data) if isinstance(data, dict) else data
+                                output_text = f"📋 **W&B Runs — {project}**\n\n"
+                                if isinstance(runs, list):
+                                    for r in runs[:limit]:
+                                        name = r.get("name", r.get("id", "?")) if isinstance(r, dict) else str(r)
+                                        state = r.get("state", "?") if isinstance(r, dict) else ""
+                                        output_text += f"  - **{name}** ({state})\n"
+                                else:
+                                    output_text += f"```json\n{json.dumps(data, indent=2)[:2000]}\n```"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "wandb_run_details":
                 api_key = arguments["api_key"]
                 run_id = arguments["run_id"]
                 try:
-            async with aiohttp.ClientSession(headers={"Authorization": f"Bearer {api_key}"}) as session:
-                async with session.get(f"https://api.wandb.ai/v1/runs/{run_id}", timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        output_text = f"🔍 **W&B Run Details — {run_id}**\n\n```json\n{json.dumps(data, indent=2)[:3000]}\n```"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ {resp.status}: {body[:500]}")], isError=True)
+                    async with aiohttp.ClientSession(headers={"Authorization": f"Bearer {api_key}"}) as session:
+                        async with session.get(f"https://api.wandb.ai/v1/runs/{run_id}", timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                output_text = f"🔍 **W&B Run Details — {run_id}**\n\n```json\n{json.dumps(data, indent=2)[:3000]}\n```"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── LangSmith Handlers ───────────────────────────────────────────────
 
             elif tool_name == "langsmith_list_projects":
                 api_key = arguments["api_key"]
                 try:
-            async with aiohttp.ClientSession(headers={"x-api-key": api_key}) as session:
-                async with session.get("https://api.smith.langchain.com/api/v1/projects", timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        output_text = "🔗 **LangSmith Projects**\n\n"
-                        for p in (data if isinstance(data, list) else data.get("projects", []))[:50]:
-                            name = p.get("name", "?") if isinstance(p, dict) else str(p)
-                            output_text += f"  - **{name}**\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ LangSmith {resp.status}: {body[:500]}")], isError=True)
+                    async with aiohttp.ClientSession(headers={"x-api-key": api_key}) as session:
+                        async with session.get("https://api.smith.langchain.com/api/v1/projects", timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                output_text = "🔗 **LangSmith Projects**\n\n"
+                                for p in (data if isinstance(data, list) else data.get("projects", []))[:50]:
+                                    name = p.get("name", "?") if isinstance(p, dict) else str(p)
+                                    output_text += f"  - **{name}**\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ LangSmith {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "langsmith_list_runs":
                 api_key = arguments["api_key"]
                 project = arguments.get("project", "default")
                 limit = arguments.get("limit", 50)
                 try:
-            async with aiohttp.ClientSession(headers={"x-api-key": api_key}) as session:
-                async with session.get(f"https://api.smith.langchain.com/api/v1/runs", params={"project_name": project, "limit": limit}, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        runs = data if isinstance(data, list) else data.get("runs", [])
-                        output_text = f"📋 **LangSmith Runs — {project}**\n\n"
-                        for r in runs[:limit]:
-                            name = r.get("name", r.get("id", "?")) if isinstance(r, dict) else str(r)
-                            output_text += f"  - **{name}**\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ {resp.status}: {body[:500]}")], isError=True)
+                    async with aiohttp.ClientSession(headers={"x-api-key": api_key}) as session:
+                        async with session.get(f"https://api.smith.langchain.com/api/v1/runs", params={"project_name": project, "limit": limit}, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                runs = data if isinstance(data, list) else data.get("runs", [])
+                                output_text = f"📋 **LangSmith Runs — {project}**\n\n"
+                                for r in runs[:limit]:
+                                    name = r.get("name", r.get("id", "?")) if isinstance(r, dict) else str(r)
+                                    output_text += f"  - **{name}**\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "langsmith_gpu_correlate":
                 api_key = arguments["api_key"]
                 project = arguments.get("project", "default")
                 days = arguments.get("days", 7)
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.langsmith_service import LangSmithService, LangSmithConfig
-            svc = LangSmithService(LangSmithConfig(api_key=api_key))
-            correlation = await svc.correlate_runs_with_gpu_metrics(project_name=project, days=days)
-            output_text = f"🔗💰 **GPU-Correlated LangSmith Runs — {project}**\n\n"
-            output_text += f"```json\n{json.dumps(correlation, indent=2, default=str)[:3000]}\n```\n\n"
-            output_text += "**suggest_action:** Use this data to identify cost-efficient GPU/provider combos for your LLM workloads."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.langsmith_service import LangSmithService, LangSmithConfig
+                    svc = LangSmithService(LangSmithConfig(api_key=api_key))
+                    correlation = await svc.correlate_runs_with_gpu_metrics(project_name=project, days=days)
+                    output_text = f"🔗💰 **GPU-Correlated LangSmith Runs — {project}**\n\n"
+                    output_text += f"```json\n{json.dumps(correlation, indent=2, default=str)[:3000]}\n```\n\n"
+                    output_text += "**suggest_action:** Use this data to identify cost-efficient GPU/provider combos for your LLM workloads."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ Correlation failed: {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ Correlation failed: {e}")], isError=True)
 
             # ── MLflow Handlers ──────────────────────────────────────────────────
 
@@ -6139,106 +6139,106 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 password = arguments.get("password")
                 headers = {}
                 if username and password:
-            import base64 as b64
-            headers["Authorization"] = "Basic " + b64.b64encode(f"{username}:{password}".encode()).decode()
+                    import base64 as b64
+                    headers["Authorization"] = "Basic " + b64.b64encode(f"{username}:{password}".encode()).decode()
                 try:
-            async with aiohttp.ClientSession(headers=headers) as session:
-                async with session.get(f"{uri}/api/2.0/mlflow/experiments/search", timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        exps = data.get("experiments", [])
-                        output_text = f"🧪 **MLflow Experiments — {uri}**\n\n"
-                        for e in exps:
-                            output_text += f"  - **{e.get('name', '?')}** (ID: {e.get('experiment_id', '?')})\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ MLflow {resp.status}: {body[:500]}")], isError=True)
+                    async with aiohttp.ClientSession(headers=headers) as session:
+                        async with session.get(f"{uri}/api/2.0/mlflow/experiments/search", timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                exps = data.get("experiments", [])
+                                output_text = f"🧪 **MLflow Experiments — {uri}**\n\n"
+                                for e in exps:
+                                    output_text += f"  - **{e.get('name', '?')}** (ID: {e.get('experiment_id', '?')})\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ MLflow {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "mlflow_log_run":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.mlflow_service import MLflowService, MLflowConfig
-            config = MLflowConfig(
-                tracking_uri=arguments["tracking_uri"],
-                username=arguments.get("username"),
-                password=arguments.get("password"),
-            )
-            svc = MLflowService(config)
-            result = await svc.log_terradev_run(
-                experiment_name=arguments["experiment_name"],
-                run_name=arguments["run_name"],
-                gpu_type=arguments.get("gpu_type", "unknown"),
-                provider=arguments.get("provider", "unknown"),
-                cost_per_hour=arguments.get("cost_per_hour", 0.0),
-                duration_seconds=arguments.get("duration_seconds", 0.0),
-                extra_metrics=arguments.get("metrics", {}),
-            )
-            output_text = f"✅ **MLflow Run Logged**\n\n"
-            output_text += f"**Experiment:** {arguments['experiment_name']}\n"
-            output_text += f"**Run:** {arguments['run_name']}\n"
-            output_text += f"**GPU:** {arguments.get('gpu_type', 'N/A')} ({arguments.get('provider', 'N/A')})\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```\n\n"
-            output_text += "**suggest_action:** Register the model with `mlflow_register_model`."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.mlflow_service import MLflowService, MLflowConfig
+                    config = MLflowConfig(
+                        tracking_uri=arguments["tracking_uri"],
+                        username=arguments.get("username"),
+                        password=arguments.get("password"),
+                    )
+                    svc = MLflowService(config)
+                    result = await svc.log_terradev_run(
+                        experiment_name=arguments["experiment_name"],
+                        run_name=arguments["run_name"],
+                        gpu_type=arguments.get("gpu_type", "unknown"),
+                        provider=arguments.get("provider", "unknown"),
+                        cost_per_hour=arguments.get("cost_per_hour", 0.0),
+                        duration_seconds=arguments.get("duration_seconds", 0.0),
+                        extra_metrics=arguments.get("metrics", {}),
+                    )
+                    output_text = f"✅ **MLflow Run Logged**\n\n"
+                    output_text += f"**Experiment:** {arguments['experiment_name']}\n"
+                    output_text += f"**Run:** {arguments['run_name']}\n"
+                    output_text += f"**GPU:** {arguments.get('gpu_type', 'N/A')} ({arguments.get('provider', 'N/A')})\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```\n\n"
+                    output_text += "**suggest_action:** Register the model with `mlflow_register_model`."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "mlflow_register_model":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.mlflow_service import MLflowService, MLflowConfig
-            config = MLflowConfig(
-                tracking_uri=arguments["tracking_uri"],
-                username=arguments.get("username"),
-                password=arguments.get("password"),
-            )
-            svc = MLflowService(config)
-            result = await svc.register_terradev_model(
-                model_name=arguments["model_name"],
-                run_id=arguments["run_id"],
-                model_uri=arguments.get("model_uri", f"runs:/{arguments['run_id']}/model"),
-                tags=arguments.get("tags", {}),
-            )
-            output_text = f"✅ **Model Registered: {arguments['model_name']}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```\n\n"
-            output_text += "**suggest_action:** Deploy with `kserve_generate_yaml` or `infer_deploy`."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.mlflow_service import MLflowService, MLflowConfig
+                    config = MLflowConfig(
+                        tracking_uri=arguments["tracking_uri"],
+                        username=arguments.get("username"),
+                        password=arguments.get("password"),
+                    )
+                    svc = MLflowService(config)
+                    result = await svc.register_terradev_model(
+                        model_name=arguments["model_name"],
+                        run_id=arguments["run_id"],
+                        model_uri=arguments.get("model_uri", f"runs:/{arguments['run_id']}/model"),
+                        tags=arguments.get("tags", {}),
+                    )
+                    output_text = f"✅ **Model Registered: {arguments['model_name']}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```\n\n"
+                    output_text += "**suggest_action:** Deploy with `kserve_generate_yaml` or `infer_deploy`."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── DVC Handlers ─────────────────────────────────────────────────────
 
             elif tool_name == "dvc_status":
                 repo = arguments["repo_path"]
                 try:
-            result = await asyncio.create_subprocess_exec(
-                "dvc", "status", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=repo
-            )
-            stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=30)
-            output = stdout.decode() if result.returncode == 0 else stderr.decode()
-            output_text = f"📦 **DVC Status — {repo}**\n\n{output or 'No changes.'}"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
+                    result = await asyncio.create_subprocess_exec(
+                        "dvc", "status", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=repo
+                    )
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=30)
+                    output = stdout.decode() if result.returncode == 0 else stderr.decode()
+                    output_text = f"📦 **DVC Status — {repo}**\n\n{output or 'No changes.'}"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=result.returncode != 0)
                 except FileNotFoundError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ DVC not installed. Run: `pip install dvc`")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ DVC not installed. Run: `pip install dvc`")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "dvc_diff":
                 repo = arguments["repo_path"]
                 cmd = ["dvc", "diff"]
                 if arguments.get("rev_a"):
-            cmd.append(arguments["rev_a"])
+                    cmd.append(arguments["rev_a"])
                 if arguments.get("rev_b"):
-            cmd.append(arguments["rev_b"])
+                    cmd.append(arguments["rev_b"])
                 try:
-            result = await asyncio.create_subprocess_exec(
+                    result = await asyncio.create_subprocess_exec(
                 *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=repo
             )
             stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=30)
