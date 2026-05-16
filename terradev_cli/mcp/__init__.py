@@ -5,10 +5,9 @@ Terradev MCP Server - Native Model Context Protocol integration
 Makes Terradev callable from AI agents (Claude Desktop, Cursor, Windsurf, Continue, Cline)
 """
 
-from .server import run_server, install_config, list_tools
+from .server import check_terradev_installation, generate_terraform_config
 
 __all__ = [
-    "run_server",
-    "install_config",
-    "list_tools",
+    "check_terradev_installation",
+    "generate_terraform_config",
 ]
