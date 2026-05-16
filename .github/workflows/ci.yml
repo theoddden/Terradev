@@ -78,6 +78,8 @@ jobs:
         python-version: ['3.9', '3.11', '3.12']
     env:
       TERRADEV_SKIP_ONBOARDING: "1"
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TERRADEV_GITHUB_TOKEN: ${{ secrets.TERRADEV_GITHUB_TOKEN }}
 
     steps:
     - uses: actions/checkout@v4
@@ -108,6 +110,14 @@ jobs:
 
     - name: Run test suite with coverage
       run: pytest tests/ -v --tb=short --cov=terradev_cli --cov-report=xml --cov-report=html
+
+    - name: Test MCP server loading
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TERRADEV_GITHUB_TOKEN: ${{ secrets.TERRADEV_GITHUB_TOKEN }}
+      run: |
+        python -c "from terradev_cli.mcp import server; print('MCP server loaded successfully')"
+        python -c "from terradev_cli.mcp.server import list_tools; tools = list_tools(); print(f'MCP server has {len(tools)} tools')"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
