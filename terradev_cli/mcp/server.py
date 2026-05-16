@@ -6472,26 +6472,26 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                 info = await resp.json()
                                 output_text = f"🤗 **Model: {model_id}**\n\n"
                                 output_text += f"**Pipeline:** {info.get('pipeline_tag', 'N/A')}\n"
-                        output_text += f"**Library:** {info.get('library_name', 'N/A')}\n"
-                        output_text += f"**Downloads:** {info.get('downloads', 0):,}\n"
-                        output_text += f"**Likes:** {info.get('likes', 0)}\n"
-                        output_text += f"**License:** {info.get('cardData', {}).get('license', 'N/A') if isinstance(info.get('cardData'), dict) else 'N/A'}\n"
-                        output_text += f"**Tags:** {', '.join(info.get('tags', [])[:15])}\n"
-                        siblings = info.get("siblings", [])
-                        total_size = sum(s.get("size", 0) for s in siblings if isinstance(s, dict))
-                        if total_size > 0:
-                            output_text += f"**Total Size:** {total_size / 1e9:.2f} GB\n"
-                        safetensors = info.get("safetensors", {})
-                        if safetensors and isinstance(safetensors, dict):
-                            params = safetensors.get("total", 0)
-                            if params:
-                                output_text += f"**Parameters:** {params / 1e9:.2f}B\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    elif resp.status == 404:
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ Model not found: {model_id}")], isError=True)
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
+                                output_text += f"**Library:** {info.get('library_name', 'N/A')}\n"
+                                output_text += f"**Downloads:** {info.get('downloads', 0):,}\n"
+                                output_text += f"**Likes:** {info.get('likes', 0)}\n"
+                                output_text += f"**License:** {info.get('cardData', {}).get('license', 'N/A') if isinstance(info.get('cardData'), dict) else 'N/A'}\n"
+                                output_text += f"**Tags:** {', '.join(info.get('tags', [])[:15])}\n"
+                                siblings = info.get("siblings", [])
+                                total_size = sum(s.get("size", 0) for s in siblings if isinstance(s, dict))
+                                if total_size > 0:
+                                    output_text += f"**Total Size:** {total_size / 1e9:.2f} GB\n"
+                                safetensors = info.get("safetensors", {})
+                                if safetensors and isinstance(safetensors, dict):
+                                    params = safetensors.get("total", 0)
+                                    if params:
+                                        output_text += f"**Parameters:** {params / 1e9:.2f}B\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            elif resp.status == 404:
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ Model not found: {model_id}")], isError=True)
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
                     return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
@@ -7909,8 +7909,15 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     content=[TextContent(type="text", text=f"Error: {error_msg}")],
                     isError=True
                 )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"❌ Error: {e}")],
+                isError=True
+            )
+        finally:
+            _concurrent_requests -= 1
 
-            @server.list_resources()
+@server.list_resources()
 async def handle_list_resources() -> ListResourcesResult:
     """List available MCP resources for session-start context and polling."""
     return ListResourcesResult(resources=[
@@ -8036,8 +8043,8 @@ def _cleanup_expired():
     """Remove expired auth codes and tokens."""
     now = time.time()
     for store in (_auth_codes, _access_tokens):
-            expired = [k for k, v in store.items() if v.get("expires", 0) < now]
-            for k in expired:
+        expired = [k for k, v in store.items() if v.get("expires", 0) < now]
+        for k in expired:
             del store[k]
 
 
