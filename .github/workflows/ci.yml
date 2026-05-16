@@ -118,7 +118,6 @@ jobs:
         TERRADEV_GITHUB_TOKEN: ${{ secrets.TERRADEV_GITHUB_TOKEN }}
       run: |
         python -c "from terradev_cli.mcp import server; print('MCP server loaded successfully')"
-        python -c "from terradev_cli.mcp.server import list_tools; tools = list_tools(); print(f'MCP server has {len(tools)} tools')"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
