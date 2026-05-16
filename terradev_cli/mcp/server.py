@@ -143,7 +143,6 @@ async def discover_local_gpus() -> Dict[str, Any]:
                     total_vram += device_info['vram_gb']
                 except ImportError:
                     pass
-    
     except ImportError:
         # torch not available, try nvidia-smi
         try:
@@ -168,7 +167,7 @@ async def discover_local_gpus() -> Dict[str, Any]:
                             total_vram += device_info['vram_gb']
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass
-    
+
     return {
         'local_devices': devices,
         'total_vram_gb': round(total_vram, 2),
@@ -496,7 +495,6 @@ async def execute_terraform_parallel(gpu_type: str, count: int, providers: List[
             "workspace": workspace_name,
             "workspace_path": ws_dir,
         }
-        
     except Exception as e:
         return {
             "success": False,
@@ -3643,7 +3641,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "optimize": ["optimize"],
                 "setup_provider": ["setup"],
                 "configure_provider": ["configure"],
-        # v3.4.0 tools
+            # v3.4.0 tools
                 "train": ["train"],
                 "train_status": ["train-status"],
                 "train_monitor": ["monitor"],
@@ -3651,7 +3649,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "checkpoint_save": ["checkpoint", "save"],
                 "preflight": ["preflight"],
                 "price_discovery": ["price-discovery"],
-        # v3.2.0 tools
+            # v3.2.0 tools
                 "infer_route": ["inference", "route"],
                 "infer_route_disagg": ["inference", "route"],
                 "infer_status": ["inference", "status"],
@@ -3660,7 +3658,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "price_intel": ["analytics"],
                 "moe_deploy": ["provision"],
                 "gitops_init": ["gitops", "init"],
-        # v2.0.0 tools — complete agentic loop
+            # v2.0.0 tools — complete agentic loop
                 "train_stop": ["train-stop"],
                 "train_resume": ["train-resume"],
                 "checkpoint_restore": ["checkpoint", "restore"],
@@ -3693,11 +3691,11 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "hf_space_status": ["hf-space"],
                 "run_workflow": ["workflow", "run"],
                 "active_context": ["status"],  # Composite — handled specially
-        # v3.5.0: Multi-LoRA
+            # v3.5.0: Multi-LoRA
                 "lora_list": ["lora", "list"],
                 "lora_add": ["lora", "add"],
                 "lora_remove": ["lora", "remove"],
-        # v4.0.0: ML Services — handled by custom elif blocks below
+            # v4.0.0: ML Services — handled by custom elif blocks below
                 "ray_status": ["ml", "ray", "status"],
                 "ray_start": ["ml", "ray", "start"],
                 "ray_stop": ["ml", "ray", "stop"],
@@ -3712,9 +3710,9 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "vllm_info": ["ml", "vllm", "info"],
                 "vllm_sleep": ["ml", "vllm", "sleep"],
                 "vllm_wake": ["ml", "vllm", "wake"],
-        # v5.0.0: SGLang Optimization Stack
+            # v5.0.0: SGLang Optimization Stack
                 "sglang": ["ml", "sglang"],
-        # v4.0.0: Legacy SGLang (deprecated)
+            # v4.0.0: Legacy SGLang (deprecated)
                 "sglang_start": ["ml", "sglang", "start"],
                 "sglang_stop": ["ml", "sglang", "stop"],
                 "sglang_inference": ["ml", "sglang", "inference"],
@@ -3742,7 +3740,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "kserve_status": ["ml", "kserve", "status"],
                 "egress_cheapest_route": ["egress", "route"],
                 "egress_optimize_staging": ["egress", "optimize"],
-        # v5.0.0: HuggingFace Hub — handled by custom elif blocks
+            # v5.0.0: HuggingFace Hub — handled by custom elif blocks
                 "hf_list_models": ["ml", "hf", "models"],
                 "hf_list_datasets": ["ml", "hf", "datasets"],
                 "hf_model_info": ["ml", "hf", "model-info"],
@@ -3751,11 +3749,11 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "hf_endpoint_info": ["ml", "hf", "endpoint-info"],
                 "hf_delete_endpoint": ["ml", "hf", "delete-endpoint"],
                 "hf_endpoint_infer": ["ml", "hf", "endpoint-infer"],
-        # v5.0.0: HF Smart Templates — handled by custom elif blocks
+            # v5.0.0: HF Smart Templates — handled by custom elif blocks
                 "hf_smart_template": ["ml", "hf", "smart-template"],
                 "hf_hardware_recommend": ["ml", "hf", "hardware-recommend"],
                 "hf_hardware_compare": ["ml", "hf", "hardware-compare"],
-        # v5.0.0: LangChain / LangGraph — handled by custom elif blocks
+            # v5.0.0: LangChain / LangGraph — handled by custom elif blocks
                 "langchain_create_workflow": ["ml", "langchain", "workflow"],
                 "langchain_create_sglang_pipeline": ["ml", "langchain", "sglang-pipeline"],
                 "langsmith_create_project": ["ml", "langsmith", "create-project"],
@@ -3765,7 +3763,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "langgraph_orchestrator_worker": ["ml", "langgraph", "orchestrator-worker"],
                 "langgraph_evaluation_workflow": ["ml", "langgraph", "evaluation"],
                 "langgraph_workflow_status": ["ml", "langgraph", "status"],
-        # v5.0.0: W&B Enhanced — handled by custom elif blocks
+            # v5.0.0: W&B Enhanced — handled by custom elif blocks
                 "wandb_create_dashboard": ["ml", "wandb", "create-dashboard"],
                 "wandb_create_terradev_dashboard": ["ml", "wandb", "terradev-dashboard"],
                 "wandb_create_report": ["ml", "wandb", "create-report"],
@@ -3773,38 +3771,38 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "wandb_setup_alerts": ["ml", "wandb", "setup-alerts"],
                 "wandb_create_terradev_alerts": ["ml", "wandb", "terradev-alerts"],
                 "wandb_dashboard_status": ["ml", "wandb", "dashboard-status"],
-        # v5.0.0: Data Governance — handled by custom elif blocks
+            # v5.0.0: Data Governance — handled by custom elif blocks
                 "governance_request_consent": ["governance", "consent-request"],
                 "governance_record_consent": ["governance", "consent-record"],
                 "governance_evaluate_opa": ["governance", "evaluate-opa"],
                 "governance_move_data": ["governance", "move"],
                 "governance_movement_history": ["governance", "history"],
                 "governance_compliance_report": ["governance", "compliance-report"],
-        # v5.0.0: Cost Optimizer Deep — handled by custom elif blocks
+            # v5.0.0: Cost Optimizer Deep — handled by custom elif blocks
                 "cost_analyze": ["cost", "analyze"],
                 "cost_optimize_recommend": ["cost", "recommend"],
                 "cost_simulate": ["cost", "simulate"],
                 "cost_budget_optimize": ["cost", "budget-optimize"],
-        # v5.0.0: Price Intelligence Extended — handled by custom elif blocks
+            # v5.0.0: Price Intelligence Extended — handled by custom elif blocks
                 "price_trends": ["price", "trends"],
                 "price_budget_optimize": ["price", "budget-optimize"],
                 "price_spot_risk": ["price", "spot-risk"],
-        # v5.0.0: Training Extended — handled by custom elif blocks
+            # v5.0.0: Training Extended — handled by custom elif blocks
                 "training_config_generate": ["train", "config-generate"],
                 "training_launch_distributed": ["train", "launch-distributed"],
                 "train_snapshot": ["train", "snapshot"],
                 "train_detect_stragglers": ["train", "detect-stragglers"],
-        # v5.0.0: Preflight Extended — handled by custom elif blocks
+            # v5.0.0: Preflight Extended — handled by custom elif blocks
                 "preflight_report": ["preflight", "report"],
                 "preflight_gpu_check": ["preflight", "gpu-check"],
                 "preflight_network_check": ["preflight", "network-check"],
-        # v5.0.0: Kubernetes Enhanced — handled by custom elif blocks
+            # v5.0.0: Kubernetes Enhanced — handled by custom elif blocks
                 "k8s_gpu_operator_install": ["k8s", "gpu-operator"],
                 "k8s_device_plugin": ["k8s", "device-plugin"],
                 "k8s_mig_configure": ["k8s", "mig-configure"],
                 "k8s_time_slicing": ["k8s", "time-slicing"],
                 "k8s_monitoring_stack": ["k8s", "monitoring-stack"],
-        # v5.1.0: Datadog Integration — handled by custom elif blocks
+            # v5.1.0: Datadog Integration — handled by custom elif blocks
                 "datadog_status": ["datadog", "status"],
                 "datadog_push_metrics": ["datadog", "push"],
                 "datadog_send_event": ["datadog", "event"],
@@ -3815,7 +3813,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "datadog_query": ["datadog", "query"],
                 "datadog_terraform_export": ["datadog", "terraform-export"],
                 "datadog_metric_catalog": ["datadog", "metric-catalog"],
-        # v5.2.0: Phoenix / Guardrails / Qdrant
+            # v5.2.0: Phoenix / Guardrails / Qdrant
                 "phoenix_test": ["phoenix", "test"],
                 "phoenix_projects": ["phoenix", "projects"],
                 "phoenix_spans": ["phoenix", "spans"],
@@ -3833,7 +3831,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "qdrant_info": ["qdrant", "info"],
                 "qdrant_count": ["qdrant", "count"],
                 "qdrant_k8s": ["qdrant", "k8s"],
-        # v5.3.0: New v4.0.11 Features - Karpenter, Triggers, Environments, Lineage, Migration
+            # v5.3.0: New v4.0.11 Features - Karpenter, Triggers, Environments, Lineage, Migration
                 **NEW_COMMAND_MAP,
                 # v4.0.12: New ML Services and Enhanced Features
                 "phoenix": ["phoenix"],
@@ -6328,154 +6326,152 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                 url = item.get("status", {}).get("url", "N/A")
                                 output_text += f"  - {ready} **{name}** → {url}\n"
                         else:
-                    output_text += "No InferenceServices found."
-                return CallToolResult(content=[TextContent(type="text", text=output_text)])
-            else:
-                return CallToolResult(content=[TextContent(type="text", text=f"❌ kubectl failed: {stderr.decode()}")], isError=True)
+                            output_text += "No InferenceServices found."
+                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    else:
+                        return CallToolResult(content=[TextContent(type="text", text=f"❌ kubectl failed: {stderr.decode()}")], isError=True)
                 except FileNotFoundError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ kubectl not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ kubectl not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "kserve_status":
                 name = arguments["name"]
                 ns = arguments.get("namespace", "default")
                 try:
-            result = await asyncio.create_subprocess_exec(
-                "kubectl", "get", "inferenceservice", name, "-n", ns, "-o", "json",
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
-            if result.returncode == 0:
-                data = json.loads(stdout.decode())
-                status = data.get("status", {})
-                conditions = status.get("conditions", [])
-                url = status.get("url", "N/A")
-                output_text = f"☸️ **KServe Status — {name}**\n\n"
-                output_text += f"**URL:** {url}\n\n**Conditions:**\n"
-                for c in conditions:
-                    icon = "✅" if c.get("status") == "True" else "❌"
-                    output_text += f"  - {icon} **{c.get('type')}**: {c.get('message', '')}\n"
-                return CallToolResult(content=[TextContent(type="text", text=output_text)])
-            else:
-                return CallToolResult(content=[TextContent(type="text", text=f"❌ {stderr.decode()}")], isError=True)
+                    result = await asyncio.create_subprocess_exec(
+                        "kubectl", "get", "inferenceservice", name, "-n", ns, "-o", "json",
+                        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=15)
+                    if result.returncode == 0:
+                        data = json.loads(stdout.decode())
+                        status = data.get("status", {})
+                        conditions = status.get("conditions", [])
+                        url = status.get("url", "N/A")
+                        output_text = f"☸️ **KServe Status — {name}**\n\n"
+                        output_text += f"**URL:** {url}\n\n**Conditions:**\n"
+                        for c in conditions:
+                            icon = "✅" if c.get("status") == "True" else "❌"
+                            output_text += f"  - {icon} **{c.get('type')}**: {c.get('message', '')}\n"
+                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    else:
+                        return CallToolResult(content=[TextContent(type="text", text=f"❌ {stderr.decode()}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── Egress Optimizer Handlers ────────────────────────────────────────
 
             elif tool_name == "egress_cheapest_route":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.egress_optimizer import EgressOptimizer
-            optimizer = EgressOptimizer()
-            src = f"{arguments['source_provider']}:{arguments['source_region']}"
-            dst = f"{arguments['dest_provider']}:{arguments['dest_region']}"
-            size_gb = arguments["size_gb"]
-            route = optimizer.find_cheapest_route(src, dst, size_gb)
-            output_text = f"🌐 **Cheapest Egress Route**\n\n"
-            output_text += f"**From:** {src}\n**To:** {dst}\n**Size:** {size_gb}GB\n\n"
-            output_text += f"```json\n{json.dumps(route, indent=2, default=str)[:2000]}\n```\n\n"
-            output_text += "**suggest_action:** Use `stage` or `egress_optimize_staging` to execute the transfer."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.egress_optimizer import EgressOptimizer
+                    optimizer = EgressOptimizer()
+                    src = f"{arguments['source_provider']}:{arguments['source_region']}"
+                    dst = f"{arguments['dest_provider']}:{arguments['dest_region']}"
+                    size_gb = arguments["size_gb"]
+                    route = optimizer.find_cheapest_route(src, dst, size_gb)
+                    output_text = f"🌐 **Cheapest Egress Route**\n\n"
+                    output_text += f"**From:** {src}\n**To:** {dst}\n**Size:** {size_gb}GB\n\n"
+                    output_text += f"```json\n{json.dumps(route, indent=2, default=str)[:2000]}\n```\n\n"
+                    output_text += "**suggest_action:** Use `stage` or `egress_optimize_staging` to execute the transfer."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "egress_optimize_staging":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.egress_optimizer import EgressOptimizer
-            optimizer = EgressOptimizer()
-            source_uri = arguments["source_uri"]
-            targets = arguments["target_regions"]
-            size_gb = arguments["size_gb"]
-            plan = optimizer.optimize_transfer_plan(source_uri, targets, size_gb)
-            output_text = f"🌐 **Optimized Staging Plan**\n\n"
-            output_text += f"**Source:** {source_uri}\n**Targets:** {', '.join(targets)}\n**Size:** {size_gb}GB\n\n"
-            output_text += f"```json\n{json.dumps(plan, indent=2, default=str)[:2000]}\n```\n\n"
-            output_text += "**suggest_action:** Execute with `stage` tool."
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.egress_optimizer import EgressOptimizer
+                    optimizer = EgressOptimizer()
+                    source_uri = arguments["source_uri"]
+                    targets = arguments["target_regions"]
+                    size_gb = arguments["size_gb"]
+                    plan = optimizer.optimize_transfer_plan(source_uri, targets, size_gb)
+                    output_text = f"🌐 **Optimized Staging Plan**\n\n"
+                    output_text += f"**Source:** {source_uri}\n**Targets:** {', '.join(targets)}\n**Size:** {size_gb}GB\n\n"
+                    output_text += f"```json\n{json.dumps(plan, indent=2, default=str)[:2000]}\n```\n\n"
+                    output_text += "**suggest_action:** Execute with `stage` tool."
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: HuggingFace Hub Handlers ────────────────────────────────
 
             elif tool_name == "hf_list_models":
                 try:
-            api_key = arguments["api_key"]
-            params = {"limit": arguments.get("limit", 20)}
-            if arguments.get("author"):
-                params["author"] = arguments["author"]
-            if arguments.get("search"):
-                params["search"] = arguments["search"]
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "https://huggingface.co/api/models",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    params=params,
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    if resp.status == 200:
-                        models = await resp.json()
-                        output_text = f"🤗 **HuggingFace Models** ({len(models)} results)\n\n"
-                        for m in models[:int(params["limit"])]:
-                            downloads = m.get("downloads", 0)
-                            likes = m.get("likes", 0)
-                            pipeline = m.get("pipeline_tag", "N/A")
-                            output_text += f"- **{m['modelId']}** — ⬇️ {downloads:,} | ❤️ {likes} | 🏷️ {pipeline}\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
+                    api_key = arguments["api_key"]
+                    params = {"limit": arguments.get("limit", 20)}
+                    if arguments.get("author"):
+                        params["author"] = arguments["author"]
+                    if arguments.get("search"):
+                        params["search"] = arguments["search"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            "https://huggingface.co/api/models",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            params=params,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status == 200:
+                                models = await resp.json()
+                                output_text = f"🤗 **HuggingFace Models** ({len(models)} results)\n\n"
+                                for m in models[:int(params["limit"])]:
+                                    downloads = m.get("downloads", 0)
+                                    likes = m.get("likes", 0)
+                                    pipeline = m.get("pipeline_tag", "N/A")
+                                    output_text += f"- **{m['modelId']}** — ⬇️ {downloads:,} | ❤️ {likes} | 🏷️ {pipeline}\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API error: {resp.status}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "hf_list_datasets":
                 try:
-            api_key = arguments["api_key"]
-            params = {"limit": arguments.get("limit", 20)}
-            if arguments.get("author"):
-                params["author"] = arguments["author"]
-            if arguments.get("search"):
-                params["search"] = arguments["search"]
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "https://huggingface.co/api/datasets",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    params=params,
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    if resp.status == 200:
-                        datasets = await resp.json()
-                        output_text = f"🤗 **HuggingFace Datasets** ({len(datasets)} results)\n\n"
-                        for d in datasets[:int(params["limit"])]:
-                            downloads = d.get("downloads", 0)
-                            output_text += f"- **{d['id']}** — ⬇️ {downloads:,}\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
+                    api_key = arguments["api_key"]
+                    params = {"limit": arguments.get("limit", 20)}
+                    if arguments.get("author"):
+                        params["author"] = arguments["author"]
+                    if arguments.get("search"):
+                        params["search"] = arguments["search"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            "https://huggingface.co/api/datasets",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            params=params,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status == 200:
+                                datasets = await resp.json()
+                                output_text = f"🤗 **HuggingFace Datasets** ({len(datasets)} results)\n\n"
+                                for d in datasets[:int(params["limit"])]:
+                                    downloads = d.get("downloads", 0)
+                                    output_text += f"- **{d['id']}** — ⬇️ {downloads:,}\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API error: {resp.status}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "hf_model_info":
                 try:
-            api_key = arguments["api_key"]
-            model_id = arguments["model_id"]
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"https://huggingface.co/api/models/{model_id}",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    if resp.status == 200:
-                        info = await resp.json()
-                        output_text = f"🤗 **Model: {model_id}**\n\n"
-                        output_text += f"**Pipeline:** {info.get('pipeline_tag', 'N/A')}\n"
+                    api_key = arguments["api_key"]
+                    model_id = arguments["model_id"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            f"https://huggingface.co/api/models/{model_id}",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status == 200:
+                                info = await resp.json()
+                                output_text = f"🤗 **Model: {model_id}**\n\n"
+                                output_text += f"**Pipeline:** {info.get('pipeline_tag', 'N/A')}\n"
                         output_text += f"**Library:** {info.get('library_name', 'N/A')}\n"
                         output_text += f"**Downloads:** {info.get('downloads', 0):,}\n"
                         output_text += f"**Likes:** {info.get('likes', 0)}\n"
@@ -6497,1424 +6493,1424 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         body = await resp.text()
                         return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "hf_create_endpoint":
                 try:
-            api_key = arguments["api_key"]
-            payload = {
-                "name": arguments["endpoint_name"],
-                "model": {"repository": arguments["model_id"]},
-                "compute": {
-                    "instanceType": arguments["instance_type"],
-                    "instanceSize": arguments.get("instance_size", "x1"),
-                    "scaling": {
-                        "minReplicas": arguments.get("min_replicas", 0),
-                        "maxReplicas": arguments.get("max_replicas", 1),
+                    api_key = arguments["api_key"]
+                    payload = {
+                        "name": arguments["endpoint_name"],
+                        "model": {"repository": arguments["model_id"]},
+                        "compute": {
+                            "instanceType": arguments["instance_type"],
+                            "instanceSize": arguments.get("instance_size", "x1"),
+                            "scaling": {
+                                "minReplicas": arguments.get("min_replicas", 0),
+                                "maxReplicas": arguments.get("max_replicas", 1),
+                            }
+                        },
+                        "region": arguments.get("region", "us-east-1"),
+                        "type": "protected",
                     }
-                },
-                "region": arguments.get("region", "us-east-1"),
-                "type": "protected",
-            }
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://api.endpoints.huggingface.cloud/v2/endpoint",
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json=payload,
-                    timeout=aiohttp.ClientTimeout(total=60)
-                ) as resp:
-                    body = await resp.json(content_type=None)
-                    if resp.status in (200, 201, 202):
-                        output_text = f"✅ **HF Endpoint Created: {arguments['endpoint_name']}**\n\n"
-                        output_text += f"**Model:** {arguments['model_id']}\n"
-                        output_text += f"**Instance:** {arguments['instance_type']}\n"
-                        output_text += f"**Region:** {arguments.get('region', 'us-east-1')}\n"
-                        output_text += f"**Status:** {body.get('status', {}).get('state', 'pending')}\n"
-                        if body.get("status", {}).get("url"):
-                            output_text += f"**URL:** {body['status']['url']}\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {json.dumps(body, default=str)[:800]}")], isError=True)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://api.endpoints.huggingface.cloud/v2/endpoint",
+                            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=60)
+                        ) as resp:
+                            body = await resp.json(content_type=None)
+                            if resp.status in (200, 201, 202):
+                                output_text = f"✅ **HF Endpoint Created: {arguments['endpoint_name']}**\n\n"
+                                output_text += f"**Model:** {arguments['model_id']}\n"
+                                output_text += f"**Instance:** {arguments['instance_type']}\n"
+                                output_text += f"**Region:** {arguments.get('region', 'us-east-1')}\n"
+                                output_text += f"**Status:** {body.get('status', {}).get('state', 'pending')}\n"
+                                if body.get("status", {}).get("url"):
+                                    output_text += f"**URL:** {body['status']['url']}\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {json.dumps(body, default=str)[:800]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "hf_list_endpoints":
                 try:
-            api_key = arguments["api_key"]
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "https://api.endpoints.huggingface.cloud/v2/endpoint",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    if resp.status == 200:
-                        endpoints = await resp.json(content_type=None)
-                        items = endpoints if isinstance(endpoints, list) else endpoints.get("items", [])
-                        output_text = f"🤗 **HF Inference Endpoints** ({len(items)})\n\n"
-                        for ep in items:
-                            name = ep.get("name", "?")
-                            state = ep.get("status", {}).get("state", "unknown")
-                            url = ep.get("status", {}).get("url", "N/A")
-                            model = ep.get("model", {}).get("repository", "?")
-                            icon = "✅" if state == "running" else "⏳" if state in ("pending", "initializing", "updating") else "🔴"
-                            output_text += f"- {icon} **{name}** — {model} | {state} | {url}\n"
-                        if not items:
-                            output_text += "No endpoints found.\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
+                    api_key = arguments["api_key"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            "https://api.endpoints.huggingface.cloud/v2/endpoint",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status == 200:
+                                endpoints = await resp.json(content_type=None)
+                                items = endpoints if isinstance(endpoints, list) else endpoints.get("items", [])
+                                output_text = f"🤗 **HF Inference Endpoints** ({len(items)})\n\n"
+                                for ep in items:
+                                    name = ep.get("name", "?")
+                                    state = ep.get("status", {}).get("state", "unknown")
+                                    url = ep.get("status", {}).get("url", "N/A")
+                                    model = ep.get("model", {}).get("repository", "?")
+                                    icon = "✅" if state == "running" else "⏳" if state in ("pending", "initializing", "updating") else "🔴"
+                                    output_text += f"- {icon} **{name}** — {model} | {state} | {url}\n"
+                                if not items:
+                                    output_text += "No endpoints found.\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "hf_endpoint_info":
                 try:
-            api_key = arguments["api_key"]
-            ep_name = arguments["endpoint_name"]
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"https://api.endpoints.huggingface.cloud/v2/endpoint/{ep_name}",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    if resp.status == 200:
-                        ep = await resp.json(content_type=None)
-                        output_text = f"🤗 **Endpoint: {ep_name}**\n\n"
-                        output_text += f"**Model:** {ep.get('model', {}).get('repository', '?')}\n"
-                        output_text += f"**State:** {ep.get('status', {}).get('state', 'unknown')}\n"
-                        output_text += f"**URL:** {ep.get('status', {}).get('url', 'N/A')}\n"
-                        compute = ep.get("compute", {})
-                        output_text += f"**Instance:** {compute.get('instanceType', '?')} ({compute.get('instanceSize', '?')})\n"
-                        scaling = compute.get("scaling", {})
-                        output_text += f"**Scaling:** {scaling.get('minReplicas', 0)} – {scaling.get('maxReplicas', 1)}\n"
-                        output_text += f"**Region:** {ep.get('region', '?')}\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
+                    api_key = arguments["api_key"]
+                    ep_name = arguments["endpoint_name"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            f"https://api.endpoints.huggingface.cloud/v2/endpoint/{ep_name}",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status == 200:
+                                ep = await resp.json(content_type=None)
+                                output_text = f"🤗 **Endpoint: {ep_name}**\n\n"
+                                output_text += f"**Model:** {ep.get('model', {}).get('repository', '?')}\n"
+                                output_text += f"**State:** {ep.get('status', {}).get('state', 'unknown')}\n"
+                                output_text += f"**URL:** {ep.get('status', {}).get('url', 'N/A')}\n"
+                                compute = ep.get("compute", {})
+                                output_text += f"**Instance:** {compute.get('instanceType', '?')} ({compute.get('instanceSize', '?')})\n"
+                                scaling = compute.get("scaling", {})
+                                output_text += f"**Scaling:** {scaling.get('minReplicas', 0)} – {scaling.get('maxReplicas', 1)}\n"
+                                output_text += f"**Region:** {ep.get('region', '?')}\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "hf_delete_endpoint":
                 try:
-            api_key = arguments["api_key"]
-            ep_name = arguments["endpoint_name"]
-            async with aiohttp.ClientSession() as session:
-                async with session.delete(
-                    f"https://api.endpoints.huggingface.cloud/v2/endpoint/{ep_name}",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    if resp.status in (200, 202, 204):
-                        return CallToolResult(content=[TextContent(type="text", text=f"✅ **Endpoint deleted: {ep_name}**")])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
+                    api_key = arguments["api_key"]
+                    ep_name = arguments["endpoint_name"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.delete(
+                            f"https://api.endpoints.huggingface.cloud/v2/endpoint/{ep_name}",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status in (200, 202, 204):
+                                return CallToolResult(content=[TextContent(type="text", text=f"✅ **Endpoint deleted: {ep_name}**")])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ HF API {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "hf_endpoint_infer":
                 try:
-            api_key = arguments["api_key"]
-            ep_name = arguments["endpoint_name"]
-            payload = {"inputs": arguments["inputs"]}
-            if arguments.get("parameters"):
-                payload["parameters"] = arguments["parameters"]
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"https://api.endpoints.huggingface.cloud/v2/endpoint/{ep_name}/inference",
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json=payload,
-                    timeout=aiohttp.ClientTimeout(total=120)
-                ) as resp:
-                    body = await resp.json(content_type=None)
-                    if resp.status == 200:
-                        output_text = f"🤗 **Inference Result — {ep_name}**\n\n"
-                        output_text += f"```json\n{json.dumps(body, indent=2, default=str)[:3000]}\n```"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ HF Inference {resp.status}: {json.dumps(body, default=str)[:800]}")], isError=True)
+                    api_key = arguments["api_key"]
+                    ep_name = arguments["endpoint_name"]
+                    payload = {"inputs": arguments["inputs"]}
+                    if arguments.get("parameters"):
+                        payload["parameters"] = arguments["parameters"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            f"https://api.endpoints.huggingface.cloud/v2/endpoint/{ep_name}/inference",
+                            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=120)
+                        ) as resp:
+                            body = await resp.json(content_type=None)
+                            if resp.status == 200:
+                                output_text = f"🤗 **Inference Result — {ep_name}**\n\n"
+                                output_text += f"```json\n{json.dumps(body, indent=2, default=str)[:3000]}\n```"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ HF Inference {resp.status}: {json.dumps(body, default=str)[:800]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: HF Smart Templates Handlers ──────────────────────────────
 
             elif tool_name == "hf_smart_template":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.hf_smart_templates import HFSmartTemplates
-            templates = HFSmartTemplates()
-            model_id = arguments["model_id"]
-            template_type = arguments.get("template_type", "auto")
-            result = await templates.generate_template(model_id, template_type=template_type)
-            output_text = f"🧠 **Smart Template — {model_id}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.hf_smart_templates import HFSmartTemplates
+                    templates = HFSmartTemplates()
+                    model_id = arguments["model_id"]
+                    template_type = arguments.get("template_type", "auto")
+                    result = await templates.generate_template(model_id, template_type=template_type)
+                    output_text = f"🧠 **Smart Template — {model_id}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found. Install: pip install terradev-cli")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found. Install: pip install terradev-cli")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "hf_hardware_recommend":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.hf_smart_templates import HFSmartTemplates
-            templates = HFSmartTemplates()
-            model_id = arguments["model_id"]
-            budget = arguments.get("budget_constraint")
-            result = await templates.recommend_hardware(model_id, budget_constraint=budget)
-            output_text = f"🖥️ **Hardware Recommendation — {model_id}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.hf_smart_templates import HFSmartTemplates
+                    templates = HFSmartTemplates()
+                    model_id = arguments["model_id"]
+                    budget = arguments.get("budget_constraint")
+                    result = await templates.recommend_hardware(model_id, budget_constraint=budget)
+                    output_text = f"🖥️ **Hardware Recommendation — {model_id}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "hf_hardware_compare":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.hf_smart_templates import HFSmartTemplates
-            templates = HFSmartTemplates()
-            model_id = arguments["model_id"]
-            result = await templates.compare_hardware(model_id)
-            output_text = f"📊 **Hardware Comparison — {model_id}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.hf_smart_templates import HFSmartTemplates
+                    templates = HFSmartTemplates()
+                    model_id = arguments["model_id"]
+                    result = await templates.compare_hardware(model_id)
+                    output_text = f"📊 **Hardware Comparison — {model_id}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: LangChain / LangGraph / LangSmith Handlers ───────────────
 
             elif tool_name == "langchain_create_workflow":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.langchain_service import LangChainService
-            svc = LangChainService(api_key=arguments["api_key"])
-            config = arguments["workflow_config"]
-            langsmith_key = arguments.get("langsmith_api_key")
-            result = await svc.create_workflow(config, langsmith_api_key=langsmith_key)
-            output_text = f"🔗 **LangChain Workflow Created**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.langchain_service import LangChainService
+                    svc = LangChainService(api_key=arguments["api_key"])
+                    config = arguments["workflow_config"]
+                    langsmith_key = arguments.get("langsmith_api_key")
+                    result = await svc.create_workflow(config, langsmith_api_key=langsmith_key)
+                    output_text = f"🔗 **LangChain Workflow Created**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "langchain_create_sglang_pipeline":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.langchain_service import LangChainService
-            svc = LangChainService(api_key=arguments["api_key"])
-            config = arguments["pipeline_config"]
-            result = await svc.create_sglang_pipeline(config)
-            output_text = f"🔗 **SGLang Pipeline Created**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.langchain_service import LangChainService
+                    svc = LangChainService(api_key=arguments["api_key"])
+                    config = arguments["pipeline_config"]
+                    result = await svc.create_sglang_pipeline(config)
+                    output_text = f"🔗 **SGLang Pipeline Created**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "langsmith_create_project":
                 try:
-            api_key = arguments["api_key"]
-            payload = {"name": arguments["name"]}
-            if arguments.get("description"):
-                payload["description"] = arguments["description"]
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://api.smith.langchain.com/api/v1/sessions",
-                    headers={"x-api-key": api_key, "Content-Type": "application/json"},
-                    json=payload,
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    body = await resp.json(content_type=None)
-                    if resp.status in (200, 201):
-                        output_text = f"✅ **LangSmith Project Created: {arguments['name']}**\n\n"
-                        output_text += f"**ID:** {body.get('id', 'N/A')}\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ LangSmith {resp.status}: {json.dumps(body, default=str)[:500]}")], isError=True)
+                    api_key = arguments["api_key"]
+                    payload = {"name": arguments["name"]}
+                    if arguments.get("description"):
+                        payload["description"] = arguments["description"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://api.smith.langchain.com/api/v1/sessions",
+                            headers={"x-api-key": api_key, "Content-Type": "application/json"},
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            body = await resp.json(content_type=None)
+                            if resp.status in (200, 201):
+                                output_text = f"✅ **LangSmith Project Created: {arguments['name']}**\n\n"
+                                output_text += f"**ID:** {body.get('id', 'N/A')}\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ LangSmith {resp.status}: {json.dumps(body, default=str)[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "langsmith_get_workspaces":
                 try:
-            api_key = arguments["api_key"]
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "https://api.smith.langchain.com/api/v1/workspaces",
-                    headers={"x-api-key": api_key},
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    if resp.status == 200:
-                        workspaces = await resp.json(content_type=None)
-                        items = workspaces if isinstance(workspaces, list) else workspaces.get("workspaces", [workspaces])
-                        output_text = f"🔗 **LangSmith Workspaces** ({len(items)})\n\n"
-                        for w in items:
-                            name = w.get("display_name", w.get("name", w.get("id", "?")))
-                            output_text += f"- **{name}** (ID: {w.get('id', '?')})\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ LangSmith {resp.status}: {body[:500]}")], isError=True)
+                    api_key = arguments["api_key"]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            "https://api.smith.langchain.com/api/v1/workspaces",
+                            headers={"x-api-key": api_key},
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status == 200:
+                                workspaces = await resp.json(content_type=None)
+                                items = workspaces if isinstance(workspaces, list) else workspaces.get("workspaces", [workspaces])
+                                output_text = f"🔗 **LangSmith Workspaces** ({len(items)})\n\n"
+                                for w in items:
+                                    name = w.get("display_name", w.get("name", w.get("id", "?")))
+                                    output_text += f"- **{name}** (ID: {w.get('id', '?')})\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ LangSmith {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "langsmith_create_trace":
                 try:
-            api_key = arguments["api_key"]
-            run_id = arguments["run_id"]
-            trace_data = arguments["trace_data"]
-            trace_data["id"] = run_id
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://api.smith.langchain.com/api/v1/runs",
-                    headers={"x-api-key": api_key, "Content-Type": "application/json"},
-                    json=trace_data,
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    if resp.status in (200, 201, 202):
-                        output_text = f"✅ **Trace Created: {run_id}**\n"
-                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
-                    else:
-                        body = await resp.text()
-                        return CallToolResult(content=[TextContent(type="text", text=f"❌ LangSmith {resp.status}: {body[:500]}")], isError=True)
+                    api_key = arguments["api_key"]
+                    run_id = arguments["run_id"]
+                    trace_data = arguments["trace_data"]
+                    trace_data["id"] = run_id
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://api.smith.langchain.com/api/v1/runs",
+                            headers={"x-api-key": api_key, "Content-Type": "application/json"},
+                            json=trace_data,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status in (200, 201, 202):
+                                output_text = f"✅ **Trace Created: {run_id}**\n"
+                                return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                            else:
+                                body = await resp.text()
+                                return CallToolResult(content=[TextContent(type="text", text=f"❌ LangSmith {resp.status}: {body[:500]}")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "langgraph_create_workflow":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.langgraph_service import LangGraphService
-            svc = LangGraphService(api_key=arguments["api_key"])
-            config = arguments["graph_config"]
-            langsmith_key = arguments.get("langsmith_api_key")
-            result = await svc.create_workflow(config, langsmith_api_key=langsmith_key)
-            output_text = f"🕸️ **LangGraph Workflow Created**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.langgraph_service import LangGraphService
+                    svc = LangGraphService(api_key=arguments["api_key"])
+                    config = arguments["graph_config"]
+                    langsmith_key = arguments.get("langsmith_api_key")
+                    result = await svc.create_workflow(config, langsmith_api_key=langsmith_key)
+                    output_text = f"🕸️ **LangGraph Workflow Created**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "langgraph_orchestrator_worker":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.langgraph_service import LangGraphService
-            svc = LangGraphService(api_key=arguments["api_key"])
-            config = arguments["workflow_config"]
-            result = await svc.create_orchestrator_worker(config)
-            output_text = f"🕸️ **Orchestrator-Worker Created**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.langgraph_service import LangGraphService
+                    svc = LangGraphService(api_key=arguments["api_key"])
+                    config = arguments["workflow_config"]
+                    result = await svc.create_orchestrator_worker(config)
+                    output_text = f"🕸️ **Orchestrator-Worker Created**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "langgraph_evaluation_workflow":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.langgraph_service import LangGraphService
-            svc = LangGraphService(api_key=arguments["api_key"])
-            config = arguments["evaluation_config"]
-            result = await svc.create_evaluation_workflow(config)
-            output_text = f"🕸️ **Evaluation Workflow Created**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.langgraph_service import LangGraphService
+                    svc = LangGraphService(api_key=arguments["api_key"])
+                    config = arguments["evaluation_config"]
+                    result = await svc.create_evaluation_workflow(config)
+                    output_text = f"🕸️ **Evaluation Workflow Created**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "langgraph_workflow_status":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.langgraph_service import LangGraphService
-            svc = LangGraphService(api_key=arguments["api_key"])
-            wf_id = arguments["workflow_id"]
-            result = await svc.get_workflow_status(wf_id)
-            output_text = f"🕸️ **Workflow Status — {wf_id}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.langgraph_service import LangGraphService
+                    svc = LangGraphService(api_key=arguments["api_key"])
+                    wf_id = arguments["workflow_id"]
+                    result = await svc.get_workflow_status(wf_id)
+                    output_text = f"🕸️ **Workflow Status — {wf_id}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: W&B Enhanced Handlers ─────────────────────────────────────
 
             elif tool_name == "wandb_create_dashboard":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
-            svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
-            config = arguments["dashboard_config"]
-            result = await svc.create_dashboard(config)
-            output_text = f"📊 **W&B Dashboard Created**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
+                    svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
+                    config = arguments["dashboard_config"]
+                    result = await svc.create_dashboard(config)
+                    output_text = f"📊 **W&B Dashboard Created**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "wandb_create_terradev_dashboard":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
-            svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
-            project = arguments.get("project", "terradev")
-            # Parallel: create dashboard + alerts simultaneously
-            dashboard_coro = svc.create_terradev_dashboard(project)
-            alerts_coro = svc.create_terradev_alerts()
-            dashboard_result, alerts_result = await asyncio.gather(dashboard_coro, alerts_coro, return_exceptions=True)
-            output_text = f"📊 **Terradev Dashboard — {project}**\n\n"
-            if not isinstance(dashboard_result, Exception):
-                output_text += f"**Dashboard:** ✅ Created\n```json\n{json.dumps(dashboard_result, indent=2, default=str)[:2000]}\n```\n\n"
-            else:
-                output_text += f"**Dashboard:** ❌ {dashboard_result}\n\n"
-            if not isinstance(alerts_result, Exception):
-                output_text += f"**Alerts:** ✅ Configured\n```json\n{json.dumps(alerts_result, indent=2, default=str)[:1000]}\n```"
-            else:
-                output_text += f"**Alerts:** ❌ {alerts_result}"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
+                    svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
+                    project = arguments.get("project", "terradev")
+                    # Parallel: create dashboard + alerts simultaneously
+                    dashboard_coro = svc.create_terradev_dashboard(project)
+                    alerts_coro = svc.create_terradev_alerts()
+                    dashboard_result, alerts_result = await asyncio.gather(dashboard_coro, alerts_coro, return_exceptions=True)
+                    output_text = f"📊 **Terradev Dashboard — {project}**\n\n"
+                    if not isinstance(dashboard_result, Exception):
+                        output_text += f"**Dashboard:** ✅ Created\n```json\n{json.dumps(dashboard_result, indent=2, default=str)[:2000]}\n```\n\n"
+                    else:
+                        output_text += f"**Dashboard:** ❌ {dashboard_result}\n\n"
+                    if not isinstance(alerts_result, Exception):
+                        output_text += f"**Alerts:** ✅ Configured\n```json\n{json.dumps(alerts_result, indent=2, default=str)[:1000]}\n```"
+                    else:
+                        output_text += f"**Alerts:** ❌ {alerts_result}"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "wandb_create_report":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
-            svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
-            config = arguments["report_config"]
-            result = await svc.create_report(config)
-            output_text = f"📝 **W&B Report Created**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
+                    svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
+                    config = arguments["report_config"]
+                    result = await svc.create_report(config)
+                    output_text = f"📝 **W&B Report Created**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "wandb_create_terradev_report":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
-            svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
-            metrics = arguments.get("metrics_data", {})
-            result = await svc.create_terradev_report(metrics)
-            output_text = f"📝 **Terradev Report Generated**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
+                    svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
+                    metrics = arguments.get("metrics_data", {})
+                    result = await svc.create_terradev_report(metrics)
+                    output_text = f"📝 **Terradev Report Generated**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "wandb_setup_alerts":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
-            svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
-            config = arguments["alert_config"]
-            result = await svc.setup_alerts(config)
-            output_text = f"🔔 **W&B Alerts Configured**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
+                    svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
+                    config = arguments["alert_config"]
+                    result = await svc.setup_alerts(config)
+                    output_text = f"🔔 **W&B Alerts Configured**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "wandb_create_terradev_alerts":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
-            svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
-            result = await svc.create_terradev_alerts()
-            output_text = f"🔔 **Terradev Alerts Created**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
+                    svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
+                    result = await svc.create_terradev_alerts()
+                    output_text = f"🔔 **Terradev Alerts Created**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "wandb_dashboard_status":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
-            svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
-            result = await svc.dashboard_status()
-            output_text = f"📊 **W&B Monitoring Overview**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
+                    svc = WandBEnhanced(api_key=arguments["api_key"], entity=arguments.get("entity"))
+                    result = await svc.dashboard_status()
+                    output_text = f"📊 **W&B Monitoring Overview**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: Data Governance Handlers ──────────────────────────────────
 
             elif tool_name == "governance_request_consent":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.data_governance import DataGovernance
-            gov = DataGovernance()
-            result = await gov.request_consent(
-                user_id=arguments["user_id"],
-                consent_type=arguments["consent_type"],
-                dataset_name=arguments["dataset_name"],
-                purpose=arguments["purpose"],
-                source_location=arguments.get("source_location"),
-                target_location=arguments.get("target_location"),
-            )
-            output_text = f"📋 **Consent Request Created**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.data_governance import DataGovernance
+                    gov = DataGovernance()
+                    result = await gov.request_consent(
+                        user_id=arguments["user_id"],
+                        consent_type=arguments["consent_type"],
+                        dataset_name=arguments["dataset_name"],
+                        purpose=arguments["purpose"],
+                        source_location=arguments.get("source_location"),
+                        target_location=arguments.get("target_location"),
+                    )
+                    output_text = f"📋 **Consent Request Created**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "governance_record_consent":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.data_governance import DataGovernance
-            gov = DataGovernance()
-            result = await gov.record_consent(
-                request_id=arguments["request_id"],
-                user_id=arguments["user_id"],
-                granted=arguments["granted"],
-                conditions=arguments.get("conditions"),
-            )
-            icon = "✅" if arguments["granted"] else "❌"
-            output_text = f"{icon} **Consent {'Granted' if arguments['granted'] else 'Denied'}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.data_governance import DataGovernance
+                    gov = DataGovernance()
+                    result = await gov.record_consent(
+                        request_id=arguments["request_id"],
+                        user_id=arguments["user_id"],
+                        granted=arguments["granted"],
+                        conditions=arguments.get("conditions"),
+                    )
+                    icon = "✅" if arguments["granted"] else "❌"
+                    output_text = f"{icon} **Consent {'Granted' if arguments['granted'] else 'Denied'}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "governance_evaluate_opa":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.data_governance import DataGovernance
-            gov = DataGovernance()
-            result = await gov.evaluate_opa(
-                user_id=arguments["user_id"],
-                dataset_name=arguments["dataset_name"],
-                action=arguments["action"],
-                target_location=arguments.get("target_location"),
-            )
-            allowed = result.get("allowed", result.get("result", {}).get("allow", False))
-            icon = "✅" if allowed else "🚫"
-            output_text = f"{icon} **OPA Policy Evaluation**\n\n"
-            output_text += f"**Action:** {arguments['action']} on {arguments['dataset_name']}\n"
-            output_text += f"**Decision:** {'ALLOWED' if allowed else 'DENIED'}\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.data_governance import DataGovernance
+                    gov = DataGovernance()
+                    result = await gov.evaluate_opa(
+                        user_id=arguments["user_id"],
+                        dataset_name=arguments["dataset_name"],
+                        action=arguments["action"],
+                        target_location=arguments.get("target_location"),
+                    )
+                    allowed = result.get("allowed", result.get("result", {}).get("allow", False))
+                    icon = "✅" if allowed else "🚫"
+                    output_text = f"{icon} **OPA Policy Evaluation**\n\n"
+                    output_text += f"**Action:** {arguments['action']} on {arguments['dataset_name']}\n"
+                    output_text += f"**Decision:** {'ALLOWED' if allowed else 'DENIED'}\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "governance_move_data":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.data_governance import DataGovernance
-            gov = DataGovernance()
-            result = await gov.move_data(
-                user_id=arguments["user_id"],
-                consent_request_id=arguments["consent_request_id"],
-                dataset_name=arguments["dataset_name"],
-                source_location=arguments["source_location"],
-                target_location=arguments["target_location"],
-            )
-            output_text = f"📦 **Data Move — {arguments['dataset_name']}**\n\n"
-            output_text += f"**From:** {arguments['source_location']}\n"
-            output_text += f"**To:** {arguments['target_location']}\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.data_governance import DataGovernance
+                    gov = DataGovernance()
+                    result = await gov.move_data(
+                        user_id=arguments["user_id"],
+                        consent_request_id=arguments["consent_request_id"],
+                        dataset_name=arguments["dataset_name"],
+                        source_location=arguments["source_location"],
+                        target_location=arguments["target_location"],
+                    )
+                    output_text = f"📦 **Data Move — {arguments['dataset_name']}**\n\n"
+                    output_text += f"**From:** {arguments['source_location']}\n"
+                    output_text += f"**To:** {arguments['target_location']}\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "governance_movement_history":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.data_governance import DataGovernance
-            gov = DataGovernance()
-            result = await gov.movement_history(
-                user_id=arguments.get("user_id"),
-                dataset_name=arguments.get("dataset_name"),
-                limit=arguments.get("limit", 50),
-            )
-            output_text = f"📜 **Data Movement History**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.data_governance import DataGovernance
+                    gov = DataGovernance()
+                    result = await gov.movement_history(
+                        user_id=arguments.get("user_id"),
+                        dataset_name=arguments.get("dataset_name"),
+                        limit=arguments.get("limit", 50),
+                    )
+                    output_text = f"📜 **Data Movement History**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "governance_compliance_report":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.data_governance import DataGovernance
-            gov = DataGovernance()
-            # Parallel: gather consent stats + movement history + policy evaluations
-            report = await gov.compliance_report(
-                start_date=arguments["start_date"],
-                end_date=arguments["end_date"],
-            )
-            output_text = f"📋 **Compliance Report**\n\n"
-            output_text += f"**Period:** {arguments['start_date']} → {arguments['end_date']}\n\n"
-            output_text += f"```json\n{json.dumps(report, indent=2, default=str)[:5000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.data_governance import DataGovernance
+                    gov = DataGovernance()
+                    # Parallel: gather consent stats + movement history + policy evaluations
+                    report = await gov.compliance_report(
+                        start_date=arguments["start_date"],
+                        end_date=arguments["end_date"],
+                    )
+                    output_text = f"📋 **Compliance Report**\n\n"
+                    output_text += f"**Period:** {arguments['start_date']} → {arguments['end_date']}\n\n"
+                    output_text += f"```json\n{json.dumps(report, indent=2, default=str)[:5000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: Cost Optimizer Deep Handlers ──────────────────────────────
 
             elif tool_name == "cost_analyze":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.cost_optimizer import CostOptimizer
-            optimizer = CostOptimizer()
-            days = arguments.get("days", 30)
-            result = await optimizer.analyze(days=days)
-            output_text = f"💰 **Cost Analysis — Last {days} Days**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.cost_optimizer import CostOptimizer
+                    optimizer = CostOptimizer()
+                    days = arguments.get("days", 30)
+                    result = await optimizer.analyze(days=days)
+                    output_text = f"💰 **Cost Analysis — Last {days} Days**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "cost_optimize_recommend":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.cost_optimizer import CostOptimizer
-            optimizer = CostOptimizer()
-            result = await optimizer.recommend(
-                target_savings=arguments.get("target_savings"),
-                constraints=arguments.get("constraints"),
-            )
-            output_text = f"💡 **Cost Optimization Recommendations**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.cost_optimizer import CostOptimizer
+                    optimizer = CostOptimizer()
+                    result = await optimizer.recommend(
+                        target_savings=arguments.get("target_savings"),
+                        constraints=arguments.get("constraints"),
+                    )
+                    output_text = f"💡 **Cost Optimization Recommendations**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "cost_simulate":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.cost_optimizer import CostOptimizer
-            optimizer = CostOptimizer()
-            result = await optimizer.simulate(
-                scenario=arguments["scenario"],
-                compare_with=arguments.get("compare_with"),
-            )
-            output_text = f"🔮 **Cost Simulation**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.cost_optimizer import CostOptimizer
+                    optimizer = CostOptimizer()
+                    result = await optimizer.simulate(
+                        scenario=arguments["scenario"],
+                        compare_with=arguments.get("compare_with"),
+                    )
+                    output_text = f"🔮 **Cost Simulation**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "cost_budget_optimize":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.cost_optimizer import CostOptimizer
-            optimizer = CostOptimizer()
-            result = await optimizer.budget_optimize(
-                budget=arguments["budget"],
-                gpu_type=arguments.get("gpu_type"),
-                gpu_count=arguments.get("gpu_count", 1),
-                hours=arguments.get("hours", 1.0),
-                allow_spot=arguments.get("allow_spot", True),
-            )
-            output_text = f"💰 **Budget Optimization — ${arguments['budget']}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.cost_optimizer import CostOptimizer
+                    optimizer = CostOptimizer()
+                    result = await optimizer.budget_optimize(
+                        budget=arguments["budget"],
+                        gpu_type=arguments.get("gpu_type"),
+                        gpu_count=arguments.get("gpu_count", 1),
+                        hours=arguments.get("hours", 1.0),
+                        allow_spot=arguments.get("allow_spot", True),
+                    )
+                    output_text = f"💰 **Budget Optimization — ${arguments['budget']}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: Price Intelligence Extended Handlers ──────────────────────
 
             elif tool_name == "price_trends":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.price_intelligence import PriceIntelligence
-            intel = PriceIntelligence()
-            gpu_type = arguments["gpu_type"]
-            hours = arguments.get("hours", 24)
-            result = await intel.get_trends(gpu_type=gpu_type, hours=hours)
-            output_text = f"📈 **Price Trends — {gpu_type} (last {hours}h)**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.price_intelligence import PriceIntelligence
+                    intel = PriceIntelligence()
+                    gpu_type = arguments["gpu_type"]
+                    hours = arguments.get("hours", 24)
+                    result = await intel.get_trends(gpu_type=gpu_type, hours=hours)
+                    output_text = f"📈 **Price Trends — {gpu_type} (last {hours}h)**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "price_budget_optimize":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.price_intelligence import PriceIntelligence
-            intel = PriceIntelligence()
-            result = await intel.budget_optimize(
-                budget=arguments["budget"],
-                gpu_type=arguments["gpu_type"],
-                gpu_count=arguments.get("gpu_count", 1),
-                hours=arguments.get("hours", 1.0),
-            )
-            output_text = f"💰 **Price Budget Optimization**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.price_intelligence import PriceIntelligence
+                    intel = PriceIntelligence()
+                    result = await intel.budget_optimize(
+                        budget=arguments["budget"],
+                        gpu_type=arguments["gpu_type"],
+                        gpu_count=arguments.get("gpu_count", 1),
+                        hours=arguments.get("hours", 1.0),
+                    )
+                    output_text = f"💰 **Price Budget Optimization**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "price_spot_risk":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.price_intelligence import PriceIntelligence
-            intel = PriceIntelligence()
-            result = await intel.spot_risk(
-                gpu_type=arguments["gpu_type"],
-                provider=arguments.get("provider", "all"),
-            )
-            output_text = f"⚠️ **Spot Risk Assessment — {arguments['gpu_type']}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.price_intelligence import PriceIntelligence
+                    intel = PriceIntelligence()
+                    result = await intel.spot_risk(
+                        gpu_type=arguments["gpu_type"],
+                        provider=arguments.get("provider", "all"),
+                    )
+                    output_text = f"⚠️ **Spot Risk Assessment — {arguments['gpu_type']}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: Training Extended Handlers ────────────────────────────────
 
             elif tool_name == "training_config_generate":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.training_orchestrator import TrainingOrchestrator
-            orch = TrainingOrchestrator()
-            result = await orch.generate_config(
-                name=arguments["name"],
-                script=arguments["script"],
-                framework=arguments.get("framework", "torchrun"),
-                nodes=arguments.get("nodes"),
-                gpus_per_node=arguments.get("gpus_per_node", 8),
-                from_provision=arguments.get("from_provision"),
-                deepspeed_config=arguments.get("deepspeed_config"),
-                script_args=arguments.get("script_args"),
-            )
-            output_text = f"⚙️ **Training Config — {arguments['name']}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.training_orchestrator import TrainingOrchestrator
+                    orch = TrainingOrchestrator()
+                    result = await orch.generate_config(
+                        name=arguments["name"],
+                        script=arguments["script"],
+                        framework=arguments.get("framework", "torchrun"),
+                        nodes=arguments.get("nodes"),
+                        gpus_per_node=arguments.get("gpus_per_node", 8),
+                        from_provision=arguments.get("from_provision"),
+                        deepspeed_config=arguments.get("deepspeed_config"),
+                        script_args=arguments.get("script_args"),
+                    )
+                    output_text = f"⚙️ **Training Config — {arguments['name']}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "training_launch_distributed":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.training_orchestrator import TrainingOrchestrator
-            orch = TrainingOrchestrator()
-            skip_preflight = arguments.get("skip_preflight", False)
-            # Parallel: preflight + config generation (if not skipping)
-            if not skip_preflight and (arguments.get("nodes") or arguments.get("from_provision")):
-                from terradev_cli.core.preflight_validator import PreflightValidator
-                validator = PreflightValidator()
-                config_coro = orch.generate_config(
-                    name=arguments["name"], script=arguments["script"],
-                    framework=arguments.get("framework", "torchrun"),
-                    nodes=arguments.get("nodes"), gpus_per_node=arguments.get("gpus_per_node", 8),
-                    from_provision=arguments.get("from_provision"),
-                )
-                preflight_coro = validator.validate(
-                    nodes=arguments.get("nodes"), from_provision=arguments.get("from_provision"),
-                )
-                config_result, preflight_result = await asyncio.gather(config_coro, preflight_coro, return_exceptions=True)
-                output_text = f"🚀 **Distributed Training Launch — {arguments['name']}**\n\n"
-                if isinstance(preflight_result, Exception):
-                    output_text += f"**Preflight:** ⚠️ {preflight_result}\n"
-                else:
-                    passed = preflight_result.get("passed", True) if isinstance(preflight_result, dict) else True
-                    output_text += f"**Preflight:** {'✅ Passed' if passed else '⚠️ Warnings'}\n"
-                if isinstance(config_result, Exception):
-                    output_text += f"**Config:** ❌ {config_result}\n"
-                else:
-                    output_text += f"**Config:** ✅ Generated\n"
-                    output_text += f"```json\n{json.dumps(config_result, indent=2, default=str)[:3000]}\n```"
-            else:
-                result = await orch.launch_distributed(
-                    name=arguments["name"], script=arguments["script"],
-                    framework=arguments.get("framework", "torchrun"),
-                    nodes=arguments.get("nodes"), gpus_per_node=arguments.get("gpus_per_node", 8),
-                    from_provision=arguments.get("from_provision"),
-                )
-                output_text = f"🚀 **Distributed Training Launched — {arguments['name']}**\n\n"
-                output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.training_orchestrator import TrainingOrchestrator
+                    orch = TrainingOrchestrator()
+                    skip_preflight = arguments.get("skip_preflight", False)
+                    # Parallel: preflight + config generation (if not skipping)
+                    if not skip_preflight and (arguments.get("nodes") or arguments.get("from_provision")):
+                        from terradev_cli.core.preflight_validator import PreflightValidator
+                        validator = PreflightValidator()
+                        config_coro = orch.generate_config(
+                            name=arguments["name"], script=arguments["script"],
+                            framework=arguments.get("framework", "torchrun"),
+                            nodes=arguments.get("nodes"), gpus_per_node=arguments.get("gpus_per_node", 8),
+                            from_provision=arguments.get("from_provision"),
+                        )
+                        preflight_coro = validator.validate(
+                            nodes=arguments.get("nodes"), from_provision=arguments.get("from_provision"),
+                        )
+                        config_result, preflight_result = await asyncio.gather(config_coro, preflight_coro, return_exceptions=True)
+                        output_text = f"🚀 **Distributed Training Launch — {arguments['name']}**\n\n"
+                        if isinstance(preflight_result, Exception):
+                            output_text += f"**Preflight:** ⚠️ {preflight_result}\n"
+                        else:
+                            passed = preflight_result.get("passed", True) if isinstance(preflight_result, dict) else True
+                            output_text += f"**Preflight:** {'✅ Passed' if passed else '⚠️ Warnings'}\n"
+                        if isinstance(config_result, Exception):
+                            output_text += f"**Config:** ❌ {config_result}\n"
+                        else:
+                            output_text += f"**Config:** ✅ Generated\n"
+                            output_text += f"```json\n{json.dumps(config_result, indent=2, default=str)[:3000]}\n```"
+                    else:
+                        result = await orch.launch_distributed(
+                            name=arguments["name"], script=arguments["script"],
+                            framework=arguments.get("framework", "torchrun"),
+                            nodes=arguments.get("nodes"), gpus_per_node=arguments.get("gpus_per_node", 8),
+                            from_provision=arguments.get("from_provision"),
+                        )
+                        output_text = f"🚀 **Distributed Training Launched — {arguments['name']}**\n\n"
+                        output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                        return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "train_snapshot":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.training_monitor import TrainingMonitor
-            monitor = TrainingMonitor()
-            job_id = arguments["job_id"]
-            cost_rate = arguments.get("cost_rate", 2.0)
-            result = await monitor.snapshot(job_id=job_id, cost_rate=cost_rate)
-            output_text = f"📊 **Training Snapshot — {job_id}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:5000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.training_monitor import TrainingMonitor
+                    monitor = TrainingMonitor()
+                    job_id = arguments["job_id"]
+                    cost_rate = arguments.get("cost_rate", 2.0)
+                    result = await monitor.snapshot(job_id=job_id, cost_rate=cost_rate)
+                    output_text = f"📊 **Training Snapshot — {job_id}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:5000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "train_detect_stragglers":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.training_monitor import TrainingMonitor
-            monitor = TrainingMonitor()
-            job_id = arguments["job_id"]
-            threshold = arguments.get("threshold", 0.7)
-            result = await monitor.detect_stragglers(job_id=job_id, threshold=threshold)
-            stragglers = result.get("stragglers", []) if isinstance(result, dict) else []
-            output_text = f"🐢 **Straggler Detection — {job_id}**\n\n"
-            if stragglers:
-                output_text += f"⚠️ **{len(stragglers)} straggler(s) detected!**\n\n"
-            else:
-                output_text += "✅ **No stragglers detected.**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.training_monitor import TrainingMonitor
+                    monitor = TrainingMonitor()
+                    job_id = arguments["job_id"]
+                    threshold = arguments.get("threshold", 0.7)
+                    result = await monitor.detect_stragglers(job_id=job_id, threshold=threshold)
+                    stragglers = result.get("stragglers", []) if isinstance(result, dict) else []
+                    output_text = f"🐢 **Straggler Detection — {job_id}**\n\n"
+                    if stragglers:
+                        output_text += f"⚠️ **{len(stragglers)} straggler(s) detected!**\n\n"
+                    else:
+                        output_text += "✅ **No stragglers detected.**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: Preflight Extended Handlers ───────────────────────────────
 
             elif tool_name == "preflight_report":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.preflight_validator import PreflightValidator
-            validator = PreflightValidator()
-            result = await validator.full_report(
-                nodes=arguments.get("nodes"),
-                from_provision=arguments.get("from_provision"),
-                checks=arguments.get("checks"),
-            )
-            output_text = f"🔍 **Preflight Report**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:5000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.preflight_validator import PreflightValidator
+                    validator = PreflightValidator()
+                    result = await validator.full_report(
+                        nodes=arguments.get("nodes"),
+                        from_provision=arguments.get("from_provision"),
+                        checks=arguments.get("checks"),
+                    )
+                    output_text = f"🔍 **Preflight Report**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:5000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "preflight_gpu_check":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.preflight_validator import PreflightValidator
-            validator = PreflightValidator()
-            result = await validator.gpu_check(
-                nodes=arguments.get("nodes"),
-                from_provision=arguments.get("from_provision"),
-            )
-            output_text = f"🖥️ **GPU Preflight Check**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.preflight_validator import PreflightValidator
+                    validator = PreflightValidator()
+                    result = await validator.gpu_check(
+                        nodes=arguments.get("nodes"),
+                        from_provision=arguments.get("from_provision"),
+                    )
+                    output_text = f"🖥️ **GPU Preflight Check**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "preflight_network_check":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.core.preflight_validator import PreflightValidator
-            validator = PreflightValidator()
-            result = await validator.network_check(
-                nodes=arguments.get("nodes"),
-                from_provision=arguments.get("from_provision"),
-            )
-            output_text = f"🌐 **Network Preflight Check**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.core.preflight_validator import PreflightValidator
+                    validator = PreflightValidator()
+                    result = await validator.network_check(
+                        nodes=arguments.get("nodes"),
+                        from_provision=arguments.get("from_provision"),
+                    )
+                    output_text = f"🌐 **Network Preflight Check**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.0.0: Kubernetes Enhanced Handlers ──────────────────────────────
 
             elif tool_name == "k8s_gpu_operator_install":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService
-            svc = EnhancedKubernetesService()
-            cluster = arguments["cluster_name"]
-            ns = arguments.get("namespace", "gpu-operator")
-            driver_ver = arguments.get("driver_version")
-            result = await svc.install_gpu_operator(cluster_name=cluster, namespace=ns, driver_version=driver_ver)
-            output_text = f"🖥️ **GPU Operator Installed — {cluster}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService
+                    svc = EnhancedKubernetesService()
+                    cluster = arguments["cluster_name"]
+                    ns = arguments.get("namespace", "gpu-operator")
+                    driver_ver = arguments.get("driver_version")
+                    result = await svc.install_gpu_operator(cluster_name=cluster, namespace=ns, driver_version=driver_ver)
+                    output_text = f"🖥️ **GPU Operator Installed — {cluster}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "k8s_device_plugin":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService
-            svc = EnhancedKubernetesService()
-            result = await svc.configure_device_plugin(
-                cluster_name=arguments["cluster_name"],
-                strategy=arguments.get("strategy", "none"),
-                replicas=arguments.get("replicas", 2),
-            )
-            output_text = f"🔌 **Device Plugin Configured — {arguments['cluster_name']}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService
+                    svc = EnhancedKubernetesService()
+                    result = await svc.configure_device_plugin(
+                        cluster_name=arguments["cluster_name"],
+                        strategy=arguments.get("strategy", "none"),
+                        replicas=arguments.get("replicas", 2),
+                    )
+                    output_text = f"🔌 **Device Plugin Configured — {arguments['cluster_name']}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "k8s_mig_configure":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService
-            svc = EnhancedKubernetesService()
-            result = await svc.configure_mig(
-                cluster_name=arguments["cluster_name"],
-                mig_profile=arguments["mig_profile"],
-                gpu_indices=arguments.get("gpu_indices"),
-            )
-            output_text = f"🔧 **MIG Configured — {arguments['cluster_name']}**\n\n"
-            output_text += f"**Profile:** {arguments['mig_profile']}\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService
+                    svc = EnhancedKubernetesService()
+                    result = await svc.configure_mig(
+                        cluster_name=arguments["cluster_name"],
+                        mig_profile=arguments["mig_profile"],
+                        gpu_indices=arguments.get("gpu_indices"),
+                    )
+                    output_text = f"🔧 **MIG Configured — {arguments['cluster_name']}**\n\n"
+                    output_text += f"**Profile:** {arguments['mig_profile']}\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "k8s_time_slicing":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService
-            svc = EnhancedKubernetesService()
-            result = await svc.configure_time_slicing(
-                cluster_name=arguments["cluster_name"],
-                replicas=arguments.get("replicas", 4),
-                oversubscribe=arguments.get("oversubscribe", True),
-            )
-            output_text = f"⏱️ **Time-Slicing Configured — {arguments['cluster_name']}**\n\n"
-            output_text += f"**Replicas/GPU:** {arguments.get('replicas', 4)}\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService
+                    svc = EnhancedKubernetesService()
+                    result = await svc.configure_time_slicing(
+                        cluster_name=arguments["cluster_name"],
+                        replicas=arguments.get("replicas", 4),
+                        oversubscribe=arguments.get("oversubscribe", True),
+                    )
+                    output_text = f"⏱️ **Time-Slicing Configured — {arguments['cluster_name']}**\n\n"
+                    output_text += f"**Replicas/GPU:** {arguments.get('replicas', 4)}\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "k8s_monitoring_stack":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService
-            svc = EnhancedKubernetesService()
-            result = await svc.install_monitoring_stack(
-                cluster_name=arguments["cluster_name"],
-                namespace=arguments.get("namespace", "monitoring"),
-                grafana_password=arguments.get("grafana_password"),
-                enable_alerting=arguments.get("enable_alerting", True),
-            )
-            output_text = f"📊 **Monitoring Stack Deployed — {arguments['cluster_name']}**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService
+                    svc = EnhancedKubernetesService()
+                    result = await svc.install_monitoring_stack(
+                        cluster_name=arguments["cluster_name"],
+                        namespace=arguments.get("namespace", "monitoring"),
+                        grafana_password=arguments.get("grafana_password"),
+                        enable_alerting=arguments.get("enable_alerting", True),
+                    )
+                    output_text = f"📊 **Monitoring Stack Deployed — {arguments['cluster_name']}**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
-            return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.1.0: Datadog Integration Handlers ────────────────────────────
 
             elif tool_name == "datadog_status":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.integrations.datadog_integration import get_status_summary, METRIC_CATALOG, MONITOR_TEMPLATES
-            # Load creds from ~/.terradev/credentials.json
-            creds = _load_datadog_creds()
-            status = get_status_summary(creds)
-            status["available_metrics"] = len(METRIC_CATALOG)
-            status["available_monitors"] = list(MONITOR_TEMPLATES.keys())
-            output_text = "🐕 **Datadog Integration Status**\n\n"
-            output_text += f"```json\n{json.dumps(status, indent=2)}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.integrations.datadog_integration import get_status_summary, METRIC_CATALOG, MONITOR_TEMPLATES
+                    # Load creds from ~/.terradev/credentials.json
+                    creds = _load_datadog_creds()
+                    status = get_status_summary(creds)
+                    status["available_metrics"] = len(METRIC_CATALOG)
+                    status["available_monitors"] = list(MONITOR_TEMPLATES.keys())
+                    output_text = "🐕 **Datadog Integration Status**\n\n"
+                    output_text += f"```json\n{json.dumps(status, indent=2)}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "datadog_push_metrics":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.integrations.datadog_integration import push_cost_snapshot
-            creds = _load_datadog_creds()
-            result = await push_cost_snapshot(creds)
-            output_text = "📤 **Datadog Metrics Push**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.integrations.datadog_integration import push_cost_snapshot
+                    creds = _load_datadog_creds()
+                    result = await push_cost_snapshot(creds)
+                    output_text = "📤 **Datadog Metrics Push**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "datadog_send_event":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.integrations.datadog_integration import send_event_async
-            creds = _load_datadog_creds()
-            result = await send_event_async(
-                creds, title=arguments["title"], text=arguments["text"],
-                alert_type=arguments.get("alert_type", "info"),
-            )
-            output_text = "📨 **Datadog Event Sent**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.integrations.datadog_integration import send_event_async
+                    creds = _load_datadog_creds()
+                    result = await send_event_async(
+                        creds, title=arguments["title"], text=arguments["text"],
+                        alert_type=arguments.get("alert_type", "info"),
+                    )
+                    output_text = "📨 **Datadog Event Sent**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "datadog_create_monitors":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.integrations.datadog_integration import create_monitor, create_all_monitors
-            creds = _load_datadog_creds()
-            template = arguments.get("template")
-            if template:
-                result = await create_monitor(creds, template)
-            else:
-                result = await create_all_monitors(creds)
-            output_text = "🔔 **Datadog Monitors**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.integrations.datadog_integration import create_monitor, create_all_monitors
+                    creds = _load_datadog_creds()
+                    template = arguments.get("template")
+                    if template:
+                        result = await create_monitor(creds, template)
+                    else:
+                        result = await create_all_monitors(creds)
+                    output_text = "🔔 **Datadog Monitors**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "datadog_list_monitors":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.integrations.datadog_integration import list_monitors
-            creds = _load_datadog_creds()
-            result = await list_monitors(creds)
-            output_text = "📋 **Terradev Monitors in Datadog**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.integrations.datadog_integration import list_monitors
+                    creds = _load_datadog_creds()
+                    result = await list_monitors(creds)
+                    output_text = "📋 **Terradev Monitors in Datadog**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "datadog_create_dashboard":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.integrations.datadog_integration import create_dashboard
-            creds = _load_datadog_creds()
-            result = await create_dashboard(creds, custom_title=arguments.get("title"))
-            output_text = "📊 **Datadog Dashboard Created**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.integrations.datadog_integration import create_dashboard
+                    creds = _load_datadog_creds()
+                    result = await create_dashboard(creds, custom_title=arguments.get("title"))
+                    output_text = "📊 **Datadog Dashboard Created**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "datadog_list_dashboards":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.integrations.datadog_integration import list_dashboards
-            creds = _load_datadog_creds()
-            result = await list_dashboards(creds)
-            output_text = "📋 **Terradev Dashboards in Datadog**\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.integrations.datadog_integration import list_dashboards
+                    creds = _load_datadog_creds()
+                    result = await list_dashboards(creds)
+                    output_text = "📋 **Terradev Dashboards in Datadog**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "datadog_query":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.integrations.datadog_integration import query_metrics
-            creds = _load_datadog_creds()
-            result = await query_metrics(creds, query=arguments["query"],
-                                          from_seconds=arguments.get("from_seconds", 3600))
-            output_text = f"🔍 **Datadog Query:** `{arguments['query']}`\n\n"
-            output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:5000]}\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.integrations.datadog_integration import query_metrics
+                    creds = _load_datadog_creds()
+                    result = await query_metrics(creds, query=arguments["query"],
+                                                  from_seconds=arguments.get("from_seconds", 3600))
+                    output_text = f"🔍 **Datadog Query:** `{arguments['query']}`\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:5000]}\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "datadog_terraform_export":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.integrations.datadog_integration import generate_full_terraform_module
-            creds = _load_datadog_creds()
-            out_dir = arguments.get("output_dir", "./datadog-terraform")
-            files = generate_full_terraform_module(creds)
-            os.makedirs(out_dir, exist_ok=True)
-            written = []
-            for fname, content in files.items():
-                fpath = os.path.join(out_dir, fname)
-                with open(fpath, "w") as f:
-                    f.write(content)
-                written.append(fpath)
-            output_text = f"🏗️ **Terraform Module Exported → `{out_dir}/`**\n\n"
-            output_text += "**Files:**\n" + "\n".join(f"- `{w}`" for w in written)
-            output_text += f"\n\n**Next steps:**\n```bash\ncd {out_dir}\nterraform init\nterraform plan\nterraform apply\n```"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.integrations.datadog_integration import generate_full_terraform_module
+                    creds = _load_datadog_creds()
+                    out_dir = arguments.get("output_dir", "./datadog-terraform")
+                    files = generate_full_terraform_module(creds)
+                    os.makedirs(out_dir, exist_ok=True)
+                    written = []
+                    for fname, content in files.items():
+                        fpath = os.path.join(out_dir, fname)
+                        with open(fpath, "w") as f:
+                            f.write(content)
+                        written.append(fpath)
+                    output_text = f"🏗️ **Terraform Module Exported → `{out_dir}/`**\n\n"
+                    output_text += "**Files:**\n" + "\n".join(f"- `{w}`" for w in written)
+                    output_text += f"\n\n**Next steps:**\n```bash\ncd {out_dir}\nterraform init\nterraform plan\nterraform apply\n```"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             elif tool_name == "datadog_metric_catalog":
                 try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-            from terradev_cli.integrations.datadog_integration import METRIC_CATALOG
-            output_text = "📖 **Terradev Metric Catalog for Datadog**\n\n"
-            output_text += f"**{len(METRIC_CATALOG)} metrics available:**\n\n"
-            for name, meta in METRIC_CATALOG.items():
-                tags = ", ".join(meta.get("tags", []))
-                output_text += f"- `{name}` ({meta['type']}, {meta['unit']}) — {meta['desc']}"
-                if tags:
-                    output_text += f" [tags: {tags}]"
-                output_text += "\n"
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
+                    from terradev_cli.integrations.datadog_integration import METRIC_CATALOG
+                    output_text = "📖 **Terradev Metric Catalog for Datadog**\n\n"
+                    output_text += f"**{len(METRIC_CATALOG)} metrics available:**\n\n"
+                    for name, meta in METRIC_CATALOG.items():
+                        tags = ", ".join(meta.get("tags", []))
+                        output_text += f"- `{name}` ({meta['type']}, {meta['unit']}) — {meta['desc']}"
+                        if tags:
+                            output_text += f" [tags: {tags}]"
+                        output_text += "\n"
+                    return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except Exception as e:
-            return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
+                    return CallToolResult(content=[TextContent(type="text", text=f"❌ {e}")], isError=True)
 
             # ── v5.2.0: Phoenix / Guardrails / Qdrant argument builders ──────────
 
             elif tool_name == "phoenix_projects":
                 if arguments.get("limit"):
-            cmd_args.extend(["--limit", str(arguments["limit"])])
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
 
             elif tool_name == "phoenix_spans":
                 if arguments.get("project"):
-            cmd_args.extend(["--project", arguments["project"]])
+                    cmd_args.extend(["--project", arguments["project"]])
                 if arguments.get("filter"):
-            cmd_args.extend(["--filter", arguments["filter"]])
+                    cmd_args.extend(["--filter", arguments["filter"]])
                 if arguments.get("limit"):
-            cmd_args.extend(["--limit", str(arguments["limit"])])
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
 
             elif tool_name == "phoenix_trace":
                 cmd_args.extend(["--trace-id", arguments["trace_id"]])
                 if arguments.get("project"):
-            cmd_args.extend(["--project", arguments["project"]])
+                    cmd_args.extend(["--project", arguments["project"]])
 
             elif tool_name == "phoenix_otel_env":
                 if arguments.get("project"):
-            cmd_args.extend(["--project", arguments["project"]])
+                    cmd_args.extend(["--project", arguments["project"]])
 
             elif tool_name == "phoenix_snippet":
                 if arguments.get("project"):
-            cmd_args.extend(["--project", arguments["project"]])
+                    cmd_args.extend(["--project", arguments["project"]])
 
             elif tool_name == "phoenix_k8s":
                 if arguments.get("namespace"):
-            cmd_args.extend(["--namespace", arguments["namespace"]])
+                    cmd_args.extend(["--namespace", arguments["namespace"]])
 
             elif tool_name == "guardrails_chat":
                 cmd_args.extend(["--message", arguments["message"]])
                 if arguments.get("config_id"):
-            cmd_args.extend(["--config-id", arguments["config_id"]])
+                    cmd_args.extend(["--config-id", arguments["config_id"]])
 
             elif tool_name == "guardrails_generate_config":
                 if arguments.get("config_id"):
-            cmd_args.extend(["--config-id", arguments["config_id"]])
+                    cmd_args.extend(["--config-id", arguments["config_id"]])
                 if arguments.get("output_dir"):
-            cmd_args.extend(["--output-dir", arguments["output_dir"]])
+                    cmd_args.extend(["--output-dir", arguments["output_dir"]])
 
             elif tool_name == "guardrails_k8s":
                 if arguments.get("namespace"):
-            cmd_args.extend(["--namespace", arguments["namespace"]])
+                    cmd_args.extend(["--namespace", arguments["namespace"]])
 
             elif tool_name == "qdrant_create_collection":
                 if arguments.get("name"):
-            cmd_args.extend(["--name", arguments["name"]])
+                    cmd_args.extend(["--name", arguments["name"]])
                 if arguments.get("embedding_model"):
-            cmd_args.extend(["--embedding-model", arguments["embedding_model"]])
+                    cmd_args.extend(["--embedding-model", arguments["embedding_model"]])
 
             elif tool_name == "qdrant_info":
                 if arguments.get("name"):
-            cmd_args.extend(["--name", arguments["name"]])
+                    cmd_args.extend(["--name", arguments["name"]])
 
             elif tool_name == "qdrant_count":
                 if arguments.get("name"):
-            cmd_args.extend(["--name", arguments["name"]])
+                    cmd_args.extend(["--name", arguments["name"]])
 
             elif tool_name == "qdrant_k8s":
                 if arguments.get("namespace"):
-            cmd_args.extend(["--namespace", arguments["namespace"]])
+                    cmd_args.extend(["--namespace", arguments["namespace"]])
 
             # ── v5.3.0: New v4.0.11 Features - Argument Builders ────────────────────────
     
             # Karpenter tools
             elif tool_name == "karpenter_install":
                 if arguments.get("version"):
-            cmd_args.extend(["--version", arguments["version"]])
+                    cmd_args.extend(["--version", arguments["version"]])
                 if arguments.get("cluster_name"):
-            cmd_args.extend(["--cluster", arguments["cluster_name"]])
+                    cmd_args.extend(["--cluster", arguments["cluster_name"]])
     
             elif tool_name == "karpenter_status":
                 if arguments.get("format"):
-            cmd_args.extend(["--format", arguments["format"]])
+                    cmd_args.extend(["--format", arguments["format"]])
     
             elif tool_name == "karpenter_nodepools":
                 if arguments.get("format"):
-            cmd_args.extend(["--format", arguments["format"]])
+                    cmd_args.extend(["--format", arguments["format"]])
     
             elif tool_name == "karpenter_create_nodepool":
                 if arguments.get("gpu_type"):
-            cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
+                    cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
                 if arguments.get("cpu_limit"):
-            cmd_args.extend(["--cpu-limit", arguments["cpu_limit"]])
+                    cmd_args.extend(["--cpu-limit", arguments["cpu_limit"]])
                 if arguments.get("memory_limit"):
-            cmd_args.extend(["--memory-limit", arguments["memory_limit"]])
-    
+                    cmd_args.extend(["--memory-limit", arguments["memory_limit"]])
+
             elif tool_name == "karpenter_delete_nodepool":
                 if arguments.get("name"):
-            cmd_args.extend([arguments["name"]])
+                    cmd_args.extend([arguments["name"]])
                 if arguments.get("yes"):
-            cmd_args.extend(["--yes"])
+                    cmd_args.extend(["--yes"])
     
             elif tool_name == "karpenter_events":
                 if arguments.get("limit"):
-            cmd_args.extend(["--limit", str(arguments["limit"])])
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
     
             elif tool_name == "karpenter_logs":
                 if arguments.get("lines"):
-            cmd_args.extend(["--lines", str(arguments["lines"])])
-    
+                    cmd_args.extend(["--lines", str(arguments["lines"])])
+
             elif tool_name in ["karpenter_gpu_nodes", "karpenter_resources"]:
                 if arguments.get("format"):
-            cmd_args.extend(["--format", arguments["format"]])
+                    cmd_args.extend(["--format", arguments["format"]])
     
             # Triggers tools
             elif tool_name == "triggers_create":
                 if arguments.get("name"):
-            cmd_args.extend(["--name", arguments["name"]])
+                    cmd_args.extend(["--name", arguments["name"]])
                 if arguments.get("type"):
-            cmd_args.extend(["--type", arguments["type"]])
+                    cmd_args.extend(["--type", arguments["type"]])
                 if arguments.get("source"):
-            cmd_args.extend(["--source", arguments["source"]])
+                    cmd_args.extend(["--source", arguments["source"]])
                 if arguments.get("schedule"):
-            cmd_args.extend(["--schedule", arguments["schedule"]])
+                    cmd_args.extend(["--schedule", arguments["schedule"]])
                 if arguments.get("condition"):
-            cmd_args.extend(["--condition", arguments["condition"]])
+                    cmd_args.extend(["--condition", arguments["condition"]])
                 if arguments.get("action"):
-            cmd_args.extend(["--action", arguments["action"]])
+                    cmd_args.extend(["--action", arguments["action"]])
                 if arguments.get("target"):
-            cmd_args.extend(["--target", arguments["target"]])
+                    cmd_args.extend(["--target", arguments["target"]])
                 if arguments.get("enabled") is not None:
-            cmd_args.extend(["--enabled" if arguments["enabled"] else "--disabled"])
-    
+                    cmd_args.extend(["--enabled" if arguments["enabled"] else "--disabled"])
+
             elif tool_name == "triggers_list":
                 if arguments.get("type"):
-            cmd_args.extend(["--type", arguments["type"]])
+                    cmd_args.extend(["--type", arguments["type"]])
                 if arguments.get("status"):
-            cmd_args.extend(["--status", arguments["status"]])
+                    cmd_args.extend(["--status", arguments["status"]])
     
             elif tool_name == "triggers_enable":
                 if arguments.get("name"):
-            cmd_args.extend([arguments["name"]])
-                if arguments.get("enabled"):
-            cmd_args.append("--enable")
-                else:
-            cmd_args.append("--disable")
-    
+                    cmd_args.extend([arguments["name"]])
+                if arguments.get("enabled") is not None:
+                    cmd_args.append("--enable" if arguments["enabled"] else "--disable")
+
             elif tool_name == "triggers_execute":
                 if arguments.get("name"):
-            cmd_args.extend([arguments["name"]])
+                    cmd_args.extend([arguments["name"]])
                 if arguments.get("dry_run"):
-            cmd_args.append("--dry-run")
+                    cmd_args.append("--dry-run")
     
             elif tool_name == "triggers_history":
                 if arguments.get("name"):
-            cmd_args.extend(["--name", arguments["name"]])
+                    cmd_args.extend(["--name", arguments["name"]])
                 if arguments.get("limit"):
-            cmd_args.extend(["--limit", str(arguments["limit"])])
-    
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
+
             # Environments tools
             elif tool_name == "environments_create":
                 if arguments.get("name"):
-            cmd_args.extend(["--name", arguments["name"]])
+                    cmd_args.extend(["--name", arguments["name"]])
                 if arguments.get("type"):
-            cmd_args.extend(["--type", arguments["type"]])
+                    cmd_args.extend(["--type", arguments["type"]])
                 if arguments.get("cluster"):
-            cmd_args.extend(["--cluster", arguments["cluster"]])
+                    cmd_args.extend(["--cluster", arguments["cluster"]])
                 if arguments.get("namespace"):
-            cmd_args.extend(["--namespace", arguments["namespace"]])
+                    cmd_args.extend(["--namespace", arguments["namespace"]])
                 if arguments.get("approval_required") is not None:
-            cmd_args.extend(["--approval-required" if arguments["approval_required"] else "--no-approval"])
+                    cmd_args.extend(["--approval-required" if arguments["approval_required"] else "--no-approval"])
                 if arguments.get("policies"):
-            cmd_args.extend(["--policies", ",".join(arguments["policies"])])
+                    cmd_args.extend(["--policies", ",".join(arguments["policies"])])
     
             elif tool_name == "environments_promote":
                 if arguments.get("artifact"):
-            cmd_args.extend(["--artifact", arguments["artifact"]])
+                    cmd_args.extend(["--artifact", arguments["artifact"]])
                 if arguments.get("from_env"):
-            cmd_args.extend(["--from", arguments["from_env"]])
+                    cmd_args.extend(["--from", arguments["from_env"]])
                 if arguments.get("to_env"):
-            cmd_args.extend(["--to", arguments["to_env"]])
+                    cmd_args.extend(["--to", arguments["to_env"]])
                 if arguments.get("version"):
-            cmd_args.extend(["--version", arguments["version"]])
+                    cmd_args.extend(["--version", arguments["version"]])
                 if arguments.get("approval_comment"):
-            cmd_args.extend(["--comment", arguments["approval_comment"]])
+                    cmd_args.extend(["--comment", arguments["approval_comment"]])
                 if arguments.get("dry_run"):
-            cmd_args.append("--dry-run")
+                    cmd_args.append("--dry-run")
     
             elif tool_name == "environments_list":
                 if arguments.get("cluster"):
-            cmd_args.extend(["--cluster", arguments["cluster"]])
+                    cmd_args.extend(["--cluster", arguments["cluster"]])
     
             elif tool_name == "environments_approve":
                 if arguments.get("request_id"):
-            cmd_args.extend([arguments["request_id"]])
+                    cmd_args.extend([arguments["request_id"]])
                 if arguments.get("action"):
-            cmd_args.extend(["--action", arguments["action"]])
+                    cmd_args.extend(["--action", arguments["action"]])
                 if arguments.get("comment"):
-            cmd_args.extend(["--comment", arguments["comment"]])
+                    cmd_args.extend(["--comment", arguments["comment"]])
     
             elif tool_name == "environments_history":
                 if arguments.get("environment"):
-            cmd_args.extend(["--environment", arguments["environment"]])
+                    cmd_args.extend(["--environment", arguments["environment"]])
                 if arguments.get("artifact"):
-            cmd_args.extend(["--artifact", arguments["artifact"]])
+                    cmd_args.extend(["--artifact", arguments["artifact"]])
                 if arguments.get("limit"):
-            cmd_args.extend(["--limit", str(arguments["limit"])])
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
     
             # Lineage tools
             elif tool_name == "lineage_trace":
                 if arguments.get("artifact"):
-            cmd_args.extend([arguments["artifact"]])
+                    cmd_args.extend([arguments["artifact"]])
                 if arguments.get("depth"):
-            cmd_args.extend(["--depth", str(arguments["depth"])])
+                    cmd_args.extend(["--depth", str(arguments["depth"])])
                 if arguments.get("direction"):
-            cmd_args.extend(["--direction", arguments["direction"]])
+                    cmd_args.extend(["--direction", arguments["direction"]])
     
             elif tool_name == "lineage_diff":
                 if arguments.get("from_artifact"):
-            cmd_args.extend(["--from", arguments["from_artifact"]])
+                    cmd_args.extend(["--from", arguments["from_artifact"]])
                 if arguments.get("to_artifact"):
-            cmd_args.extend(["--to", arguments["to_artifact"]])
+                    cmd_args.extend(["--to", arguments["to_artifact"]])
                 if arguments.get("show_changes") is not None:
-            cmd_args.extend(["--show-changes" if arguments["show_changes"] else "--no-changes"])
+                    cmd_args.extend(["--show-changes" if arguments["show_changes"] else "--no-changes"])
     
             elif tool_name == "lineage_export":
                 if arguments.get("artifact"):
-            cmd_args.extend([arguments["artifact"]])
+                    cmd_args.extend([arguments["artifact"]])
                 if arguments.get("format"):
-            cmd_args.extend(["--format", arguments["format"]])
+                    cmd_args.extend(["--format", arguments["format"]])
                 if arguments.get("include_metadata") is not None:
-            cmd_args.extend(["--metadata" if arguments["include_metadata"] else "--no-metadata"])
+                    cmd_args.extend(["--metadata" if arguments["include_metadata"] else "--no-metadata"])
     
             elif tool_name == "lineage_checkpoint":
                 if arguments.get("checkpoint_id"):
-            cmd_args.extend([arguments["checkpoint_id"]])
+                    cmd_args.extend([arguments["checkpoint_id"]])
                 if arguments.get("show_dependencies") is not None:
-            cmd_args.extend(["--show-deps" if arguments["show_dependencies"] else "--no-deps"])
+                    cmd_args.extend(["--show-deps" if arguments["show_dependencies"] else "--no-deps"])
     
             elif tool_name == "lineage_graph":
                 if arguments.get("artifact"):
-            cmd_args.extend([arguments["artifact"]])
+                    cmd_args.extend([arguments["artifact"]])
                 if arguments.get("format"):
-            cmd_args.extend(["--format", arguments["format"]])
+                    cmd_args.extend(["--format", arguments["format"]])
                 if arguments.get("include_versions") is not None:
-            cmd_args.extend(["--versions" if arguments["include_versions"] else "--no-versions"])
+                    cmd_args.extend(["--versions" if arguments["include_versions"] else "--no-versions"])
     
             # Migration tools
             elif tool_name == "migrate_plan":
                 if arguments.get("from_provider"):
-            cmd_args.extend(["--from", arguments["from_provider"]])
+                    cmd_args.extend(["--from", arguments["from_provider"]])
                 if arguments.get("to_provider"):
-            cmd_args.extend(["--to", arguments["to_provider"]])
+                    cmd_args.extend(["--to", arguments["to_provider"]])
                 if arguments.get("instances"):
-            cmd_args.extend(["--instances", ",".join(arguments["instances"])])
+                    cmd_args.extend(["--instances", ",".join(arguments["instances"])])
                 if arguments.get("gpu_type"):
-            cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
+                    cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
                 if arguments.get("region"):
-            cmd_args.extend(["--region", arguments["region"]])
+                    cmd_args.extend(["--region", arguments["region"]])
                 if arguments.get("dry_run") is not None:
-            cmd_args.extend(["--dry-run" if arguments["dry_run"] else "--execute"])
-    
+                    cmd_args.extend(["--dry-run" if arguments["dry_run"] else "--execute"])
+
             elif tool_name == "migrate_execute":
                 if arguments.get("plan_id"):
-            cmd_args.extend(["--plan", arguments["plan_id"]])
+                    cmd_args.extend(["--plan", arguments["plan_id"]])
                 if arguments.get("batch_size"):
-            cmd_args.extend(["--batch-size", str(arguments["batch_size"])])
+                    cmd_args.extend(["--batch-size", str(arguments["batch_size"])])
                 if arguments.get("wait_for_health") is not None:
-            cmd_args.extend(["--wait-health" if arguments["wait_for_health"] else "--no-wait"])
+                    cmd_args.extend(["--wait-health" if arguments["wait_for_health"] else "--no-wait"])
                 if arguments.get("rollback_on_failure") is not None:
-            cmd_args.extend(["--rollback" if arguments["rollback_on_failure"] else "--no-rollback"])
-    
+                    cmd_args.extend(["--rollback" if arguments["rollback_on_failure"] else "--no-rollback"])
+
             elif tool_name == "migrate_status":
                 if arguments.get("plan_id"):
-            cmd_args.extend(["--plan", arguments["plan_id"]])
+                    cmd_args.extend(["--plan", arguments["plan_id"]])
                 if arguments.get("show_details") is not None:
-            cmd_args.extend(["--details" if arguments["show_details"] else "--summary"])
+                    cmd_args.extend(["--details" if arguments["show_details"] else "--summary"])
     
             elif tool_name == "migrate_rollback":
                 if arguments.get("plan_id"):
-            cmd_args.extend(["--plan", arguments["plan_id"]])
+                    cmd_args.extend(["--plan", arguments["plan_id"]])
                 if arguments.get("force"):
-            cmd_args.append("--force")
+                    cmd_args.append("--force")
+                    if arguments.get("yes"):
+                        cmd_args.append("--yes")
     
             elif tool_name == "migrate_compare":
                 if arguments.get("plan_id"):
-            cmd_args.extend(["--plan", arguments["plan_id"]])
+                    cmd_args.extend(["--plan", arguments["plan_id"]])
                 if arguments.get("metrics"):
-            cmd_args.extend(["--metrics", ",".join(arguments["metrics"])])
+                    cmd_args.extend(["--metrics", ",".join(arguments["metrics"])])
                 if arguments.get("duration"):
-            cmd_args.extend(["--duration", arguments["duration"]])
+                    cmd_args.extend(["--duration", arguments["duration"]])
 
             # Execute the command (generic fallback for simple tools)
             result = await execute_terradev_command(cmd_args)
     
             if result["success"]:
                 return CallToolResult(
-            content=[TextContent(type="text", text=result["stdout"])]
+                    content=[TextContent(type="text", text=result["stdout"])]
                 )
             else:
                 error_msg = result["stderr"] or "Command failed"
                 return CallToolResult(
-            content=[TextContent(type="text", text=f"Error: {error_msg}")],
-            isError=True
+                    content=[TextContent(type="text", text=f"Error: {error_msg}")],
+                    isError=True
                 )
 
-        @server.list_resources()
+            @server.list_resources()
 async def handle_list_resources() -> ListResourcesResult:
     """List available MCP resources for session-start context and polling."""
     return ListResourcesResult(resources=[
@@ -8040,8 +8036,8 @@ def _cleanup_expired():
     """Remove expired auth codes and tokens."""
     now = time.time()
     for store in (_auth_codes, _access_tokens):
-        expired = [k for k, v in store.items() if v.get("expires", 0) < now]
-        for k in expired:
+            expired = [k for k, v in store.items() if v.get("expires", 0) < now]
+            for k in expired:
             del store[k]
 
 
@@ -8053,13 +8049,13 @@ async def oauth_authorization_server_metadata(request: Request) -> JSONResponse:
     """RFC 8414 — OAuth Authorization Server Metadata."""
     base = str(request.base_url).rstrip("/")
     return JSONResponse({
-        "issuer": base,
-        "authorization_endpoint": base + "/authorize",
-        "token_endpoint": base + "/token",
-        "response_types_supported": ["code"],
-        "grant_types_supported": ["authorization_code"],
-        "code_challenge_methods_supported": ["S256"],
-        "token_endpoint_auth_methods_supported": ["none"],
+            "issuer": base,
+            "authorization_endpoint": base + "/authorize",
+            "token_endpoint": base + "/token",
+            "response_types_supported": ["code"],
+            "grant_types_supported": ["authorization_code"],
+            "code_challenge_methods_supported": ["S256"],
+            "token_endpoint_auth_methods_supported": ["none"],
     })
 
 
@@ -8067,9 +8063,9 @@ async def oauth_protected_resource(request: Request) -> JSONResponse:
     """RFC 9728 — OAuth Protected Resource Metadata."""
     base = str(request.base_url).rstrip("/")
     return JSONResponse({
-        "resource": base,
-        "authorization_servers": [base],
-        "bearer_methods_supported": ["header"],
+            "resource": base,
+            "authorization_servers": [base],
+            "bearer_methods_supported": ["header"],
     })
 
 
@@ -8088,20 +8084,20 @@ async def oauth_authorize(request: Request) -> Response:
 
     # Validate client_id matches our configured token
     if TERRADEV_MCP_BEARER_TOKEN and client_id != TERRADEV_MCP_BEARER_TOKEN:
-        logger.warning("OAuth authorize rejected: bad client_id")
-        return JSONResponse({"error": "invalid_client"}, status_code=401)
+            logger.warning("OAuth authorize rejected: bad client_id")
+            return JSONResponse({"error": "invalid_client"}, status_code=401)
 
     if code_challenge_method and code_challenge_method != "S256":
-        return JSONResponse({"error": "invalid_request", "error_description": "Only S256 supported"}, status_code=400)
+            return JSONResponse({"error": "invalid_request", "error_description": "Only S256 supported"}, status_code=400)
 
     # Generate authorization code
     _cleanup_expired()
     code = secrets.token_urlsafe(48)
     _auth_codes[code] = {
-        "client_id": client_id,
-        "code_challenge": code_challenge,
-        "redirect_uri": redirect_uri,
-        "expires": time.time() + 300,  # 5 min
+            "client_id": client_id,
+            "code_challenge": code_challenge,
+            "redirect_uri": redirect_uri,
+            "expires": time.time() + 300,  # 5 min
     }
 
     # Redirect back to Claude.ai with the code
@@ -8114,10 +8110,10 @@ async def oauth_authorize(request: Request) -> Response:
 async def oauth_token(request: Request) -> JSONResponse:
     """OAuth 2.0 Token Endpoint — exchanges auth code for access token (PKCE)."""
     if request.method == "GET":
-        return JSONResponse({"error": "method_not_allowed"}, status_code=405)
+            return JSONResponse({"error": "method_not_allowed"}, status_code=405)
 
     try:
-        body = await request.form()
+            body = await request.form()
     except Exception:
         body = {}
     body = dict(body)
