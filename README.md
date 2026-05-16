@@ -615,11 +615,10 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## License
 
-BUSL 1.1 License - see [LICENSE](LICENSE) file for details.
+Apache 2.0.
 
 ## Support
 
 - **Documentation**: [Full User Guide](USER_GUIDE.md)
 - **Issues**: [GitHub Issues](https://github.com/theoddden/Terradev/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/theoddden/Terradev/discussions)
-- **Community**: [Discord Server](https://discord.gg/terradev)
