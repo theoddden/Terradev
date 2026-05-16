@@ -3171,7 +3171,7 @@ _ALL_TOOLS = [
                     "from_provision": {"type": "string", "description": "Resolve nodes from provision ('latest' or group ID)"},
                     "nodes": {"type": "array", "description": "Manual node IPs", "items": {"type": "string"}},
                     "gpus_per_node": {"type": "integer", "description": "GPUs per node", "default": 8},
-                    "skip_preflight": {"type": "boolean", "description": "Skip preflight validation", "default": false}
+                    "skip_preflight": {"type": "boolean", "description": "Skip preflight validation", "default": False}
                 },
                 "required": ["name", "script"]
             }
