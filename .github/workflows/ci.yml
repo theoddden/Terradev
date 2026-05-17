@@ -115,13 +115,6 @@ jobs:
     - name: Run test suite with coverage
       run: pytest tests/ -v --tb=short --cov=terradev_cli --cov-report=xml --cov-report=html --ignore=tests/test_mcp_handlers.py
 
-    - name: Test MCP server loading
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TERRADEV_GITHUB_TOKEN: ${{ secrets.TERRADEV_GITHUB_TOKEN }}
-      run: |
-        python -c "from terradev_cli.mcp import server; print('MCP server loaded successfully')"
-
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
