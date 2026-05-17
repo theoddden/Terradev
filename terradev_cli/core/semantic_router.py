@@ -33,6 +33,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .semantic_signals import SignalOrchestrator, SignalVector
 
+logger = logging.getLogger(__name__)
+
 # Rust semantic router integration
 try:
     from terradev_semantic_router import SemanticRouter
@@ -41,8 +43,6 @@ try:
 except ImportError:
     USE_RUST_ROUTER = False
     logger.info("Rust semantic router not available, using Python fallback")
-
-logger = logging.getLogger(__name__)
 
 
 # ── Policy Data Structures ──────────────────────────────────────────────────
