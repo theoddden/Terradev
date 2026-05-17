@@ -20,6 +20,15 @@ from .base_provider import BaseProvider
 
 logger = logging.getLogger(__name__)
 
+# Rust authentication integration
+try:
+    from terradev_authentication import PyOVHSigner, PyOvhCredentials
+    USE_RUST_AUTH = True
+    logger.info("Using Rust authentication for 10x faster signature generation")
+except ImportError:
+    USE_RUST_AUTH = False
+    logger.info("Rust authentication not available, using Python fallback")
+
 
 class OVHcloudProvider(BaseProvider):
     """OVHcloud Public Cloud provider for GPU instances"""

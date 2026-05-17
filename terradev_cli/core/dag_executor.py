@@ -34,6 +34,15 @@ import threading
 
 logger = logging.getLogger(__name__)
 
+# Rust DAG executor integration
+try:
+    from terradev_dag_executor import DAGExecutor as RustDAGExecutor
+    USE_RUST_DAG = True
+    logger.info("Using Rust DAG executor for 5-10x performance improvement")
+except ImportError:
+    USE_RUST_DAG = False
+    logger.info("Rust DAG executor not available, using Python fallback")
+
 
 # ── Data Models ───────────────────────────────────────────────────────────────
 

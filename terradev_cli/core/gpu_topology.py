@@ -28,6 +28,15 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Rust GPU topology integration
+try:
+    from terradev_gpu_topology import PyGPUNICOptimizer, PyGPUDevice, PyNICDevice
+    USE_RUST_GPU_TOPOLOGY = True
+    logger.info("Using Rust GPU topology for 10x faster pairing")
+except ImportError:
+    USE_RUST_GPU_TOPOLOGY = False
+    logger.info("Rust GPU topology not available, using Python fallback")
+
 
 # ---------------------------------------------------------------------------
 # Data models

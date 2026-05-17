@@ -10,6 +10,13 @@ import asyncio
 import aiohttp
 import json
 
+# Rust connection pool integration
+try:
+    from terradev_connection_pool import PyConnectionPool, PyConnectionConfig
+    USE_RUST_POOL = True
+except ImportError:
+    USE_RUST_POOL = False
+
 
 class BaseProvider(ABC):
     """Abstract base class for cloud providers"""

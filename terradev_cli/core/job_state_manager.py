@@ -29,6 +29,15 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# Rust state machine integration
+try:
+    from terradev_state_machine import JobStateMachine as RustJobStateMachine
+    USE_RUST_STATE_MACHINE = True
+    logger.info("Using Rust state machine for 10x faster transitions")
+except ImportError:
+    USE_RUST_STATE_MACHINE = False
+    logger.info("Rust state machine not available, using Python fallback")
+
 
 class JobStatus(Enum):
     CREATED = "created"

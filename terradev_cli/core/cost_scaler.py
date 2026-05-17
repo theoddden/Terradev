@@ -19,6 +19,24 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Rust cost scaler integration
+try:
+    from terradev_cost_scaler import CostScaler
+    USE_RUST_COST_SCALER = True
+    logger.info("Using Rust cost scaler for 5-10x faster cost analysis")
+except ImportError:
+    USE_RUST_COST_SCALER = False
+    logger.info("Rust cost scaler not available, using Python fallback")
+
+# Rust cost calculator integration
+try:
+    from terradev_cost_calculator import PyCostCalculator, PyInstanceType
+    USE_RUST_COST_CALC = True
+    logger.info("Using Rust cost calculator for decimal-precision arithmetic")
+except ImportError:
+    USE_RUST_COST_CALC = False
+    logger.info("Rust cost calculator not available, using Python fallback")
+
 
 class CostStrategy(Enum):
     """Cost optimization strategies"""

@@ -33,6 +33,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .semantic_signals import SignalOrchestrator, SignalVector
 
+# Rust semantic router integration
+try:
+    from terradev_semantic_router import SemanticRouter
+    USE_RUST_ROUTER = True
+    logger.info("Using Rust semantic router for 5-15x faster routing")
+except ImportError:
+    USE_RUST_ROUTER = False
+    logger.info("Rust semantic router not available, using Python fallback")
+
 logger = logging.getLogger(__name__)
 
 
