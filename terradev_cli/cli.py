@@ -240,7 +240,7 @@ class TerradevAPI:
     def _maybe_sync_gpu_metering(self):
         """Enterprise+ only: report accrued GPU-hours for all active instances.
 
-        Runs on every CLI invocation (lightweight — reads local state only,
+        Runs on every CLI invocation (lightweight  reads local state only,
         reports to Stripe only if there are unreported hours since last sync).
         This catches GPU-hours even if an instance was terminated outside the
         CLI (e.g. directly on the provider dashboard or via MCP subprocess).
@@ -266,9 +266,9 @@ class TerradevAPI:
         #     metering = sm._load_metering()
         #     sub_item_id = metering.get('subscription_item_id')
         #     if not sub_item_id:
-        #         return  # Not yet linked — will link on activation
+        #         return  # Not yet linked  will link on activation
 
-        #     # Monthly minimum reconciliation — once per month boundary
+        #     # Monthly minimum reconciliation  once per month boundary
         #     topup = sm.reconcile_monthly_minimum(sub_item_id)
         #     if topup:
         #         print(f"   Enterprise+ monthly min for {topup['month']}: "
@@ -525,7 +525,7 @@ class TerradevAPI:
         return await self._get_provider_quotes('coreweave', gpu_type)
 
     async def get_oracle_quotes(self, gpu_type: str):
-        """Oracle Cloud – requires API credentials (BYOAPI requirement)"""
+        """Oracle Cloud  requires API credentials (BYOAPI requirement)"""
         # CRITICAL FIX: Don't return quotes without API credentials
         creds = self._provider_creds('oracle')
         if not creds or not creds.get('api_key'):
@@ -897,7 +897,7 @@ def onboarding(force):
 # @click.option('--tier', '-t', type=click.Choice(['research_plus', 'enterprise', 'enterprise_plus']),
 #               help='Tier to upgrade to')
 # @click.option('--activate', is_flag=True,
-#               help='Activate after payment — verifies your Stripe subscription and unlocks your tier')
+#               help='Activate after payment  verifies your Stripe subscription and unlocks your tier')
 # @click.option('--email', help='Email used for Stripe checkout (for --activate)')
 # def upgrade(tier, activate, email):
 #     """Upgrade your Terradev subscription via Stripe - REMOVED (tier system eliminated)"""
@@ -1222,7 +1222,7 @@ def configure(provider):
                 if dashboard_port:
                     api.credentials['kubernetes_dashboard_port'] = dashboard_port
             
-            print("   Kubernetes configured — cluster management, Karpenter, and monitoring")
+            print("   Kubernetes configured  cluster management, Karpenter, and monitoring")
         
         # W&B (enhanced)
         wandb_key = click.prompt('W&B API Key (optional, from wandb.ai/settings)', hide_input=True, default='', show_default=False)
@@ -1246,7 +1246,7 @@ def configure(provider):
                 api.credentials['wandb_alerts_enabled'] = 'true'
                 api.credentials['wandb_integration_enabled'] = 'true'
             
-            print("   W&B configured — experiment tracking, dashboards, and alerts")
+            print("   W&B configured  experiment tracking, dashboards, and alerts")
         
         # LangChain (enhanced)
         langchain_config = click.prompt('Configure LangChain? (y/n)', default='n', show_default=False)
@@ -1275,7 +1275,7 @@ def configure(provider):
                 api.credentials['langchain_evaluation_enabled'] = 'true'
                 api.credentials['langchain_workflow_enabled'] = 'true'
             
-            print("   LangChain configured — chains, workflows, and LangSmith integration")
+            print("   LangChain configured  chains, workflows, and LangSmith integration")
         
         # SGLang
         sglang_config = click.prompt('Configure SGLang? (y/n)', default='n', show_default=False)
@@ -1296,7 +1296,7 @@ def configure(provider):
                 api.credentials['sglang_deployment_enabled'] = 'true'
                 api.credentials['sglang_observability_enabled'] = 'true'
             
-            print("   SGLang configured — model serving and optimization")
+            print("   SGLang configured  model serving and optimization")
         
         prom_url = click.prompt('Prometheus Pushgateway URL (optional, e.g. http://pushgateway:9091)', default='', show_default=False)
         if prom_url:
@@ -1307,7 +1307,7 @@ def configure(provider):
             prom_pass = click.prompt('Pushgateway Password', hide_input=True, default='', show_default=False)
             if prom_pass:
                 api.credentials['prometheus_password'] = prom_pass
-            print("   Prometheus configured — metrics will be pushed on provision/terminate events")
+            print("   Prometheus configured  metrics will be pushed on provision/terminate events")
         
         # ── ML Platform Integrations ──
         print("\nML Platform Integrations (optional)")
@@ -1321,7 +1321,7 @@ def configure(provider):
             kserve_kubeconfig = click.prompt('Kubeconfig path (optional, uses default)', default='', show_default=False)
             if kserve_kubeconfig:
                 api.credentials['kserve_kubeconfig_path'] = kserve_kubeconfig
-            print("   KServe configured — model deployment on Kubernetes")
+            print("   KServe configured  model deployment on Kubernetes")
         
         # LangSmith
         langsmith_key = click.prompt('LangSmith API Key (optional)', hide_input=True, default='', show_default=False)
@@ -1333,7 +1333,7 @@ def configure(provider):
             langsmith_endpoint = click.prompt('LangSmith Endpoint (optional)', default='', show_default=False)
             if langsmith_endpoint:
                 api.credentials['langsmith_endpoint'] = langsmith_endpoint
-            print("   LangSmith configured — tracing and evaluation")
+            print("   LangSmith configured  tracing and evaluation")
         
         # DVC
         dvc_config = click.prompt('Configure DVC? (y/n)', default='n', show_default=False)
@@ -1347,7 +1347,7 @@ def configure(provider):
             dvc_type = click.prompt('DVC Remote Type (s3, gs, azure, ssh)', default='', show_default=False)
             if dvc_type:
                 api.credentials['dvc_remote_type'] = dvc_type
-            print("   DVC configured — data versioning and storage")
+            print("   DVC configured  data versioning and storage")
         
         # MLflow
         mlflow_uri = click.prompt('MLflow Tracking URI (optional)', default='', show_default=False)
@@ -1359,7 +1359,7 @@ def configure(provider):
             mlflow_pass = click.prompt('MLflow Password (optional)', hide_input=True, default='', show_default=False)
             if mlflow_pass:
                 api.credentials['mlflow_password'] = mlflow_pass
-            print("   MLflow configured — experiment tracking")
+            print("   MLflow configured  experiment tracking")
         
         # Ray
         ray_dashboard = click.prompt('Ray Dashboard URI (optional)', default='', show_default=False)
@@ -1368,7 +1368,7 @@ def configure(provider):
             ray_head = click.prompt('Ray Head Node IP (optional)', default='', show_default=False)
             if ray_head:
                 api.credentials['ray_head_node_ip'] = ray_head
-            print("   Ray configured — distributed computing")
+            print("   Ray configured  distributed computing")
     
     api.save_credentials()
     
@@ -1474,7 +1474,7 @@ def quote(gpu_type, providers, parallel, region, quick):
 
     # ── Display results ──
     best = all_quotes[0]
-    print(f"\nTerradev Quote — {gpu_type}")
+    print(f"\nTerradev Quote  {gpu_type}")
     print(f"{'#':<4} {'Provider':<14} {'Region':<16} {'$/hr':<10} {'Type':<10}")
     print("-" * 58)
     for i, q in enumerate(all_quotes[:10]):
@@ -1820,7 +1820,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
         else:
             # No workload type specified - use balanced approach
             use_spot = True
-            print(f"⚖️  Auto-selected: spot instances (cost-optimized default)")
+            print(f"  Auto-selected: spot instances (cost-optimized default)")
             print(f"   Strategy: {spot_strategy}")
             print(f"   Tip: Use --on-demand for guaranteed availability or --spot to force spot instances")
 
@@ -1889,9 +1889,9 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             print(f"COST: Filtering for spot instances: {len(all_quotes)}/{original_count} available")
             if not all_quotes:
                 print("ERROR: No spot instances available. Try:")
-                print("   • Use --on-demand for guaranteed availability")
-                print("   • Try different GPU types or regions")
-                print("   • Wait for spot capacity to become available")
+                print("    Use --on-demand for guaranteed availability")
+                print("    Try different GPU types or regions")
+                print("    Wait for spot capacity to become available")
                 return
         else:
             # Filter for on-demand instances only
@@ -1931,7 +1931,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
         pass
 
     # ── Step 2: Build allocation plan (cheapest-spread across clouds) ──
-    print(f"{len(all_quotes)} quotes — building allocation plan...")
+    print(f"{len(all_quotes)} quotes  building allocation plan...")
 
     # Silent: record price ticks for ML training data
     try:
@@ -1991,7 +1991,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
 
     # ── Dry-run: show plan and exit ──
     if dry_run:
-        print(f"\nDRY RUN — allocation plan ({count} instance(s)):")
+        print(f"\nDRY RUN  allocation plan ({count} instance(s)):")
         print(f"{'#':<4} {'Provider':<14} {'Region':<14} {'$/hr':<10} {'Type':<10}")
         print("-" * 56)
         total_hr = 0
@@ -2008,7 +2008,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     unique_clouds = set(q['provider'] for q in allocations)
     print(f"Deploying {count} instance(s) across {len(unique_clouds)} cloud(s) simultaneously...")
     for q in allocations:
-        print(f"   {q['provider']} / {q['region']} — ${q['price']:.2f}/hr")
+        print(f"   {q['provider']} / {q['region']}  ${q['price']:.2f}/hr")
 
     group_id = f"pg_{int(time.time())}_{uuid.uuid4().hex[:8]}"
 
@@ -2019,7 +2019,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
         _ssh_priv_path, _provision_ssh_pubkey = generate_provision_keypair(group_id)
         print(f"   SSH keypair generated for {group_id} (Ed25519, encrypted at rest)")
     except Exception as _ssh_err:
-        print(f"   Warning: SSH key generation failed ({_ssh_err}) — manual --ssh-key needed for train")
+        print(f"   Warning: SSH key generation failed ({_ssh_err})  manual --ssh-key needed for train")
 
     async def _provision_all():
         from providers.provider_factory import ProviderFactory
@@ -2058,9 +2058,9 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
                             if actual in ('error', 'failed', 'terminated', 'deleted'):
                                 verified = False
                                 break
-                            # still booting (pending/starting/provisioning) — keep polling
+                            # still booting (pending/starting/provisioning)  keep polling
                         else:
-                            verified = None  # timed out — still not running after ~100s
+                            verified = None  # timed out  still not running after ~100s
                     except Exception:
                         verified = None  # verification inconclusive
                     return {
@@ -2095,7 +2095,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     if count > 1 and 0 < len(succeeded) < count:
         print(f"\n{'='*60}")
         print(f"PARTIAL FAILURE: Got {len(succeeded)}/{count} instances.")
-        print(f"   {len(failed)} instance(s) failed — cannot run distributed training with {len(succeeded)}/{count} nodes.")
+        print(f"   {len(failed)} instance(s) failed  cannot run distributed training with {len(succeeded)}/{count} nodes.")
         print(f"   Cleaning up {len(succeeded)} successful provision(s) to avoid billing waste...")
 
         async def _gang_cleanup():
@@ -2110,7 +2110,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
                     print(f"   [+] Terminated {r['instance_id']} on {r['provider']}")
                 except Exception as _e:
                     print(f"   [!] FAILED to terminate {r['instance_id']} on {r['provider']}: {_e}")
-                    print(f"       MANUAL CLEANUP NEEDED — terminate in your {r['provider']} console")
+                    print(f"       MANUAL CLEANUP NEEDED  terminate in your {r['provider']} console")
 
         asyncio.run(_gang_cleanup())
 
@@ -2276,7 +2276,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
         print(f"\nTotal: ${total_hr:.2f}/hr  (${total_hr*24:.2f}/day)")
         print(f"Group: {group_id}")
         if wandb_injected:
-            print(f"W&B: WANDB_* env vars ready for injection — use `terradev run` to auto-configure")
+            print(f"W&B: WANDB_* env vars ready for injection  use `terradev run` to auto-configure")
     if failed:
         print(f"\n{len(failed)} instance(s) failed:")
         for r in failed:
@@ -2338,7 +2338,7 @@ def manage(instance_id, action):
         return
 
     pname = instance['provider'].lower().replace(' ', '_')
-    print(f"{action.upper()} — {instance_id}")
+    print(f"{action.upper()}  {instance_id}")
     print(f"   Provider: {instance['provider']}  |  GPU: {instance['gpu_type']}  |  Region: {instance.get('region', '?')}")
 
     async def _run():
@@ -2366,7 +2366,7 @@ def manage(instance_id, action):
                 end_provision(instance_id)
             except Exception:
                 pass
-            # Enterprise+ GPU-hour metering — report final usage to Stripe
+            # Enterprise+ GPU-hour metering  report final usage to Stripe
             # BYOAPI: Stripe billing disabled - no GPU-hour reporting
             # try:
             #     if api.tier.get('name') == 'Enterprise+':
@@ -2446,7 +2446,7 @@ def manage(instance_id, action):
 
     except Exception as e:
         print(f"Warning  Provider API error: {e}")
-        print("   (Action may still have succeeded — check provider dashboard)")
+        print("   (Action may still have succeeded  check provider dashboard)")
 
 @cli.command()
 @click.option('--format', '-f', type=click.Choice(['table', 'json']), default='table', help='Output format: table (default) or json')
@@ -2581,7 +2581,7 @@ def stage(dataset, target_regions, compression, plan_only):
 
         # Execute
         def _progress(phase, msg):
-            print(f"   ⚡ [{phase}] {msg}")
+            print(f"    [{phase}] {msg}")
 
         result = asyncio.run(stager.stage(dataset, regions, compression, progress_callback=_progress))
 
@@ -2625,7 +2625,7 @@ def stage(dataset, target_regions, compression, plan_only):
             pass
 
     except ImportError:
-        print("Warning  dataset_stager module not found — falling back to basic copy")
+        print("Warning  dataset_stager module not found  falling back to basic copy")
         for region in regions:
             print(f"   UPLOAD: Uploading to {region}...")
         print(f"\nDataset staged across {len(regions)} regions")
@@ -2692,7 +2692,7 @@ def execute(instance_id, cmd, async_exec):
         result = asyncio.run(_exec())
         if async_exec:
             job_id = result.get('job_id', 'unknown') if isinstance(result, dict) else 'unknown'
-            print(f"Submitted async — job ID: {job_id}")
+            print(f"Submitted async  job ID: {job_id}")
         else:
             stdout = result.get('stdout', '') if isinstance(result, dict) else str(result)
             stderr = result.get('stderr', '') if isinstance(result, dict) else ''
@@ -2730,14 +2730,14 @@ def analytics(days, format):
         by_provider = summary.get('by_provider', {})
 
         print(f"� Total Provision Cost: ${total_cost:.2f}")
-        print(f"�️  Total Provisions:     {total_provisions}")
+        print(f"�  Total Provisions:     {total_provisions}")
         print(f"� Quotes Fetched:       {quotes_fetched}")
         if egress_cost > 0:
-            print(f"📡 Egress Cost:          ${egress_cost:.2f}")
-        print(f"💵 All-in Cost:          ${total_cost + egress_cost:.2f}")
+            print(f" Egress Cost:          ${egress_cost:.2f}")
+        print(f" All-in Cost:          ${total_cost + egress_cost:.2f}")
 
         if by_provider:
-            print(f"\n💸 Cost by Provider:")
+            print(f"\n Cost by Provider:")
             for prov, data in sorted(by_provider.items(), key=lambda x: x[1]['cost'], reverse=True):
                 print(f"   {prov:<14} ${data['cost']:>8.2f}  ({data['count']} provisions)")
 
@@ -2745,7 +2745,7 @@ def analytics(days, format):
         try:
             daily = get_daily_spend(days)
             if daily:
-                print(f"\n📅 Daily Spend (last {min(days, len(daily))} days):")
+                print(f"\n Daily Spend (last {min(days, len(daily))} days):")
                 for row in daily[-7:]:
                     bar = '█' * max(1, int(row['cost'] / max(r['cost'] for r in daily) * 20)) if row['cost'] > 0 else '░'
                     print(f"   {row['date']}  ${row['cost']:>7.2f}  {bar}")
@@ -2928,7 +2928,7 @@ def optimize(instance_id, auto_apply):
     print(f"{'='*80}")
     
     if recommendations:
-        print(f"\n🎯 RECOMMENDED OPTIMIZATIONS ({len(recommendations)} found):")
+        print(f"\n RECOMMENDED OPTIMIZATIONS ({len(recommendations)} found):")
         print(f"{'Instance':<20} {'Type':<20} {'Impact':<15} {'Cost+':<8} {'Description'}")
         print(f"{'-'*80}")
         
@@ -2950,7 +2950,7 @@ def optimize(instance_id, auto_apply):
         
         # Auto-apply if requested
         if auto_apply:
-            print(f"\n🚀 AUTO-APPLYING OPTIMIZATIONS...")
+            print(f"\n AUTO-APPLYING OPTIMIZATIONS...")
             applied_count = 0
             
             for rec in recommendations:
@@ -2971,7 +2971,7 @@ def optimize(instance_id, auto_apply):
                     total_cost_increase += rec['cost_increase']
             
             if total_speedup > 1.0:
-                print(f"📈 Total Performance Gain: {total_speedup:.2f}x")
+                print(f" Total Performance Gain: {total_speedup:.2f}x")
             if total_cost_increase > 0.0:
                 print(f"COST: Total Cost Increase: {total_cost_increase:.1%}")
         
@@ -2982,7 +2982,7 @@ def optimize(instance_id, auto_apply):
     cost_savings = sum(rec.get('monthly_savings', 0) for rec in recommendations)
     performance_optimizations = [r for r in recommendations if 'expected_speedup' in r]
     
-    print(f"\n📊 OPTIMIZATION SUMMARY:")
+    print(f"\n OPTIMIZATION SUMMARY:")
     print(f"  Instances analyzed: {len(instances)}")
     print(f"  Total opportunities: {len(recommendations)}")
     print(f"  Cost savings: ${cost_savings:.2f}/month")
@@ -3002,7 +3002,7 @@ def optimize(instance_id, auto_apply):
 def integrations(export_grafana, export_scrape_config, export_wandb_script):
     """Show status of observability & ML integrations and export configs.
 
-    Terradev facilitates connections to your existing tools — your keys
+    Terradev facilitates connections to your existing tools  your keys
     stay local, and all data flows directly from your instances to your services.
 
     Examples:
@@ -3237,7 +3237,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
                     all_q.append({
                         'provider': pname,
                         'price': q.get('price', 0),
-                        'latency': 120,  # estimated — real latency requires endpoint probing
+                        'latency': 120,  # estimated  real latency requires endpoint probing
                         'gpu_type': q.get('gpu_type', target_gpu),
                         'region': q.get('region', ''),
                     })
@@ -3404,7 +3404,7 @@ def infer_deploy(model_path, name, provider, gpu_type, min_workers, max_workers,
     print(f"Selected provider: {pname} (${best['price']:.2f}/hr)")
 
     if dry_run:
-        print("\n🔍 Dry run — deployment plan shown above. No resources provisioned.")
+        print("\n Dry run  deployment plan shown above. No resources provisioned.")
         return
 
     # Provision the instance
@@ -3556,7 +3556,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
         print(f"   Mode:    auto-terminate on completion")
 
     # ── Step 1: Get quotes ──
-    print(f"\n🔍 Finding cheapest {gpu} instance...")
+    print(f"\n Finding cheapest {gpu} instance...")
 
     async def _fetch_quotes():
         tasks = []
@@ -3609,10 +3609,10 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
             return
 
     best = all_quotes[0]
-    print(f"   Best: {best['provider']} / {best.get('region', '?')} — ${best['price']:.2f}/hr")
+    print(f"   Best: {best['provider']} / {best.get('region', '?')}  ${best['price']:.2f}/hr")
 
     if dry_run:
-        print(f"\nDRY RUN — would provision {best['provider']} {gpu} at ${best['price']:.2f}/hr")
+        print(f"\nDRY RUN  would provision {best['provider']} {gpu} at ${best['price']:.2f}/hr")
         print(f"   Then pull {image} and run: {cmd or '(interactive)'}")
         elapsed = (time.time() - run_start) * 1000
         print(f"   Plan built in {elapsed:.0f}ms")
@@ -3667,7 +3667,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
         pass
 
     # ── Step 3: Deploy Docker container ──
-    print(f"\n🐳 Deploying container: {image}")
+    print(f"\n Deploying container: {image}")
 
     docker_cmd_parts = ["docker", "run", "-d", "--gpus", "all"]
     for m in mount:
@@ -3716,7 +3716,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
 
     except Exception as e:
         print(f"Warning  Container deployment error: {e}")
-        print("   (Instance is still running — use 'terradev execute' to retry)")
+        print("   (Instance is still running  use 'terradev execute' to retry)")
         exit_code = 1
 
     # ── Step 4: Cleanup or keep alive ──
@@ -3726,12 +3726,12 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
         print(f"\nOK: Container running on {best['provider']} ({instance_id})")
         print(f"   COST: Cost: ${best['price']:.2f}/hr")
         if port:
-            print(f"   🌐 Ports: {', '.join(str(p) for p in port)}")
-        print(f"   🔧 Manage: terradev manage -i {instance_id} -a status")
-        print(f"   🛑 Stop:   terradev manage -i {instance_id} -a terminate")
+            print(f"    Ports: {', '.join(str(p) for p in port)}")
+        print(f"    Manage: terradev manage -i {instance_id} -a status")
+        print(f"    Stop:   terradev manage -i {instance_id} -a terminate")
     else:
         if exit_code == 0:
-            print(f"\n🛑 Auto-terminating instance...")
+            print(f"\n Auto-terminating instance...")
             async def _terminate():
                 from providers.provider_factory import ProviderFactory
                 factory = ProviderFactory()
@@ -3749,7 +3749,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
                     end_provision(instance_id)
                 except Exception:
                     pass
-                # Enterprise+ GPU-hour metering — report usage to Stripe
+                # Enterprise+ GPU-hour metering  report usage to Stripe
                 # BYOAPI: Stripe billing disabled - no termination billing
                 # try:
                 #     if api.tier.get('name') == 'Enterprise+':
@@ -3781,17 +3781,17 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
                 print(f"   OK: Terminated")
             except Exception as e:
                 print(f"   Warning  Auto-terminate failed: {e}")
-                print(f"   🛑 Manual: terradev manage -i {instance_id} -a terminate")
+                print(f"    Manual: terradev manage -i {instance_id} -a terminate")
         else:
-            print(f"\nWarning  Command exited with code {exit_code} — instance kept alive for debugging")
-            print(f"   🔧 Debug:  terradev execute -i {instance_id} -c 'docker logs terradev-{instance_id[:12]}'")
-            print(f"   🛑 Stop:   terradev manage -i {instance_id} -a terminate")
+            print(f"\nWarning  Command exited with code {exit_code}  instance kept alive for debugging")
+            print(f"    Debug:  terradev execute -i {instance_id} -c 'docker logs terradev-{instance_id[:12]}'")
+            print(f"    Stop:   terradev manage -i {instance_id} -a terminate")
 
-    print(f"⚡ Total time: {total_time:.0f}ms")
+    print(f" Total time: {total_time:.0f}ms")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Inference Routing — Auto-failover + Latency-aware routing
+# Inference Routing  Auto-failover + Latency-aware routing
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @cli.command('infer-status')
@@ -3815,17 +3815,17 @@ def infer_status(check):
     router = InferenceRouter()
 
     if not router.endpoints:
-        print("📭 No inference endpoints registered.")
+        print(" No inference endpoints registered.")
         print("   Deploy one with: terradev infer --model <model>")
         return
 
     if check:
-        print("🔍 Running health probes...")
+        print(" Running health probes...")
         asyncio.run(router.check_all_endpoints())
         print()
 
     status = router.get_status()
-    print("🧠 Inference Endpoint Status")
+    print(" Inference Endpoint Status")
     print("=" * 70)
     print(f"   Total: {status['total_endpoints']}  |  Healthy: {status['healthy']}  |  Unhealthy: {status['unhealthy']}")
     print()
@@ -3835,9 +3835,9 @@ def infer_status(check):
     print("-" * 70)
 
     for ep in status['endpoints']:
-        health_icon = {'healthy': '🟢', 'degraded': '🟡', 'unhealthy': '🔴', 'unknown': '⚪'}.get(ep['health'], '⚪')
+        health_icon = {'healthy': '', 'degraded': '', 'unhealthy': '', 'unknown': ''}.get(ep['health'], '')
         role = 'PRIMARY' if ep['is_primary'] else f"backup→{ep.get('backup', '?')}"
-        lat = f"{ep['avg_latency_ms']}ms" if ep['avg_latency_ms'] > 0 else '—'
+        lat = f"{ep['avg_latency_ms']}ms" if ep['avg_latency_ms'] > 0 else ''
         print(f"{ep['endpoint_id']:<28} {ep['provider']:<12} {health_icon} {ep['health']:<9} {lat:<10} ${ep['price_per_hour']:<7.2f} {role}")
 
     # Show failover log if any
@@ -3883,20 +3883,20 @@ def infer_failover(dry_run):
     router = InferenceRouter()
 
     if not router.endpoints:
-        print("📭 No inference endpoints registered.")
+        print(" No inference endpoints registered.")
         sys.exit(1)
 
-    print("🔍 Running health checks on all inference endpoints...")
+    print(" Running health checks on all inference endpoints...")
     probes = asyncio.run(router.check_all_endpoints())
 
     for eid, probe in probes.items():
         ep = router.endpoints.get(eid)
-        icon = '🟢' if probe.healthy else '🔴'
-        lat = f"{probe.latency_ms:.0f}ms" if probe.latency_ms > 0 else '—'
+        icon = '' if probe.healthy else ''
+        lat = f"{probe.latency_ms:.0f}ms" if probe.latency_ms > 0 else ''
         print(f"   {icon} {eid[:24]:<24} {ep.provider:<12} {lat}")
 
     if dry_run:
-        print("\n🔍 DRY RUN — checking for failover candidates...")
+        print("\n DRY RUN  checking for failover candidates...")
         for eid, ep in router.endpoints.items():
             if ep.is_primary and ep.health.value == 'unhealthy' and ep.backup_endpoint_id:
                 backup = router.endpoints.get(ep.backup_endpoint_id)
@@ -3905,16 +3905,16 @@ def infer_failover(dry_run):
         print("   (No changes made)")
         return
 
-    print("\n⚡ Checking for auto-failover...")
+    print("\n Checking for auto-failover...")
     events = asyncio.run(router.check_and_failover())
 
     if events:
         for ev in events:
-            print(f"   🔄 FAILOVER: {ev['failed_provider']}/{ev['failed_endpoint'][:16]} → {ev['new_provider']}/{ev['new_primary'][:16]}")
+            print(f"    FAILOVER: {ev['failed_provider']}/{ev['failed_endpoint'][:16]} → {ev['new_provider']}/{ev['new_primary'][:16]}")
             print(f"      Reason: {ev['reason']}")
         print(f"\nOK: {len(events)} failover(s) executed. Traffic shifted to healthy providers.")
     else:
-        print("   OK: All primary endpoints healthy — no failover needed.")
+        print("   OK: All primary endpoints healthy  no failover needed.")
 
 
 @cli.command('infer-route')
@@ -3954,14 +3954,14 @@ def infer_route(model, strategy, measure):
     router = InferenceRouter()
 
     if not router.endpoints:
-        print("📭 No inference endpoints registered.")
+        print(" No inference endpoints registered.")
         return
 
     if measure:
-        print("🔍 Running latency measurements...")
+        print(" Running latency measurements...")
         wpt_key = os.environ.get('WPT_API_KEY')
         if wpt_key:
-            print("   📡 WebPageTest integration enabled")
+            print("    WebPageTest integration enabled")
 
         async def _measure_all():
             probes = await router.check_all_endpoints()
@@ -3987,7 +3987,7 @@ def infer_route(model, strategy, measure):
         print(f"ERROR: No healthy endpoints found" + (f" for model '{model}'" if model else ""))
         return
 
-    print(f"🎯 Best endpoint (strategy: {strategy}):")
+    print(f" Best endpoint (strategy: {strategy}):")
     print(f"   Endpoint:  {best.endpoint_id}")
     print(f"   Provider:  {best.provider}")
     print(f"   Model:     {best.model}")
@@ -4000,7 +4000,7 @@ def infer_route(model, strategy, measure):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Kubernetes / Karpenter Integration — `terradev k8s`
+# Kubernetes / Karpenter Integration  `terradev k8s`
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Workload → Karpenter provisioner mapping (matches karpenter_provisioners.yaml)
@@ -4239,14 +4239,14 @@ def k8s_create(cluster_name, gpu, count, max_price, multi_cloud, prefer_spot, aw
         'control_plane': control_plane
     }
     
-    print(f"🚀 Creating Kubernetes cluster '{cluster_name}'...")
-    print(f"🎮 GPU Type: {gpu}")
-    print(f"📊 Node Count: {count}")
+    print(f" Creating Kubernetes cluster '{cluster_name}'...")
+    print(f" GPU Type: {gpu}")
+    print(f" Node Count: {count}")
     print(f"COST: Max Price: ${max_price}/hr")
-    print(f"☁️  Multi-Cloud: {multi_cloud}")
-    print(f"🎯 Spot Instances: {prefer_spot}")
+    print(f"  Multi-Cloud: {multi_cloud}")
+    print(f" Spot Instances: {prefer_spot}")
     print(f"")
-    print(f"🧬 Topology optimization (auto-applied):")
+    print(f" Topology optimization (auto-applied):")
     print(f"   Kubelet Topology Manager: restricted (NUMA-aligned)")
     print(f"   CPU Manager: static (pinned cores)")
     print(f"   GPUDirect RDMA: enabled (nvidia_peermem)")
@@ -4263,7 +4263,7 @@ def k8s_create(cluster_name, gpu, count, max_price, multi_cloud, prefer_spot, aw
         print(f"OK: Cluster '{cluster_name}' created successfully!")
         print(f"   Topology: NUMA-aligned, GPUDirect RDMA, Topology Manager=restricted")
         print(f"INFO:  Run 'terradev k8s info {cluster_name}' for details")
-        print(f"🔗 Run 'export KUBECONFIG=~/.terradev/clusters/{cluster_name}.json' to connect")
+        print(f" Run 'export KUBECONFIG=~/.terradev/clusters/{cluster_name}.json' to connect")
     else:
         print(f"ERROR: Failed to create cluster '{cluster_name}'")
 
@@ -4282,7 +4282,7 @@ def k8s_destroy(cluster_name):
     
     wrapper = TerraformWrapper()
     
-    print(f"🗑️  Destroying Kubernetes cluster '{cluster_name}'...")
+    print(f"  Destroying Kubernetes cluster '{cluster_name}'...")
     
     success = wrapper.destroy_cluster(cluster_name)
     
@@ -4302,7 +4302,7 @@ def k8s_list():
     clusters = wrapper.list_clusters()
     
     if not clusters:
-        print("📭 No clusters found")
+        print(" No clusters found")
         return
     
     print("Plan Kubernetes Clusters:")
@@ -4313,14 +4313,14 @@ def k8s_list():
         created = cluster.get('created_at', 'unknown')
         outputs = cluster.get('outputs', {})
         
-        print(f"🏷️  Name: {name}")
+        print(f"  Name: {name}")
         print(f"Status Status: {status}")
-        print(f"📅 Created: {created}")
+        print(f" Created: {created}")
         
         if outputs:
             gpu_summary = outputs.get('gpu_summary', {})
             if gpu_summary:
-                print(f"🎮 GPU Type: {gpu_summary.get('gpu_type', 'unknown')}")
+                print(f" GPU Type: {gpu_summary.get('gpu_type', 'unknown')}")
                 print(f"Status Total Nodes: {gpu_summary.get('total_gpus', 0)}")
                 print(f"COST: Cost/hr: ${outputs.get('total_cost_per_hour', 0):.2f}")
         
@@ -4350,11 +4350,11 @@ def k8s_info(cluster_name):
         # GPU Summary
         gpu_summary = outputs.get('gpu_summary', {})
         if gpu_summary:
-            print(f"🎮 GPU Type: {gpu_summary.get('gpu_type', 'unknown')}")
+            print(f" GPU Type: {gpu_summary.get('gpu_type', 'unknown')}")
             print(f"Status Total Nodes: {gpu_summary.get('total_gpus', 0)}")
             print(f"COST: Max Price: ${gpu_summary.get('max_price', 0):.2f}/hr")
-            print(f"🎯 Actual Average: ${gpu_summary.get('actual_average', 0):.2f}/hr")
-            print(f"🔄 Spot Preferred: {gpu_summary.get('prefer_spot', False)}")
+            print(f" Actual Average: ${gpu_summary.get('actual_average', 0):.2f}/hr")
+            print(f" Spot Preferred: {gpu_summary.get('prefer_spot', False)}")
         
         # Cost Breakdown
         cost_breakdown = outputs.get('cost_breakdown', {})
@@ -4368,7 +4368,7 @@ def k8s_info(cluster_name):
         # Savings Analysis
         savings = outputs.get('savings_analysis', {})
         if savings:
-            print(f"\n💸 Savings Analysis:")
+            print(f"\n Savings Analysis:")
             print(f"AWS-only cost: ${savings.get('aws_only_cost_per_hour', 0):.2f}/hr")
             print(f"Multi-cloud cost: ${savings.get('multi_cloud_cost_per_hour', 0):.2f}/hr")
             print(f"Savings: ${savings.get('savings_per_hour', 0):.2f}/hr ({savings.get('savings_percentage', 0):.1f}%)")
@@ -4390,7 +4390,7 @@ def k8s_info(cluster_name):
 @click.option('--image', required=True, help='Docker image (e.g. pytorch/pytorch:latest)')
 @click.option('--cmd', default=None, help='Command to run inside the container')
 @click.option('--gpu-count', '-G', type=int, default=None, help='Number of GPUs (default: per workload profile)')
-@click.option('--budget', '-b', type=float, default=None, help='Max $/hr budget — forces spot if < $2/hr')
+@click.option('--budget', '-b', type=float, default=None, help='Max $/hr budget  forces spot if < $2/hr')
 @click.option('--namespace', '-n', default='terradev-workloads', help='Kubernetes namespace')
 @click.option('--name', default=None, help='Job/Deployment name (auto-generated if omitted)')
 @click.option('--env', '-e', multiple=True, help='Environment variables KEY=VALUE')
@@ -4423,7 +4423,7 @@ def smart_deploy(image, workload, cmd, gpu_count, budget, namespace, name, env, 
             'region': region
         }
         
-        print("🧠 Analyzing deployment options...")
+        print(" Analyzing deployment options...")
         
         # Get recommendations
         recommendations = await router.recommend_deployments(user_request)
@@ -4446,7 +4446,7 @@ def smart_deploy(image, workload, cmd, gpu_count, budget, namespace, name, env, 
             print(f"   Confidence: {chosen.confidence:.1%}")
             
             if dry_run:
-                print("🔍 Dry run - not actually deploying")
+                print(" Dry run - not actually deploying")
                 return
             
             # Execute deployment
@@ -4459,7 +4459,7 @@ def smart_deploy(image, workload, cmd, gpu_count, budget, namespace, name, env, 
                 print(f"ERROR: Deployment failed: {e}")
         else:
             # Show all recommendations
-            print(f"\n🎯 Smart Deployment Recommendations:")
+            print(f"\n Smart Deployment Recommendations:")
             print("=" * 60)
             
             for i, rec in enumerate(recommendations[:5]):
@@ -4472,12 +4472,12 @@ def smart_deploy(image, workload, cmd, gpu_count, budget, namespace, name, env, 
                 
                 print(f"   Pros:")
                 for pro in rec.pros[:3]:
-                    print(f"     • {pro}")
+                    print(f"      {pro}")
                 
                 if len(rec.cons) > 0:
                     print(f"   Cons:")
                     for con in rec.cons[:2]:
-                        print(f"     • {con}")
+                        print(f"      {con}")
                 
                 print(f"   Deploy with: terradev smart-deploy --option {i}")
     
@@ -4504,7 +4504,7 @@ def price_discovery(gpu_type, region, hours, trends):
         
         async with engine as e:
             if gpu_type:
-                print(f"🔍 Getting real-time prices for {gpu_type}...")
+                print(f" Getting real-time prices for {gpu_type}...")
                 prices = await e.get_realtime_prices(gpu_type, region)
                 
                 print(f"\nCOST: Real-time Prices for {gpu_type}:")
@@ -4516,7 +4516,7 @@ def price_discovery(gpu_type, region, hours, trends):
                     print(f"{price.provider:<12} ${price.price:<9.2f} {price.instance_type:<20} {price.capacity:<12} {price.confidence:<12.1%}")
                 
                 if trends:
-                    print(f"\n📈 Price Trends (last {hours} hours):")
+                    print(f"\n Price Trends (last {hours} hours):")
                     trends_data = await e.get_price_trends(gpu_type, hours)
                     
                     for provider, data in trends_data.items():
@@ -4565,7 +4565,7 @@ def budget_optimize(gpu_type, budget, gpu_count, hours, region, workload):
             print(f"ERROR: No options found under ${budget:.2f}/hr budget")
             return
         
-        print(f"\n🎯 Budget-Optimized Options:")
+        print(f"\n Budget-Optimized Options:")
         print("=" * 80)
         print(f"{'Provider':<12} {'Instance':<20} {'Cost':<10} {'Risk':<8} {'Budget Used':<12} {'Confidence':<12}")
         print("-" * 80)
@@ -4684,7 +4684,7 @@ def helm_generate(workload, gpu_type, image, gpu_count, memory, storage, budget,
 @click.option('--spot', is_flag=True, default=None, help='Spot instances only')
 @click.option('--window', '-w', default=720, help='Lookback window in hours (default: 720 = 30d)')
 def percentiles(gpu_type, provider, spot, window):
-    """Show historical price percentiles (p10–p99) per provider."""
+    """Show historical price percentiles (p10p99) per provider."""
     try:
         from core.price_intelligence import compute_percentiles
     except ImportError:
@@ -4699,7 +4699,7 @@ def percentiles(gpu_type, provider, spot, window):
         print("Tip: Run 'terradev quote -g {gpu_type}' to start collecting price data.")
         return
 
-    print(f"\nStatus Price Percentiles — {gpu_type.upper()} (last {window}h)")
+    print(f"\nStatus Price Percentiles  {gpu_type.upper()} (last {window}h)")
     print(f"{'Provider':<14} {'p10':>8} {'p25':>8} {'p50':>8} {'p75':>8} {'p90':>8} {'p99':>8} {'Min':>8} {'Max':>8} {'N':>6}")
     print("─" * 100)
     for prov, stats in sorted(providers.items()):
@@ -4715,7 +4715,7 @@ def percentiles(gpu_type, provider, spot, window):
     print(f"\nTip: Cheapest median (p50): {cheapest[0]} at ${cheapest[1]:.2f}/hr")
     if len(all_p50) > 1:
         spread = all_p50[-1][1] - all_p50[0][1]
-        print(f"📈 Median spread: ${spread:.2f}/hr across {len(all_p50)} providers")
+        print(f" Median spread: ${spread:.2f}/hr across {len(all_p50)} providers")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -4742,7 +4742,7 @@ def availability(gpu_type, window):
             print(f"Tip: Run 'terradev quote -g {gpu_type}' to start tracking availability.")
             return
 
-        print(f"\n📡 Availability — {gpu_type.upper()} (last {window}h)")
+        print(f"\n Availability  {gpu_type.upper()} (last {window}h)")
         print(f"{'Provider':<14} {'Status':<12} {'Rate':>8} {'Checks':>8} {'Avail':>8} {'Avg ms':>10} {'Last Seen':<20}")
         print("─" * 90)
         for prov, stats in sorted(providers.items()):
@@ -4760,7 +4760,7 @@ def availability(gpu_type, window):
             print("Tip: Run 'terradev quote -g <GPU>' to start tracking.")
             return
 
-        print(f"\n📡 Availability Summary (all GPUs, last check)")
+        print(f"\n Availability Summary (all GPUs, last check)")
         print(f"{'GPU Type':<14} {'Provider':<14} {'Status':<12}")
         print("─" * 42)
         for gtype in sorted(summary.keys()):
@@ -4792,11 +4792,11 @@ def reliability(provider, window, ranking):
             print("Tip: Run 'terradev quote' or 'terradev provision' to start tracking.")
             return
 
-        print(f"\n🏆 Provider Reliability Ranking")
+        print(f"\n Provider Reliability Ranking")
         print(f"{'#':<4} {'Provider':<14} {'Score':>8} {'Quote %':>9} {'Prov %':>9} {'Q ms':>8} {'P ms':>8} {'Events':>8}")
         print("─" * 75)
         for i, r in enumerate(ranked, 1):
-            medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f" {i}"
+            medal = "" if i == 1 else "" if i == 2 else "" if i == 3 else f" {i}"
             print(f"{medal:<4} {r['provider']:<14} {r['overall_score']:>7.1f} "
                   f"{r['quote_success_rate']*100:>8.1f}% {r['provision_success_rate']*100:>8.1f}% "
                   f"{r['avg_quote_latency_ms']:>7.0f} {r['avg_provision_latency_ms']:>7.0f} "
@@ -4811,7 +4811,7 @@ def reliability(provider, window, ranking):
         print("Tip: Run 'terradev quote' or 'terradev provision' to start tracking.")
         return
 
-    print(f"\n🔧 Provider Reliability (last {window}h)")
+    print(f"\n Provider Reliability (last {window}h)")
     print(f"{'Provider':<14} {'Score':>8} {'Quote %':>9} {'Prov %':>9} {'Q ms':>8} {'P ms':>8} {'Quotes':>8} {'Provs':>8} {'Errors':>8}")
     print("─" * 95)
     for prov, stats in sorted(providers.items(), key=lambda x: x[1]['overall_score'], reverse=True):
@@ -4868,7 +4868,7 @@ def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type,
         service = create_enhanced_kubernetes_service_from_credentials(creds)
         
         if test:
-            print("🔍 Testing enhanced Kubernetes connection...")
+            print(" Testing enhanced Kubernetes connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -4907,7 +4907,7 @@ def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type,
                 print(f"ERROR: Metrics summary failed: {result.get('error')}")
         
         elif dashboard:
-            print("🌐 Accessing Grafana dashboard...")
+            print(" Accessing Grafana dashboard...")
             dashboard_port = creds.get('kubernetes_dashboard_port', '3000')
             print(f"   Port-forward Grafana: kubectl port-forward -n monitoring svc/grafana {dashboard_port}:80")
             print(f"   Access at: http://localhost:{dashboard_port}")
@@ -4915,12 +4915,12 @@ def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type,
             print(f"   Password: prom-operator")
         
         elif gpu_nodes:
-            print("🖥️ Listing GPU-enabled nodes...")
+            print(" Listing GPU-enabled nodes...")
             nodes = asyncio.run(service.get_gpu_nodes())
             
             if nodes:
                 for node in nodes:
-                    print(f"   🖥️ {node['name']} - {node['instance_type']} - {node['gpu_capacity']} GPUs")
+                    print(f"    {node['name']} - {node['instance_type']} - {node['gpu_capacity']} GPUs")
             else:
                 print("   INFO:  No GPU nodes found")
         
@@ -4944,7 +4944,7 @@ def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type,
             if memory_limit:
                 limits['memory'] = memory_limit
             
-            print(f"🔧 Creating Karpenter provisioner for {gpu_type}...")
+            print(f" Creating Karpenter provisioner for {gpu_type}...")
             result = asyncio.run(service.create_karpenter_provisioner(gpu_type, limits))
             
             if result['status'] == 'created':
@@ -4993,7 +4993,7 @@ def wandb(test, list_projects, create_project, list_runs, run_details, export, c
         service = create_enhanced_wandb_service_from_credentials(creds)
         
         if test:
-            print("🔍 Testing enhanced W&B connection...")
+            print(" Testing enhanced W&B connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -5039,7 +5039,7 @@ def wandb(test, list_projects, create_project, list_runs, run_details, export, c
                 print(f"ERROR: Report creation failed: {result['error']}")
         
         elif setup_alerts:
-            print("🚨 Setting up Terradev alerts...")
+            print(" Setting up Terradev alerts...")
             result = asyncio.run(service.create_terradev_alerts())
             
             if result['status'] == 'completed':
@@ -5080,14 +5080,14 @@ def wandb(test, list_projects, create_project, list_runs, run_details, export, c
             print(f"OK: Project created: {result['name']}")
         
         elif list_runs:
-            print("🏃 Listing recent runs...")
+            print(" Listing recent runs...")
             runs = asyncio.run(service.list_runs(limit=20))
             
             for run in runs[:10]:  # Show first 10
-                print(f"   🏃 {run['name'][:30]} - {run['state']} - {run['createdAt'][:10]}")
+                print(f"    {run['name'][:30]} - {run['state']} - {run['createdAt'][:10]}")
         
         elif run_details:
-            print(f"🔍 Getting run details: {run_details}")
+            print(f" Getting run details: {run_details}")
             result = asyncio.run(service.get_run_details(run_details))
             
             print(f"   Name: {result['name']}")
@@ -5132,7 +5132,7 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
         service = create_langchain_service_from_credentials(creds)
         
         if test:
-            print("🔍 Testing enhanced LangChain connection...")
+            print(" Testing enhanced LangChain connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -5147,7 +5147,7 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
                 print(f"ERROR: LangChain connection failed: {result['error']}")
         
         elif create_workflow:
-            print("🔧 Creating LangChain workflow...")
+            print(" Creating LangChain workflow...")
             workflow_config = {
                 "name": create_workflow,
                 "description": f"LangChain workflow '{create_workflow}' created via Terradev CLI"
@@ -5162,7 +5162,7 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
                 print(f"ERROR: Workflow creation failed: {result['error']}")
         
         elif create_langgraph:
-            print("🔧 Creating LangGraph workflow...")
+            print(" Creating LangGraph workflow...")
             graph_config = {
                 "name": create_langgraph,
                 "description": f"LangGraph workflow '{create_langgraph}' created via Terradev CLI"
@@ -5177,7 +5177,7 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
                 print(f"ERROR: LangGraph creation failed: {result['error']}")
         
         elif create_pipeline:
-            print("🔧 Creating SGLang pipeline...")
+            print(" Creating SGLang pipeline...")
             pipeline_config = {
                 "name": create_pipeline,
                 "description": f"SGLang pipeline '{create_pipeline}' created via Terradev CLI"
@@ -5200,11 +5200,11 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
         
         elif list_runs:
             project_name = project or creds.get('project_name', 'terradev')
-            print(f"🏃 Listing LangSmith runs in project: {project_name}")
+            print(f" Listing LangSmith runs in project: {project_name}")
             runs = asyncio.run(service.get_langsmith_runs(project_name))
             
             for run in runs[:10]:  # Show first 10
-                print(f"   🏃 {run.get('name', 'Unknown')[:30]} - {run.get('status', 'Unknown')} - {run.get('created_at', 'Unknown')[:10]}")
+                print(f"    {run.get('name', 'Unknown')[:30]} - {run.get('status', 'Unknown')} - {run.get('created_at', 'Unknown')[:10]}")
         
         elif create_trace:
             if not run_id or not data:
@@ -5217,7 +5217,7 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
                 print("ERROR: Invalid JSON data")
                 return
             
-            print(f"🔍 Creating trace: {run_id}")
+            print(f" Creating trace: {run_id}")
             result = asyncio.run(service.create_trace(run_id, trace_data))
             
             if result['status'] == 'created':
@@ -5254,7 +5254,7 @@ def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph)
         service = create_langgraph_service_from_credentials(creds)
         
         if test:
-            print("🔍 Testing enhanced LangGraph connection...")
+            print(" Testing enhanced LangGraph connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -5274,7 +5274,7 @@ def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph)
                 print("ERROR: Workflow type required")
                 return
             
-            print(f"🔧 Creating {type} LangGraph workflow...")
+            print(f" Creating {type} LangGraph workflow...")
             workflow_config = {
                 "name": create_workflow,
                 "description": f"LangGraph {type} workflow '{create_workflow}' created via Terradev CLI",
@@ -5346,7 +5346,7 @@ def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
         service = create_sglang_service_from_credentials(creds)
         
         if test:
-            print("🔍 Testing enhanced SGLang connection...")
+            print(" Testing enhanced SGLang connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -5366,7 +5366,7 @@ def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
                 print("ERROR: Model path required for pipeline creation")
                 return
             
-            print(f"🔧 Creating SGLang pipeline: {create_pipeline}")
+            print(f" Creating SGLang pipeline: {create_pipeline}")
             pipeline_config = {
                 "name": create_pipeline,
                 "description": f"SGLang pipeline '{create_pipeline}' created via Terradev CLI",
@@ -5416,7 +5416,7 @@ def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
                 print(f"ERROR: Metrics check failed: {result['error']}")
         
         elif dashboard:
-            print("🌐 Accessing SGLang dashboard...")
+            print(" Accessing SGLang dashboard...")
             serve_port = port or "8000"
             print(f"   Dashboard: http://localhost:{serve_port}/dashboard")
             print(f"   Metrics: http://localhost:{serve_port}/metrics")
@@ -5456,7 +5456,7 @@ def huggingface(test, list_models, author, list_datasets, model_info, create_end
         service = create_huggingface_service_from_credentials(creds)
         
         if test:
-            print("🔍 Testing Hugging Face connection...")
+            print(" Testing Hugging Face connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -5467,11 +5467,11 @@ def huggingface(test, list_models, author, list_datasets, model_info, create_end
                 print(f"ERROR: Hugging Face connection failed: {result['error']}")
         
         elif list_models:
-            print("📚 Listing Hugging Face models...")
+            print(" Listing Hugging Face models...")
             models = asyncio.run(service.list_models(author=author, limit=20))
             
             for model in models[:10]:  # Show first 10
-                print(f"   📚 {model['id'][:50]} - {model.get('downloads', 0)} downloads")
+                print(f"    {model['id'][:50]} - {model.get('downloads', 0)} downloads")
         
         elif list_datasets:
             print("Status Listing Hugging Face datasets...")
@@ -5481,7 +5481,7 @@ def huggingface(test, list_models, author, list_datasets, model_info, create_end
                 print(f"   Status {dataset['id'][:50]} - {dataset.get('downloads', 0)} downloads")
         
         elif model_info:
-            print(f"📖 Getting model info: {model_info}")
+            print(f" Getting model info: {model_info}")
             result = asyncio.run(service.get_model_info(model_info))
             
             print(f"   Model: {result['id']}")
@@ -5502,11 +5502,11 @@ def huggingface(test, list_models, author, list_datasets, model_info, create_end
             print(f"   Status: {result.get('status', 'Unknown')}")
         
         elif list_endpoints:
-            print("🔌 Listing inference endpoints...")
+            print(" Listing inference endpoints...")
             endpoints = asyncio.run(service.list_inference_endpoints())
             
             for endpoint in endpoints:
-                print(f"   🔌 {endpoint['name']} - {endpoint.get('status', 'Unknown')}")
+                print(f"    {endpoint['name']} - {endpoint.get('status', 'Unknown')}")
         
         elif inference:
             if not inputs:
@@ -5519,7 +5519,7 @@ def huggingface(test, list_models, author, list_datasets, model_info, create_end
                 print("ERROR: Invalid JSON inputs")
                 return
             
-            print(f"🧠 Running inference on: {inference}")
+            print(f" Running inference on: {inference}")
             result = asyncio.run(service.run_inference(inference, inputs_data))
             
             print(f"Status Inference result: {json.dumps(result, indent=2)}")
@@ -5547,7 +5547,7 @@ def kserve(test):
         service = create_kserve_service_from_credentials(creds)
         
         if test:
-            print("🔍 Testing KServe connection...")
+            print(" Testing KServe connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -5581,7 +5581,7 @@ def langsmith(test, list_projects, create_project, export):
         service = create_langsmith_service_from_credentials(creds)
         
         if test:
-            print("🔍 Testing LangSmith connection...")
+            print(" Testing LangSmith connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -5637,7 +5637,7 @@ def dvc(test, init, add_remote, add_data, push, pull, status):
         service = create_dvc_service_from_credentials(creds)
         
         if test:
-            print("🔍 Testing DVC connection...")
+            print(" Testing DVC connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -5671,7 +5671,7 @@ def dvc(test, init, add_remote, add_data, push, pull, status):
             print(f"OK: Data pushed: {result['targets']}")
         
         elif pull:
-            print("📥 Pulling data from remote...")
+            print(" Pulling data from remote...")
             result = asyncio.run(service.pull_data())
             print(f"OK: Data pulled: {result['targets']}")
         
@@ -5708,7 +5708,7 @@ def mlflow(test, list_experiments, create_experiment, list_runs, export):
         service = create_mlflow_service_from_credentials(creds)
         
         if test:
-            print("🔍 Testing MLflow connection...")
+            print(" Testing MLflow connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -5723,10 +5723,10 @@ def mlflow(test, list_experiments, create_experiment, list_runs, export):
             experiments = asyncio.run(service.list_experiments())
             
             for exp in experiments:
-                print(f"   🧪 {exp['name']} (ID: {exp['experiment_id']})")
+                print(f"    {exp['name']} (ID: {exp['experiment_id']})")
         
         elif create_experiment:
-            print(f"🧪 Creating experiment: {create_experiment}")
+            print(f" Creating experiment: {create_experiment}")
             result = asyncio.run(service.create_experiment(create_experiment, "Created via Terradev CLI"))
             print(f"OK: Experiment created: {result['experiment_id']}")
         
@@ -5736,7 +5736,7 @@ def mlflow(test, list_experiments, create_experiment, list_runs, export):
             
             for run in runs[:10]:  # Show first 10
                 info = run.get('info', {})
-                print(f"   🏃 {info.get('run_id', 'N/A')[:8]} - {info.get('status', 'N/A')}")
+                print(f"    {info.get('run_id', 'N/A')[:8]} - {info.get('status', 'N/A')}")
         
         elif export:
             print(f"UPLOAD: Exporting experiment data...")
@@ -5777,7 +5777,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
             return
         
         if test:
-            print("🔍 Testing enhanced Ray connection...")
+            print(" Testing enhanced Ray connection...")
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
@@ -5795,7 +5795,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
                 print(f"ERROR: Ray connection failed: {result['error']}")
                 if 'not installed' in result['error']:
                     print("   Tip: Install Ray: pip install ray[default]")
-                    print("   📖 For full features: pip install ray[default,train]")
+                    print("    For full features: pip install ray[default,train]")
         
         elif install_monitoring:
             print("Deploying Installing enhanced Ray monitoring stack...")
@@ -5824,7 +5824,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
                 print(f"ERROR: Metrics summary failed: {result.get('error')}")
         
         elif grafana:
-            print("🌐 Accessing Ray Grafana dashboard...")
+            print(" Accessing Ray Grafana dashboard...")
             print("   Access at: http://localhost:3000")
             print("   Username: admin")
             print("   Password: prom-operator")
@@ -5859,7 +5859,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
                 print(f"   Error: {result.get('ray', {}).get('error', 'Unknown error')}")
         
         elif list_nodes:
-            print("🖥️ Listing Ray nodes...")
+            print(" Listing Ray nodes...")
             result = asyncio.run(service.get_monitoring_status())
             
             if result.get('ray', {}).get('status') == 'running':
@@ -5883,7 +5883,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
                 print("      Prometheus: http://localhost:8080")
         
         elif stop:
-            print("🛑 Stopping Ray cluster...")
+            print(" Stopping Ray cluster...")
             result = asyncio.run(service.stop_cluster())
             print(f"OK: Cluster stopped: {result['status']}")
         
@@ -5891,7 +5891,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
             print("Status Getting Ray dashboard URL...")
             url = asyncio.run(service.get_ray_dashboard_url())
             if url:
-                print(f"🌐 Dashboard: {url}")
+                print(f" Dashboard: {url}")
             else:
                 print("ERROR: Dashboard URL not found")
         
@@ -5905,7 +5905,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Manifest Cache + Drift Detection — CLI-native reliability
+# Manifest Cache + Drift Detection  CLI-native reliability
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @cli.command('up')
@@ -5932,7 +5932,7 @@ def up(job, cache_dir, fix_drift, gpu_type, gpu_count, hours, budget, region, da
         
         if fix_drift:
             # RE-PROVISION: Detect + Fix (single command)
-            print(f"🔍 Detecting drift for job {job}...")
+            print(f" Detecting drift for job {job}...")
             
             try:
                 result = await detector.fix_drift(job)
@@ -5940,7 +5940,7 @@ def up(job, cache_dir, fix_drift, gpu_type, gpu_count, hours, budget, region, da
                 if result['status'] == 'no_drift':
                     print("OK: No drift detected - everything is in sync")
                 elif result['status'] == 'fixed':
-                    print(f"🔧 Drift fixed successfully:")
+                    print(f" Drift fixed successfully:")
                     print(f"   Terminated: {result['terminated']} nodes")
                     print(f"   Recreated: {result['recreated']} nodes")
                 else:
@@ -5976,7 +5976,7 @@ def up(job, cache_dir, fix_drift, gpu_type, gpu_count, hours, budget, region, da
         # Choose best option (simplified - would normally prompt user)
         best_option = recommendations[0]
         
-        print(f"🎯 Deploying: {best_option.provider} {best_option.instance_type}")
+        print(f" Deploying: {best_option.provider} {best_option.instance_type}")
         print(f"   Cost: ${best_option.price_per_hour:.2f}/hr")
         print(f"   Confidence: {best_option.confidence:.1%}")
         
@@ -6052,7 +6052,7 @@ def rollback(job_version, cache_dir):
         
         job, version = job_version.split('@', 1)
         
-        print(f"🔄 Rolling back {job} to version {version}...")
+        print(f" Rolling back {job} to version {version}...")
         
         detector = DriftDetector(cache_dir)
         
@@ -6089,7 +6089,7 @@ def manifests(job, cache_dir, show_imported, show_recordings):
     
     if show_imported:
         # Show imported YAML pipelines
-        print("📥 Imported YAML Pipelines:")
+        print(" Imported YAML Pipelines:")
         
         # Look for manifests with yaml-import source
         manifest_files = list(Path(cache_dir).glob("*.json"))
@@ -6132,7 +6132,7 @@ def manifests(job, cache_dir, show_imported, show_recordings):
     
     if show_recordings:
         # Show live recordings
-        print("🔴 Live Recordings:")
+        print(" Live Recordings:")
         
         recordings_dir = Path('./recordings')
         if recordings_dir.exists():
@@ -6168,12 +6168,12 @@ def manifests(job, cache_dir, show_imported, show_recordings):
         # Show versions for specific job
         versions = cache.list_versions(job)
         if versions:
-            print(f"📋 Manifest versions for {job}:")
+            print(f" Manifest versions for {job}:")
             for version in versions:
                 manifest = cache.load_manifest(job, version)
                 if manifest:
                     source = manifest.metadata.get('source', 'provisioned')
-                    source_icon = "📥" if source == 'yaml-import' else "🚀"
+                    source_icon = "" if source == 'yaml-import' else ""
                     
                     print(f"   {source_icon} {version}: {len(manifest.nodes)} nodes, created {manifest.created_at}")
                     
@@ -6205,10 +6205,10 @@ def manifests(job, cache_dir, show_imported, show_recordings):
                         jobs.add(parts[0])
             
             if jobs:
-                print("📋 Cached jobs:")
+                print(" Cached jobs:")
                 for job_name in sorted(jobs):
                     versions = cache.list_versions(job_name)
-                    icon = "📥" if job_name in imported_jobs else "🚀"
+                    icon = "" if job_name in imported_jobs else ""
                     print(f"   {icon} {job_name}: {len(versions)} versions")
                 
                 print(f"\nTip: Use --show-imported to see imported YAML pipelines")
@@ -6311,10 +6311,10 @@ def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret
             
             if result['status'] == 'created':
                 print(f"OK: Space created successfully!")
-                print(f"   🌐 Space URL: {result['space_url']}")
-                print(f"   🔧 Hardware: {result['hardware']}")
-                print(f"   🤖 Model: {result['model_id']}")
-                print(f"   ⏱️  Your Space will be ready in 2-5 minutes")
+                print(f"    Space URL: {result['space_url']}")
+                print(f"    Hardware: {result['hardware']}")
+                print(f"    Model: {result['model_id']}")
+                print(f"     Your Space will be ready in 2-5 minutes")
                 print(f"   Status 100k+ researchers can now access your model!")
             else:
                 print(f"ERROR: Failed to create space: {result['error']}")
@@ -6879,11 +6879,11 @@ def configure(api_key, endpoint, region, snapshot, gpu_slicing, multi_tenant):
         json.dump(config, f, indent=2)
     
     print(f"OK: InferX configured successfully")
-    print(f"📍 Endpoint: {endpoint}")
-    print(f"🌍 Region: {region}")
-    print(f"📸 Snapshot: {'Enabled' if snapshot else 'Disabled'}")
-    print(f"🔪 GPU Slicing: {'Enabled' if gpu_slicing else 'Disabled'}")
-    print(f"🏢 Multi-tenant: {'Enabled' if multi_tenant else 'Disabled'}")
+    print(f" Endpoint: {endpoint}")
+    print(f" Region: {region}")
+    print(f" Snapshot: {'Enabled' if snapshot else 'Disabled'}")
+    print(f" GPU Slicing: {'Enabled' if gpu_slicing else 'Disabled'}")
+    print(f" Multi-tenant: {'Enabled' if multi_tenant else 'Disabled'}")
 
 @inferx.command()
 @click.option('--model', required=True, help='Model ID or HuggingFace model name')
@@ -6923,23 +6923,23 @@ def deploy(model, image, gpu_type, gpu_memory, max_concurrency, framework, opena
         'timeout': timeout
     }
     
-    print(f"🚀 Deploying {model} to InferX...")
-    print(f"🎮 GPU: {gpu_type} ({gpu_memory}GB)")
-    print(f"⚡ Max Concurrency: {max_concurrency}")
-    print(f"🔧 Framework: {framework}")
+    print(f" Deploying {model} to InferX...")
+    print(f" GPU: {gpu_type} ({gpu_memory}GB)")
+    print(f" Max Concurrency: {max_concurrency}")
+    print(f" Framework: {framework}")
     
     try:
         result = asyncio.run(provider.deploy_model(model_config))
         
         print(f"OK: Model deployed successfully!")
-        print(f"📋 Model ID: {result['model_id']}")
-        print(f"🔗 Endpoint: {result['endpoint']}")
-        print(f"⚡ Cold Start: {result['cold_start_time']}s")
-        print(f"📊 GPU Utilization: {result['gpu_utilization']}%")
+        print(f" Model ID: {result['model_id']}")
+        print(f" Endpoint: {result['endpoint']}")
+        print(f" Cold Start: {result['cold_start_time']}s")
+        print(f" GPU Utilization: {result['gpu_utilization']}%")
         print(f"PACKAGE: Models per Node: {result['models_per_node']}")
         
         if result['openai_compatible']:
-            print(f"🔄 OpenAI Compatible: Yes")
+            print(f" OpenAI Compatible: Yes")
             print(f"Tip: Usage: curl -X POST {result['endpoint']} -H 'Authorization: Bearer YOUR_API_KEY'")
         
     except Exception as e:
@@ -6970,11 +6970,11 @@ def status(model_id):
     try:
         result = asyncio.run(provider.get_model_status(model_id))
         
-        print(f"📊 Model Status: {result.get('status', 'Unknown')}")
-        print(f"🎮 GPU Type: {result.get('gpu_type', 'Unknown')}")
-        print(f"⚡ Cold Start Time: {result.get('cold_start_time', 'Unknown')}s")
-        print(f"📈 Requests/min: {result.get('requests_per_minute', 0)}")
-        print(f"📊 GPU Utilization: {result.get('gpu_utilization', 0)}%")
+        print(f" Model Status: {result.get('status', 'Unknown')}")
+        print(f" GPU Type: {result.get('gpu_type', 'Unknown')}")
+        print(f" Cold Start Time: {result.get('cold_start_time', 'Unknown')}s")
+        print(f" Requests/min: {result.get('requests_per_minute', 0)}")
+        print(f" GPU Utilization: {result.get('gpu_utilization', 0)}%")
         print(f"PACKAGE: Models on GPU: {result.get('models_on_gpu', 0)}")
         print(f"ERROR: Error Rate: {result.get('error_rate', 0)}%")
         
@@ -7003,7 +7003,7 @@ def delete(model_id):
     
     provider = InferXProvider(config)
     
-    print(f"🗑️  Deleting model {model_id}...")
+    print(f"  Deleting model {model_id}...")
     
     try:
         success = asyncio.run(provider.delete_model(model_id))
@@ -7041,10 +7041,10 @@ def inferx_list():
         models = asyncio.run(provider.list_models())
         
         if not models:
-            print("📭 No models deployed")
+            print(" No models deployed")
             return
         
-        print(f"📋 Deployed Models ({len(models)}):")
+        print(f" Deployed Models ({len(models)}):")
         print("-" * 80)
         
         for model in models:
@@ -7082,14 +7082,14 @@ def usage():
     try:
         stats = asyncio.run(provider.get_usage_stats())
         
-        print(f"📊 InferX Usage Statistics")
+        print(f" InferX Usage Statistics")
         print("-" * 40)
-        print(f"📈 Total Requests: {stats.get('total_requests', 0):,}")
+        print(f" Total Requests: {stats.get('total_requests', 0):,}")
         print(f"COST: Total Cost: ${stats.get('total_cost', 0):.4f}")
         print(f"PACKAGE: Active Models: {stats.get('active_models', 0)}")
-        print(f"🎮 GPU Hours: {stats.get('gpu_hours', 0):.2f}")
-        print(f"⚡ Average Latency: {stats.get('average_latency', 0):.0f}ms")
-        print(f"📊 GPU Utilization: {stats.get('gpu_utilization', 0):.1f}%")
+        print(f" GPU Hours: {stats.get('gpu_hours', 0):.2f}")
+        print(f" Average Latency: {stats.get('average_latency', 0):.0f}ms")
+        print(f" GPU Utilization: {stats.get('gpu_utilization', 0):.1f}%")
         
     except Exception as e:
         print(f"ERROR: Failed to get usage stats: {e}")
@@ -7128,15 +7128,15 @@ def quote(gpu_type, region):
         
         print(f"COST: InferX Pricing Quote")
         print("-" * 40)
-        print(f"🎮 GPU Type: {quote['gpu_type']}")
-        print(f"💸 Hourly Cost: ${quote['price_per_hour']:.4f} (Serverless - pay per request)")
-        print(f"💵 Per Request: ${quote['price_per_request']:.4f} per 1K tokens")
-        print(f"⚡ Cold Start: {quote['cold_start_time']}s")
-        print(f"📊 GPU Utilization: {quote['gpu_utilization']}%")
+        print(f" GPU Type: {quote['gpu_type']}")
+        print(f" Hourly Cost: ${quote['price_per_hour']:.4f} (Serverless - pay per request)")
+        print(f" Per Request: ${quote['price_per_request']:.4f} per 1K tokens")
+        print(f" Cold Start: {quote['cold_start_time']}s")
+        print(f" GPU Utilization: {quote['gpu_utilization']}%")
         print(f"PACKAGE: Models per Node: {quote['models_per_node']}")
-        print(f"🌍 Region: {quote['region']}")
+        print(f" Region: {quote['region']}")
         print()
-        print(f"🌟 Key Features:")
+        print(f" Key Features:")
         for feature in quote['features']:
             print(f"   OK: {feature.replace('_', ' ').title()}")
         
@@ -7188,7 +7188,7 @@ def optimize(cluster_config, usage_metrics, tier, output, implement):
         with open(usage_metrics) as f:
             usage_metrics_data = json.load(f)
     
-    print(f"🔍 Analyzing InferX costs for {tier} tier...")
+    print(f" Analyzing InferX costs for {tier} tier...")
     
     # Generate cost report
     report = asyncio.run(optimizer.generate_cost_report(
@@ -7196,22 +7196,22 @@ def optimize(cluster_config, usage_metrics, tier, output, implement):
     ))
     
     # Display results
-    print(f"\n📊 Cost Analysis Results:")
+    print(f"\n Cost Analysis Results:")
     print(f"=" * 50)
     print(f"COST: Current Monthly Cost: ${report['summary']['current_monthly_cost']:,.2f}")
-    print(f"🎯 Potential Monthly Savings: ${report['summary']['potential_monthly_savings']:,.2f}")
-    print(f"📈 Savings Percentage: {report['summary']['savings_percentage']:.1f}%")
-    print(f"💸 Optimized Monthly Cost: ${report['summary']['optimized_monthly_cost']:,.2f}")
-    print(f"⏱️  Payback Period: {report['summary']['payback_period_months']:.1f} months")
-    print(f"📊 Annual ROI: {report['summary']['annual_roi']:.1f}%")
+    print(f" Potential Monthly Savings: ${report['summary']['potential_monthly_savings']:,.2f}")
+    print(f" Savings Percentage: {report['summary']['savings_percentage']:.1f}%")
+    print(f" Optimized Monthly Cost: ${report['summary']['optimized_monthly_cost']:,.2f}")
+    print(f"  Payback Period: {report['summary']['payback_period_months']:.1f} months")
+    print(f" Annual ROI: {report['summary']['annual_roi']:.1f}%")
     print()
     
-    print(f"🎯 Key Insights:")
+    print(f" Key Insights:")
     for insight in report['key_insights']:
-        print(f"   • {insight}")
+        print(f"    {insight}")
     print()
     
-    print(f"📋 Top Recommendations:")
+    print(f" Top Recommendations:")
     for i, rec in enumerate(report['recommendations'][:5], 1):
         print(f"   {i}. {rec['description']}")
         print(f"      Savings: ${rec['estimated_savings']:,.2f}/month")
@@ -7222,16 +7222,16 @@ def optimize(cluster_config, usage_metrics, tier, output, implement):
     if output:
         with open(output, 'w') as f:
             json.dump(report, f, indent=2)
-        print(f"📄 Detailed report saved to: {output}")
+        print(f" Detailed report saved to: {output}")
     
     # Implement optimizations if requested
     if implement:
-        print(f"🚀 Implementing cost optimizations...")
+        print(f" Implementing cost optimizations...")
         # Implementation logic would go here
         print(f"OK: Optimizations implemented successfully!")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Training Pipeline — preflight / train / monitor / checkpoint / train-status
+# Training Pipeline  preflight / train / monitor / checkpoint / train-status
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -7504,7 +7504,7 @@ def train(config_path, script, framework, backend, nodes, provision_group,
             print(f"  Master: {result['master_addr']}")
         fo = result.get('flashoptim', {})
         if fo.get('enabled'):
-            print(f"  FlashOptim: {fo.get('optimizer_class', 'FlashAdamW')} (auto-applied — {fo.get('reason', '')})")
+            print(f"  FlashOptim: {fo.get('optimizer_class', 'FlashAdamW')} (auto-applied  {fo.get('reason', '')})")
         if status == 'failed':
             print(f"  Errors: {result.get('errors', '')}")
         print()
@@ -7648,7 +7648,7 @@ def checkpoint(action, job_id, step, checkpoint_id, dest, fmt):
 def train_status(job_id, fmt):
     """Show training job status, GPU-hours, cost, and ETA.
 
-    Queries the local SQLite job database — no external services needed.
+    Queries the local SQLite job database  no external services needed.
 
     Examples:
         terradev train-status
@@ -7913,12 +7913,12 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
                 return
             
             # Display results
-            print("🧠 Workload Analysis Complete")
+            print(" Workload Analysis Complete")
             print("=" * 50)
             
             workload = result.get('workload_profile')
             if workload:
-                print(f"📊 Workload Profile:")
+                print(f" Workload Profile:")
                 print(f"   Avg Prompt Tokens: {workload.avg_prompt_length:.0f}")
                 print(f"   Avg Response Tokens: {workload.avg_response_length:.0f}")
                 print(f"   Requests/Second: {workload.requests_per_second:.1f}")
@@ -7926,7 +7926,7 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
                 print(f"   Latency Sensitivity: {workload.latency_sensitivity:.2f}")
                 print()
             
-            print("🔧 Optimized Configuration:")
+            print(" Optimized Configuration:")
             optimized = result['optimized_config']
             for key, value in optimized.items():
                 print(f"   {key}: {value}")
@@ -7934,7 +7934,7 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
             # Show changes if comparison available
             changes = result.get('changes', [])
             if changes:
-                print(f"\n📈 Recommended Changes ({len(changes)}):")
+                print(f"\n Recommended Changes ({len(changes)}):")
                 for change in changes:
                     direction = "↑" if change['optimized'] > change['current'] else "↓"
                     print(f"   {change['parameter']}: {change['current']} → {change['optimized']} {direction}")
@@ -7942,7 +7942,7 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
             
             # Generate output
             if output == 'config':
-                print(f"\n📄 JSON Configuration:")
+                print(f"\n JSON Configuration:")
                 print(json.dumps(optimized, indent=2))
             elif output == 'args':
                 # Generate CLI args from optimized config
@@ -7958,10 +7958,10 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
                 )
                 temp_service = VLLMService(temp_config)
                 args = temp_service._build_server_args()
-                print(f"\n⚡ CLI Arguments:")
+                print(f"\n CLI Arguments:")
                 print(" ".join(args))
             elif output == 'helm':
-                print(f"\n☸️  Helm Values:")
+                print(f"\n  Helm Values:")
                 print("serving:")
                 print("  vllm:")
                 print(f"    gpuMemoryUtilization: {optimized['gpu_memory_utilization']}")
@@ -8004,7 +8004,7 @@ def vllm_analyze(endpoint, duration):
             config = VLLMConfig(model_name="", host=host, port=port)
             
             async with VLLMService(config) as svc:
-                print(f"🔍 Analyzing vLLM server at {endpoint} for {duration}s...")
+                print(f" Analyzing vLLM server at {endpoint} for {duration}s...")
                 print("=" * 60)
                 
                 result = await svc.analyze_current_workload(duration)
@@ -8015,7 +8015,7 @@ def vllm_analyze(endpoint, duration):
                 
                 # Display current workload
                 workload = result['current_workload']
-                print("📊 Current Workload:")
+                print(" Current Workload:")
                 print(f"   Avg Prompt Tokens: {workload.get('avg_prompt_tokens', 0):.0f}")
                 print(f"   Avg Generation Tokens: {workload.get('avg_generation_tokens', 0):.0f}")
                 print(f"   Requests/Second: {workload.get('requests_per_second', 0):.1f}")
@@ -8036,7 +8036,7 @@ def vllm_analyze(endpoint, duration):
                 else:
                     print("OK: Configuration appears well-optimized for current workload")
                 
-                print(f"🕐 Analysis completed at {result.get('timestamp')}")
+                print(f" Analysis completed at {result.get('timestamp')}")
                 
         except Exception as e:
             print(f"ERROR: Error during analysis: {e}")
@@ -8083,7 +8083,7 @@ def vllm_benchmark(endpoint, api_key, prompt, concurrent):
             total_time = end_time - start_time
             throughput = successful / total_time if total_time > 0 else 0
             
-            print(f"\n📊 Benchmark Results:")
+            print(f"\n Benchmark Results:")
             print(f"   Concurrent requests: {concurrent}")
             print(f"   Successful: {successful}/{concurrent}")
             print(f"   Total time: {total_time:.2f}s")
@@ -8154,7 +8154,7 @@ def lora_add_cmd(endpoint, name, path, api_key):
     result = asyncio.run(svc.lora_load(LoRAModule(name=name, path=path)))
 
     if result['status'] == 'loaded':
-        print(f"OK: Adapter '{name}' loaded — use \"model\": \"{name}\" in requests")
+        print(f"OK: Adapter '{name}' loaded  use \"model\": \"{name}\" in requests")
     else:
         print(f"ERROR: {result.get('error')}")
 
@@ -8183,12 +8183,12 @@ def lora_remove_cmd(endpoint, name, api_key):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Phoenix — LLM Trace Observability (Arize Phoenix, ELv2)
+# Phoenix  LLM Trace Observability (Arize Phoenix, ELv2)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @cli.group()
 def phoenix():
-    """Arize Phoenix LLM trace observability — traces, spans, OTEL."""
+    """Arize Phoenix LLM trace observability  traces, spans, OTEL."""
     pass
 
 
@@ -8224,7 +8224,7 @@ def phoenix_projects(limit):
         print("No projects found.")
         return
     for p in projects:
-        print(f"  📁 {p.get('name', p.get('id', '?'))}")
+        print(f"   {p.get('name', p.get('id', '?'))}")
 
 
 @phoenix.command('spans')
@@ -8287,12 +8287,12 @@ def phoenix_k8s(namespace):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# NeMo Guardrails — Output Safety Layer (Apache 2.0)
+# NeMo Guardrails  Output Safety Layer (Apache 2.0)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @cli.group()
 def guardrails():
-    """NeMo Guardrails — LLM output safety, jailbreak detection, PII masking."""
+    """NeMo Guardrails  LLM output safety, jailbreak detection, PII masking."""
     pass
 
 
@@ -8357,12 +8357,12 @@ def guardrails_k8s(namespace):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Qdrant — Vector Database for RAG (Apache 2.0)
+# Qdrant  Vector Database for RAG (Apache 2.0)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @cli.group()
 def qdrant():
-    """Qdrant vector database — collections, search, RAG infrastructure."""
+    """Qdrant vector database  collections, search, RAG infrastructure."""
     pass
 
 
@@ -8396,7 +8396,7 @@ def qdrant_collections():
         print("No collections found.")
         return
     for c in cols:
-        print(f"  🗄️  {c}")
+        print(f"    {c}")
 
 
 @qdrant.command('create-collection')
@@ -8639,7 +8639,7 @@ def optimize(model_path, workload_type, user_description, host, port, dry_run):
     # Get optimization summary
     summary = service.get_optimization_summary(config)
     
-    print(f"🚀 SGLang Optimization Configuration")
+    print(f" SGLang Optimization Configuration")
     print(f"Model: {model_path}")
     print(f"Workload Type: {summary['workload_type']}")
     print(f"Hardware Detected: {summary['hardware_detected']}")
@@ -8655,11 +8655,11 @@ def optimize(model_path, workload_type, user_description, host, port, dry_run):
     if summary['performance_expectations']:
         print("Performance Expectations:")
         for key, value in summary['performance_expectations'].items():
-            print(f"  📊 {key.replace('_', ' ').title()}: {value}")
+            print(f"   {key.replace('_', ' ').title()}: {value}")
         print()
     
     if summary['hardware_tuned']:
-        print("🔧 Hardware-specific optimizations applied")
+        print(" Hardware-specific optimizations applied")
         print()
     
     # Validate configuration
@@ -8671,12 +8671,12 @@ def optimize(model_path, workload_type, user_description, host, port, dry_run):
         print()
     
     if dry_run:
-        print("🔍 Dry run - configuration generated but not launched")
+        print(" Dry run - configuration generated but not launched")
         return
     
     # Generate and display launch command
     launch_cmd = service.generate_launch_command(config)
-    print("🚀 Launch Command:")
+    print(" Launch Command:")
     print(launch_cmd)
     print()
     
@@ -8708,19 +8708,19 @@ def router(model_path, dp_size, workload_type):
     # Generate router command
     router_cmd = service.generate_multi_replica_command(config, dp_size)
     
-    print(f"🔄 Cache-Aware Router Configuration")
+    print(f" Cache-Aware Router Configuration")
     print(f"Model: {model_path}")
     print(f"DP Size: {dp_size}")
     print(f"Workload Type: {config.workload_type.value}")
     print()
-    print("🚀 Router Launch Command:")
+    print(" Router Launch Command:")
     print(router_cmd)
     print()
     
     print("Tip: This router provides:")
-    print("  📈 Up to 1.9x throughput increase")
-    print("  🎯 3.8x higher cache hit rate")
-    print("  🧠 Intelligent request routing based on cache predictions")
+    print("   Up to 1.9x throughput increase")
+    print("   3.8x higher cache hit rate")
+    print("   Intelligent request routing based on cache predictions")
 
 
 @sglang.command()
@@ -8736,7 +8736,7 @@ def detect(model_path, workload_type, user_description):
     # Detect workload type
     detected_type = service.detect_workload_type(model_path, user_description)
     
-    print(f"🔍 Workload Detection Results")
+    print(f" Workload Detection Results")
     print(f"Model: {model_path}")
     print(f"Detected Workload Type: {detected_type.value}")
     
@@ -8763,15 +8763,15 @@ def detect(model_path, workload_type, user_description):
     
     summary = service.get_optimization_summary(config)
     
-    print("🎯 Optimization Recommendations:")
+    print(" Optimization Recommendations:")
     for opt in summary['optimizations_applied']:
         print(f"  OK: {opt}")
     print()
     
     if summary['performance_expectations']:
-        print("📊 Expected Performance:")
+        print(" Expected Performance:")
         for key, value in summary['performance_expectations'].items():
-            print(f"  📈 {key.replace('_', ' ').title()}: {value}")
+            print(f"   {key.replace('_', ' ').title()}: {value}")
     
     print()
     print("Tip: Run 'terradev sglang optimize' to generate the full launch command")
@@ -8798,7 +8798,7 @@ def install(instance_ip, ssh_user, ssh_key):
         
         if result["status"] == "installed":
             print("OK: SGLang installed successfully")
-            print(f"📋 Output: {result['output']}")
+            print(f" Output: {result['output']}")
         else:
             print(f"ERROR: Installation failed: {result['error']}")
     else:
@@ -8843,7 +8843,7 @@ def start(model_path, instance_ip, ssh_user, ssh_key, workload_type, port):
     
     if instance_ip:
         # Remote deployment
-        print(f"🚀 Starting SGLang server on {instance_ip}...")
+        print(f" Starting SGLang server on {instance_ip}...")
         result = asyncio.run(service.start_server(
             instance_ip=instance_ip,
             ssh_user=ssh_user,
@@ -8852,14 +8852,14 @@ def start(model_path, instance_ip, ssh_user, ssh_key, workload_type, port):
         
         if result["status"] == "started":
             print("OK: SGLang server started successfully")
-            print(f"🌐 Endpoint: http://{instance_ip}:{port}")
+            print(f" Endpoint: http://{instance_ip}:{port}")
         else:
             print(f"ERROR: Failed to start server: {result['error']}")
     else:
         # Local launch
         launch_cmd = service.generate_launch_command(config)
-        print(f"🚀 Starting SGLang server locally...")
-        print(f"🌐 Endpoint: http://localhost:{port}")
+        print(f" Starting SGLang server locally...")
+        print(f" Endpoint: http://localhost:{port}")
         print()
         print("Tip: Launch command:")
         print(launch_cmd)
@@ -8874,7 +8874,7 @@ def test():
     
     service = SGLangService()
     
-    print("🔍 Testing SGLang installation...")
+    print(" Testing SGLang installation...")
     result = asyncio.run(service.test_connection())
     
     if result["status"] == "connected":
@@ -8894,7 +8894,7 @@ def retrain():
     """Drift-triggered continuous fine-tuning.
 
     Watch Phoenix traces for quality degradation, auto-retrain LoRA adapters,
-    evaluate against holdout, and hot-swap onto vLLM — zero downtime.
+    evaluate against holdout, and hot-swap onto vLLM  zero downtime.
 
     Examples:
         terradev retrain drift --model llama-70b-prod --source phoenix-traces
@@ -8978,7 +8978,7 @@ def retrain_drift(model, source, method, eval_threshold, deploy, auto_swap,
                   f"(threshold={drift.get('threshold', '?')}, samples={drift.get('samples', 0)})")
 
         if outcome == "no_drift":
-            print(f"\n  \u2705 No drift detected — model is healthy\n")
+            print(f"\n  \u2705 No drift detected  model is healthy\n")
             return
 
         # Data
@@ -9008,7 +9008,7 @@ def retrain_drift(model, source, method, eval_threshold, deploy, auto_swap,
                 print(f"  \U0001f680 Deployed: adapter={dep.get('adapter_name')} "
                       f"on {dep.get('endpoint')}")
             elif status == "awaiting_approval":
-                print(f"  \u23f3 Awaiting approval — run: terradev retrain deploy "
+                print(f"  \u23f3 Awaiting approval  run: terradev retrain deploy "
                       f"--cycle-id {config.cycle_id}")
             else:
                 print(f"  \u274c Deploy: {dep.get('error', status)}")
@@ -9144,12 +9144,12 @@ def retrain_history(limit, fmt):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Langfuse — LLM Observability, Scoring & Dataset Management
+# Langfuse  LLM Observability, Scoring & Dataset Management
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @cli.group()
 def langfuse():
-    """Langfuse LLM observability — traces, scores, datasets, prompts."""
+    """Langfuse LLM observability  traces, scores, datasets, prompts."""
     pass
 
 
@@ -9234,7 +9234,7 @@ def langfuse_trace(trace_id, fmt):
         if obs:
             print(f"\n  Observations ({len(obs)}):")
             for o in obs:
-                print(f"    [{o.get('type', '?')}] {o.get('name', '?')} — "
+                print(f"    [{o.get('type', '?')}] {o.get('name', '?')}  "
                       f"{str(o.get('input', ''))[:60]}")
         print()
 
@@ -9304,7 +9304,7 @@ def langfuse_datasets(limit, fmt):
             print("  No datasets found.")
             return
         for d in datasets:
-            print(f"  \U0001f4ca {d.get('name', '?')} — {d.get('description', '')[:60]}")
+            print(f"  \U0001f4ca {d.get('name', '?')}  {d.get('description', '')[:60]}")
         print()
 
 
@@ -9381,12 +9381,12 @@ def langfuse_k8s(namespace):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Databricks — Jobs, Clusters, Model Serving, MLflow
+# Databricks  Jobs, Clusters, Model Serving, MLflow
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @cli.group()
 def databricks():
-    """Databricks MLOps — jobs, clusters, model serving, MLflow."""
+    """Databricks MLOps  jobs, clusters, model serving, MLflow."""
     pass
 
 
@@ -9465,7 +9465,7 @@ def databricks_run(job_id, fmt):
     else:
         if result.get("success"):
             run_id = result.get("data", {}).get("run_id", "?")
-            print(f"\U0001f680 Job {job_id} triggered — run_id: {run_id}")
+            print(f"\U0001f680 Job {job_id} triggered  run_id: {run_id}")
         else:
             print(f"\u274c {result.get('error')}")
 
@@ -9679,12 +9679,12 @@ def databricks_mlflow_models(limit, fmt):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Agentic Serving — KV Cache TTL, Prefix Caching, LMCache, Priority Scheduling
+# Agentic Serving  KV Cache TTL, Prefix Caching, LMCache, Priority Scheduling
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @cli.group('agentic-serving')
 def agentic_serving():
-    """Agentic inference serving — KV cache TTL, prefix caching, LMCache, priority scheduling."""
+    """Agentic inference serving  KV cache TTL, prefix caching, LMCache, priority scheduling."""
     pass
 
 
@@ -9814,12 +9814,12 @@ def agentic_serving_helm_values(fmt):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Model Router — Cost/Quality Routing for Agentic Workloads
+# Model Router  Cost/Quality Routing for Agentic Workloads
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @cli.group('model-router')
 def model_router():
-    """Model routing — cost/quality-aware routing between strong and weak models."""
+    """Model routing  cost/quality-aware routing between strong and weak models."""
     pass
 
 
@@ -9948,9 +9948,9 @@ def migration(from_provider, to_provider, instance_id, workload, dry_run):
     """Migrate workload between providers with detailed cost analysis"""
     from core.migration_orchestrator import MigrationOrchestrator
     
-    print(f"\n🔄 Migration Analysis: {from_provider} → {to_provider}")
+    print(f"\n Migration Analysis: {from_provider} → {to_provider}")
     if dry_run:
-        print("   📋 DRY RUN MODE - No changes will be made")
+        print("    DRY RUN MODE - No changes will be made")
     
     try:
         orchestrator = MigrationOrchestrator()
@@ -9963,7 +9963,7 @@ def migration(from_provider, to_provider, instance_id, workload, dry_run):
         )
         
         # Display migration plan
-        print(f"\n📊 Migration Plan:")
+        print(f"\n Migration Plan:")
         print(f"   Source: {plan.source['provider']} ({plan.source['gpu_type']})")
         print(f"   Target: {plan.target['provider']} ({plan.target['gpu_type']})")
         print(f"   Confidence: {plan.confidence_score:.1%}")
@@ -9971,7 +9971,7 @@ def migration(from_provider, to_provider, instance_id, workload, dry_run):
         if plan.warnings:
             print(f"\nWARNING:  Warnings:")
             for warning in plan.warnings:
-                print(f"   • {warning}")
+                print(f"    {warning}")
         
         print(f"\nCOST: Cost Analysis:")
         print(f"   Data transfer: ${plan.costs['data_transfer']:.4f}")
@@ -9979,27 +9979,27 @@ def migration(from_provider, to_provider, instance_id, workload, dry_run):
         print(f"   Hourly savings: ${plan.costs['hourly_savings']:+.2f}")
         print(f"   Monthly savings: ${plan.costs['estimated_monthly_savings']:+.2f}")
         
-        print(f"\n🔧 Compatibility:")
+        print(f"\n Compatibility:")
         print(f"   GPU match: {plan.compatibility['gpu_match']}")
         print(f"   Performance change: {plan.compatibility['performance_change']}")
         
-        print(f"\n⏱️  Migration Steps:")
+        print(f"\n  Migration Steps:")
         for step in plan.steps:
             print(f"   {step}")
         
-        print(f"\n⏱️  Estimated downtime: {plan.total_downtime}")
+        print(f"\n  Estimated downtime: {plan.total_downtime}")
         
         if dry_run:
             print(f"\nOK: Dry run complete. Use without --dry-run to execute migration.")
         else:
             # In lightweight version, just show plan and exit
-            print(f"\n🚧 Full migration execution not implemented in lightweight version.")
+            print(f"\n Full migration execution not implemented in lightweight version.")
             print(f"   This would involve:")
-            print(f"   • Checkpointing current job")
-            print(f"   • Transferring data via optimized route")
-            print(f"   • Provisioning target instance")
-            print(f"   • Restoring from checkpoint")
-            print(f"   • Validating migration success")
+            print(f"    Checkpointing current job")
+            print(f"    Transferring data via optimized route")
+            print(f"    Provisioning target instance")
+            print(f"    Restoring from checkpoint")
+            print(f"    Validating migration success")
         
     except Exception as e:
         print(f"ERROR: Migration planning failed: {e}")
@@ -10033,7 +10033,7 @@ def list_workloads(provider, fmt):
                 for w in workloads
             ], indent=2))
         else:
-            print(f"\n🔄 Available Workloads:")
+            print(f"\n Available Workloads:")
             if not workloads:
                 print(f"   No active workloads found")
                 return
@@ -10092,7 +10092,7 @@ def evaluation(model_path, endpoint, dataset, metrics, baseline, workload_type, 
             duration_seconds=duration
         )
         
-        print(f"\n🔍 Running Evaluation...")
+        print(f"\n Running Evaluation...")
         if model_path:
             print(f"   Model: {model_path}")
             print(f"   Dataset: {dataset}")
@@ -10122,11 +10122,11 @@ def evaluation(model_path, endpoint, dataset, metrics, baseline, workload_type, 
             }
             print(json.dumps(result_data, indent=2))
         else:
-            print(f"\n📊 Evaluation Results:")
+            print(f"\n Evaluation Results:")
             print(f"   Evaluation ID: {result.evaluation_id}")
             print(f"   Duration: {result.duration_seconds:.1f}s")
             
-            print(f"\n📈 Metrics:")
+            print(f"\n Metrics:")
             for metric, value in result.metrics.items():
                 if isinstance(value, float):
                     if metric in ['latency', 'error_rate']:
@@ -10141,14 +10141,14 @@ def evaluation(model_path, endpoint, dataset, metrics, baseline, workload_type, 
                     print(f"   {metric:<15}: {value}")
             
             if result.baseline_comparison and 'differences' in result.baseline_comparison:
-                print(f"\n📊 Baseline Comparison:")
+                print(f"\n Baseline Comparison:")
                 for metric, diff in result.baseline_comparison['differences'].items():
                     print(f"   {metric:<15}: {diff['percentage']:+.1f}%")
         
         # Save results if output specified
         if output:
             orchestrator.save_result(result, output)
-            print(f"\n💾 Results saved to {output}")
+            print(f"\n Results saved to {output}")
         
     except Exception as e:
         print(f"ERROR: Evaluation failed: {e}")
@@ -10168,7 +10168,7 @@ def compare_models(model_a, model_b, dataset, metrics, output):
     try:
         orchestrator = EvaluationOrchestrator()
         
-        print(f"\n🔄 Comparing Models:")
+        print(f"\n Comparing Models:")
         print(f"   Model A: {model_a}")
         print(f"   Model B: {model_b}")
         print(f"   Dataset: {dataset}")
@@ -10176,7 +10176,7 @@ def compare_models(model_a, model_b, dataset, metrics, output):
         
         comparison = orchestrator.compare_models(model_a, model_b, dataset, list(metrics))
         
-        print(f"\n📊 Comparison Results:")
+        print(f"\n Comparison Results:")
         print(f"   {'Metric':<15} {'Model A':<12} {'Model B':<12} {'Winner':<10} {'Difference':<12}")
         print(f"   {'─'*65}")
         
@@ -10203,7 +10203,7 @@ def compare_models(model_a, model_b, dataset, metrics, output):
             output_file = Path(output)
             output_file.parent.mkdir(parents=True, exist_ok=True)
             output_file.write_text(json.dumps(comparison, indent=2))
-            print(f"\n💾 Comparison saved to {output}")
+            print(f"\n Comparison saved to {output}")
         
     except Exception as e:
         print(f"ERROR: Model comparison failed: {e}")
@@ -10387,7 +10387,7 @@ def import_cmd(yaml_file, name, force, validate_only, cache_dir):
         from core.pipeline_schema import Workflow, PipelineValidator
         from core.manifest_cache import ManifestCache, Manifest, ManifestNode
         
-        print(f"📥 Importing pipeline from {yaml_file}...")
+        print(f" Importing pipeline from {yaml_file}...")
         
         # Validate YAML file
         is_valid, errors = PipelineValidator.validate_yaml_file(yaml_file)
@@ -10508,7 +10508,7 @@ def record_start(name, output_dir):
         with open(recording_file, 'w') as f:
             json.dump(recording_data, f, indent=2)
         
-        print(f"🔴 Started recording '{name}'")
+        print(f" Started recording '{name}'")
         print(f"   Output: {recording_file}")
         print(f"Tip: Run 'terradev record stop --name {name} --export pipeline.yaml' when done")
         
@@ -10545,7 +10545,7 @@ def record_stop(name, export, output_dir):
         with open(recording_file, 'w') as f:
             json.dump(recording_data, f, indent=2)
         
-        print(f"⏹️ Stopped recording '{name}'")
+        print(f" Stopped recording '{name}'")
         
         if export:
             # Convert recording to workflow
@@ -10723,7 +10723,7 @@ def disable_trigger(name):
         for trigger in trigger_manager.triggers.values():
             if trigger.name == name:
                 trigger.enabled = False
-                print(f"⏸️ Disabled trigger '{name}'")
+                print(f" Disabled trigger '{name}'")
                 return
         
         print(f"ERROR: Trigger '{name}' not found")
@@ -10756,7 +10756,7 @@ def fire_event(event_type, data, source):
         )
         
         event_bus.publish(event)
-        print(f"🔥 Fired event: {event_type}")
+        print(f" Fired event: {event_type}")
         
     except Exception as e:
         print(f"ERROR: Failed to fire event: {e}")
@@ -10830,7 +10830,7 @@ def promote_artifact(artifact_name, from_env, to_env, user):
             requested_by=user
         )
         
-        print(f"📋 Promotion requested: {from_env} -> {to_env}")
+        print(f" Promotion requested: {from_env} -> {to_env}")
         print(f"   Artifact: {artifact_name}")
         print(f"   Promotion ID: {promotion.id}")
         print(f"   Status: {promotion.status}")
@@ -10974,10 +10974,10 @@ def lineage_graph(artifact_id, direction):
             print(f"No lineage found for artifact {artifact_id}")
             return
         
-        print(f"🔍 Lineage for {artifact_id}:")
+        print(f" Lineage for {artifact_id}:")
         
         if graph["parents"]:
-            print(f"\n📥 Parents ({len(graph['parents'])}):")
+            print(f"\n Parents ({len(graph['parents'])}):")
             for parent in graph["parents"]:
                 print(f"   {parent.type.value} {parent.name} ({parent.environment.value})")
         
@@ -11008,7 +11008,7 @@ def production_artifacts(artifact_type):
             print("No production artifacts found")
             return
         
-        print(f"🏭 Production Artifacts:")
+        print(f" Production Artifacts:")
         print(f"{'Name':<20} {'Type':<12} {'Version':<8} {'Created':<20} {'Created By':<15}")
         print("─" * 79)
         
@@ -11046,7 +11046,7 @@ def show_model_lineage(model_identifier, environment):
             print(f"ERROR: No lineage found for model '{model_identifier}'")
             return
         
-        print(f"🔍 Lineage for model: {model_identifier}")
+        print(f" Lineage for model: {model_identifier}")
         print(f"{'Execution ID':<8} {'Pipeline':<20} {'Environment':<12} {'Status':<10} {'Timestamp':<20}")
         print("─" * 75)
         
@@ -11059,7 +11059,7 @@ def show_model_lineage(model_identifier, environment):
         # Show detailed view of latest execution
         if records:
             latest = records[0]
-            print(f"\n📋 Latest Execution Details:")
+            print(f"\n Latest Execution Details:")
             print(f"   Execution ID: {latest.id}")
             print(f"   Pipeline: {latest.pipeline_id}")
             print(f"   Environment: {latest.environment.value}")
@@ -11069,19 +11069,19 @@ def show_model_lineage(model_identifier, environment):
             print(f"   Cost: ${latest.compute_cost:.2f}")
             
             if latest.hyperparameters:
-                print(f"\n⚙️  Hyperparameters:")
+                print(f"\n  Hyperparameters:")
                 for key, value in latest.hyperparameters.items():
                     print(f"      {key}: {value}")
             
             if latest.datasets:
-                print(f"\n📊 Input Datasets ({len(latest.datasets)}):")
+                print(f"\n Input Datasets ({len(latest.datasets)}):")
                 for dataset_id in latest.datasets[:5]:  # Show first 5
                     print(f"      {dataset_id[:12]}...")
                 if len(latest.datasets) > 5:
                     print(f"      ... and {len(latest.datasets) - 5} more")
             
             if latest.output_models:
-                print(f"\n🤖 Output Models ({len(latest.output_models)}):")
+                print(f"\n Output Models ({len(latest.output_models)}):")
                 for model_id in latest.output_models:
                     print(f"      {model_id[:12]}...")
         
@@ -11108,7 +11108,7 @@ def diff_lineage(version1, version2):
             print(f"ERROR: {diff['error']}")
             return 1
         
-        print(f"🔍 Comparing executions:")
+        print(f" Comparing executions:")
         print(f"   Execution 1: {diff['execution_1']['id']} ({diff['execution_1']['timestamp']})")
         print(f"   Execution 2: {diff['execution_2']['id']} ({diff['execution_2']['timestamp']})")
         
@@ -11116,20 +11116,20 @@ def diff_lineage(version1, version2):
             print("\nOK: No differences found")
             return
         
-        print(f"\n📊 Differences:")
+        print(f"\n Differences:")
         
         if "hyperparameters" in diff["differences"]:
-            print(f"\n⚙️  Hyperparameters:")
+            print(f"\n  Hyperparameters:")
             for key, values in diff["differences"]["hyperparameters"].items():
                 print(f"   {key}: {values['exec1']} → {values['exec2']}")
         
         if "environment_variables" in diff["differences"]:
-            print(f"\n🌍 Environment Variables:")
+            print(f"\n Environment Variables:")
             for key, values in diff["differences"]["environment_variables"].items():
                 print(f"   {key}: {values['exec1']} → {values['exec2']}")
         
         if "inputs" in diff["differences"]:
-            print(f"\n📥 Input Artifacts:")
+            print(f"\n Input Artifacts:")
             for change_type, artifacts in diff["differences"]["inputs"].items():
                 print(f"   {change_type}: {', '.join(artifacts)}")
         
@@ -11187,8 +11187,8 @@ def trace_artifacts(checkpoint, execution):
                 print(f"ERROR: {trace['error']}")
                 return 1
             
-            print(f"🔍 Tracing lineage from checkpoint: {checkpoint}")
-            print(f"\n📋 Created By:")
+            print(f" Tracing lineage from checkpoint: {checkpoint}")
+            print(f"\n Created By:")
             created_by = trace["created_by"]
             print(f"   Execution: {created_by['execution_id']}")
             print(f"   Pipeline: {created_by['pipeline_id']}")
@@ -11196,7 +11196,7 @@ def trace_artifacts(checkpoint, execution):
             print(f"   Timestamp: {created_by['timestamp']}")
             
             if trace["inputs"]:
-                print(f"\n📥 Input Artifacts:")
+                print(f"\n Input Artifacts:")
                 if "datasets" in trace["inputs"]:
                     print(f"   Datasets ({len(trace['inputs']['datasets'])}):")
                     for dataset in trace["inputs"]["datasets"]:
@@ -11208,7 +11208,7 @@ def trace_artifacts(checkpoint, execution):
                         print(f"      {model['name']} ({model['id'][:12]}...)")
             
             if trace["ancestors"]:
-                print(f"\n🌳 Ancestor Executions:")
+                print(f"\n Ancestor Executions:")
                 for ancestor in trace["ancestors"]:
                     print(f"   {ancestor['execution_id'][:12]}... - {ancestor['pipeline_id']} "
                           f"({ancestor['environment']}) - {ancestor['timestamp']}")
@@ -11228,7 +11228,7 @@ def trace_artifacts(checkpoint, execution):
                 print(f"ERROR: Execution '{execution}' not found")
                 return 1
             
-            print(f"🔍 Tracing execution: {exec_record.id}")
+            print(f" Tracing execution: {exec_record.id}")
             print(f"   Pipeline: {exec_record.pipeline_id}")
             print(f"   Environment: {exec_record.environment.value}")
             print(f"   Status: {exec_record.status}")
@@ -11239,7 +11239,7 @@ def trace_artifacts(checkpoint, execution):
                             exec_record.output_models + exec_record.output_checkpoints)
             
             if all_artifacts:
-                print(f"\n🔗 Artifact Lineage:")
+                print(f"\n Artifact Lineage:")
                 for artifact_id in all_artifacts:
                     if artifact_id in lineage_service.artifacts:
                         artifact = lineage_service.artifacts[artifact_id]
@@ -11282,7 +11282,7 @@ def start_auto_lineage(pipeline, environment, triggered_by):
             triggered_by=triggered_by
         )
         
-        print(f"🔍 Started automatic lineage tracking")
+        print(f" Started automatic lineage tracking")
         print(f"   Execution ID: {execution.id}")
         print(f"   Pipeline: {pipeline}")
         print(f"   Environment: {environment}")
@@ -11420,7 +11420,7 @@ def local():
 
     Discover GPUs on this machine or remote hosts via SSH, register them
     into your compute pool alongside cloud providers, and route workloads
-    to the cheapest available compute — including $0/hr local hardware.
+    to the cheapest available compute  including $0/hr local hardware.
     """
     pass
 
