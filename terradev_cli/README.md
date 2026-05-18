@@ -1,4 +1,4 @@
-# Terradev CLI v5.0.0
+# Terradev CLI v5.0.1
 
 **Open Source BYOAPI Multi-Cloud GPU Infrastructure Platform**
 
@@ -10,12 +10,34 @@ Terradev is a cross-cloud compute-provisioning CLI that compresses + stages data
 
 **NOTES ON 5.0.0**
 
-We removed the paywall, open-sourced Terradev, and added Rust DAG accelerators for safe agent execution, and snappy execution...
+We removed the paywall, open-sourced Terradev, and added Rust accelerators for safe and snappy delivery...
 
-With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. The agent can issue commands freely... the orchestrator ensures they're safe to execute.
+With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. You or the agent can issue commands freely... the orchestrator ensures they're safe to execute.
 
-192 MCP sub-tools require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 21+ cloud providers, that compounds across every tool call in the chain.
+104 tools and sub-tools require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 21+ cloud providers, that compounds across every tool call in the chain.
 
+## BYOAPI Configuration
+
+Your API keys are stored locally at ~/.terradev/credentials.json and never sent to Terradev servers.
+
+```bash
+# Configure multiple providers
+terradev configure --provider runpod
+terradev configure --provider vastai
+terradev configure --provider aws
+terradev configure --provider gcp
+```
+
+## Performance
+
+- **2-8x throughput improvements** with vLLM optimization
+- **30-50% bandwidth penalty eliminated** with NUMA topology
+- **2-5x CUDA Graph speedup** with optimal topology
+- **Up to 90% cost savings** with automatic provider switching
+- **<2 minute spot recovery** with KV cache checkpointing
+- **3.6x faster cold starts** with weight streaming
+- **57.3% cost savings** with MLA-aware VRAM estimation
+  
 ## Complete Tutorial
 
 ### Step 1: Install Terradev
@@ -34,7 +56,7 @@ terradev --help
 ```
 
 ### Step 2: Configure Your First Cloud Provider
-Terradev supports 19 GPU cloud providers. Start with one, RunPod is the fastest to set up:
+Terradev supports 21+ GPU cloud providers. Start with one, RunPod is the fastest to set up:
 
 ```bash
 terradev setup runpod --quick
@@ -486,18 +508,6 @@ terradev provision --provider latitude --gpu H100 --instance-type bare-metal
 terradev provision --provider latitude --gpu H100 --instance-type vm
 ```
 
-### Bare Metal vs VM at Latitude.sh
-
-| Feature | Bare Metal | Virtual Machine |
-|---------|-----------|-----------------|
-| Isolation | Full dedicated hardware | KVM virtualization |
-| GPU access | Direct PCIe | Dedicated virtual GPU |
-| IPMI management | Yes — out-of-band control | No |
-| Virtualization overhead | None | Minimal |
-| Compliance suitability | HIPAA, FedRAMP, SOC2 | Standard workloads |
-| Spin-up time | 5–10 min | 2–3 min |
-| H100 (4x) pricing | ~$10/hr | ~$5/hr |
-
 ### IPMI: Why It Matters for Enterprise
 
 IPMI (Intelligent Platform Management Interface) gives you out-of-band server management independent of the OS and GPU stack. If a training job deadlocks the kernel, you don't wait for a cloud provider ticket — you power-cycle via IPMI directly. Security teams can verify hardware attestation. Compliance frameworks that require dedicated hardware and physical access controls are satisfied.
@@ -511,15 +521,6 @@ terradev status --live --provider latitude
 # ipmi_endpoint: 10.x.x.x
 # isolation: bare_metal
 ```
-
-**Supported GPUs on Latitude.sh:**
-- NVIDIA H100 (4x configurations)
-- NVIDIA A100 (2x configurations)
-- NVIDIA RTX 4090 (2x configurations)
-- NVIDIA RTX PRO 6000 Blackwell (2x configurations)
-
-**Regions:** Brazil (SAO), United States (ASH), Europe, Asia-Pacific
-
 ---
 
 ## Local GPU Discovery and Hybrid Compute Pools
@@ -599,14 +600,6 @@ terradev local scan --detailed
 #   Compute: 8.9  Driver: 545.29  CUDA: 12.3
 #   P-state: P0  Temp: 42C  Power: 45W / 450W TDP
 ```
-
-### Use Cases
-
-- **University researchers** — scan the lab workstation cluster, register every GPU, run `terradev quote --include-local` to see total available VRAM before deciding whether to rent cloud compute
-- **Individual ML engineers** — hybrid pipeline that runs small experiments locally on a 4090, overflows to cloud for full runs, all from the same `terradev train` command
-- **Startups with owned hardware** — on-prem rack registered as a pool, cloud as overflow — single provisioning interface for both, cost analytics shows blended spend
-- **Edge deployments** — register inference accelerators on local network into the pool
-
 ---
 
 ## Quick Reference
@@ -641,28 +634,6 @@ terradev analytics --days 30
 # Find cheaper alternatives
 terradev optimize
 ```
-
-## Configuration
-
-Your API keys are stored locally at ~/.terradev/credentials.json and never sent to Terradev servers.
-
-```bash
-# Configure multiple providers
-terradev configure --provider runpod
-terradev configure --provider vastai
-terradev configure --provider aws
-terradev configure --provider gcp
-```
-
-## Performance
-
-- **2-8x throughput improvements** with vLLM optimization
-- **30-50% bandwidth penalty eliminated** with NUMA topology
-- **2-5x CUDA Graph speedup** with optimal topology
-- **Up to 90% cost savings** with automatic provider switching
-- **<2 minute spot recovery** with KV cache checkpointing
-- **3.6x faster cold starts** with weight streaming
-- **57.3% cost savings** with MLA-aware VRAM estimation
 
 ### Troubleshooting Training Workflows
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Quick Start - Get users to provision SOMETHING in 60 seconds
-Remove all friction, show immediate value, hit paywall fast
+Remove all friction, show immediate value
 """
 
 import json

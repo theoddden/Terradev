@@ -129,12 +129,6 @@ class TerradevAPI:
     #     """Check if current tier is enterprise or enterprise_plus - REMOVED"""
     #     return False  # No tiers
 
-    # Stripe payment links removed - no payment required
-    # STRIPE_PAYMENT_LINKS = {...}
-    # STRIPE_PRICE_IDS = {...}
-    # def get_stripe_checkout_url(self, tier: str) -> str:
-    #     """Get the Stripe Payment Link URL for a tier - REMOVED"""
-    #     return ''
 
     def load_credentials(self):
         """Load user's cloud provider credentials (simple JSON for BYOAPI)"""
@@ -240,8 +234,7 @@ class TerradevAPI:
     def _maybe_sync_gpu_metering(self):
         """Enterprise+ only: report accrued GPU-hours for all active instances.
 
-        Runs on every CLI invocation (lightweight  reads local state only,
-        reports to Stripe only if there are unreported hours since last sync).
+        Runs on every CLI invocation (lightweight - reads local state only).
         This catches GPU-hours even if an instance was terminated outside the
         CLI (e.g. directly on the provider dashboard or via MCP subprocess).
 
@@ -256,77 +249,7 @@ class TerradevAPI:
           - 0 instances running  → $0 (no idle charge)
           - Month with only 500 GPU-hrs → billed 4,096 (shortfall top-up)
         """
-        # BYOAPI: Stripe billing disabled - no tier checks needed
-        # if self.tier.get('name') != 'Enterprise+':
-        #     return
-
-        # try:
-        #     from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS
-        #     sm = StripeManager()
-        #     metering = sm._load_metering()
-        #     sub_item_id = metering.get('subscription_item_id')
-        #     if not sub_item_id:
-        #         return  # Not yet linked  will link on activation
-
-        #     # Monthly minimum reconciliation  once per month boundary
-        #     topup = sm.reconcile_monthly_minimum(sub_item_id)
-        #     if topup:
-        #         print(f"   Enterprise+ monthly min for {topup['month']}: "
-        #               f"{topup['actual_gpu_hours']:.0f}/{topup['floor_gpu_hours']} GPU-hrs, "
-        #               f"top-up {topup['shortfall_gpu_hours']:.0f} (${topup['topup_cost_usd']:.2f})")
         return  # BYOAPI: No billing reconciliation needed
-
-        # BYOAPI: Orphaned billing sync code disabled
-        # instances = self.usage.get('instances_created', [])
-        # if not instances:
-        #     metering = sm._load_metering()
-        #     metering['last_sync_ts'] = datetime.now().isoformat()
-        #     sm._save_metering(metering)
-        #     return
-
-        # last_sync = metering.get('last_sync_ts', '')
-        # now = datetime.now()
-
-        # # Only sync once per hour to avoid hammering Stripe
-        # if last_sync:
-        #     try:
-        #         last_dt = datetime.fromisoformat(last_sync)
-        #         if (now - last_dt).total_seconds() < 3600:
-        #             return
-        #     except Exception:
-        #         pass
-
-        # billable_gpu_hours = 0.0
-        # for inst in instances:
-        #     created = inst.get('created_at', '')
-        #     gpu_count = inst.get('gpu_count', 1)
-        #     # 32-GPU floor per instance: you always pay for at least 32 GPUs
-        #     billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
-        #     if created:
-        #         try:
-        #             start = datetime.fromisoformat(created)
-        #             # Only bill hours since last sync (avoid double-counting)
-        #             if last_sync:
-        #                 try:
-        #                     sync_dt = datetime.fromisoformat(last_sync)
-        #                     start = max(start, sync_dt)
-        #                 except Exception:
-        #                     pass
-        #             hours = max((now - start).total_seconds() / 3600, 0)
-        #             billable_gpu_hours += hours * billable_gpus
-        #         except Exception:
-        #             continue
-
-        # if billable_gpu_hours > 0.01:
-        #     sm.report_gpu_hours(
-        #         sub_item_id, billable_gpu_hours,
-        #         gpu_type='mixed',
-        #         instance_id=f'sync-{now.strftime("%Y%m%d%H")}',
-        #     )
-        #     metering['last_sync_ts'] = now.isoformat()
-        #     sm._save_metering(metering)
-        # except Exception:
-        #     pass  # Metering sync is best-effort
     
     def _provider_creds(self, provider_name: str) -> Dict[str, str]:
         """Build credentials dict for a provider from stored BYOAPI keys.
@@ -897,10 +820,10 @@ def onboarding(force):
 # @click.option('--tier', '-t', type=click.Choice(['research_plus', 'enterprise', 'enterprise_plus']),
 #               help='Tier to upgrade to')
 # @click.option('--activate', is_flag=True,
-#               help='Activate after payment  verifies your Stripe subscription and unlocks your tier')
-# @click.option('--email', help='Email used for Stripe checkout (for --activate)')
+#               help='Activate after payment')
+# @click.option('--email', help='Email used for checkout (for --activate)')
 # def upgrade(tier, activate, email):
-#     """Upgrade your Terradev subscription via Stripe - REMOVED (tier system eliminated)"""
+#     """Upgrade your Terradev subscription - REMOVED (tier system eliminated)"""
 #     pass
 
 # Entire upgrade function body removed - tier system eliminated (open source CLI)
@@ -1840,7 +1763,6 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
         print(f"   Tip: Use --spot for cost savings on interruptible workloads")
 
     # Tier gates removed - unlimited concurrent instances and provisions (open source)
-    # All Stripe checkout and paywall code removed
 
     # ── Step 1: Fetch quotes from ALL providers in parallel ──
     print(f"Provisioning {count}x {gpu_type} (parallel={parallel})")
@@ -2366,46 +2288,7 @@ def manage(instance_id, action):
                 end_provision(instance_id)
             except Exception:
                 pass
-            # Enterprise+ GPU-hour metering  report final usage to Stripe
-            # BYOAPI: Stripe billing disabled - no GPU-hour reporting
-            # try:
-            #     if api.tier.get('name') == 'Enterprise+':
-            #         from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS, ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS
-            #         sm = StripeManager()
-            #         metering = sm._load_metering()
-            #         sub_item_id = metering.get('subscription_item_id')
-            #         if sub_item_id and instance:
-            #             created = instance.get('created_at', '')
-            #             gpu_count = instance.get('gpu_count', 1)
-            #             # 32-GPU floor: bill at least 32 GPUs per instance
-            #             billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
-            #             if created:
-            #                 from datetime import datetime as _dt
-            #                 try:
-            #                     # Bill from last sync (or creation) to now
-            #                     start = _dt.fromisoformat(created)
-            #                     last_sync = metering.get('last_sync_ts', '')
-            #                     if last_sync:
-            #                         try:
-            #                             start = max(start, _dt.fromisoformat(last_sync))
-            #                         except Exception:
-            #                             pass
-            #                     hours = max((_dt.now() - start).total_seconds() / 3600, 0.01)
-            #                     billable_gpu_hours = hours * billable_gpus
-            #                     sm.report_gpu_hours(
-            #                         sub_item_id, billable_gpu_hours,
-            #                         gpu_type=instance.get('gpu_type', ''),
-            #                         instance_id=instance_id,
-            #                     )
-            #                     rate = ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100
-            #                     cost = round(billable_gpu_hours * rate, 2)
-            #                     print(f"   Enterprise+ metered: {billable_gpu_hours:.1f} GPU-hrs @ ${rate}/hr = ${cost:.2f}")
-            #                     if gpu_count < ENTERPRISE_PLUS_MIN_GPUS:
-            #                         print(f"   (32-GPU minimum applied: {gpu_count} → {billable_gpus} GPUs)")
-            #                 except Exception:
-            #                     pass
-            # except Exception:
-            #     pass
+            # BYOAPI: Billing disabled - no GPU-hour reporting
             # Prometheus: push terminate metrics
             try:
                 from integrations.prometheus_integration import (
@@ -3116,42 +2999,7 @@ def cleanup():
     if old_instances:
         print(f"Found {len(old_instances)} old instances")
 
-        # Enterprise+ metering: report final GPU-hours for cleaned-up instances
-        # BYOAPI: Stripe billing disabled - no cleanup billing
-        # if api.tier.get('name') == 'Enterprise+':
-        #     try:
-        #         from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS, ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS
-        #         sm = StripeManager()
-        #         metering = sm._load_metering()
-        #         sub_item_id = metering.get('subscription_item_id')
-        #         if sub_item_id:
-        #             now = datetime.now()
-        #             last_sync = metering.get('last_sync_ts', '')
-        #             total_billable = 0.0
-        #             for inst in old_instances:
-        #                 created = inst.get('created_at', '')
-        #                 gpu_count = inst.get('gpu_count', 1)
-        #                 billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
-        #                 if created:
-        #                     try:
-        #                         start = datetime.fromisoformat(created)
-        #                         if last_sync:
-        #                             try:
-        #                                 start = max(start, datetime.fromisoformat(last_sync))
-        #                             except Exception:
-        #                                 pass
-        #                         hours = max((now - start).total_seconds() / 3600, 0)
-        #                         total_billable += hours * billable_gpus
-        #                     except Exception:
-        #                         pass
-        #             if total_billable > 0.01:
-        #                 sm.report_gpu_hours(sub_item_id, total_billable, gpu_type='mixed', instance_id='cleanup')
-        #                 rate = ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100
-        #                 print(f"   Enterprise+ metered: {total_billable:.1f} GPU-hrs @ ${rate}/hr = ${round(total_billable * rate, 2):.2f}")
-        #                 metering['last_sync_ts'] = now.isoformat()
-        #                 sm._save_metering(metering)
-        # except Exception:
-        #     pass
+        # BYOAPI: Billing disabled - no cleanup billing
 
         for inst in old_instances:
             print(f"   Removing {inst['id']} ({inst['provider']})")
@@ -3538,7 +3386,6 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
     run_start = time.time()
 
     # Tier gate removed - unlimited monthly provisions (open source)
-    # All Stripe checkout and paywall code removed
 
     print(f"Deploying terradev run")
     print(f"   GPU:     {gpu}")
@@ -3749,35 +3596,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
                     end_provision(instance_id)
                 except Exception:
                     pass
-                # Enterprise+ GPU-hour metering  report usage to Stripe
-                # BYOAPI: Stripe billing disabled - no termination billing
-                # try:
-                #     if api.tier.get('name') == 'Enterprise+':
-                #         from core.stripe_manager import StripeManager, ENTERPRISE_PLUS_MIN_GPUS, ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS
-                #         sm = StripeManager()
-                #         metering_data = sm._load_metering()
-                #         sub_item_id = metering_data.get('subscription_item_id')
-                #         if sub_item_id:
-                #             try:
-                #                 gpu_count = int(os.environ.get('TERRADEV_GPU_COUNT', '1'))
-                #                 # 32-GPU floor per instance
-                #                 billable_gpus = max(gpu_count, ENTERPRISE_PLUS_MIN_GPUS)
-                #                 hours = max(total_time / 3600000, 0.01)  # total_time is in ms
-                #                 billable_gpu_hours = hours * billable_gpus
-                #                 sm.report_gpu_hours(
-                #                     sub_item_id, billable_gpu_hours,
-                #                     gpu_type=gpu,
-                #                     instance_id=instance_id,
-                #                 )
-                #                 rate = ENTERPRISE_PLUS_GPU_HOUR_RATE_CENTS / 100
-                #                 cost = round(billable_gpu_hours * rate, 2)
-                #                 print(f"   Enterprise+ metered: {billable_gpu_hours:.1f} GPU-hrs @ ${rate}/hr = ${cost:.2f}")
-                #                 if gpu_count < ENTERPRISE_PLUS_MIN_GPUS:
-                #                     print(f"   (32-GPU minimum applied: {gpu_count} → {billable_gpus} GPUs)")
-                #             except Exception:
-                #                 pass
-                # except Exception:
-                #     pass
+                # BYOAPI: Billing disabled - no termination billing
                 print(f"   OK: Terminated")
             except Exception as e:
                 print(f"   Warning  Auto-terminate failed: {e}")
@@ -8461,7 +8280,7 @@ def sso_status():
     # if not api._is_enterprise_tier():
     #     print("ERROR: SSO is available for Enterprise and Enterprise+ tiers only")
     #     print("   Current tier:", api.tier['name'])
-    #     print("   Upgrade at:", api.STRIPE_PAYMENT_LINKS.get('enterprise', 'https://terradev.cloud/pricing'))
+    #     print("   See https://terradev.cloud/pricing")
     #     return
     
     if not api.enterprise_auth:
@@ -8496,7 +8315,7 @@ def sso_configure(provider, client_id, client_secret, domain, tenant_id, entity_
     # if not api._is_enterprise_tier():
     #     print("ERROR: SSO is available for Enterprise and Enterprise+ tiers only")
     #     print("   Current tier:", api.tier['name'])
-    #     print("   Upgrade at:", api.STRIPE_PAYMENT_LINKS.get('enterprise', 'https://terradev.cloud/pricing'))
+    #     print("   See https://terradev.cloud/pricing")
     #     return
     
     if not api.enterprise_auth:

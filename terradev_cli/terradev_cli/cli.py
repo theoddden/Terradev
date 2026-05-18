@@ -102,11 +102,7 @@ class TerradevAPI:
         return True  # All credentials appear to be placeholders
 
     # Tier system removed - no tier verification keys or payment links
-    # _TIER_VERIFY_KEY_B64 removed
-    # def _load_tier(self): ... REMOVED
-    # STRIPE_PAYMENT_LINKS = {...} REMOVED
-    # STRIPE_PRICE_IDS = {...} REMOVED
-    # def get_stripe_checkout_url(self, tier: str) -> str: ... REMOVED
+    # Tier system removed - no tier loading, verification, or payment links
 
     def load_credentials(self):
         """Load user's cloud provider credentials (simple JSON for BYOAPI)"""
@@ -780,8 +776,8 @@ def onboarding(force):
 @click.option('--tier', '-t', type=click.Choice(['research_plus', 'enterprise', 'enterprise_plus']),
               help='Tier to upgrade to')
 @click.option('--activate', is_flag=True,
-              help='Activate after payment — verifies your Stripe subscription and unlocks your tier')
-@click.option('--email', help='Email used for Stripe checkout (for --activate)')
+              help='Activate after payment')
+@click.option('--email', help='Email used for checkout (for --activate)')
 def upgrade(tier, activate, email):
     """Upgrade command removed - Terradev is now open source with unlimited access."""
     print("Upgrade command removed - Terradev is now open source with unlimited access.")
@@ -789,13 +785,13 @@ def upgrade(tier, activate, email):
     api = TerradevAPI()
 
     if activate:
-        # ── Activate: fetch signed token from S3 (written by Stripe webhook) ──
+        # ── Activate: fetch signed token from S3 (written by payment webhook) ──
         if not email:
             if not sys.stdin.isatty():
                 print("ERROR: --email is required in non-interactive mode")
                 print("   Usage: terradev upgrade --activate --email you@example.com")
                 sys.exit(2)
-            email = click.prompt('Enter the email you used at Stripe checkout')
+            email = click.prompt('Enter the email you used at checkout')
 
         print(f"Checking activation for {email}...")
 
@@ -834,7 +830,7 @@ def upgrade(tier, activate, email):
 
             if token is None:
                 print("No activation found for that email.")
-                print("   Make sure you completed Stripe checkout, then wait ~30 seconds and try again.")
+                print("   Make sure you completed checkout, then wait ~30 seconds and try again.")
                 print("   Contact support@terradev.com if the issue persists.")
                 return
 
@@ -1715,7 +1711,6 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             print(f"Endpoint: {endpoint_name or 'Auto-generated'}")
 
     # ── Tier gates removed - unlimited concurrent instances (open source) ──
-    # All Stripe checkout and paywall code removed
 
     # ── Step 1: Fetch quotes from ALL providers in parallel ──
     print(f"Provisioning {count}x {gpu_type} (parallel={parallel})")
