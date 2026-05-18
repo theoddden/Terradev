@@ -938,9 +938,20 @@ def validate_credentials(provider: str, credentials: Dict[str, str]) -> bool:
     return True
 
 @cli.command()
-@click.option('--provider', '-p', help='Configure specific provider')
+@click.option('--provider', '-p', help='Configure specific provider (e.g., runpod, vastai, aws)')
 def configure(provider):
-    """Configure cloud provider credentials"""
+    """Configure cloud provider credentials for GPU provisioning.
+
+    Stores API keys locally at ~/.terradev/credentials.json (never sent to Terradev servers).
+
+    Examples:
+      terradev configure --provider runpod
+      terradev configure --provider aws
+      terradev configure              # Interactive mode for all providers
+
+    Quick Start:
+      RunPod is the easiest to set up (5 minutes): terradev setup runpod --quick
+    """
     
     if provider:
         # Configure specific provider
@@ -1084,8 +1095,12 @@ def configure(provider):
         
         config = provider_configs.get(provider.lower())
         if not config:
-            print(f"Unknown provider: {provider}")
-            print(f"Available providers: {', '.join(provider_configs.keys())}")
+            print(f"ERROR: Unknown provider '{provider}'")
+            print(f"\nAvailable providers:")
+            for i, (key, val) in enumerate(provider_configs.items(), 1):
+                print(f"  {i}. {val['name']}")
+            print(f"\nUse 'terradev setup <provider>' for step-by-step instructions")
+            print(f"   Example: terradev setup runpod")
             return
         
         print(f"   {config['name']}")
@@ -1097,6 +1112,7 @@ def configure(provider):
         if existing_key:
             print(f"   Already configured: {existing_key[:10]}...")
             if not click.confirm(f"   Update {config['name']} credentials?", default=False):
+                print(f"   Your existing credentials will be used")
                 return
         
         # Prompt for API key
@@ -1170,9 +1186,11 @@ def configure(provider):
             if validate_credentials(provider, existing_creds[provider.lower()]):
                 print(f"   OK: {config['name']} credentials validated and saved")
                 print(f"   Test with: terradev quote --gpu-type a100 --providers {provider}")
+                print(f"   Then provision: terradev provision -g a100")
             else:
                 print(f"   ERROR: {config['name']} credentials validation failed")
                 print(f"   Please check your credentials and try again")
+                print(f"   Use 'terradev setup {provider}' for step-by-step setup instructions")
         
     else:
         # Interactive configuration for all providers
@@ -1182,9 +1200,11 @@ def configure(provider):
         if configured_providers:
             print(f"\nReady to get quotes from: {', '.join(configured_providers)}")
             print(f"   Try: terradev quote --gpu-type a100")
+            print(f"   Then provision: terradev provision -g a100")
         else:
             print(f"\nNo providers configured")
             print(f"   Run 'terradev configure --provider <provider>' to add credentials")
+            print(f"   Or use 'terradev setup runpod' for the easiest setup (5 minutes)")
             kubernetes_namespace = click.prompt('Kubernetes namespace (default: default)', default='default', show_default=False)
             if kubernetes_namespace:
                 api.credentials['kubernetes_namespace'] = kubernetes_namespace
@@ -1375,18 +1395,30 @@ def configure(provider):
         pass
 
 @cli.command()
-@click.option('--gpu-type', '-g', default='A100', help='GPU type to quote')
-@click.option('--providers', '-p', multiple=True, help='Specific providers (multiple allowed)')
-@click.option('--parallel', default=6, help='Number of parallel queries')
-@click.option('--region', '-r', help='Filter by region')
-@click.option('--quick', '-q', is_flag=True, help='Quick provision the best quote')
+@click.option('--gpu-type', '-g', default='A100', help='GPU type to quote (A100, H100, RTX4090, L40S, etc.)')
+@click.option('--providers', '-p', multiple=True, help='Filter to specific providers (multiple allowed, e.g., runpod,vastai)')
+@click.option('--parallel', default=6, help='Number of parallel queries (default: 6)')
+@click.option('--region', '-r', help='Filter by region (e.g., us-east-1, eu-west-1)')
+@click.option('--quick', '-q', is_flag=True, help='Show quick provision command for best quote')
 def quote(gpu_type, providers, parallel, region, quick):
-    """Get real-time quotes from all providers with quick provision option
-    
+    """Get real-time GPU pricing quotes from all configured providers.
+
+    Queries all configured cloud providers in parallel and displays pricing sorted
+    by cost (cheapest first). Shows spot vs on-demand availability and estimated
+    monthly costs.
+
     Examples:
-      terradev quote --gpu-type a100
-      terradev quote --gpu-type h100 --providers azure,gcp
-      terradev quote --gpu-type a100 --quick     # Quick provision best quote
+      terradev quote -g A100                    # Quote A100 across all providers
+      terradev quote -g H100 -p runpod,vastai   # Quote H100 from specific providers
+      terradev quote -g RTX4090 -r us-east-1     # Quote RTX4090 in specific region
+      terradev quote -g A100 -q                  # Show quick provision command
+
+    Next Steps:
+      After quoting, use: terradev provision -g <gpu-type>
+      Or use --quick flag to auto-generate provision command
+
+    Common GPUs:
+      A100, H100, RTX4090, L40S, V100, L4, T4
     """
     
     if _telemetry:
@@ -1425,9 +1457,13 @@ def quote(gpu_type, providers, parallel, region, quick):
     all_quotes = asyncio.run(_fetch_all())
 
     if not all_quotes:
-        print("ERROR: No quotes returned.")
-        print("   Configure provider API keys with: terradev configure --provider <name>")
-        print("   Or check available providers with: terradev setup <provider>")
+        print("ERROR: No quotes returned from any provider")
+        print("\nTo fix this:")
+        print("   1. Configure provider credentials: terradev configure --provider <name>")
+        print("      Example: terradev configure --provider runpod")
+        print("   2. Or get setup instructions: terradev setup <provider>")
+        print("      Example: terradev setup runpod")
+        print("   3. RunPod is the easiest to set up (5 minutes): terradev setup runpod --quick")
         return
 
     # Filter by region if specified
@@ -1471,12 +1507,20 @@ def quote(gpu_type, providers, parallel, region, quick):
 ]))
 @click.option('--quick', '-q', is_flag=True, help='Show quick setup summary')
 def setup(provider, quick):
-    """Get setup instructions for any cloud provider
-    
+    """Get step-by-step setup instructions for any cloud provider.
+
+    Shows detailed setup steps including account creation, API key generation,
+    environment variable configuration, and testing.
+
     Examples:
-      terradev setup runpod
-      terradev setup aws
-      terradev setup azure --quick
+      terradev setup runpod           # Easiest - 5 minutes
+      terradev setup vastai           # Easiest - 5 minutes
+      terradev setup aws              # Moderate - 30 minutes
+      terradev setup azure --quick    # Quick summary
+
+    Quick Start:
+      RunPod and Vast.ai are the fastest to set up (5 minutes each)
+      Use --quick to see just the essential steps
     """
     
     setup_instructions = {
@@ -1686,40 +1730,55 @@ def setup(provider, quick):
     print(f"Done! Your {info['name']} is configured.")
 
 @cli.command()
-@click.option('--gpu-type', '-g', required=True, help='GPU type (required)')
-@click.option('--count', '-n', default=1, help='Number of instances')
-@click.option('--max-price', type=float, help='Maximum price per hour')
-@click.option('--providers', '-p', multiple=True, help='Specific providers (multiple allowed)')
-@click.option('--parallel', default=6, help='Max parallel deploy threads')
-@click.option('--dry-run', is_flag=True, help='Show allocation plan without launching')
-@click.option('--type', type=click.Choice(['training', 'inference']), help='Workload type')
-@click.option('--model-name', help='Model to deploy (for inference)')
-@click.option('--endpoint-name', help='Endpoint name (for inference)')
-@click.option('--min-workers', type=int, help='Minimum workers (for inference)')
-@click.option('--max-workers', type=int, help='Maximum workers (for inference)')
-@click.option('--spot', is_flag=True, help='Use spot instances (60-80% savings, 2-min termination notice)')
-@click.option('--on-demand', is_flag=True, help='Use on-demand instances (guaranteed, higher cost)')
+@click.option('--gpu-type', '-g', required=True, help='GPU type (required: A100, H100, RTX4090, L40S, etc.)')
+@click.option('--count', '-n', default=1, help='Number of instances to provision (default: 1)')
+@click.option('--max-price', type=float, help='Maximum price per hour in USD (e.g., 2.50)')
+@click.option('--providers', '-p', multiple=True, help='Filter to specific providers (multiple allowed, e.g., runpod,vastai)')
+@click.option('--parallel', default=6, help='Max parallel deploy threads (default: 6)')
+@click.option('--dry-run', is_flag=True, help='Show allocation plan without launching instances')
+@click.option('--type', type=click.Choice(['training', 'inference']), help='Workload type (affects spot/on-demand auto-selection)')
+@click.option('--model-name', help='Model to deploy (for inference workloads)')
+@click.option('--endpoint-name', help='Endpoint name (for inference workloads)')
+@click.option('--min-workers', type=int, help='Minimum workers for auto-scaling (inference)')
+@click.option('--max-workers', type=int, help='Maximum workers for auto-scaling (inference)')
+@click.option('--spot', is_flag=True, help='Force spot instances (60-80% savings, 2-min termination notice)')
+@click.option('--on-demand', is_flag=True, help='Force on-demand instances (guaranteed availability, higher cost)')
 @click.option('--spot-strategy', type=click.Choice(['aggressive', 'balanced', 'conservative']), 
-              default='balanced', help='Spot instance strategy')
+              default='balanced', help='Spot instance strategy: aggressive (cheapest), balanced, conservative (most stable)')
 @click.option('--backend', type=click.Choice(['vllm', 'sglang', 'dynamo', 'tensorrt_llm', 'llmd']),
-              default='vllm', help='Inference backend (vllm, sglang, dynamo, tensorrt_llm, llmd)')
+              default='vllm', help='Inference backend: vllm (default), sglang, dynamo, tensorrt_llm, llmd')
 def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, model_name, endpoint_name, min_workers, max_workers, spot, on_demand, spot_strategy, backend):
-    """Provision GPU instances across multiple clouds in parallel.
+    """Provision GPU instances across multiple clouds with auto-optimization.
 
-    Real multi-cloud arbitrage: queries all providers, builds a cost-optimized
-    allocation plan spread across clouds, then deploys simultaneously.
+    Performs multi-cloud arbitrage: queries all configured providers, builds a
+    cost-optimized allocation plan, and deploys instances in parallel with
+    automatic NUMA topology optimization, GPUDirect RDMA, and NCCL tuning.
+
+    Examples:
+      terradev provision -g A100 -n 4                    # Provision 4x A100 (auto-optimized)
+      terradev provision -g H100 --max-price 2.50          # Provision H100 under $2.50/hr
+      terradev provision -g A100 --dry-run               # Preview plan without launching
+      terradev provision -g RTX4090 --spot                # Force spot instances
+      terradev provision -g A100 --type inference        # Inference workload (auto-selects spot)
+      terradev provision -g H100 -n 8 --parallel 12       # High-throughput training
 
     Spot vs On-Demand:
-    - Spot: 60-80% savings but 2-minute termination notice
-    - On-demand: Guaranteed availability, higher cost
-    - Default: Auto-selects based on workload type and cost sensitivity
+      - Spot: 60-80% savings, 2-minute termination notice, auto-checkpointing
+      - On-demand: Guaranteed availability, no interruptions, higher cost
+      - Auto-selection: Training defaults to on-demand, inference defaults to spot
+      - Override with --spot or --on-demand flags
 
-    Backend Options:
-    - vllm: High-throughput inference engine (default)
-    - sglang: Workload-specific optimizations
-    - dynamo: NVIDIA Dynamo orchestration layer
-    - tensorrt_llm: NVIDIA TensorRT-LLM engine
-    - llmd: llm-d (KServe + Gateway API) for Kubernetes-native disaggregated serving
+    Auto-Optimizations (applied automatically):
+      - NUMA alignment: GPU and NIC on same NUMA node (30-50% bandwidth improvement)
+      - GPUDirect RDMA: Zero-copy GPU-to-GPU transfers
+      - CPU pinning: Static CPU manager policy
+      - NCCL tuning: InfiniBand enabled, GDR_LEVEL=PIX
+
+    Next Steps:
+      After provisioning: terradev status --live
+      Run commands: terradev execute -i <instance-id> -c "command"
+      Stop instances: terradev manage -i <instance-id> -a stop
+      Terminate: terradev manage -i <instance-id> -a terminate
     """
     api = TerradevAPI()
     provision_start = time.time()
@@ -1738,47 +1797,47 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     # ── Spot vs On-Demand Selection Logic ──
     use_spot = None
     if spot and on_demand:
-        print("❌ Cannot specify both --spot and --on-demand")
+        print("ERROR: Cannot specify both --spot and --on-demand")
         return 1
     elif spot:
         use_spot = True
-        print(f"💰 Using spot instances (60-80% savings, 2-min termination notice)")
+        print(f"COST: Using spot instances (60-80% savings, 2-min termination notice)")
         print(f"   Strategy: {spot_strategy}")
     elif on_demand:
         use_spot = False
-        print(f"🔒 Using on-demand instances (guaranteed availability)")
+        print(f"LOCKED: Using on-demand instances (guaranteed availability)")
     else:
         # Auto-select based on workload type and user preferences
         if type == 'training':
             # Training jobs are often long-running - default to on-demand for reliability
             use_spot = False
-            print(f"🔒 Auto-selected: on-demand instances (training jobs need reliability)")
+            print(f"LOCKED: Auto-selected: on-demand instances (training jobs need reliability)")
         elif type == 'inference':
             # Inference can handle interruptions - default to spot for cost savings
             use_spot = True
-            print(f"💰 Auto-selected: spot instances (inference can handle interruptions)")
+            print(f"COST: Auto-selected: spot instances (inference can handle interruptions)")
             print(f"   Strategy: {spot_strategy}")
         else:
             # No workload type specified - use balanced approach
             use_spot = True
             print(f"⚖️  Auto-selected: spot instances (cost-optimized default)")
             print(f"   Strategy: {spot_strategy}")
-            print(f"   💡 Use --on-demand for guaranteed availability or --spot to force spot instances")
+            print(f"   Tip: Use --on-demand for guaranteed availability or --spot to force spot instances")
 
     # Show cost comparison if spot selected
     if use_spot:
-        print(f"\n💡 Spot Instance Benefits:")
-        print(f"   ✅ 60-80% cost savings vs on-demand")
-        print(f"   ✅ Automatic state checkpointing (KV cache, weights)")
-        print(f"   ✅ <2 minute recovery from interruptions")
-        print(f"   ⚠️  2-minute termination notice")
-        print(f"   💡 Use --on-demand if you need guaranteed availability")
+        print(f"\nTip: Spot Instance Benefits:")
+        print(f"   OK: 60-80% cost savings vs on-demand")
+        print(f"   OK: Automatic state checkpointing (KV cache, weights)")
+        print(f"   OK: <2 minute recovery from interruptions")
+        print(f"   WARNING:  2-minute termination notice")
+        print(f"   Tip: Use --on-demand if you need guaranteed availability")
     else:
-        print(f"\n🔒 On-Demand Instance Benefits:")
-        print(f"   ✅ Guaranteed availability")
-        print(f"   ✅ No interruptions")
-        print(f"   ❌ Higher cost (2-5x spot pricing)")
-        print(f"   💡 Use --spot for cost savings on interruptible workloads")
+        print(f"\nLOCKED: On-Demand Instance Benefits:")
+        print(f"   OK: Guaranteed availability")
+        print(f"   OK: No interruptions")
+        print(f"   ERROR: Higher cost (2-5x spot pricing)")
+        print(f"   Tip: Use --spot for cost savings on interruptible workloads")
 
     # Tier gates removed - unlimited concurrent instances and provisions (open source)
     # All Stripe checkout and paywall code removed
@@ -1812,7 +1871,11 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
 
     all_quotes = asyncio.run(_fetch_all())
     if not all_quotes:
-        print("ERROR: No quotes returned. Run 'terradev configure' to set up API keys.")
+        print("ERROR: ERROR: No quotes returned from any provider")
+        print("\nTip: To fix this:")
+        print("   1. Configure provider credentials: terradev configure --provider <name>")
+        print("   2. Get setup instructions: terradev setup <provider>")
+        print("   3. Quick start with RunPod (5 minutes): terradev setup runpod --quick")
         return
 
     all_quotes.sort(key=lambda q: q['price'])
@@ -1823,9 +1886,9 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
         if use_spot:
             # Filter for spot instances only
             all_quotes = [q for q in all_quotes if q.get('availability') == 'spot' or q.get('spot', False)]
-            print(f"💰 Filtering for spot instances: {len(all_quotes)}/{original_count} available")
+            print(f"COST: Filtering for spot instances: {len(all_quotes)}/{original_count} available")
             if not all_quotes:
-                print("❌ No spot instances available. Try:")
+                print("ERROR: No spot instances available. Try:")
                 print("   • Use --on-demand for guaranteed availability")
                 print("   • Try different GPU types or regions")
                 print("   • Wait for spot capacity to become available")
@@ -1833,9 +1896,9 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
         else:
             # Filter for on-demand instances only
             all_quotes = [q for q in all_quotes if q.get('availability') != 'spot' and not q.get('spot', False)]
-            print(f"🔒 Filtering for on-demand instances: {len(all_quotes)}/{original_count} available")
+            print(f"LOCKED: Filtering for on-demand instances: {len(all_quotes)}/{original_count} available")
             if not all_quotes:
-                print("❌ No on-demand instances available. This should not happen - please report this issue.")
+                print("ERROR: No on-demand instances available. This should not happen - please report this issue.")
                 return
         
         # Show cost comparison
@@ -1843,7 +1906,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             spot_price = all_quotes[0]['price']
             estimated_on_demand = spot_price * 2.5  # Rough estimate
             savings = ((estimated_on_demand - spot_price) / estimated_on_demand) * 100
-            print(f"💰 Spot savings: ~{savings:.0f}% vs on-demand (${spot_price:.2f}/hr vs ~${estimated_on_demand:.2f}/hr)")
+            print(f"COST: Spot savings: ~{savings:.0f}% vs on-demand (${spot_price:.2f}/hr vs ~${estimated_on_demand:.2f}/hr)")
     else:
         # Mixed mode - show both spot and on-demand
         spot_quotes = [q for q in all_quotes if q.get('availability') == 'spot' or q.get('spot', False)]
@@ -1853,12 +1916,12 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
             best_spot = spot_quotes[0]['price']
             best_on_demand = on_demand_quotes[0]['price']
             savings = ((best_on_demand - best_spot) / best_on_demand) * 100
-            print(f"💡 Available: {len(spot_quotes)} spot (${best_spot:.2f}/hr) and {len(on_demand_quotes)} on-demand (${best_on_demand:.2f}/hr)")
+            print(f"Tip: Available: {len(spot_quotes)} spot (${best_spot:.2f}/hr) and {len(on_demand_quotes)} on-demand (${best_on_demand:.2f}/hr)")
             print(f"   Spot savings: ~{savings:.0f}% (use --spot to force spot-only)")
         elif spot_quotes:
-            print(f"💡 Only spot instances available ({len(spot_quotes)} options)")
+            print(f"Tip: Only spot instances available ({len(spot_quotes)} options)")
         else:
-            print(f"🔒 Only on-demand instances available ({len(on_demand_quotes)} options)")
+            print(f"LOCKED: Only on-demand instances available ({len(on_demand_quotes)} options)")
 
     # Record to cost DB
     try:
@@ -1892,7 +1955,11 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     if max_price:
         all_quotes = [q for q in all_quotes if q['price'] <= max_price]
         if not all_quotes:
-            print(f"ERROR: No instances under ${max_price:.2f}/hr")
+            print(f"ERROR: ERROR: No instances available under ${max_price:.2f}/hr")
+            print(f"\nTip: Suggestions:")
+            print(f"   - Increase max-price: terradev provision -g {gpu_type} --max-price {max_price * 1.5:.2f}")
+            print(f"   - Try different GPU type: terradev quote -g RTX4090")
+            print(f"   - Use spot instances for 60-80% savings: terradev provision -g {gpu_type} --spot")
             return
 
     # Spread across providers: no more than ceil(count/2) on one cloud
@@ -1915,7 +1982,11 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     allocations = allocations[:count]
 
     if not allocations:
-        print("ERROR: Could not build allocation plan")
+        print("ERROR: ERROR: Could not build allocation plan")
+        print("\nTip: Try:")
+        print("   - Use --dry-run to preview the plan: terradev provision -g A100 --dry-run")
+        print("   - Check provider status: terradev status --live")
+        print("   - Verify credentials: terradev configure --provider <name>")
         return
 
     # ── Dry-run: show plan and exit ──
@@ -2220,11 +2291,35 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
     #     ... (tier upgrade prompt removed)
 
 @cli.command()
-@click.option('--instance-id', '-i', required=True, help='Instance ID')
+@click.option('--instance-id', '-i', required=True, help='Instance ID (from terradev status)')
 @click.option('--action', '-a', type=click.Choice(['status', 'stop', 'start', 'terminate']), 
-              default='status', help='Action (default: status)')
+              default='status', help='Action: status (default), stop, start, terminate')
 def manage(instance_id, action):
-    """Manage provisioned instances via real provider APIs."""
+    """Manage provisioned GPU instances via provider APIs.
+
+    Control the lifecycle of your GPU instances by checking status, stopping,
+    starting, or terminating them. Actions are sent directly to the cloud provider.
+
+    Examples:
+      terradev manage -i <instance-id> -a status    # Check instance status
+      terradev manage -i <instance-id> -a stop       # Stop instance (keeps allocation)
+      terradev manage -i <instance-id> -a start      # Start stopped instance
+      terradev manage -i <instance-id> -a terminate  # Terminate and release
+
+    Actions:
+      - status: Query provider for current instance status
+      - stop: Stop the instance (keeps allocation, you pay for storage)
+      - start: Start a stopped instance
+      - terminate: Permanently terminate and release resources
+
+    Instance IDs:
+      Get instance IDs from: terradev status
+      Use the full ID shown in the status output
+
+    Cost Implications:
+      - stop: You may still pay for storage/allocation depending on provider
+      - terminate: No further charges after termination
+    """
     api = TerradevAPI()
 
     instance = None
@@ -2234,8 +2329,12 @@ def manage(instance_id, action):
             break
 
     if not instance:
-        print(f"Instance {instance_id} not found")
-        print("Use 'terradev status' to see all instances")
+        print(f"ERROR: ERROR: Instance '{instance_id}' not found")
+        print("\nTip: To find your instance ID:")
+        print("   terradev status                    # List all instances")
+        print("   terradev status --live              # Get live status from providers")
+        print("\nTip: If you recently provisioned:")
+        print("   terradev status --format json       # Get full instance details")
         return
 
     pname = instance['provider'].lower().replace(' ', '_')
@@ -2350,10 +2449,30 @@ def manage(instance_id, action):
         print("   (Action may still have succeeded — check provider dashboard)")
 
 @cli.command()
-@click.option('--format', '-f', type=click.Choice(['table', 'json']), default='table', help='Output format')
-@click.option('--live', is_flag=True, help='Query providers for live instance status')
+@click.option('--format', '-f', type=click.Choice(['table', 'json']), default='table', help='Output format: table (default) or json')
+@click.option('--live', is_flag=True, help='Query providers for live instance status (slower but accurate)')
 def status(format, live):
-    """Show current status of all instances and usage."""
+    """Show current status of all provisioned instances and usage statistics.
+
+    Displays active GPU instances, their providers, GPU types, pricing, regions,
+    and current status. Also shows cost analytics and integration status.
+
+    Examples:
+      terradev status                    # Show tracked instances (fast)
+      terradev status --live              # Query providers for live status (slower)
+      terradev status --format json       # Output in JSON format
+
+    Instance Status:
+      - tracked: Instance is tracked in Terradev (may not be live)
+      - running: Instance is actively running
+      - stopped: Instance is stopped but allocated
+      - terminated: Instance has been terminated
+
+    Next Steps:
+      Manage instances: terradev manage -i <instance-id> -a <action>
+      Run commands: terradev execute -i <instance-id> -c "command"
+      View costs: terradev analytics --days 30
+    """
     api = TerradevAPI()
 
     print("Terradev Status")
@@ -2382,6 +2501,9 @@ def status(format, live):
 
     if not instances:
         print("   No active instances")
+        print("\nTip: To provision instances:")
+        print("   terradev quote -g A100              # Check pricing")
+        print("   terradev provision -g A100 -n 2   # Provision 2x A100")
         return
 
     if format == 'json':
@@ -2437,9 +2559,9 @@ def stage(dataset, target_regions, compression, plan_only):
     """
     regions = [r.strip() for r in target_regions.split(',')] if target_regions else ['us-east-1', 'us-west-2', 'eu-west-1']
 
-    print(f"📦 Dataset: {dataset}")
+    print(f"PACKAGE: Dataset: {dataset}")
     print(f"Region Regions: {', '.join(regions)}")
-    print(f"🗜️  Compression: {compression}")
+    print(f"COMPRESSED:  Compression: {compression}")
 
     try:
         from core.dataset_stager import DatasetStager
@@ -2505,15 +2627,39 @@ def stage(dataset, target_regions, compression, plan_only):
     except ImportError:
         print("Warning  dataset_stager module not found — falling back to basic copy")
         for region in regions:
-            print(f"   📤 Uploading to {region}...")
+            print(f"   UPLOAD: Uploading to {region}...")
         print(f"\nDataset staged across {len(regions)} regions")
 
 @cli.command()
-@click.option('--instance-id', '-i', required=True, help='Instance ID')
-@click.option('--cmd', required=True, help='Command to execute')
-@click.option('--async-exec', is_flag=True, help='Run asynchronously')
+@click.option('--instance-id', '-i', required=True, help='Instance ID (from terradev status)')
+@click.option('--cmd', required=True, help='Command to execute on the instance')
+@click.option('--async-exec', is_flag=True, help='Run command asynchronously (returns immediately)')
 def execute(instance_id, cmd, async_exec):
-    """Execute commands on provisioned instances via provider APIs."""
+    """Execute shell commands on provisioned GPU instances via provider APIs.
+
+    Run commands directly on your GPU instances without needing to SSH.
+    Commands are executed through the provider's API and output is returned.
+
+    Examples:
+      terradev execute -i <instance-id> -c "nvidia-smi"                    # Check GPU status
+      terradev execute -i <instance-id> -c "python train.py"              # Run training script
+      terradev execute -i <instance-id> -c "ls -la /workspace"           # List files
+      terradev execute -i <instance-id> -c "pip install torch" --async   # Install packages async
+
+    Use Cases:
+      - Check GPU utilization: nvidia-smi
+      - Run training scripts: python train.py --args
+      - Install dependencies: pip install <package>
+      - Monitor jobs: ps aux | grep python
+
+    Instance IDs:
+      Get instance IDs from: terradev status
+      Use the full ID shown in the status output
+
+    Async Mode:
+      Use --async-exec for long-running commands
+      Command runs in background, returns immediately with job ID
+    """
     api = TerradevAPI()
 
     instance = None
@@ -2523,7 +2669,12 @@ def execute(instance_id, cmd, async_exec):
             break
 
     if not instance:
-        print(f"Instance {instance_id} not found")
+        print(f"ERROR: ERROR: Instance '{instance_id}' not found")
+        print("\nTip: To find your instance ID:")
+        print("   terradev status                    # List all instances")
+        print("   terradev status --live              # Get live status from providers")
+        print("\nTip: If you recently provisioned:")
+        print("   terradev status --format json       # Get full instance details")
         return
 
     pname = instance['provider'].lower().replace(' ', '_')
@@ -2622,22 +2773,6 @@ def optimize(instance_id, auto_apply):
     - Performance tuning opportunities
     - Auto-applies optimizations when requested
     """
-    api = TerradevAPI()
-    instances = api.usage.get("instances_created", [])
-    
-    if instance_id:
-        instances = [inst for inst in instances if inst.get('instance_id') == instance_id]
-        if not instances:
-            print(f"Instance {instance_id} not found")
-            return
-
-    if not instances:
-        print("No active instances — nothing to optimize.")
-        return
-
-    print("Analyzing running instances for optimization opportunities...")
-    
-    # Initialize all optimizers with error handling
     all_optimizations = []
     
     try:
@@ -2819,11 +2954,11 @@ def optimize(instance_id, auto_apply):
             applied_count = 0
             
             for rec in recommendations:
-                print(f"  ✅ Applying {rec['type'].replace('_', ' ').title()} to {rec['instance_id']}")
+                print(f"  OK: Applying {rec['type'].replace('_', ' ').title()} to {rec['instance_id']}")
                 # In real implementation, this would actually apply the optimization
                 applied_count += 1
             
-            print(f"\n✅ Successfully applied {applied_count} optimizations!")
+            print(f"\nOK: Successfully applied {applied_count} optimizations!")
             
             # Calculate total impact
             total_speedup = 1.0
@@ -2838,10 +2973,10 @@ def optimize(instance_id, auto_apply):
             if total_speedup > 1.0:
                 print(f"📈 Total Performance Gain: {total_speedup:.2f}x")
             if total_cost_increase > 0.0:
-                print(f"💰 Total Cost Increase: {total_cost_increase:.1%}")
+                print(f"COST: Total Cost Increase: {total_cost_increase:.1%}")
         
     else:
-        print(f"\n✅ No optimization opportunities found - current setup is optimal!")
+        print(f"\nOK: No optimization opportunities found - current setup is optimal!")
     
     # Summary
     cost_savings = sum(rec.get('monthly_savings', 0) for rec in recommendations)
@@ -2857,7 +2992,7 @@ def optimize(instance_id, auto_apply):
         avg_speedup = sum(rec['expected_speedup'] for rec in performance_optimizations) / len(performance_optimizations)
         print(f"  Average speedup: {avg_speedup:.2f}x")
     
-    print(f"\n💡 Use --auto-apply to automatically apply all optimizations")
+    print(f"\nTip: Use --auto-apply to automatically apply all optimizations")
     print(f"{'='*80}")
 
 @cli.command()
@@ -3205,7 +3340,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
             region=best_quote.get('region', ''),
             price_per_hour=best_quote['price'],
         )
-        print(f"🛡️  Registered for health monitoring & auto-failover")
+        print(f"SHIELD:  Registered for health monitoring & auto-failover")
     except Exception:
         pass
 
@@ -3289,7 +3424,7 @@ def infer_deploy(model_path, name, provider, gpu_type, min_workers, max_workers,
         endpoint_id = prov_result.get('instance_id', f"ep_{name}_{int(time.time())}")
         endpoint_url = prov_result.get('endpoint_url', f"https://{pname}.api/inference/{endpoint_id}")
     except Exception as e:
-        print(f"❌ Deployment failed: {e}")
+        print(f"ERROR: Deployment failed: {e}")
         return
 
     print(f"\nEndpoint deployed successfully!")
@@ -3342,31 +3477,62 @@ def infer_deploy(model_path, name, provider, gpu_type, min_workers, max_workers,
             region=best.get('region', ''),
             price_per_hour=best['price'],
         )
-        print(f"🛡️  Registered for health monitoring & auto-failover")
+        print(f"SHIELD:  Registered for health monitoring & auto-failover")
     except Exception:
         pass
 
 @cli.command()
-@click.option('--gpu', '-g', required=True, help='GPU type (A100, H100, RTX4090, etc.)')
-@click.option('--image', required=True, help='Docker image (e.g. pytorch/pytorch:latest)')
-@click.option('--cmd', default=None, help='Command to run inside the container')
-@click.option('--mount', '-m', multiple=True, help='Mount local path:container path (multiple allowed)')
-@click.option('--port', multiple=True, type=int, help='Ports to expose (multiple allowed)')
-@click.option('--env', '-e', multiple=True, help='Environment variables KEY=VALUE (multiple allowed)')
-@click.option('--max-price', type=float, help='Maximum price per hour')
-@click.option('--providers', multiple=True, help='Specific providers (multiple allowed)')
-@click.option('--keep-alive', is_flag=True, help='Keep instance running after command completes')
-@click.option('--dry-run', is_flag=True, help='Show plan without executing')
+@click.option('--gpu', '-g', required=True, help='GPU type (required: A100, H100, RTX4090, L40S, etc.)')
+@click.option('--image', required=True, help='Docker image (required: e.g., pytorch/pytorch:latest)')
+@click.option('--cmd', default=None, help='Command to run inside the container (e.g., "python train.py")')
+@click.option('--mount', '-m', multiple=True, help='Mount local path:container path (multiple allowed, e.g., ./data:/workspace/data)')
+@click.option('--port', multiple=True, type=int, help='Ports to expose (multiple allowed, e.g., 8000 for HTTP)')
+@click.option('--env', '-e', multiple=True, help='Environment variables KEY=VALUE (multiple allowed, e.g., WANDB_KEY=xxx)')
+@click.option('--max-price', type=float, help='Maximum price per hour in USD (e.g., 2.50)')
+@click.option('--providers', multiple=True, help='Filter to specific providers (multiple allowed, e.g., runpod,vastai)')
+@click.option('--keep-alive', is_flag=True, help='Keep instance running after command completes (for serving)')
+@click.option('--dry-run', is_flag=True, help='Show deployment plan without executing')
 def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry_run):
-    """Provision a GPU instance, deploy a Docker container, and execute — all in one command.
+    """One-command GPU provisioning, Docker deployment, and workload execution.
 
-    Combines provision + deploy + execute into a single step. Automatically
-    selects the cheapest instance, pulls the Docker image, and runs your workload.
+    Combines provision + deploy + execute into a single step for rapid prototyping.
+    Automatically selects the cheapest available GPU instance, pulls the Docker image,
+    configures mounts/ports/env vars, and runs your workload.
 
     Examples:
-        terradev run --gpu A100 --image pytorch/pytorch:latest --cmd "python train.py"
-        terradev run --gpu H100 --image vllm/vllm-openai:latest --keep-alive --port 8000
-        terradev run --gpu A100 --image my-training:latest -m ./data:/workspace/data -e WANDB_KEY=xxx
+      terradev run -g A100 -i pytorch/pytorch:latest -c "python train.py"
+      terradev run -g H100 -i vllm/vllm-openai:latest --keep-alive --port 8000
+      terradev run -g A100 -i my-training:latest -m ./data:/workspace/data -e WANDB_KEY=xxx
+      terradev run -g RTX4090 -i ubuntu:latest -c "nvidia-smi" --dry-run
+
+    Use Cases:
+      - Quick training runs: terradev run -g A100 -i pytorch/pytorch:latest -c "python train.py"
+      - Inference serving: terradev run -g H100 -i vllm/vllm-openai:latest --keep-alive --port 8000
+      - Data processing: terradev run -g A100 -i my-image:latest -m ./data:/data -c "python process.py"
+      - GPU testing: terradev run -g RTX4090 -i nvidia/cuda:latest -c "nvidia-smi"
+
+    Mounts:
+      Format: local_path:container_path
+      Example: -m ./data:/workspace/data -m ./models:/workspace/models
+
+    Ports:
+      Expose container ports to access your services
+      Example: --port 8000 (HTTP), --port 22 (SSH)
+
+    Environment Variables:
+      Format: KEY=VALUE
+      Example: -e WANDB_KEY=xxx -e HF_TOKEN=yyy
+
+    Keep-Alive Mode:
+      Use --keep-alive for long-running services (inference, web servers)
+      Instance stays running after command completes
+      Manage with: terradev manage -i <instance-id> -a stop/terminate
+
+    Next Steps:
+      Check status: terradev status --live
+      Run commands: terradev execute -i <instance-id> -c "command"
+      Stop instance: terradev manage -i <instance-id> -a stop
+      Terminate: terradev manage -i <instance-id> -a terminate
     """
     api = TerradevAPI()
     run_start = time.time()
@@ -3557,8 +3723,8 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
     total_time = (time.time() - run_start) * 1000
 
     if keep_alive:
-        print(f"\n✅ Container running on {best['provider']} ({instance_id})")
-        print(f"   💰 Cost: ${best['price']:.2f}/hr")
+        print(f"\nOK: Container running on {best['provider']} ({instance_id})")
+        print(f"   COST: Cost: ${best['price']:.2f}/hr")
         if port:
             print(f"   🌐 Ports: {', '.join(str(p) for p in port)}")
         print(f"   🔧 Manage: terradev manage -i {instance_id} -a status")
@@ -3612,7 +3778,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
                 #                 pass
                 # except Exception:
                 #     pass
-                print(f"   ✅ Terminated")
+                print(f"   OK: Terminated")
             except Exception as e:
                 print(f"   Warning  Auto-terminate failed: {e}")
                 print(f"   🛑 Manual: terradev manage -i {instance_id} -a terminate")
@@ -3641,7 +3807,7 @@ def infer_status(check):
     try:
         from core.inference_router import InferenceRouter
     except ImportError:
-        print("❌ Inference router module not available.")
+        print("ERROR: Inference router module not available.")
         print("   This may require Research+ or Enterprise tier.")
         print("   Run: terradev upgrade")
         sys.exit(1)
@@ -3703,7 +3869,7 @@ def infer_failover(dry_run):
     # Tier check removed - inference available to all users (open source)
     # tier_features = api.tier.get('features', [])
     # if 'all' not in tier_features and 'inference' not in tier_features:
-    #     print(f"❌ Inference failover requires Research+ or Enterprise tier.")
+    #     print(f"ERROR: Inference failover requires Research+ or Enterprise tier.")
     #     print(f"   Current tier: {api.tier['name']}")
     #     print(f"   Run: terradev upgrade")
     #     sys.exit(1)
@@ -3711,7 +3877,7 @@ def infer_failover(dry_run):
     try:
         from core.inference_router import InferenceRouter
     except ImportError:
-        print("❌ Inference router module not available.")
+        print("ERROR: Inference router module not available.")
         sys.exit(1)
 
     router = InferenceRouter()
@@ -3746,9 +3912,9 @@ def infer_failover(dry_run):
         for ev in events:
             print(f"   🔄 FAILOVER: {ev['failed_provider']}/{ev['failed_endpoint'][:16]} → {ev['new_provider']}/{ev['new_primary'][:16]}")
             print(f"      Reason: {ev['reason']}")
-        print(f"\n✅ {len(events)} failover(s) executed. Traffic shifted to healthy providers.")
+        print(f"\nOK: {len(events)} failover(s) executed. Traffic shifted to healthy providers.")
     else:
-        print("   ✅ All primary endpoints healthy — no failover needed.")
+        print("   OK: All primary endpoints healthy — no failover needed.")
 
 
 @cli.command('infer-route')
@@ -3774,14 +3940,14 @@ def infer_route(model, strategy, measure):
     # Tier check removed - inference available to all users (open source)
     # tier_features = api.tier.get('features', [])
     # if 'all' not in tier_features and 'inference' not in tier_features:
-    #     print(f"❌ Inference routing requires Research+ or Enterprise tier.")
+    #     print(f"ERROR: Inference routing requires Research+ or Enterprise tier.")
     #     print(f"   Run: terradev upgrade")
     #     sys.exit(1)
 
     try:
         from core.inference_router import InferenceRouter
     except ImportError:
-        print("❌ Inference router module not available.")
+        print("ERROR: Inference router module not available.")
         print("   Run: terradev upgrade")
         sys.exit(1)
 
@@ -3818,7 +3984,7 @@ def infer_route(model, strategy, measure):
     best = router.get_best_endpoint(model=model, strategy=strategy)
 
     if not best:
-        print(f"❌ No healthy endpoints found" + (f" for model '{model}'" if model else ""))
+        print(f"ERROR: No healthy endpoints found" + (f" for model '{model}'" if model else ""))
         return
 
     print(f"🎯 Best endpoint (strategy: {strategy}):")
@@ -4020,7 +4186,7 @@ def _kubectl_apply(manifest_dict: Dict[str, Any], dry_run: bool = False) -> bool
             print(f"   {result.stdout.strip()}")
             return True
         except subprocess.CalledProcessError as e:
-            print(f"   ❌ kubectl error: {e.stderr.strip()}")
+            print(f"   ERROR: kubectl error: {e.stderr.strip()}")
             return False
         finally:
             os.unlink(f.name)
@@ -4046,7 +4212,7 @@ cli.add_command(k8s)
 def k8s_create(cluster_name, gpu, count, max_price, multi_cloud, prefer_spot, aws_region, gcp_region, control_plane):
     """Create multi-cloud Kubernetes GPU cluster"""
     if not TerraformWrapper:
-        print("❌ Kubernetes wrapper not available")
+        print("ERROR: Kubernetes wrapper not available")
         sys.exit(1)
     
     if _telemetry:
@@ -4076,7 +4242,7 @@ def k8s_create(cluster_name, gpu, count, max_price, multi_cloud, prefer_spot, aw
     print(f"🚀 Creating Kubernetes cluster '{cluster_name}'...")
     print(f"🎮 GPU Type: {gpu}")
     print(f"📊 Node Count: {count}")
-    print(f"💰 Max Price: ${max_price}/hr")
+    print(f"COST: Max Price: ${max_price}/hr")
     print(f"☁️  Multi-Cloud: {multi_cloud}")
     print(f"🎯 Spot Instances: {prefer_spot}")
     print(f"")
@@ -4094,19 +4260,19 @@ def k8s_create(cluster_name, gpu, count, max_price, multi_cloud, prefer_spot, aw
     success = wrapper.create_cluster(cluster_config)
     
     if success:
-        print(f"✅ Cluster '{cluster_name}' created successfully!")
+        print(f"OK: Cluster '{cluster_name}' created successfully!")
         print(f"   Topology: NUMA-aligned, GPUDirect RDMA, Topology Manager=restricted")
-        print(f"ℹ️  Run 'terradev k8s info {cluster_name}' for details")
+        print(f"INFO:  Run 'terradev k8s info {cluster_name}' for details")
         print(f"🔗 Run 'export KUBECONFIG=~/.terradev/clusters/{cluster_name}.json' to connect")
     else:
-        print(f"❌ Failed to create cluster '{cluster_name}'")
+        print(f"ERROR: Failed to create cluster '{cluster_name}'")
 
 @k8s.command('destroy')
 @click.argument('cluster_name')
 def k8s_destroy(cluster_name):
     """Destroy Kubernetes cluster"""
     if not TerraformWrapper:
-        print("❌ Kubernetes wrapper not available")
+        print("ERROR: Kubernetes wrapper not available")
         return
     
     if _telemetry:
@@ -4121,15 +4287,15 @@ def k8s_destroy(cluster_name):
     success = wrapper.destroy_cluster(cluster_name)
     
     if success:
-        print(f"✅ Cluster '{cluster_name}' destroyed successfully!")
+        print(f"OK: Cluster '{cluster_name}' destroyed successfully!")
     else:
-        print(f"❌ Failed to destroy cluster '{cluster_name}'")
+        print(f"ERROR: Failed to destroy cluster '{cluster_name}'")
 
 @k8s.command('list')
 def k8s_list():
     """List all Kubernetes clusters"""
     if not TerraformWrapper:
-        print("❌ Kubernetes wrapper not available")
+        print("ERROR: Kubernetes wrapper not available")
         sys.exit(1)
     
     wrapper = TerraformWrapper()
@@ -4156,7 +4322,7 @@ def k8s_list():
             if gpu_summary:
                 print(f"🎮 GPU Type: {gpu_summary.get('gpu_type', 'unknown')}")
                 print(f"Status Total Nodes: {gpu_summary.get('total_gpus', 0)}")
-                print(f"💰 Cost/hr: ${outputs.get('total_cost_per_hour', 0):.2f}")
+                print(f"COST: Cost/hr: ${outputs.get('total_cost_per_hour', 0):.2f}")
         
         print("-" * 40)
 
@@ -4165,14 +4331,14 @@ def k8s_list():
 def k8s_info(cluster_name):
     """Get detailed cluster information"""
     if not TerraformWrapper:
-        print("❌ Kubernetes wrapper not available")
+        print("ERROR: Kubernetes wrapper not available")
         return
     
     wrapper = TerraformWrapper()
     info = wrapper.get_cluster_info(cluster_name)
     
     if not info:
-        print(f"❌ Cluster '{cluster_name}' not found")
+        print(f"ERROR: Cluster '{cluster_name}' not found")
         return
     
     print(f"Plan Cluster Information: {cluster_name}")
@@ -4186,14 +4352,14 @@ def k8s_info(cluster_name):
         if gpu_summary:
             print(f"🎮 GPU Type: {gpu_summary.get('gpu_type', 'unknown')}")
             print(f"Status Total Nodes: {gpu_summary.get('total_gpus', 0)}")
-            print(f"💰 Max Price: ${gpu_summary.get('max_price', 0):.2f}/hr")
+            print(f"COST: Max Price: ${gpu_summary.get('max_price', 0):.2f}/hr")
             print(f"🎯 Actual Average: ${gpu_summary.get('actual_average', 0):.2f}/hr")
             print(f"🔄 Spot Preferred: {gpu_summary.get('prefer_spot', False)}")
         
         # Cost Breakdown
         cost_breakdown = outputs.get('cost_breakdown', {})
         if cost_breakdown:
-            print(f"\n💰 Cost Breakdown:")
+            print(f"\nCOST: Cost Breakdown:")
             print(f"{'Provider':<12} {'Nodes':<6} {'Cost/hr':<10} {'Cost/mo':<12}")
             print("-" * 50)
             for provider, breakdown in cost_breakdown.items():
@@ -4215,7 +4381,7 @@ def k8s_info(cluster_name):
                 print(f"  {step}")
     
     else:
-        print("❌ No detailed information available")
+        print("ERROR: No detailed information available")
 
 @cli.command()
 @click.option('--workload', '-w',
@@ -4240,7 +4406,7 @@ def smart_deploy(image, workload, cmd, gpu_count, budget, namespace, name, env, 
     try:
         from core.deployment_router import SmartDeploymentRouter
     except ImportError:
-        print("❌ Smart deployment module not available. Install terradev_cli package.")
+        print("ERROR: Smart deployment module not available. Install terradev_cli package.")
         sys.exit(1)
     import asyncio
     
@@ -4263,13 +4429,13 @@ def smart_deploy(image, workload, cmd, gpu_count, budget, namespace, name, env, 
         recommendations = await router.recommend_deployments(user_request)
         
         if not recommendations:
-            print("❌ No deployment options available")
+            print("ERROR: No deployment options available")
             return
         
         if option is not None:
             # Deploy specific option
             if option >= len(recommendations):
-                print(f"❌ Invalid option. Available options: 0-{len(recommendations)-1}")
+                print(f"ERROR: Invalid option. Available options: 0-{len(recommendations)-1}")
                 return
             
             chosen = recommendations[option]
@@ -4286,11 +4452,11 @@ def smart_deploy(image, workload, cmd, gpu_count, budget, namespace, name, env, 
             # Execute deployment
             try:
                 result = await router.execute_deployment(chosen, router.requirements_analyzer.analyze(user_request))
-                print(f"✅ Deployment started: {result['deployment_id']}")
+                print(f"OK: Deployment started: {result['deployment_id']}")
                 print(f"   Status: {result['status']}")
                 print(f"   Estimated ready: {result['estimated_ready_time']}")
             except Exception as e:
-                print(f"❌ Deployment failed: {e}")
+                print(f"ERROR: Deployment failed: {e}")
         else:
             # Show all recommendations
             print(f"\n🎯 Smart Deployment Recommendations:")
@@ -4328,7 +4494,7 @@ def price_discovery(gpu_type, region, hours, trends):
     try:
         from core.price_discovery import PriceDiscoveryEngine
     except ImportError:
-        print("❌ Price discovery module not available. Install terradev_cli package.")
+        print("ERROR: Price discovery module not available. Install terradev_cli package.")
         sys.exit(1)
     import asyncio
     
@@ -4341,7 +4507,7 @@ def price_discovery(gpu_type, region, hours, trends):
                 print(f"🔍 Getting real-time prices for {gpu_type}...")
                 prices = await e.get_realtime_prices(gpu_type, region)
                 
-                print(f"\n💰 Real-time Prices for {gpu_type}:")
+                print(f"\nCOST: Real-time Prices for {gpu_type}:")
                 print("=" * 70)
                 print(f"{'Provider':<12} {'Price':<10} {'Instance':<20} {'Capacity':<12} {'Confidence':<12}")
                 print("-" * 70)
@@ -4361,7 +4527,7 @@ def price_discovery(gpu_type, region, hours, trends):
                         print(f"   Volatility: {metrics['volatility']:.3f}")
                         print(f"   Trend: {metrics['trend']}")
             else:
-                print("❌ Please specify --gpu-type")
+                print("ERROR: Please specify --gpu-type")
                 sys.exit(2)
     
     asyncio.run(_price_discovery())
@@ -4391,12 +4557,12 @@ def budget_optimize(gpu_type, budget, gpu_count, hours, region, workload):
             'region': region
         }
         
-        print(f"💰 Finding options under ${budget:.2f}/hr budget for {gpu_type}...")
+        print(f"COST: Finding options under ${budget:.2f}/hr budget for {gpu_type}...")
         
         options = await optimizer.optimize_for_budget(requirements, budget)
         
         if not options:
-            print(f"❌ No options found under ${budget:.2f}/hr budget")
+            print(f"ERROR: No options found under ${budget:.2f}/hr budget")
             return
         
         print(f"\n🎯 Budget-Optimized Options:")
@@ -4522,15 +4688,15 @@ def percentiles(gpu_type, provider, spot, window):
     try:
         from core.price_intelligence import compute_percentiles
     except ImportError:
-        print("❌ Price intelligence module not available")
+        print("ERROR: Price intelligence module not available")
         sys.exit(1)
 
     data = compute_percentiles(gpu_type, provider=provider, spot=spot, hours=window)
     providers = data.get("providers", {})
 
     if not providers:
-        print(f"❌ No price data for {gpu_type.upper()} in the last {window}h")
-        print("💡 Run 'terradev quote -g {gpu_type}' to start collecting price data.")
+        print(f"ERROR: No price data for {gpu_type.upper()} in the last {window}h")
+        print("Tip: Run 'terradev quote -g {gpu_type}' to start collecting price data.")
         return
 
     print(f"\nStatus Price Percentiles — {gpu_type.upper()} (last {window}h)")
@@ -4546,7 +4712,7 @@ def percentiles(gpu_type, provider, spot, window):
     all_p50 = [(p, s['p50']) for p, s in providers.items()]
     all_p50.sort(key=lambda x: x[1])
     cheapest = all_p50[0]
-    print(f"\n💡 Cheapest median (p50): {cheapest[0]} at ${cheapest[1]:.2f}/hr")
+    print(f"\nTip: Cheapest median (p50): {cheapest[0]} at ${cheapest[1]:.2f}/hr")
     if len(all_p50) > 1:
         spread = all_p50[-1][1] - all_p50[0][1]
         print(f"📈 Median spread: ${spread:.2f}/hr across {len(all_p50)} providers")
@@ -4564,7 +4730,7 @@ def availability(gpu_type, window):
     try:
         from core.price_intelligence import get_availability, get_availability_summary
     except ImportError:
-        print("❌ Price intelligence module not available")
+        print("ERROR: Price intelligence module not available")
         sys.exit(1)
 
     if gpu_type:
@@ -4572,15 +4738,15 @@ def availability(gpu_type, window):
         providers = data.get("providers", {})
 
         if not providers:
-            print(f"❌ No availability data for {gpu_type.upper()} in the last {window}h")
-            print(f"💡 Run 'terradev quote -g {gpu_type}' to start tracking availability.")
+            print(f"ERROR: No availability data for {gpu_type.upper()} in the last {window}h")
+            print(f"Tip: Run 'terradev quote -g {gpu_type}' to start tracking availability.")
             return
 
         print(f"\n📡 Availability — {gpu_type.upper()} (last {window}h)")
         print(f"{'Provider':<14} {'Status':<12} {'Rate':>8} {'Checks':>8} {'Avail':>8} {'Avg ms':>10} {'Last Seen':<20}")
         print("─" * 90)
         for prov, stats in sorted(providers.items()):
-            status = "✅ In Stock" if stats["available"] else "❌ Sold Out"
+            status = "OK: In Stock" if stats["available"] else "ERROR: Sold Out"
             rate_pct = f"{stats['availability_rate'] * 100:.1f}%"
             print(f"{prov:<14} {status:<12} {rate_pct:>8} {stats['total_checks']:>8} "
                   f"{stats['available_checks']:>8} {stats['avg_response_ms']:>9.0f}ms "
@@ -4590,8 +4756,8 @@ def availability(gpu_type, window):
     else:
         summary = get_availability_summary()
         if not summary:
-            print("❌ No availability data yet.")
-            print("💡 Run 'terradev quote -g <GPU>' to start tracking.")
+            print("ERROR: No availability data yet.")
+            print("Tip: Run 'terradev quote -g <GPU>' to start tracking.")
             return
 
         print(f"\n📡 Availability Summary (all GPUs, last check)")
@@ -4599,7 +4765,7 @@ def availability(gpu_type, window):
         print("─" * 42)
         for gtype in sorted(summary.keys()):
             for prov in sorted(summary[gtype].keys()):
-                status = "✅ In Stock" if summary[gtype][prov] else "❌ Sold Out"
+                status = "OK: In Stock" if summary[gtype][prov] else "ERROR: Sold Out"
                 print(f"{gtype:<14} {prov:<14} {status:<12}")
 
 
@@ -4616,14 +4782,14 @@ def reliability(provider, window, ranking):
     try:
         from core.price_intelligence import get_provider_reliability, get_provider_ranking
     except ImportError:
-        print("❌ Price intelligence module not available")
+        print("ERROR: Price intelligence module not available")
         sys.exit(1)
 
     if ranking:
         ranked = get_provider_ranking()
         if not ranked:
-            print("❌ No reliability data yet.")
-            print("💡 Run 'terradev quote' or 'terradev provision' to start tracking.")
+            print("ERROR: No reliability data yet.")
+            print("Tip: Run 'terradev quote' or 'terradev provision' to start tracking.")
             return
 
         print(f"\n🏆 Provider Reliability Ranking")
@@ -4641,8 +4807,8 @@ def reliability(provider, window, ranking):
     providers = data.get("providers", {})
 
     if not providers:
-        print(f"❌ No reliability data" + (f" for {provider}" if provider else "") + f" in the last {window}h")
-        print("💡 Run 'terradev quote' or 'terradev provision' to start tracking.")
+        print(f"ERROR: No reliability data" + (f" for {provider}" if provider else "") + f" in the last {window}h")
+        print("Tip: Run 'terradev quote' or 'terradev provision' to start tracking.")
         return
 
     print(f"\n🔧 Provider Reliability (last {window}h)")
@@ -4706,27 +4872,27 @@ def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type,
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ Kubernetes connected successfully")
+                print(f"OK: Kubernetes connected successfully")
                 print(f"   Cluster: {result['cluster_name']}")
                 print(f"   Namespace: {result['namespace']}")
                 print(f"   Nodes: {len(result['nodes'])}")
                 print(f"   Karpenter: {'Enabled' if result['karpenter_enabled'] else 'Disabled'}")
                 print(f"   Monitoring: {'Enabled' if creds.get('kubernetes_monitoring_enabled') == 'true' else 'Disabled'}")
             else:
-                print(f"❌ Kubernetes connection failed: {result['error']}")
+                print(f"ERROR: Kubernetes connection failed: {result['error']}")
         
         elif install_monitoring:
             print("Deploying Installing enhanced monitoring stack...")
             result = asyncio.run(service.install_monitoring_stack())
             
             if result['status'] == 'installed':
-                print(f"✅ Monitoring stack installed")
+                print(f"OK: Monitoring stack installed")
                 print(f"   Prometheus: {result.get('prometheus')}")
                 print(f"   Grafana: {result.get('grafana')}")
                 print(f"   Dashboards: {result.get('dashboards')}")
                 print(f"   Access Grafana: kubectl port-forward -n monitoring svc/grafana 3000:80")
             else:
-                print(f"❌ Installation failed: {result['error']}")
+                print(f"ERROR: Installation failed: {result['error']}")
         
         elif metrics_summary:
             print("Status Getting comprehensive metrics summary...")
@@ -4738,7 +4904,7 @@ def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type,
                 print(f"   Monitoring: {result.get('monitoring', {})}")
                 print(f"   Karpenter: {result.get('karpenter', {})}")
             else:
-                print(f"❌ Metrics summary failed: {result.get('error')}")
+                print(f"ERROR: Metrics summary failed: {result.get('error')}")
         
         elif dashboard:
             print("🌐 Accessing Grafana dashboard...")
@@ -4756,20 +4922,20 @@ def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type,
                 for node in nodes:
                     print(f"   🖥️ {node['name']} - {node['instance_type']} - {node['gpu_capacity']} GPUs")
             else:
-                print("   ℹ️  No GPU nodes found")
+                print("   INFO:  No GPU nodes found")
         
         elif install_karpenter:
             print("Deploying Installing Karpenter...")
             result = asyncio.run(service.install_karpenter())
             
             if result['status'] == 'installed':
-                print(f"✅ Karpenter installed: {result['version']}")
+                print(f"OK: Karpenter installed: {result['version']}")
             else:
-                print(f"❌ Installation failed: {result['error']}")
+                print(f"ERROR: Installation failed: {result['error']}")
         
         elif create_provisioner:
             if not gpu_type:
-                print("❌ GPU type required for provisioner creation")
+                print("ERROR: GPU type required for provisioner creation")
                 return
             
             limits = {}
@@ -4782,9 +4948,9 @@ def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type,
             result = asyncio.run(service.create_karpenter_provisioner(gpu_type, limits))
             
             if result['status'] == 'created':
-                print(f"✅ Provisioner created: {result['provisioner']}")
+                print(f"OK: Provisioner created: {result['provisioner']}")
             else:
-                print(f"❌ Creation failed: {result['error']}")
+                print(f"ERROR: Creation failed: {result['error']}")
         
         elif resources:
             print("Status Getting cluster resources...")
@@ -4796,10 +4962,10 @@ def kubernetes(test, gpu_nodes, install_karpenter, create_provisioner, gpu_type,
             print(f"   Nodes: {len(resources_data['nodes'])}")
         
         else:
-            print("✅ Enhanced Kubernetes configured. Use --test to verify connection.")
+            print("OK: Enhanced Kubernetes configured. Use --test to verify connection.")
             
     except ImportError:
-        print("❌ Enhanced Kubernetes service not available.")
+        print("ERROR: Enhanced Kubernetes service not available.")
 
 @ml.command()
 @click.option('--test', is_flag=True, help='Test connection to the service')
@@ -4831,7 +4997,7 @@ def wandb(test, list_projects, create_project, list_runs, run_details, export, c
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ W&B connected successfully")
+                print(f"OK: W&B connected successfully")
                 print(f"   Entity: {result['entity']}")
                 print(f"   Project: {result['project']}")
                 print(f"   Base URL: {result['base_url']}")
@@ -4839,17 +5005,17 @@ def wandb(test, list_projects, create_project, list_runs, run_details, export, c
                 print(f"   Reports: {'Enabled' if creds.get('wandb_reports_enabled') == 'true' else 'Disabled'}")
                 print(f"   Alerts: {'Enabled' if creds.get('wandb_alerts_enabled') == 'true' else 'Disabled'}")
             else:
-                print(f"❌ W&B connection failed: {result['error']}")
+                print(f"ERROR: W&B connection failed: {result['error']}")
         
         elif create_dashboard:
             print("Status Creating Terradev dashboard...")
             result = asyncio.run(service.create_terradev_dashboard())
             
             if result['status'] == 'created':
-                print(f"✅ Dashboard created: {result['dashboard']['id']}")
+                print(f"OK: Dashboard created: {result['dashboard']['id']}")
                 print(f"   Access at: https://wandb.ai/{creds.get('wandb_entity', 'default')}/{creds.get('wandb_project', 'terradev')}")
             else:
-                print(f"❌ Dashboard creation failed: {result['error']}")
+                print(f"ERROR: Dashboard creation failed: {result['error']}")
         
         elif create_report:
             print("Plan Generating infrastructure report...")
@@ -4867,24 +5033,24 @@ def wandb(test, list_projects, create_project, list_runs, run_details, export, c
             result = asyncio.run(service.create_terradev_report(metrics_data))
             
             if result['status'] == 'created':
-                print(f"✅ Report created: {result['report']['id']}")
+                print(f"OK: Report created: {result['report']['id']}")
                 print(f"   Access at: https://wandb.ai/{creds.get('wandb_entity', 'default')}/{creds.get('wandb_project', 'terradev')}/reports")
             else:
-                print(f"❌ Report creation failed: {result['error']}")
+                print(f"ERROR: Report creation failed: {result['error']}")
         
         elif setup_alerts:
             print("🚨 Setting up Terradev alerts...")
             result = asyncio.run(service.create_terradev_alerts())
             
             if result['status'] == 'completed':
-                print(f"✅ Alerts set up: {len(result['alerts'])} alerts created")
+                print(f"OK: Alerts set up: {len(result['alerts'])} alerts created")
                 for alert in result['alerts']:
                     if alert['status'] == 'created':
-                        print(f"   ✅ {alert['alert']['name']}")
+                        print(f"   OK: {alert['alert']['name']}")
                     else:
-                        print(f"   ❌ {alert['alert']['name']}: {alert['error']}")
+                        print(f"   ERROR: {alert['alert']['name']}: {alert['error']}")
             else:
-                print(f"❌ Alert setup failed: {result['error']}")
+                print(f"ERROR: Alert setup failed: {result['error']}")
         
         elif dashboard_status:
             print("Status Getting comprehensive dashboard status...")
@@ -4899,7 +5065,7 @@ def wandb(test, list_projects, create_project, list_runs, run_details, export, c
                 print(f"   Reports: {len(result['reports'])}")
                 print(f"   Monitoring: {result['monitoring']}")
             else:
-                print(f"❌ Dashboard status failed: {result['error']}")
+                print(f"ERROR: Dashboard status failed: {result['error']}")
         
         elif list_projects:
             print("Plan Listing W&B projects...")
@@ -4911,7 +5077,7 @@ def wandb(test, list_projects, create_project, list_runs, run_details, export, c
         elif create_project:
             print(f"Path Creating project: {create_project}")
             result = asyncio.run(service.create_project(create_project, "Created via Terradev CLI"))
-            print(f"✅ Project created: {result['name']}")
+            print(f"OK: Project created: {result['name']}")
         
         elif list_runs:
             print("🏃 Listing recent runs...")
@@ -4930,15 +5096,15 @@ def wandb(test, list_projects, create_project, list_runs, run_details, export, c
             print(f"   Config: {json.dumps(result.get('config', {}), indent=2)}")
         
         elif export:
-            print(f"📤 Exporting runs data...")
+            print(f"UPLOAD: Exporting runs data...")
             data = asyncio.run(service.export_runs_data(format=export))
             print(data)
         
         else:
-            print("✅ Enhanced W&B configured. Use --test to verify connection.")
+            print("OK: Enhanced W&B configured. Use --test to verify connection.")
             
     except ImportError:
-        print("❌ Enhanced W&B service not available.")
+        print("ERROR: Enhanced W&B service not available.")
 
 @ml.command()
 @click.option('--test', is_flag=True, help='Test connection to the service')
@@ -4970,7 +5136,7 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ LangChain connected successfully")
+                print(f"OK: LangChain connected successfully")
                 print(f"   LangSmith: {result['langsmith']}")
                 print(f"   Environment: {result['environment']}")
                 print(f"   Dashboard: {'Enabled' if creds.get('langchain_dashboard_enabled') == 'true' else 'Disabled'}")
@@ -4978,7 +5144,7 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
                 print(f"   Evaluation: {'Enabled' if creds.get('langchain_evaluation_enabled') == 'true' else 'Disabled'}")
                 print(f"   Workflow: {'Enabled' if creds.get('langchain_workflow_enabled') == 'true' else 'Disabled'}")
             else:
-                print(f"❌ LangChain connection failed: {result['error']}")
+                print(f"ERROR: LangChain connection failed: {result['error']}")
         
         elif create_workflow:
             print("🔧 Creating LangChain workflow...")
@@ -4989,11 +5155,11 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
             result = asyncio.run(service.create_workflow(workflow_config))
             
             if result['status'] == 'created':
-                print(f"✅ Workflow created: {result['workflow_id']}")
+                print(f"OK: Workflow created: {result['workflow_id']}")
                 print(f"   Name: {result['name']}")
                 print(f"   Description: {result['description']}")
             else:
-                print(f"❌ Workflow creation failed: {result['error']}")
+                print(f"ERROR: Workflow creation failed: {result['error']}")
         
         elif create_langgraph:
             print("🔧 Creating LangGraph workflow...")
@@ -5004,11 +5170,11 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
             result = asyncio.run(service.create_langgraph_workflow(graph_config))
             
             if result['status'] == 'created':
-                print(f"✅ LangGraph workflow created: {result['workflow_id']}")
+                print(f"OK: LangGraph workflow created: {result['workflow_id']}")
                 print(f"   Name: {result['name']}")
                 print(f"   Description: {result['description']}")
             else:
-                print(f"❌ LangGraph creation failed: {result['error']}")
+                print(f"ERROR: LangGraph creation failed: {result['error']}")
         
         elif create_pipeline:
             print("🔧 Creating SGLang pipeline...")
@@ -5019,11 +5185,11 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
             result = asyncio.run(service.create_sglang_pipeline(pipeline_config))
             
             if result['status'] == 'created':
-                print(f"✅ SGLang pipeline created: {result['pipeline_id']}")
+                print(f"OK: SGLang pipeline created: {result['pipeline_id']}")
                 print(f"   Name: {result['name']}")
                 print(f"   Description: {result['description']}")
             else:
-                print(f"❌ Pipeline creation failed: {result['error']}")
+                print(f"ERROR: Pipeline creation failed: {result['error']}")
         
         elif list_projects:
             print("Plan Listing LangSmith projects...")
@@ -5042,28 +5208,28 @@ def langchain(test, create_workflow, create_langgraph, create_pipeline, list_pro
         
         elif create_trace:
             if not run_id or not data:
-                print("❌ Run ID and data required for trace creation")
+                print("ERROR: Run ID and data required for trace creation")
                 return
             
             try:
                 trace_data = json.loads(data)
             except json.JSONDecodeError:
-                print("❌ Invalid JSON data")
+                print("ERROR: Invalid JSON data")
                 return
             
             print(f"🔍 Creating trace: {run_id}")
             result = asyncio.run(service.create_trace(run_id, trace_data))
             
             if result['status'] == 'created':
-                print(f"✅ Trace created: {run_id}")
+                print(f"OK: Trace created: {run_id}")
             else:
-                print(f"❌ Trace creation failed: {result['error']}")
+                print(f"ERROR: Trace creation failed: {result['error']}")
         
         else:
-            print("✅ Enhanced LangChain configured. Use --test to verify connection.")
+            print("OK: Enhanced LangChain configured. Use --test to verify connection.")
             
     except ImportError:
-        print("❌ Enhanced LangChain service not available.")
+        print("ERROR: Enhanced LangChain service not available.")
 
 @ml.command()
 @click.option('--test', is_flag=True, help='Test connection to the service')
@@ -5092,7 +5258,7 @@ def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph)
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ LangGraph connected successfully")
+                print(f"OK: LangGraph connected successfully")
                 print(f"   LangSmith: {result['langsmith']}")
                 print(f"   Environment: {result['environment']}")
                 print(f"   Dashboard: {'Enabled' if creds.get('langchain_dashboard_enabled') == 'true' else 'Disabled'}")
@@ -5101,11 +5267,11 @@ def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph)
                 print(f"   Deployment: {'Enabled' if creds.get('langchain_deployment_enabled') == 'true' else 'Disabled'}")
                 print(f"   Observability: {'Enabled' if creds.get('langchain_observability_enabled') == 'true' else 'Disabled'}")
             else:
-                print(f"❌ LangGraph connection failed: {result['error']}")
+                print(f"ERROR: LangGraph connection failed: {result['error']}")
         
         elif create_workflow:
             if not type:
-                print("❌ Workflow type required")
+                print("ERROR: Workflow type required")
                 return
             
             print(f"🔧 Creating {type} LangGraph workflow...")
@@ -5123,11 +5289,11 @@ def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph)
                 result = asyncio.run(service.create_workflow(workflow_config))
             
             if result['status'] == 'created':
-                print(f"✅ {type} workflow created: {result['workflow_id']}")
+                print(f"OK: {type} workflow created: {result['workflow_id']}")
                 print(f"   Name: {result['name']}")
                 print(f"   Description: {result['description']}")
             else:
-                print(f"❌ Workflow creation failed: {result['error']}")
+                print(f"ERROR: Workflow creation failed: {result['error']}")
         
         elif workflow_status:
             print(f"Status Getting workflow status: {workflow_status}")
@@ -5139,23 +5305,23 @@ def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph)
                 print(f"   Metrics: {result['metrics']}")
                 print(f"   Monitoring: {result['monitoring']}")
             else:
-                print(f"❌ Status check failed: {result['error']}")
+                print(f"ERROR: Status check failed: {result['error']}")
         
         elif deploy:
             if not name:
-                print("❌ Workflow name required for deployment")
+                print("ERROR: Workflow name required for deployment")
                 return
             
             print(f"Deploying workflow: {name}")
             # This would integrate with LangGraph's deployment APIs
-            print(f"✅ Workflow deployed: {name}")
+            print(f"OK: Workflow deployed: {name}")
             print(f"   Access at: https://smith.langchain.com/deployments/{name}")
         
         else:
-            print("✅ Enhanced LangGraph configured. Use --test to verify connection.")
+            print("OK: Enhanced LangGraph configured. Use --test to verify connection.")
             
     except ImportError:
-        print("❌ Enhanced LangGraph service not available.")
+        print("ERROR: Enhanced LangGraph service not available.")
 
 @ml.command()
 @click.option('--test', is_flag=True, help='Test connection to the service')
@@ -5184,7 +5350,7 @@ def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ SGLang connected successfully")
+                print(f"OK: SGLang connected successfully")
                 print(f"   Version: {result['sglang_version']}")
                 print(f"   Model Path: {result['model_path']}")
                 print(f"   Dashboard: {'Enabled' if creds.get('sglang_dashboard_enabled') == 'true' else 'Disabled'}")
@@ -5193,11 +5359,11 @@ def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
                 print(f"   Deployment: {'Enabled' if creds.get('sglang_deployment_enabled') == 'true' else 'Disabled'}")
                 print(f"   Observability: {'Enabled' if creds.get('sglang_observability_enabled') == 'true' else 'Disabled'}")
             else:
-                print(f"❌ SGLang connection failed: {result['error']}")
+                print(f"ERROR: SGLang connection failed: {result['error']}")
         
         elif create_pipeline:
             if not model_path:
-                print("❌ Model path required for pipeline creation")
+                print("ERROR: Model path required for pipeline creation")
                 return
             
             print(f"🔧 Creating SGLang pipeline: {create_pipeline}")
@@ -5209,19 +5375,19 @@ def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
             result = asyncio.run(service.create_pipeline(pipeline_config))
             
             if result['status'] == 'created':
-                print(f"✅ Pipeline created: {result['pipeline_id']}")
+                print(f"OK: Pipeline created: {result['pipeline_id']}")
                 print(f"   Name: {result['name']}")
                 print(f"   Description: {result['description']}")
                 print(f"   Model Path: {result['model_path']}")
             else:
-                print(f"❌ Pipeline creation failed: {result['error']}")
+                print(f"ERROR: Pipeline creation failed: {result['error']}")
         
         elif serve:
             serve_port = port or "8000"
             model_to_serve = model_path or creds.get('sglang_model_path')
             
             if not model_to_serve:
-                print("❌ Model path required for serving")
+                print("ERROR: Model path required for serving")
                 return
             
             print(f"Deploying Starting SGLang serving...")
@@ -5231,7 +5397,7 @@ def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
             print(f"   Metrics: http://localhost:{serve_port}/metrics")
             
             # This would integrate with SGLang's serving APIs
-            print(f"✅ SGLang serving started on port {serve_port}")
+            print(f"OK: SGLang serving started on port {serve_port}")
         
         elif metrics:
             print("Status Getting SGLang metrics...")
@@ -5247,7 +5413,7 @@ def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
                 print(f"   GPU Utilization: {result['metrics']['gpu_utilization']:.1f}%")
                 print(f"   Memory Usage: {result['metrics']['memory_usage']:.2%}")
             else:
-                print(f"❌ Metrics check failed: {result['error']}")
+                print(f"ERROR: Metrics check failed: {result['error']}")
         
         elif dashboard:
             print("🌐 Accessing SGLang dashboard...")
@@ -5257,10 +5423,10 @@ def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
             print(f"   Health: http://localhost:{serve_port}/health")
         
         else:
-            print("✅ Enhanced SGLang configured. Use --test to verify connection.")
+            print("OK: Enhanced SGLang configured. Use --test to verify connection.")
             
     except ImportError:
-        print("❌ Enhanced SGLang service not available.")
+        print("ERROR: Enhanced SGLang service not available.")
 
 @ml.command()
 @click.option('--test', is_flag=True, help='Test connection to the service')
@@ -5294,11 +5460,11 @@ def huggingface(test, list_models, author, list_datasets, model_info, create_end
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ Hugging Face connected successfully")
+                print(f"OK: Hugging Face connected successfully")
                 print(f"   Namespace: {result['namespace']}")
                 print(f"   Organization: {result['organization']}")
             else:
-                print(f"❌ Hugging Face connection failed: {result['error']}")
+                print(f"ERROR: Hugging Face connection failed: {result['error']}")
         
         elif list_models:
             print("📚 Listing Hugging Face models...")
@@ -5325,14 +5491,14 @@ def huggingface(test, list_models, author, list_datasets, model_info, create_end
         
         elif create_endpoint:
             if not model or not name:
-                print("❌ Model and name required for endpoint creation")
+                print("ERROR: Model and name required for endpoint creation")
                 return
             
             instance = instance_type or "gpu-medium-a10g"
             print(f"Deploying Creating inference endpoint: {name}")
             result = asyncio.run(service.create_inference_endpoint(model, name, instance))
             
-            print(f"✅ Endpoint created: {result['name']}")
+            print(f"OK: Endpoint created: {result['name']}")
             print(f"   Status: {result.get('status', 'Unknown')}")
         
         elif list_endpoints:
@@ -5344,13 +5510,13 @@ def huggingface(test, list_models, author, list_datasets, model_info, create_end
         
         elif inference:
             if not inputs:
-                print("❌ Inputs required for inference")
+                print("ERROR: Inputs required for inference")
                 return
             
             try:
                 inputs_data = json.loads(inputs)
             except json.JSONDecodeError:
-                print("❌ Invalid JSON inputs")
+                print("ERROR: Invalid JSON inputs")
                 return
             
             print(f"🧠 Running inference on: {inference}")
@@ -5359,10 +5525,10 @@ def huggingface(test, list_models, author, list_datasets, model_info, create_end
             print(f"Status Inference result: {json.dumps(result, indent=2)}")
         
         else:
-            print("✅ Hugging Face configured. Use --test to verify connection.")
+            print("OK: Hugging Face configured. Use --test to verify connection.")
             
     except ImportError:
-        print("❌ Hugging Face service not available.")
+        print("ERROR: Hugging Face service not available.")
 
 @ml.command()
 @click.option('--test', is_flag=True, help='Test connection to the service')
@@ -5385,15 +5551,15 @@ def kserve(test):
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ KServe connected successfully")
+                print(f"OK: KServe connected successfully")
                 print(f"   Namespace: {result['namespace']}")
             else:
-                print(f"❌ KServe connection failed: {result['error']}")
+                print(f"ERROR: KServe connection failed: {result['error']}")
         else:
-            print("✅ KServe configured. Use --test to verify connection.")
+            print("OK: KServe configured. Use --test to verify connection.")
             
     except ImportError:
-        print("❌ KServe service not available. Install with: pip install kserve")
+        print("ERROR: KServe service not available. Install with: pip install kserve")
 
 @ml.command()
 @click.option('--test', is_flag=True, help='Test connection to the service')
@@ -5419,11 +5585,11 @@ def langsmith(test, list_projects, create_project, export):
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ LangSmith connected successfully")
+                print(f"OK: LangSmith connected successfully")
                 print(f"   Workspace: {result['workspace_id']}")
                 print(f"   Endpoint: {result['endpoint']}")
             else:
-                print(f"❌ LangSmith connection failed: {result['error']}")
+                print(f"ERROR: LangSmith connection failed: {result['error']}")
         
         elif list_projects:
             print("Plan Listing LangSmith projects...")
@@ -5435,18 +5601,18 @@ def langsmith(test, list_projects, create_project, export):
         elif create_project:
             print(f"Path Creating project: {create_project}")
             result = asyncio.run(service.create_project(create_project, "Created via Terradev CLI"))
-            print(f"✅ Project created: {result['id']}")
+            print(f"OK: Project created: {result['id']}")
         
         elif export:
-            print(f"📤 Exporting runs data...")
+            print(f"UPLOAD: Exporting runs data...")
             data = asyncio.run(service.export_runs(format=export))
             print(data)
             
         else:
-            print("✅ LangSmith configured. Use --test to verify connection.")
+            print("OK: LangSmith configured. Use --test to verify connection.")
             
     except ImportError:
-        print("❌ LangSmith service not available.")
+        print("ERROR: LangSmith service not available.")
 
 @ml.command()
 @click.option('--test', is_flag=True, help='Test connection to the service')
@@ -5475,39 +5641,39 @@ def dvc(test, init, add_remote, add_data, push, pull, status):
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ DVC connected successfully")
+                print(f"OK: DVC connected successfully")
                 print(f"   Repository: {result['repo_path']}")
             else:
-                print(f"❌ DVC connection failed: {result['error']}")
+                print(f"ERROR: DVC connection failed: {result['error']}")
         
         elif init:
             print("Path Initializing DVC repository...")
             result = asyncio.run(service.init_repo())
-            print(f"✅ Repository initialized: {result['repo_path']}")
+            print(f"OK: Repository initialized: {result['repo_path']}")
         
         elif add_remote:
             if ':' not in add_remote:
-                print("❌ Remote format should be: name:url")
+                print("ERROR: Remote format should be: name:url")
                 return
             name, url = add_remote.split(':', 1)
-            print(f"📦 Adding remote: {name} -> {url}")
+            print(f"PACKAGE: Adding remote: {name} -> {url}")
             result = asyncio.run(service.add_remote(name, url))
-            print(f"✅ Remote added: {result['name']}")
+            print(f"OK: Remote added: {result['name']}")
         
         elif add_data:
             print(f"Status Adding data to tracking: {add_data}")
             result = asyncio.run(service.add_data(add_data))
-            print(f"✅ Data added: {add_data}")
+            print(f"OK: Data added: {add_data}")
         
         elif push:
-            print("📤 Pushing data to remote...")
+            print("UPLOAD: Pushing data to remote...")
             result = asyncio.run(service.push_data())
-            print(f"✅ Data pushed: {result['targets']}")
+            print(f"OK: Data pushed: {result['targets']}")
         
         elif pull:
             print("📥 Pulling data from remote...")
             result = asyncio.run(service.pull_data())
-            print(f"✅ Data pulled: {result['targets']}")
+            print(f"OK: Data pulled: {result['targets']}")
         
         elif status:
             print("Status Repository status:")
@@ -5516,10 +5682,10 @@ def dvc(test, init, add_remote, add_data, push, pull, status):
                 print(f"   {detail}")
         
         else:
-            print("✅ DVC configured. Use --test to verify connection.")
+            print("OK: DVC configured. Use --test to verify connection.")
             
     except ImportError:
-        print("❌ DVC service not available. Install with: pip install dvc")
+        print("ERROR: DVC service not available. Install with: pip install dvc")
 
 @ml.command()
 @click.option('--test', is_flag=True, help='Test connection to the service')
@@ -5546,11 +5712,11 @@ def mlflow(test, list_experiments, create_experiment, list_runs, export):
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ MLflow connected successfully")
+                print(f"OK: MLflow connected successfully")
                 print(f"   Tracking URI: {result['tracking_uri']}")
                 print(f"   Experiments: {result['experiments_count']}")
             else:
-                print(f"❌ MLflow connection failed: {result['error']}")
+                print(f"ERROR: MLflow connection failed: {result['error']}")
         
         elif list_experiments:
             print("Plan Listing MLflow experiments...")
@@ -5562,7 +5728,7 @@ def mlflow(test, list_experiments, create_experiment, list_runs, export):
         elif create_experiment:
             print(f"🧪 Creating experiment: {create_experiment}")
             result = asyncio.run(service.create_experiment(create_experiment, "Created via Terradev CLI"))
-            print(f"✅ Experiment created: {result['experiment_id']}")
+            print(f"OK: Experiment created: {result['experiment_id']}")
         
         elif list_runs:
             print(f"Status Listing runs in experiment: {list_runs}")
@@ -5573,15 +5739,15 @@ def mlflow(test, list_experiments, create_experiment, list_runs, export):
                 print(f"   🏃 {info.get('run_id', 'N/A')[:8]} - {info.get('status', 'N/A')}")
         
         elif export:
-            print(f"📤 Exporting experiment data...")
+            print(f"UPLOAD: Exporting experiment data...")
             data = asyncio.run(service.export_experiment_data(export, 'json'))
             print(data)
         
         else:
-            print("✅ MLflow configured. Use --test to verify connection.")
+            print("OK: MLflow configured. Use --test to verify connection.")
             
     except ImportError:
-        print("❌ MLflow service not available. Install with: pip install mlflow")
+        print("ERROR: MLflow service not available. Install with: pip install mlflow")
 
 @ml.command()
 @click.option('--test', is_flag=True, help='Test connection to the service')
@@ -5615,7 +5781,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
             result = asyncio.run(service.test_connection())
             
             if result['status'] == 'connected':
-                print(f"✅ Ray connected successfully")
+                print(f"OK: Ray connected successfully")
                 print(f"   Version: {result.get('ray_version', 'N/A')}")
                 print(f"   Cluster: {result.get('cluster_name', 'local')}")
                 print(f"   Dashboard: {result.get('dashboard_uri', 'N/A')}")
@@ -5624,11 +5790,11 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
                 print(f"Warning  Ray installed but cluster not running")
                 print(f"   Version: {result.get('ray_version', 'N/A')}")
                 print(f"   Error: {result['error']}")
-                print(f"   💡 Suggestion: {result.get('suggestion')}")
+                print(f"   Tip: Suggestion: {result.get('suggestion')}")
             else:
-                print(f"❌ Ray connection failed: {result['error']}")
+                print(f"ERROR: Ray connection failed: {result['error']}")
                 if 'not installed' in result['error']:
-                    print("   💡 Install Ray: pip install ray[default]")
+                    print("   Tip: Install Ray: pip install ray[default]")
                     print("   📖 For full features: pip install ray[default,train]")
         
         elif install_monitoring:
@@ -5636,7 +5802,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
             result = asyncio.run(service.install_monitoring_stack())
             
             if result['status'] == 'installed':
-                print(f"✅ Ray monitoring stack installed")
+                print(f"OK: Ray monitoring stack installed")
                 print(f"   Ray Dashboard: {result.get('ray')}")
                 print(f"   Prometheus: {result.get('prometheus')}")
                 print(f"   Grafana: {result.get('grafana')}")
@@ -5644,7 +5810,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
                 print(f"   Access Ray Dashboard: http://localhost:8265")
                 print(f"   Access Grafana: http://localhost:3000")
             else:
-                print(f"❌ Installation failed: {result['error']}")
+                print(f"ERROR: Installation failed: {result['error']}")
         
         elif metrics_summary:
             print("Status Getting comprehensive Ray metrics summary...")
@@ -5655,7 +5821,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
                 print(f"   Monitoring: {result.get('monitoring', {})}")
                 print(f"   Metrics: {result.get('metrics', {})}")
             else:
-                print(f"❌ Metrics summary failed: {result.get('error')}")
+                print(f"ERROR: Metrics summary failed: {result.get('error')}")
         
         elif grafana:
             print("🌐 Accessing Ray Grafana dashboard...")
@@ -5674,7 +5840,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
             result = asyncio.run(service.get_monitoring_status())
             
             if result.get('ray', {}).get('status') == 'running':
-                print(f"   ✅ Status: {result['ray']['status']}")
+                print(f"   OK: Status: {result['ray']['status']}")
                 print(f"   Version: {result['ray'].get('version', 'N/A')}")
                 print(f"   Cluster: {result['ray'].get('cluster_name', 'local')}")
                 print(f"   Dashboard: {result['ray'].get('dashboard_uri', 'N/A')}")
@@ -5689,7 +5855,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
                     print(f"   GPU Total: {metrics.get('gpu_total', 0)}")
                     print(f"   GPU Used: {metrics.get('gpu_used', 0)}")
             else:
-                print(f"   ❌ Status: {result.get('ray', {}).get('status', 'Unknown')}")
+                print(f"   ERROR: Status: {result.get('ray', {}).get('status', 'Unknown')}")
                 print(f"   Error: {result.get('ray', {}).get('error', 'Unknown error')}")
         
         elif list_nodes:
@@ -5703,12 +5869,12 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
                 print(f"   Active Workers: {total_workers}")
                 print(f"   Head Node: {creds.get('ray_head_node_ip', 'localhost')}")
             else:
-                print("   ℹ️  No active Ray cluster found")
+                print("   INFO:  No active Ray cluster found")
         
         elif start:
             print("Deploying Starting enhanced Ray cluster...")
             result = asyncio.run(service.start_cluster(head_node=True))
-            print(f"✅ Cluster started: {result['status']}")
+            print(f"OK: Cluster started: {result['status']}")
             
             if creds.get('ray_monitoring_enabled') == 'true':
                 print("   Status Monitoring enabled - access dashboards:")
@@ -5719,7 +5885,7 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
         elif stop:
             print("🛑 Stopping Ray cluster...")
             result = asyncio.run(service.stop_cluster())
-            print(f"✅ Cluster stopped: {result['status']}")
+            print(f"OK: Cluster stopped: {result['status']}")
         
         elif dashboard:
             print("Status Getting Ray dashboard URL...")
@@ -5727,15 +5893,15 @@ def ray(test, status, list_nodes, start, stop, dashboard, install, install_monit
             if url:
                 print(f"🌐 Dashboard: {url}")
             else:
-                print("❌ Dashboard URL not found")
+                print("ERROR: Dashboard URL not found")
         
         else:
-            print("✅ Enhanced Ray configured. Use --test to verify connection.")
+            print("OK: Enhanced Ray configured. Use --test to verify connection.")
             if creds.get('ray_monitoring_enabled') == 'true':
                 print("   Status Monitoring enabled - use --install-monitoring to set up dashboards")
             
     except ImportError:
-        print("❌ Enhanced Ray service not available. Install with: pip install ray[default]")
+        print("ERROR: Enhanced Ray service not available. Install with: pip install ray[default]")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -5772,7 +5938,7 @@ def up(job, cache_dir, fix_drift, gpu_type, gpu_count, hours, budget, region, da
                 result = await detector.fix_drift(job)
                 
                 if result['status'] == 'no_drift':
-                    print("✅ No drift detected - everything is in sync")
+                    print("OK: No drift detected - everything is in sync")
                 elif result['status'] == 'fixed':
                     print(f"🔧 Drift fixed successfully:")
                     print(f"   Terminated: {result['terminated']} nodes")
@@ -5783,7 +5949,7 @@ def up(job, cache_dir, fix_drift, gpu_type, gpu_count, hours, budget, region, da
                 return result
                 
             except Exception as e:
-                print(f"❌ Error fixing drift: {e}")
+                print(f"ERROR: Error fixing drift: {e}")
                 return
         
         # PROVISION: Auto-generates + stores manifest
@@ -5804,7 +5970,7 @@ def up(job, cache_dir, fix_drift, gpu_type, gpu_count, hours, budget, region, da
         recommendations = await router.recommend_deployments(user_request)
         
         if not recommendations:
-            print("❌ No deployment options available")
+            print("ERROR: No deployment options available")
             return
         
         # Choose best option (simplified - would normally prompt user)
@@ -5857,14 +6023,14 @@ def up(job, cache_dir, fix_drift, gpu_type, gpu_count, hours, budget, region, da
             # Store manifest
             manifest_path = cache.store_manifest(manifest)
             
-            print(f"✅ Job {job} provisioned successfully!")
+            print(f"OK: Job {job} provisioned successfully!")
             print(f"   Manifest: {manifest_path}")
             print(f"   Version: {version}")
             print(f"   Nodes: {len(nodes)}")
             print(f"   Fix drift: terradev up --job {job} --fix-drift")
             
         except Exception as e:
-            print(f"❌ Deployment failed: {e}")
+            print(f"ERROR: Deployment failed: {e}")
     
     asyncio.run(_up())
 
@@ -5881,7 +6047,7 @@ def rollback(job_version, cache_dir):
         
         # Parse job@version
         if '@' not in job_version:
-            print("❌ Invalid format. Use: job@version (e.g., llama3@v3)")
+            print("ERROR: Invalid format. Use: job@version (e.g., llama3@v3)")
             return
         
         job, version = job_version.split('@', 1)
@@ -5893,13 +6059,13 @@ def rollback(job_version, cache_dir):
         try:
             result = await detector.rollback(job, version)
             
-            print(f"✅ Rollback completed:")
+            print(f"OK: Rollback completed:")
             print(f"   Target version: {result['target_version']}")
             print(f"   Terminated: {result['terminated']} nodes")
             print(f"   Recreated: {result['recreated']} nodes")
             
         except Exception as e:
-            print(f"❌ Rollback failed: {e}")
+            print(f"ERROR: Rollback failed: {e}")
             sys.exit(1)
     
     asyncio.run(_rollback())
@@ -5916,7 +6082,7 @@ def manifests(job, cache_dir, show_imported, show_recordings):
         from core.manifest_cache import ManifestCache
         from pathlib import Path
     except ImportError:
-        print("❌ Manifest cache module not available. Install terradev_cli package.")
+        print("ERROR: Manifest cache module not available. Install terradev_cli package.")
         sys.exit(1)
     
     cache = ManifestCache(cache_dir)
@@ -5960,7 +6126,7 @@ def manifests(job, cache_dir, show_imported, show_recordings):
                 print(f"{job_info['name']:<20} {job_info['version']:<8} {job_info['workflow_name']:<25} {yaml_name:<30} {created:<20}")
         else:
             print("   No imported YAML pipelines found")
-            print("   💡 Use 'terradev import pipeline.yaml' to register a pipeline")
+            print("   Tip: Use 'terradev import pipeline.yaml' to register a pipeline")
         
         return
     
@@ -5991,10 +6157,10 @@ def manifests(job, cache_dir, show_imported, show_recordings):
                         continue
             else:
                 print("   No recordings found")
-                print("   💡 Use 'terradev record start --name my-recording' to start recording")
+                print("   Tip: Use 'terradev record start --name my-recording' to start recording")
         else:
             print("   No recordings directory found")
-            print("   💡 Use 'terradev record start --name my-recording' to start recording")
+            print("   Tip: Use 'terradev record start --name my-recording' to start recording")
         
         return
     
@@ -6015,7 +6181,7 @@ def manifests(job, cache_dir, show_imported, show_recordings):
                         yaml_file = manifest.metadata.get('yaml_file', 'unknown')
                         print(f"      Source: {Path(yaml_file).name}")
         else:
-            print(f"❌ No manifests found for job {job}")
+            print(f"ERROR: No manifests found for job {job}")
     else:
         # Show all jobs
         manifest_files = list(Path(cache_dir).glob("*.json"))
@@ -6045,17 +6211,17 @@ def manifests(job, cache_dir, show_imported, show_recordings):
                     icon = "📥" if job_name in imported_jobs else "🚀"
                     print(f"   {icon} {job_name}: {len(versions)} versions")
                 
-                print(f"\n💡 Use --show-imported to see imported YAML pipelines")
-                print(f"💡 Use --show-recordings to see live recordings")
-                print(f"💡 Use --job <name> to see detailed versions")
+                print(f"\nTip: Use --show-imported to see imported YAML pipelines")
+                print(f"Tip: Use --show-recordings to see live recordings")
+                print(f"Tip: Use --job <name> to see detailed versions")
             else:
-                print("❌ No cached manifests found")
-                print("   💡 Use 'terradev provision' to create a job")
-                print("   💡 Use 'terradev import pipeline.yaml' to register a pipeline")
+                print("ERROR: No cached manifests found")
+                print("   Tip: Use 'terradev provision' to create a job")
+                print("   Tip: Use 'terradev import pipeline.yaml' to register a pipeline")
         else:
-            print("❌ No cached manifests found")
-            print("   💡 Use 'terradev provision' to create a job")
-            print("   💡 Use 'terradev import pipeline.yaml' to register a pipeline")
+            print("ERROR: No cached manifests found")
+            print("   Tip: Use 'terradev provision' to create a job")
+            print("   Tip: Use 'terradev import pipeline.yaml' to register a pipeline")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -6087,7 +6253,7 @@ def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret
         # Get HF token
         hf_token = os.getenv('HF_TOKEN') or os.getenv('HUGGINGFACE_HUB_TOKEN')
         if not hf_token:
-            print("❌ HF_TOKEN environment variable required")
+            print("ERROR: HF_TOKEN environment variable required")
             print("   Set it with: export HF_TOKEN=your_token")
             sys.exit(2)
         
@@ -6144,17 +6310,17 @@ def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret
             result = await deployer.create_space(config)
             
             if result['status'] == 'created':
-                print(f"✅ Space created successfully!")
+                print(f"OK: Space created successfully!")
                 print(f"   🌐 Space URL: {result['space_url']}")
                 print(f"   🔧 Hardware: {result['hardware']}")
                 print(f"   🤖 Model: {result['model_id']}")
                 print(f"   ⏱️  Your Space will be ready in 2-5 minutes")
                 print(f"   Status 100k+ researchers can now access your model!")
             else:
-                print(f"❌ Failed to create space: {result['error']}")
+                print(f"ERROR: Failed to create space: {result['error']}")
                 
         except Exception as e:
-            print(f"❌ Deployment failed: {e}")
+            print(f"ERROR: Deployment failed: {e}")
     
     asyncio.run(_hf_space())
 
@@ -6712,7 +6878,7 @@ def configure(api_key, endpoint, region, snapshot, gpu_slicing, multi_tenant):
     with open(config_file, 'w') as f:
         json.dump(config, f, indent=2)
     
-    print(f"✅ InferX configured successfully")
+    print(f"OK: InferX configured successfully")
     print(f"📍 Endpoint: {endpoint}")
     print(f"🌍 Region: {region}")
     print(f"📸 Snapshot: {'Enabled' if snapshot else 'Disabled'}")
@@ -6736,7 +6902,7 @@ def deploy(model, image, gpu_type, gpu_memory, max_concurrency, framework, opena
     # Load InferX config
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
-        print("❌ InferX not configured. Run 'terradev inferx configure' first.")
+        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
         sys.exit(1)
     
     with open(config_file) as f:
@@ -6765,19 +6931,19 @@ def deploy(model, image, gpu_type, gpu_memory, max_concurrency, framework, opena
     try:
         result = asyncio.run(provider.deploy_model(model_config))
         
-        print(f"✅ Model deployed successfully!")
+        print(f"OK: Model deployed successfully!")
         print(f"📋 Model ID: {result['model_id']}")
         print(f"🔗 Endpoint: {result['endpoint']}")
         print(f"⚡ Cold Start: {result['cold_start_time']}s")
         print(f"📊 GPU Utilization: {result['gpu_utilization']}%")
-        print(f"📦 Models per Node: {result['models_per_node']}")
+        print(f"PACKAGE: Models per Node: {result['models_per_node']}")
         
         if result['openai_compatible']:
             print(f"🔄 OpenAI Compatible: Yes")
-            print(f"💡 Usage: curl -X POST {result['endpoint']} -H 'Authorization: Bearer YOUR_API_KEY'")
+            print(f"Tip: Usage: curl -X POST {result['endpoint']} -H 'Authorization: Bearer YOUR_API_KEY'")
         
     except Exception as e:
-        print(f"❌ Deployment failed: {e}")
+        print(f"ERROR: Deployment failed: {e}")
     finally:
         asyncio.run(provider.close())
 
@@ -6791,7 +6957,7 @@ def status(model_id):
     # Load InferX config
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
-        print("❌ InferX not configured. Run 'terradev inferx configure' first.")
+        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
         sys.exit(1)
     
     with open(config_file) as f:
@@ -6809,11 +6975,11 @@ def status(model_id):
         print(f"⚡ Cold Start Time: {result.get('cold_start_time', 'Unknown')}s")
         print(f"📈 Requests/min: {result.get('requests_per_minute', 0)}")
         print(f"📊 GPU Utilization: {result.get('gpu_utilization', 0)}%")
-        print(f"📦 Models on GPU: {result.get('models_on_gpu', 0)}")
-        print(f"❌ Error Rate: {result.get('error_rate', 0)}%")
+        print(f"PACKAGE: Models on GPU: {result.get('models_on_gpu', 0)}")
+        print(f"ERROR: Error Rate: {result.get('error_rate', 0)}%")
         
     except Exception as e:
-        print(f"❌ Failed to get status: {e}")
+        print(f"ERROR: Failed to get status: {e}")
     finally:
         asyncio.run(provider.close())
 
@@ -6827,7 +6993,7 @@ def delete(model_id):
     # Load InferX config
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
-        print("❌ InferX not configured. Run 'terradev inferx configure' first.")
+        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
         sys.exit(1)
     
     with open(config_file) as f:
@@ -6843,12 +7009,12 @@ def delete(model_id):
         success = asyncio.run(provider.delete_model(model_id))
         
         if success:
-            print(f"✅ Model deleted successfully")
+            print(f"OK: Model deleted successfully")
         else:
-            print(f"❌ Failed to delete model")
+            print(f"ERROR: Failed to delete model")
         
     except Exception as e:
-        print(f"❌ Failed to delete model: {e}")
+        print(f"ERROR: Failed to delete model: {e}")
     finally:
         asyncio.run(provider.close())
 
@@ -6861,7 +7027,7 @@ def inferx_list():
     # Load InferX config
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
-        print("❌ InferX not configured. Run 'terradev inferx configure' first.")
+        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
         sys.exit(1)
     
     with open(config_file) as f:
@@ -6882,7 +7048,7 @@ def inferx_list():
         print("-" * 80)
         
         for model in models:
-            print(f"📦 {model.get('model_id', 'Unknown')}")
+            print(f"PACKAGE: {model.get('model_id', 'Unknown')}")
             print(f"   Status: {model.get('status', 'Unknown')}")
             print(f"   GPU: {model.get('gpu_type', 'Unknown')}")
             print(f"   Endpoint: {model.get('endpoint', 'Unknown')}")
@@ -6890,7 +7056,7 @@ def inferx_list():
             print()
         
     except Exception as e:
-        print(f"❌ Failed to list models: {e}")
+        print(f"ERROR: Failed to list models: {e}")
     finally:
         asyncio.run(provider.close())
 
@@ -6903,7 +7069,7 @@ def usage():
     # Load InferX config
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
-        print("❌ InferX not configured. Run 'terradev inferx configure' first.")
+        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
         sys.exit(1)
     
     with open(config_file) as f:
@@ -6919,14 +7085,14 @@ def usage():
         print(f"📊 InferX Usage Statistics")
         print("-" * 40)
         print(f"📈 Total Requests: {stats.get('total_requests', 0):,}")
-        print(f"💰 Total Cost: ${stats.get('total_cost', 0):.4f}")
-        print(f"📦 Active Models: {stats.get('active_models', 0)}")
+        print(f"COST: Total Cost: ${stats.get('total_cost', 0):.4f}")
+        print(f"PACKAGE: Active Models: {stats.get('active_models', 0)}")
         print(f"🎮 GPU Hours: {stats.get('gpu_hours', 0):.2f}")
         print(f"⚡ Average Latency: {stats.get('average_latency', 0):.0f}ms")
         print(f"📊 GPU Utilization: {stats.get('gpu_utilization', 0):.1f}%")
         
     except Exception as e:
-        print(f"❌ Failed to get usage stats: {e}")
+        print(f"ERROR: Failed to get usage stats: {e}")
     finally:
         asyncio.run(provider.close())
 
@@ -6941,7 +7107,7 @@ def quote(gpu_type, region):
     # Load InferX config
     config_file = Path.home() / '.terradev' / 'inferx_config.json'
     if not config_file.exists():
-        print("❌ InferX not configured. Run 'terradev inferx configure' first.")
+        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
         sys.exit(1)
     
     with open(config_file) as f:
@@ -6955,27 +7121,27 @@ def quote(gpu_type, region):
         quotes = asyncio.run(provider.get_instance_quotes(gpu_type, region))
         
         if not quotes:
-            print("❌ No quotes available")
+            print("ERROR: No quotes available")
             return
         
         quote = quotes[0]
         
-        print(f"💰 InferX Pricing Quote")
+        print(f"COST: InferX Pricing Quote")
         print("-" * 40)
         print(f"🎮 GPU Type: {quote['gpu_type']}")
         print(f"💸 Hourly Cost: ${quote['price_per_hour']:.4f} (Serverless - pay per request)")
         print(f"💵 Per Request: ${quote['price_per_request']:.4f} per 1K tokens")
         print(f"⚡ Cold Start: {quote['cold_start_time']}s")
         print(f"📊 GPU Utilization: {quote['gpu_utilization']}%")
-        print(f"📦 Models per Node: {quote['models_per_node']}")
+        print(f"PACKAGE: Models per Node: {quote['models_per_node']}")
         print(f"🌍 Region: {quote['region']}")
         print()
         print(f"🌟 Key Features:")
         for feature in quote['features']:
-            print(f"   ✅ {feature.replace('_', ' ').title()}")
+            print(f"   OK: {feature.replace('_', ' ').title()}")
         
     except Exception as e:
-        print(f"❌ Failed to get quotes: {e}")
+        print(f"ERROR: Failed to get quotes: {e}")
     finally:
         asyncio.run(provider.close())
 
@@ -7032,7 +7198,7 @@ def optimize(cluster_config, usage_metrics, tier, output, implement):
     # Display results
     print(f"\n📊 Cost Analysis Results:")
     print(f"=" * 50)
-    print(f"💰 Current Monthly Cost: ${report['summary']['current_monthly_cost']:,.2f}")
+    print(f"COST: Current Monthly Cost: ${report['summary']['current_monthly_cost']:,.2f}")
     print(f"🎯 Potential Monthly Savings: ${report['summary']['potential_monthly_savings']:,.2f}")
     print(f"📈 Savings Percentage: {report['summary']['savings_percentage']:.1f}%")
     print(f"💸 Optimized Monthly Cost: ${report['summary']['optimized_monthly_cost']:,.2f}")
@@ -7062,7 +7228,7 @@ def optimize(cluster_config, usage_metrics, tier, output, implement):
     if implement:
         print(f"🚀 Implementing cost optimizations...")
         # Implementation logic would go here
-        print(f"✅ Optimizations implemented successfully!")
+        print(f"OK: Optimizations implemented successfully!")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Training Pipeline — preflight / train / monitor / checkpoint / train-status
@@ -7232,39 +7398,59 @@ def preflight(nodes, ssh_user, ssh_key, provision_group, quick, fmt):
 
 
 @cli.command()
-@click.option('--config', '-c', 'config_path', type=click.Path(exists=True), help='YAML config file')
-@click.option('--script', '-s', help='Training script path')
+@click.option('--config', '-c', 'config_path', type=click.Path(exists=True), help='YAML config file for training job')
+@click.option('--script', '-s', help='Training script path (Python file)')
 @click.option('--framework', type=click.Choice(['torchrun', 'deepspeed', 'accelerate', 'megatron']),
-              default='torchrun', help='Framework (default: torchrun)')
+              default='torchrun', help='Distributed framework: torchrun (default), deepspeed, accelerate, megatron')
 @click.option('--backend', type=click.Choice(['native', 'ray']), default='native',
-              help='Launch backend (default: native, ray = optional)')
-@click.option('--nodes', '-n', multiple=True, help='Node IPs')
+              help='Launch backend: native (default), ray (optional, requires Ray cluster)')
+@click.option('--nodes', '-n', multiple=True, help='Node IP addresses (multiple allowed)')
 @click.option('--from-provision', 'provision_group', default='',
-              help='Use nodes from a provision group (pg_xxx). "latest" = most recent.')
+              help='Use nodes from provision group (pg_xxx or "latest" for most recent)')
 @click.option('--gpus-per-node', default=8, help='GPUs per node (default: 8)')
-@click.option('--tp', default=1, help='Tensor parallel size')
-@click.option('--pp', default=1, help='Pipeline parallel size')
-@click.option('--total-steps', default=0, help='Total training steps (for ETA)')
-@click.option('--skip-preflight', is_flag=True, help='Skip preflight checks')
-@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text')
+@click.option('--tp', default=1, help='Tensor parallel size for model parallelism')
+@click.option('--pp', default=1, help='Pipeline parallel size for model parallelism')
+@click.option('--total-steps', default=0, help='Total training steps (for ETA calculation)')
+@click.option('--skip-preflight', is_flag=True, help='Skip preflight GPU/NCCL/RDMA validation checks')
+@click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text', help='Output format: text (default) or json')
 @click.argument('script_args', nargs=-1, type=click.UNPROCESSED)
 def train(config_path, script, framework, backend, nodes, provision_group,
           gpus_per_node, tp, pp, total_steps, skip_preflight, fmt, script_args):
-    """Launch a distributed training job.
+    """Launch distributed training jobs across provisioned GPU nodes.
 
-    Zero external dependencies by default — delegates to torchrun/deepspeed.
-    Set --backend ray to use Ray when available (auto-fallback to native).
-
-    Use --from-provision to automatically use nodes from a previous provision:
-        terradev provision -g H100 -n 4
-        terradev train -s train.py --from-provision latest
+    Orchestrates distributed training with automatic topology optimization, FlashOptim
+    integration, and checkpoint management. Supports torchrun, DeepSpeed, Accelerate,
+    and Megatron frameworks.
 
     Examples:
-        terradev train -s train.py --framework torchrun --gpus-per-node 8
-        terradev train -c job.yaml
-        terradev train -s train.py -n 10.0.0.1 -n 10.0.0.2 --tp 2 -- --lr 1e-4
-        terradev train -s train.py --from-provision pg_1709123456_abc12345
-        terradev train -s train.py --from-provision latest
+      terradev train -s train.py --framework torchrun --gpus-per-node 8
+      terradev train -c job.yaml                                      # Use YAML config
+      terradev train -s train.py -n 10.0.0.1 -n 10.0.0.2 --tp 2 -- --lr 1e-4
+      terradev train -s train.py --from-provision latest             # Auto-resolve nodes
+      terradev train -s train.py --from-provision pg_1709123456_abc12345
+
+    Workflow:
+      1. Provision nodes: terradev provision -g H100 -n 4
+      2. Validate: terradev preflight (optional, auto-run by default)
+      3. Train: terradev train -s train.py --from-provision latest
+      4. Monitor: terradev monitor --job <job-id>
+      5. Checkpoint: terradev checkpoint list --job <job-id>
+
+    FlashOptim (auto-applied):
+      When training with bf16/fp16 and 40GB+ VRAM, FlashOptim is automatically
+      enabled for gradient compression and checkpoint optimization.
+
+    Frameworks:
+      - torchrun: PyTorch native distributed training (default)
+      - deepspeed: Microsoft DeepSpeed for large models
+      - accelerate: HuggingFace Accelerate
+      - megatron: NVIDIA Megatron-LM for massive models
+
+    Next Steps:
+      Monitor training: terradev monitor --job <job-id>
+      Check status: terradev train-status --job <job-id>
+      Stop training: terradev train-stop --job <job-id>
+      View checkpoints: terradev checkpoint list --job <job-id>
     """
     from core.training_orchestrator import TrainingOrchestrator, TrainingConfig
 
@@ -7700,7 +7886,7 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
             else:
                 # Analyze from samples only
                 if not sample_data:
-                    print("❌ Either --endpoint or --samples must be provided")
+                    print("ERROR: Either --endpoint or --samples must be provided")
                     return
                 
                 workload = VLLMConfig.analyze_workload_from_samples(sample_data, gpu_count)
@@ -7723,7 +7909,7 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
                 }
             
             if result['status'] != 'success':
-                print(f"❌ Auto-optimization failed: {result.get('error')}")
+                print(f"ERROR: Auto-optimization failed: {result.get('error')}")
                 return
             
             # Display results
@@ -7791,7 +7977,7 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
                 print(f"    cpu: \"{optimized.get('cpu_cores', 2) + 4}\"  # Extra headroom")
             
         except Exception as e:
-            print(f"❌ Error during auto-optimization: {e}")
+            print(f"ERROR: Error during auto-optimization: {e}")
     
     asyncio.run(run_optimization())
 
@@ -7824,7 +8010,7 @@ def vllm_analyze(endpoint, duration):
                 result = await svc.analyze_current_workload(duration)
                 
                 if result['status'] != 'success':
-                    print(f"❌ Analysis failed: {result.get('error')}")
+                    print(f"ERROR: Analysis failed: {result.get('error')}")
                     return
                 
                 # Display current workload
@@ -7840,7 +8026,7 @@ def vllm_analyze(endpoint, duration):
                 # Display recommendations
                 recommendations = result.get('optimization_recommendations', [])
                 if recommendations:
-                    print(f"💡 Optimization Recommendations ({len(recommendations)}):")
+                    print(f"Tip: Optimization Recommendations ({len(recommendations)}):")
                     for i, rec in enumerate(recommendations, 1):
                         print(f"   {i}. {rec['type'].replace('_', ' ').title()}")
                         print(f"      Current: {rec['current_value']} → Recommended: {rec['recommended_value']}")
@@ -7848,12 +8034,12 @@ def vllm_analyze(endpoint, duration):
                         print(f"      Impact: {rec['impact']}")
                         print()
                 else:
-                    print("✅ Configuration appears well-optimized for current workload")
+                    print("OK: Configuration appears well-optimized for current workload")
                 
                 print(f"🕐 Analysis completed at {result.get('timestamp')}")
                 
         except Exception as e:
-            print(f"❌ Error during analysis: {e}")
+            print(f"ERROR: Error during analysis: {e}")
     
     asyncio.run(run_analysis())
 
@@ -7877,10 +8063,10 @@ def vllm_benchmark(endpoint, api_key, prompt, concurrent):
             # Test connection
             health = await svc.test_connection()
             if health['status'] != 'connected':
-                print(f"❌ Connection failed: {health.get('error')}")
+                print(f"ERROR: Connection failed: {health.get('error')}")
                 return
             
-            print(f"✅ Connected to vLLM at {endpoint}")
+            print(f"OK: Connected to vLLM at {endpoint}")
             
             # Run concurrent requests
             start_time = time.time()
@@ -7904,7 +8090,7 @@ def vllm_benchmark(endpoint, api_key, prompt, concurrent):
             print(f"   Throughput: {throughput:.2f} req/s")
             
             if successful < concurrent:
-                print(f"   ⚠️  {concurrent - successful} requests failed")
+                print(f"   WARNING:  {concurrent - successful} requests failed")
     
     asyncio.run(run_benchmark())
 
@@ -7968,7 +8154,7 @@ def lora_add_cmd(endpoint, name, path, api_key):
     result = asyncio.run(svc.lora_load(LoRAModule(name=name, path=path)))
 
     if result['status'] == 'loaded':
-        print(f"✅ Adapter '{name}' loaded — use \"model\": \"{name}\" in requests")
+        print(f"OK: Adapter '{name}' loaded — use \"model\": \"{name}\" in requests")
     else:
         print(f"ERROR: {result.get('error')}")
 
@@ -7990,7 +8176,7 @@ def lora_remove_cmd(endpoint, name, api_key):
     result = asyncio.run(svc.lora_unload(name))
 
     if result['status'] == 'unloaded':
-        print(f"✅ Adapter '{name}' unloaded")
+        print(f"OK: Adapter '{name}' unloaded")
     else:
         print(f"ERROR: {result.get('error')}")
 
@@ -8019,10 +8205,10 @@ def phoenix_test():
     svc = create_phoenix_service_from_credentials(creds)
     result = asyncio.run(svc.test_connection())
     if result['status'] == 'connected':
-        print(f"✅ Phoenix connected: {result['collector_endpoint']}")
+        print(f"OK: Phoenix connected: {result['collector_endpoint']}")
         print(f"   Projects found: {result['projects_found']}")
     else:
-        print(f"❌ Connection failed: {result.get('error')}")
+        print(f"ERROR: Connection failed: {result.get('error')}")
 
 
 @phoenix.command('projects')
@@ -8123,9 +8309,9 @@ def guardrails_test_cmd():
     svc = create_guardrails_service_from_credentials(creds)
     result = asyncio.run(svc.test_connection())
     if result['status'] == 'connected':
-        print(f"✅ Guardrails connected: {result['server_url']}")
+        print(f"OK: Guardrails connected: {result['server_url']}")
     else:
-        print(f"❌ Connection failed: {result.get('error')}")
+        print(f"ERROR: Connection failed: {result.get('error')}")
 
 
 @guardrails.command('chat')
@@ -8156,8 +8342,8 @@ def guardrails_generate_config(config_id, output_dir):
         fpath = output_path / fname
         fpath.parent.mkdir(parents=True, exist_ok=True)
         fpath.write_text(content)
-        print(f"  ✅ {fpath}")
-    print(f"\n🛡️ Config generated. Start server: nemoguardrails server --config {output_dir}")
+        print(f"  OK: {fpath}")
+    print(f"\nSHIELD: Config generated. Start server: nemoguardrails server --config {output_dir}")
 
 
 @guardrails.command('k8s')
@@ -8193,10 +8379,10 @@ def qdrant_test():
     svc = create_qdrant_service_from_credentials(creds)
     result = asyncio.run(svc.test_connection())
     if result['status'] == 'connected':
-        print(f"✅ Qdrant connected: {result['url']}")
+        print(f"OK: Qdrant connected: {result['url']}")
         print(f"   Collections: {', '.join(result['collections']) or 'none'}")
     else:
-        print(f"❌ Connection failed: {result.get('error')}")
+        print(f"ERROR: Connection failed: {result.get('error')}")
 
 
 @qdrant.command('collections')
@@ -8222,7 +8408,7 @@ def qdrant_create_collection(name, embedding_model):
     api = TerradevAPI()
     svc = create_qdrant_service_from_credentials(api._provider_creds('qdrant'))
     result = asyncio.run(svc.configure_rag_collection(name=name, embedding_model=embedding_model))
-    print(f"✅ Collection created: {result['collection']}")
+    print(f"OK: Collection created: {result['collection']}")
     print(f"   Embedding model: {result['embedding_model']}")
     print(f"   Vector size: {result['vector_size']}")
 
@@ -8273,22 +8459,22 @@ def sso_status():
 
     # Tier check removed - SSO available to all users (open source)
     # if not api._is_enterprise_tier():
-    #     print("❌ SSO is available for Enterprise and Enterprise+ tiers only")
+    #     print("ERROR: SSO is available for Enterprise and Enterprise+ tiers only")
     #     print("   Current tier:", api.tier['name'])
     #     print("   Upgrade at:", api.STRIPE_PAYMENT_LINKS.get('enterprise', 'https://terradev.cloud/pricing'))
     #     return
     
     if not api.enterprise_auth:
-        print("⚠️  Enterprise auth not initialized")
+        print("WARNING:  Enterprise auth not initialized")
         print("   Install enterprise dependencies: pip install terradev-cli[enterprise]")
         return
     
     enabled_providers = api.enterprise_auth.list_enabled_providers()
     if enabled_providers:
-        print("✅ SSO is configured")
+        print("OK: SSO is configured")
         print("   Enabled providers:", ', '.join(enabled_providers))
     else:
-        print("⚠️  No SSO providers configured")
+        print("WARNING:  No SSO providers configured")
         print("   Configure providers with: terradev sso configure")
 
 
@@ -8308,13 +8494,13 @@ def sso_configure(provider, client_id, client_secret, domain, tenant_id, entity_
     
     # Tier check removed - SSO available to all users (open source)
     # if not api._is_enterprise_tier():
-    #     print("❌ SSO is available for Enterprise and Enterprise+ tiers only")
+    #     print("ERROR: SSO is available for Enterprise and Enterprise+ tiers only")
     #     print("   Current tier:", api.tier['name'])
     #     print("   Upgrade at:", api.STRIPE_PAYMENT_LINKS.get('enterprise', 'https://terradev.cloud/pricing'))
     #     return
     
     if not api.enterprise_auth:
-        print("❌ Enterprise auth not initialized")
+        print("ERROR: Enterprise auth not initialized")
         print("   Install enterprise dependencies: pip install terradev-cli[enterprise]")
         return
     
@@ -8323,7 +8509,7 @@ def sso_configure(provider, client_id, client_secret, domain, tenant_id, entity_
     if provider in ['google_workspace', 'auth0', 'azure_ad']:
         # OIDC providers
         if not client_id or not client_secret:
-            print("❌ Client ID and secret required for OIDC providers")
+            print("ERROR: Client ID and secret required for OIDC providers")
             return
         
         if provider == 'google_workspace':
@@ -8335,7 +8521,7 @@ def sso_configure(provider, client_id, client_secret, domain, tenant_id, entity_
             })
         elif provider == 'auth0':
             if not domain:
-                print("❌ Domain required for Auth0")
+                print("ERROR: Domain required for Auth0")
                 return
             config = api.enterprise_auth.get_sso_provider_config(provider)
             config.update({
@@ -8346,7 +8532,7 @@ def sso_configure(provider, client_id, client_secret, domain, tenant_id, entity_
             })
         elif provider == 'azure_ad':
             if not tenant_id:
-                print("❌ Tenant ID required for Azure AD")
+                print("ERROR: Tenant ID required for Azure AD")
                 return
             config = api.enterprise_auth.get_sso_provider_config(provider)
             config.update({
@@ -8359,7 +8545,7 @@ def sso_configure(provider, client_id, client_secret, domain, tenant_id, entity_
     elif provider in ['azure_ad', 'okta']:
         # SAML providers
         if not entity_id or not sso_url:
-            print("❌ Entity ID and SSO URL required for SAML providers")
+            print("ERROR: Entity ID and SSO URL required for SAML providers")
             return
         
         config = api.enterprise_auth.get_sso_provider_config(provider)
@@ -8372,10 +8558,10 @@ def sso_configure(provider, client_id, client_secret, domain, tenant_id, entity_
     
     try:
         api.enterprise_auth.enable_sso_provider(provider, config)
-        print(f"✅ {provider} SSO provider configured successfully")
+        print(f"OK: {provider} SSO provider configured successfully")
         print("   Test the configuration with: terradev sso test")
     except Exception as e:
-        print(f"❌ Failed to configure {provider}: {e}")
+        print(f"ERROR: Failed to configure {provider}: {e}")
 
 
 @sso.command('test')
@@ -8386,33 +8572,33 @@ def sso_test(provider):
 
     # Tier check removed - SSO available to all users (open source)
     # if not api._is_enterprise_tier():
-    #     print("❌ SSO is available for Enterprise and Enterprise+ tiers only")
+    #     print("ERROR: SSO is available for Enterprise and Enterprise+ tiers only")
     #     return
     
     if not api.enterprise_auth:
-        print("❌ Enterprise auth not initialized")
+        print("ERROR: Enterprise auth not initialized")
         return
     
     if provider:
         # Test specific provider
         config = api.enterprise_auth.get_sso_provider_config(provider)
         if not config or not config.get('enabled'):
-            print(f"❌ Provider {provider} not configured")
+            print(f"ERROR: Provider {provider} not configured")
             return
         
         print(f"Testing {provider}...")
         # Add actual testing logic here
-        print(f"✅ {provider} configuration appears valid")
+        print(f"OK: {provider} configuration appears valid")
     else:
         # Test all providers
         enabled_providers = api.enterprise_auth.list_enabled_providers()
         if not enabled_providers:
-            print("⚠️  No SSO providers configured")
+            print("WARNING:  No SSO providers configured")
             return
         
         print("Testing all configured providers...")
         for p in enabled_providers:
-            print(f"✅ {p} configuration appears valid")
+            print(f"OK: {p} configuration appears valid")
 
 
 # ── SGLANG COMMAND GROUP ──
@@ -8463,7 +8649,7 @@ def optimize(model_path, workload_type, user_description, host, port, dry_run):
     
     print("Applied Optimizations:")
     for opt in summary['optimizations_applied']:
-        print(f"  ✅ {opt}")
+        print(f"  OK: {opt}")
     print()
     
     if summary['performance_expectations']:
@@ -8479,9 +8665,9 @@ def optimize(model_path, workload_type, user_description, host, port, dry_run):
     # Validate configuration
     warnings = service.validate_config(config)
     if warnings:
-        print("⚠️  Configuration Warnings:")
+        print("WARNING:  Configuration Warnings:")
         for warning in warnings:
-            print(f"  ⚠️  {warning}")
+            print(f"  WARNING:  {warning}")
         print()
     
     if dry_run:
@@ -8494,7 +8680,7 @@ def optimize(model_path, workload_type, user_description, host, port, dry_run):
     print(launch_cmd)
     print()
     
-    print("💡 To start the server, run:")
+    print("Tip: To start the server, run:")
     print(f"   {launch_cmd}")
 
 
@@ -8531,7 +8717,7 @@ def router(model_path, dp_size, workload_type):
     print(router_cmd)
     print()
     
-    print("💡 This router provides:")
+    print("Tip: This router provides:")
     print("  📈 Up to 1.9x throughput increase")
     print("  🎯 3.8x higher cache hit rate")
     print("  🧠 Intelligent request routing based on cache predictions")
@@ -8558,10 +8744,10 @@ def detect(model_path, workload_type, user_description):
         manual_type = WorkloadType(workload_type)
         print(f"Manual Workload Type: {manual_type.value}")
         if detected_type != manual_type:
-            print("⚠️  Manual and detected types differ - using manual specification")
+            print("WARNING:  Manual and detected types differ - using manual specification")
             final_type = manual_type
         else:
-            print("✅ Manual and detected types match")
+            print("OK: Manual and detected types match")
             final_type = detected_type
     else:
         final_type = detected_type
@@ -8579,7 +8765,7 @@ def detect(model_path, workload_type, user_description):
     
     print("🎯 Optimization Recommendations:")
     for opt in summary['optimizations_applied']:
-        print(f"  ✅ {opt}")
+        print(f"  OK: {opt}")
     print()
     
     if summary['performance_expectations']:
@@ -8588,7 +8774,7 @@ def detect(model_path, workload_type, user_description):
             print(f"  📈 {key.replace('_', ' ').title()}: {value}")
     
     print()
-    print("💡 Run 'terradev sglang optimize' to generate the full launch command")
+    print("Tip: Run 'terradev sglang optimize' to generate the full launch command")
 
 
 @sglang.command()
@@ -8603,7 +8789,7 @@ def install(instance_ip, ssh_user, ssh_key):
     
     if instance_ip:
         # Remote installation
-        print(f"📦 Installing SGLang on {instance_ip}...")
+        print(f"PACKAGE: Installing SGLang on {instance_ip}...")
         result = asyncio.run(service.install_on_instance(
             instance_ip=instance_ip,
             ssh_user=ssh_user,
@@ -8611,13 +8797,13 @@ def install(instance_ip, ssh_user, ssh_key):
         ))
         
         if result["status"] == "installed":
-            print("✅ SGLang installed successfully")
+            print("OK: SGLang installed successfully")
             print(f"📋 Output: {result['output']}")
         else:
-            print(f"❌ Installation failed: {result['error']}")
+            print(f"ERROR: Installation failed: {result['error']}")
     else:
         # Local installation
-        print("📦 Installing SGLang locally...")
+        print("PACKAGE: Installing SGLang locally...")
         import subprocess
         import sys
         
@@ -8626,9 +8812,9 @@ def install(instance_ip, ssh_user, ssh_key):
                 sys.executable, "-m", "pip", "install", 
                 "sglang[all]", "--find-links", "https://flashinfer.ai/whl/cu124/torch2.5/flashinfer-python"
             ], check=True)
-            print("✅ SGLang installed successfully")
+            print("OK: SGLang installed successfully")
         except subprocess.CalledProcessError as e:
-            print(f"❌ Installation failed: {e}")
+            print(f"ERROR: Installation failed: {e}")
 
 
 @sglang.command()
@@ -8665,20 +8851,20 @@ def start(model_path, instance_ip, ssh_user, ssh_key, workload_type, port):
         ))
         
         if result["status"] == "started":
-            print("✅ SGLang server started successfully")
+            print("OK: SGLang server started successfully")
             print(f"🌐 Endpoint: http://{instance_ip}:{port}")
         else:
-            print(f"❌ Failed to start server: {result['error']}")
+            print(f"ERROR: Failed to start server: {result['error']}")
     else:
         # Local launch
         launch_cmd = service.generate_launch_command(config)
         print(f"🚀 Starting SGLang server locally...")
         print(f"🌐 Endpoint: http://localhost:{port}")
         print()
-        print("💡 Launch command:")
+        print("Tip: Launch command:")
         print(launch_cmd)
         print()
-        print("⚠️  Run the command above to start the server")
+        print("WARNING:  Run the command above to start the server")
 
 
 @sglang.command()
@@ -8692,11 +8878,11 @@ def test():
     result = asyncio.run(service.test_connection())
     
     if result["status"] == "connected":
-        print("✅ SGLang is installed and available")
-        print(f"📦 Version: {result['sglang_version']}")
+        print("OK: SGLang is installed and available")
+        print(f"PACKAGE: Version: {result['sglang_version']}")
     else:
-        print(f"❌ SGLang test failed: {result['error']}")
-        print("💡 Run 'terradev sglang install' to install SGLang")
+        print(f"ERROR: SGLang test failed: {result['error']}")
+        print("Tip: Run 'terradev sglang install' to install SGLang")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -9783,11 +9969,11 @@ def migration(from_provider, to_provider, instance_id, workload, dry_run):
         print(f"   Confidence: {plan.confidence_score:.1%}")
         
         if plan.warnings:
-            print(f"\n⚠️  Warnings:")
+            print(f"\nWARNING:  Warnings:")
             for warning in plan.warnings:
                 print(f"   • {warning}")
         
-        print(f"\n💰 Cost Analysis:")
+        print(f"\nCOST: Cost Analysis:")
         print(f"   Data transfer: ${plan.costs['data_transfer']:.4f}")
         print(f"   Target hourly: ${plan.costs['target_hourly']:.2f}")
         print(f"   Hourly savings: ${plan.costs['hourly_savings']:+.2f}")
@@ -9804,7 +9990,7 @@ def migration(from_provider, to_provider, instance_id, workload, dry_run):
         print(f"\n⏱️  Estimated downtime: {plan.total_downtime}")
         
         if dry_run:
-            print(f"\n✅ Dry run complete. Use without --dry-run to execute migration.")
+            print(f"\nOK: Dry run complete. Use without --dry-run to execute migration.")
         else:
             # In lightweight version, just show plan and exit
             print(f"\n🚧 Full migration execution not implemented in lightweight version.")
@@ -9816,7 +10002,7 @@ def migration(from_provider, to_provider, instance_id, workload, dry_run):
             print(f"   • Validating migration success")
         
     except Exception as e:
-        print(f"❌ Migration planning failed: {e}")
+        print(f"ERROR: Migration planning failed: {e}")
         return 1
 
 
@@ -9860,7 +10046,7 @@ def list_workloads(provider, fmt):
                 print(f"   {w.job_id:<20} {w.name:<15} {w.provider:<12} {w.gpu_type:<8} {progress:<12} {size:<8}")
         
     except Exception as e:
-        print(f"❌ Failed to list workloads: {e}")
+        print(f"ERROR: Failed to list workloads: {e}")
         return 1
 
 
@@ -9887,11 +10073,11 @@ def evaluation(model_path, endpoint, dataset, metrics, baseline, workload_type, 
     from core.evaluation_orchestrator import EvaluationOrchestrator, EvaluationConfig
     
     if not model_path and not endpoint:
-        print("❌ Either --model or --endpoint must be specified")
+        print("ERROR: Either --model or --endpoint must be specified")
         return 1
     
     if model_path and not dataset:
-        print("❌ --dataset required when evaluating a model")
+        print("ERROR: --dataset required when evaluating a model")
         return 1
     
     try:
@@ -9965,7 +10151,7 @@ def evaluation(model_path, endpoint, dataset, metrics, baseline, workload_type, 
             print(f"\n💾 Results saved to {output}")
         
     except Exception as e:
-        print(f"❌ Evaluation failed: {e}")
+        print(f"ERROR: Evaluation failed: {e}")
         return 1
 
 
@@ -10020,7 +10206,7 @@ def compare_models(model_a, model_b, dataset, metrics, output):
             print(f"\n💾 Comparison saved to {output}")
         
     except Exception as e:
-        print(f"❌ Model comparison failed: {e}")
+        print(f"ERROR: Model comparison failed: {e}")
         return 1
 
 
@@ -10047,11 +10233,11 @@ def export(output, job, cache_dir, output_format):
             # Export specific job
             manifest = cache.load_manifest(job)
             if not manifest:
-                print(f"❌ Job '{job}' not found in manifest cache")
-                print(f"💡 Run 'terradev manifests --job {job}' to see available versions")
+                print(f"ERROR: Job '{job}' not found in manifest cache")
+                print(f"Tip: Run 'terradev manifests --job {job}' to see available versions")
                 return 1
             
-            print(f"📤 Exporting job '{job}' (version {manifest.version})...")
+            print(f"UPLOAD: Exporting job '{job}' (version {manifest.version})...")
             
             # Convert manifest to Argo workflow
             workflow = Workflow()
@@ -10116,7 +10302,7 @@ def export(output, job, cache_dir, output_format):
             
         else:
             # Export current state
-            print("📤 Exporting current Terradev state...")
+            print("UPLOAD: Exporting current Terradev state...")
             
             workflow = Workflow()
             workflow.metadata = WorkflowMetadata(
@@ -10176,7 +10362,7 @@ def export(output, job, cache_dir, output_format):
                 else:
                     yaml.dump({"exported": "current-state", "timestamp": datetime.now().isoformat()}, f)
         
-        print(f"✅ Exported to {output} (format: {output_format})")
+        print(f"OK: Exported to {output} (format: {output_format})")
         
         if job and manifest:
             print(f"   Job: {manifest.job}")
@@ -10185,7 +10371,7 @@ def export(output, job, cache_dir, output_format):
             print(f"   Provider: {manifest.nodes[0].provider if manifest.nodes else 'N/A'}")
         
     except Exception as e:
-        print(f"❌ Export failed: {e}")
+        print(f"ERROR: Export failed: {e}")
         return 1
 
 
@@ -10206,7 +10392,7 @@ def import_cmd(yaml_file, name, force, validate_only, cache_dir):
         # Validate YAML file
         is_valid, errors = PipelineValidator.validate_yaml_file(yaml_file)
         if not is_valid:
-            print("❌ YAML validation failed:")
+            print("ERROR: YAML validation failed:")
             for error in errors:
                 print(f"   - {error}")
             return 1
@@ -10215,7 +10401,7 @@ def import_cmd(yaml_file, name, force, validate_only, cache_dir):
         workflow = Workflow.from_file(yaml_file)
         
         if not workflow.metadata or not workflow.metadata.name:
-            print("❌ Workflow must have metadata.name")
+            print("ERROR: Workflow must have metadata.name")
             return 1
         
         pipeline_name = name or workflow.metadata.name
@@ -10225,12 +10411,12 @@ def import_cmd(yaml_file, name, force, validate_only, cache_dir):
         existing_versions = cache.list_versions(pipeline_name)
         
         if existing_versions and not force:
-            print(f"❌ Pipeline '{pipeline_name}' already exists with versions: {', '.join(existing_versions)}")
-            print(f"💡 Use --force to overwrite or --name to specify a different name")
+            print(f"ERROR: Pipeline '{pipeline_name}' already exists with versions: {', '.join(existing_versions)}")
+            print(f"Tip: Use --force to overwrite or --name to specify a different name")
             return 1
         
         if validate_only:
-            print(f"✅ YAML validation passed for '{pipeline_name}'")
+            print(f"OK: YAML validation passed for '{pipeline_name}'")
             return 0
         
         # Extract Terradev annotations
@@ -10274,7 +10460,7 @@ def import_cmd(yaml_file, name, force, validate_only, cache_dir):
         # Store manifest
         manifest_path = cache.store_manifest(manifest)
         
-        print(f"✅ Imported pipeline '{pipeline_name}' (version {version})")
+        print(f"OK: Imported pipeline '{pipeline_name}' (version {version})")
         print(f"   Stored: {manifest_path}")
         
         if terradev_ann.provider:
@@ -10284,10 +10470,10 @@ def import_cmd(yaml_file, name, force, validate_only, cache_dir):
         if terradev_ann.gpu_count:
             print(f"   GPU Count: {terradev_ann.gpu_count}")
         
-        print(f"💡 Run 'terradev job {yaml_file}' to execute this pipeline")
+        print(f"Tip: Run 'terradev job {yaml_file}' to execute this pipeline")
         
     except Exception as e:
-        print(f"❌ Import failed: {e}")
+        print(f"ERROR: Import failed: {e}")
         return 1
 
 
@@ -10324,10 +10510,10 @@ def record_start(name, output_dir):
         
         print(f"🔴 Started recording '{name}'")
         print(f"   Output: {recording_file}")
-        print(f"💡 Run 'terradev record stop --name {name} --export pipeline.yaml' when done")
+        print(f"Tip: Run 'terradev record stop --name {name} --export pipeline.yaml' when done")
         
     except Exception as e:
-        print(f"❌ Failed to start recording: {e}")
+        print(f"ERROR: Failed to start recording: {e}")
         return 1
 
 
@@ -10345,7 +10531,7 @@ def record_stop(name, export, output_dir):
         recording_file = output_path / f"{name}.recording"
         
         if not recording_file.exists():
-            print(f"❌ Recording '{name}' not found")
+            print(f"ERROR: Recording '{name}' not found")
             return 1
         
         # Load recording
@@ -10413,10 +10599,10 @@ def record_stop(name, export, output_dir):
             with open(export_path, 'w') as f:
                 f.write(workflow.to_yaml())
             
-            print(f"📤 Exported recording as pipeline: {export}")
+            print(f"UPLOAD: Exported recording as pipeline: {export}")
         
     except Exception as e:
-        print(f"❌ Failed to stop recording: {e}")
+        print(f"ERROR: Failed to stop recording: {e}")
         return 1
 
 
@@ -10465,7 +10651,7 @@ def create_trigger(name, pipeline, trigger_type, event, schedule, condition, env
             target_environment=env_enum
         )
         
-        print(f"✅ Created trigger '{name}'")
+        print(f"OK: Created trigger '{name}'")
         print(f"   Type: {trigger_type}")
         print(f"   Pipeline: {pipeline}")
         print(f"   Environment: {environment}")
@@ -10478,7 +10664,7 @@ def create_trigger(name, pipeline, trigger_type, event, schedule, condition, env
             print(f"   Condition: {condition}")
         
     except Exception as e:
-        print(f"❌ Failed to create trigger: {e}")
+        print(f"ERROR: Failed to create trigger: {e}")
         return 1
 
 
@@ -10490,19 +10676,19 @@ def list_triggers():
         
         if not trigger_manager.triggers:
             print("No triggers found")
-            print("💡 Use 'terradev triggers create' to create a trigger")
+            print("Tip: Use 'terradev triggers create' to create a trigger")
             return
         
         print(f"{'Name':<20} {'Type':<12} {'Pipeline':<20} {'Environment':<12} {'Enabled':<8} {'Count':<6}")
         print("─" * 92)
         
         for trigger in trigger_manager.triggers.values():
-            enabled = "✅" if trigger.enabled else "❌"
+            enabled = "OK:" if trigger.enabled else "ERROR:"
             print(f"{trigger.name:<20} {trigger.type.value:<12} {trigger.target_pipeline:<20} "
                   f"{trigger.target_environment.value:<12} {enabled:<8} {trigger.trigger_count:<6}")
         
     except Exception as e:
-        print(f"❌ Failed to list triggers: {e}")
+        print(f"ERROR: Failed to list triggers: {e}")
         return 1
 
 
@@ -10516,14 +10702,14 @@ def enable_trigger(name):
         for trigger in trigger_manager.triggers.values():
             if trigger.name == name:
                 trigger.enabled = True
-                print(f"✅ Enabled trigger '{name}'")
+                print(f"OK: Enabled trigger '{name}'")
                 return
         
-        print(f"❌ Trigger '{name}' not found")
+        print(f"ERROR: Trigger '{name}' not found")
         return 1
         
     except Exception as e:
-        print(f"❌ Failed to enable trigger: {e}")
+        print(f"ERROR: Failed to enable trigger: {e}")
         return 1
 
 
@@ -10540,11 +10726,11 @@ def disable_trigger(name):
                 print(f"⏸️ Disabled trigger '{name}'")
                 return
         
-        print(f"❌ Trigger '{name}' not found")
+        print(f"ERROR: Trigger '{name}' not found")
         return 1
         
     except Exception as e:
-        print(f"❌ Failed to disable trigger: {e}")
+        print(f"ERROR: Failed to disable trigger: {e}")
         return 1
 
 
@@ -10573,7 +10759,7 @@ def fire_event(event_type, data, source):
         print(f"🔥 Fired event: {event_type}")
         
     except Exception as e:
-        print(f"❌ Failed to fire event: {e}")
+        print(f"ERROR: Failed to fire event: {e}")
         return 1
 
 
@@ -10609,7 +10795,7 @@ def list_environments(environment):
                   f"{artifact.version:<8} {created:<20}")
         
     except Exception as e:
-        print(f"❌ Failed to list environments: {e}")
+        print(f"ERROR: Failed to list environments: {e}")
         return 1
 
 
@@ -10634,7 +10820,7 @@ def promote_artifact(artifact_name, from_env, to_env, user):
                 break
         
         if not artifact:
-            print(f"❌ Artifact '{artifact_name}' not found in {from_env}")
+            print(f"ERROR: Artifact '{artifact_name}' not found in {from_env}")
             return 1
         
         promotion = environment_manager.request_promotion(
@@ -10648,10 +10834,10 @@ def promote_artifact(artifact_name, from_env, to_env, user):
         print(f"   Artifact: {artifact_name}")
         print(f"   Promotion ID: {promotion.id}")
         print(f"   Status: {promotion.status}")
-        print(f"💡 Use 'terradev environments approve {promotion.id}' to complete")
+        print(f"Tip: Use 'terradev environments approve {promotion.id}' to complete")
         
     except Exception as e:
-        print(f"❌ Failed to request promotion: {e}")
+        print(f"ERROR: Failed to request promotion: {e}")
         return 1
 
 
@@ -10666,13 +10852,13 @@ def approve_promotion(promotion_id, user):
         success = environment_manager.approve_promotion(promotion_id, user)
         
         if success:
-            print(f"✅ Promotion approved and executed: {promotion_id}")
+            print(f"OK: Promotion approved and executed: {promotion_id}")
         else:
-            print(f"❌ Promotion not found or failed: {promotion_id}")
+            print(f"ERROR: Promotion not found or failed: {promotion_id}")
             return 1
         
     except Exception as e:
-        print(f"❌ Failed to approve promotion: {e}")
+        print(f"ERROR: Failed to approve promotion: {e}")
         return 1
 
 
@@ -10710,7 +10896,7 @@ def promotion_history(artifact):
                   f"{promo.to_env.value:<10} {promo.status:<12} {requested:<20}")
         
     except Exception as e:
-        print(f"❌ Failed to get promotion history: {e}")
+        print(f"ERROR: Failed to get promotion history: {e}")
         return 1
 
 
@@ -10764,13 +10950,13 @@ def register_artifact(type, name, uri, environment, artifact_hash, size, user, p
         )
         event_bus.publish(event)
         
-        print(f"✅ Registered artifact: {type} {name}")
+        print(f"OK: Registered artifact: {type} {name}")
         print(f"   ID: {artifact.id}")
         print(f"   Environment: {environment}")
         print(f"   URI: {uri}")
         
     except Exception as e:
-        print(f"❌ Failed to register artifact: {e}")
+        print(f"ERROR: Failed to register artifact: {e}")
         return 1
 
 
@@ -10796,12 +10982,12 @@ def lineage_graph(artifact_id, direction):
                 print(f"   {parent.type.value} {parent.name} ({parent.environment.value})")
         
         if graph["children"]:
-            print(f"\n📤 Children ({len(graph['children'])}):")
+            print(f"\nUPLOAD: Children ({len(graph['children'])}):")
             for child in graph["children"]:
                 print(f"   {child.type.value} {child.name} ({child.environment.value})")
         
     except Exception as e:
-        print(f"❌ Failed to get lineage: {e}")
+        print(f"ERROR: Failed to get lineage: {e}")
         return 1
 
 
@@ -10832,7 +11018,7 @@ def production_artifacts(artifact_type):
                   f"{created:<20} {artifact.created_by:<15}")
         
     except Exception as e:
-        print(f"❌ Failed to get production artifacts: {e}")
+        print(f"ERROR: Failed to get production artifacts: {e}")
         return 1
 
 
@@ -10857,7 +11043,7 @@ def show_model_lineage(model_identifier, environment):
             records = auto_lineage.get_lineage_for_model(model_identifier, env_enum)
         
         if not records:
-            print(f"❌ No lineage found for model '{model_identifier}'")
+            print(f"ERROR: No lineage found for model '{model_identifier}'")
             return
         
         print(f"🔍 Lineage for model: {model_identifier}")
@@ -10900,7 +11086,7 @@ def show_model_lineage(model_identifier, environment):
                     print(f"      {model_id[:12]}...")
         
     except Exception as e:
-        print(f"❌ Failed to show lineage: {e}")
+        print(f"ERROR: Failed to show lineage: {e}")
         return 1
 
 
@@ -10919,7 +11105,7 @@ def diff_lineage(version1, version2):
         diff = auto_lineage.diff_executions(exec1_id, exec2_id)
         
         if "error" in diff:
-            print(f"❌ {diff['error']}")
+            print(f"ERROR: {diff['error']}")
             return 1
         
         print(f"🔍 Comparing executions:")
@@ -10927,7 +11113,7 @@ def diff_lineage(version1, version2):
         print(f"   Execution 2: {diff['execution_2']['id']} ({diff['execution_2']['timestamp']})")
         
         if not diff["differences"]:
-            print("\n✅ No differences found")
+            print("\nOK: No differences found")
             return
         
         print(f"\n📊 Differences:")
@@ -10948,12 +11134,12 @@ def diff_lineage(version1, version2):
                 print(f"   {change_type}: {', '.join(artifacts)}")
         
         if "resources" in diff["differences"]:
-            print(f"\n💰 Resource Usage:")
+            print(f"\nCOST: Resource Usage:")
             for resource, values in diff["differences"]["resources"].items():
                 print(f"   {resource}: {values['exec1']} → {values['exec2']}")
         
     except Exception as e:
-        print(f"❌ Failed to diff lineage: {e}")
+        print(f"ERROR: Failed to diff lineage: {e}")
         return 1
 
 
@@ -10977,12 +11163,12 @@ def export_lineage(format, model, environment, output):
             output_path = Path(output)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(data)
-            print(f"✅ Exported lineage to {output}")
+            print(f"OK: Exported lineage to {output}")
         else:
             print(data)
         
     except Exception as e:
-        print(f"❌ Failed to export lineage: {e}")
+        print(f"ERROR: Failed to export lineage: {e}")
         return 1
 
 
@@ -10998,7 +11184,7 @@ def trace_artifacts(checkpoint, execution):
             trace = auto_lineage.trace_from_checkpoint(checkpoint)
             
             if "error" in trace:
-                print(f"❌ {trace['error']}")
+                print(f"ERROR: {trace['error']}")
                 return 1
             
             print(f"🔍 Tracing lineage from checkpoint: {checkpoint}")
@@ -11039,7 +11225,7 @@ def trace_artifacts(checkpoint, execution):
                     break
             
             if not exec_record:
-                print(f"❌ Execution '{execution}' not found")
+                print(f"ERROR: Execution '{execution}' not found")
                 return 1
             
             print(f"🔍 Tracing execution: {exec_record.id}")
@@ -11069,11 +11255,11 @@ def trace_artifacts(checkpoint, execution):
                                 print(f"         └─ {parent.type.value}: {parent.name}")
         
         else:
-            print("❌ Must specify either --checkpoint or --execution")
+            print("ERROR: Must specify either --checkpoint or --execution")
             return 1
         
     except Exception as e:
-        print(f"❌ Failed to trace artifacts: {e}")
+        print(f"ERROR: Failed to trace artifacts: {e}")
         return 1
 
 
@@ -11103,13 +11289,13 @@ def start_auto_lineage(pipeline, environment, triggered_by):
         print(f"   Use this ID to add artifacts and complete the execution")
         
         # Show example commands for manual tracking
-        print(f"\n💡 Example commands to track this execution:")
+        print(f"\nTip: Example commands to track this execution:")
         print(f"   terradev lineage add-input {execution.id} dataset <dataset-id>")
         print(f"   terradev lineage add-output {execution.id} model <model-id>")
         print(f"   terradev lineage complete {execution.id}")
         
     except Exception as e:
-        print(f"❌ Failed to start lineage tracking: {e}")
+        print(f"ERROR: Failed to start lineage tracking: {e}")
         return 1
 
 
@@ -11126,11 +11312,11 @@ def add_input_artifact(execution_id, artifact_type, artifact_id):
         artifact_enum = ArtifactType(artifact_type)
         auto_lineage.add_input_artifact(execution_id, artifact_enum, artifact_id)
         
-        print(f"✅ Added input {artifact_type}: {artifact_id}")
+        print(f"OK: Added input {artifact_type}: {artifact_id}")
         print(f"   Execution: {execution_id}")
         
     except Exception as e:
-        print(f"❌ Failed to add input artifact: {e}")
+        print(f"ERROR: Failed to add input artifact: {e}")
         return 1
 
 
@@ -11147,11 +11333,11 @@ def add_output_artifact(execution_id, artifact_type, artifact_id):
         artifact_enum = ArtifactType(artifact_type)
         auto_lineage.add_output_artifact(execution_id, artifact_enum, artifact_id)
         
-        print(f"✅ Added output {artifact_type}: {artifact_id}")
+        print(f"OK: Added output {artifact_type}: {artifact_id}")
         print(f"   Execution: {execution_id}")
         
     except Exception as e:
-        print(f"❌ Failed to add output artifact: {e}")
+        print(f"ERROR: Failed to add output artifact: {e}")
         return 1
 
 
@@ -11165,12 +11351,12 @@ def complete_execution(execution_id, status):
         
         auto_lineage.complete_execution(execution_id, status)
         
-        print(f"✅ Completed execution: {execution_id}")
+        print(f"OK: Completed execution: {execution_id}")
         print(f"   Status: {status}")
         print(f"   Lineage record finalized and available for queries")
         
     except Exception as e:
-        print(f"❌ Failed to complete execution: {e}")
+        print(f"ERROR: Failed to complete execution: {e}")
         return 1
 
 
