@@ -169,8 +169,32 @@ class BaseProvider(ABC):
             "H100": {
                 "memory_gb": 80,
                 "compute_capability": "9.0",
-                "tflops": 67.0,
+                "tflops": 1979.0,
                 "bandwidth_gb_s": 3350,
+            },
+            "H200": {
+                "memory_gb": 141,
+                "compute_capability": "9.0",
+                "tflops": 1979.0,
+                "bandwidth_gb_s": 4800,
+            },
+            "MI300X": {
+                "memory_gb": 192,
+                "compute_capability": "9.4",
+                "tflops": 1307.4,
+                "bandwidth_gb_s": 5300,
+            },
+            "A100-80GB": {
+                "memory_gb": 80,
+                "compute_capability": "8.0",
+                "tflops": 312.0,
+                "bandwidth_gb_s": 2000,
+            },
+            "B200": {
+                "memory_gb": 192,
+                "compute_capability": "10.0",
+                "tflops": 4500.0,
+                "bandwidth_gb_s": 8000,
             },
         }
         return gpu_specs.get(gpu_type, {})

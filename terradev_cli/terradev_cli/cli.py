@@ -136,6 +136,10 @@ class TerradevAPI:
         try:
             with open(self.credentials_file, 'w') as f:
                 json.dump(self.credentials, f, indent=2)
+            try:
+                os.chmod(self.credentials_file, 0o600)
+            except OSError:
+                pass
         except Exception as e:
             import sys
             print(f"ERROR: Failed to save credentials: {e}", file=sys.stderr)
@@ -144,12 +148,17 @@ class TerradevAPI:
         """Load usage tracking"""
         if self.usage_file.exists():
             with open(self.usage_file, 'r') as f:
-                import fcntl
-                fcntl.flock(f, fcntl.LOCK_SH)
+                try:
+                    import fcntl
+                    fcntl.flock(f, fcntl.LOCK_SH)
+                    _has_fcntl = True
+                except ImportError:
+                    _has_fcntl = False
                 try:
                     self.usage = json.load(f)
                 finally:
-                    fcntl.flock(f, fcntl.LOCK_UN)
+                    if _has_fcntl:
+                        fcntl.flock(f, fcntl.LOCK_UN)
         else:
             self.usage = {
                 "provisions_this_month": 0,
@@ -161,18 +170,25 @@ class TerradevAPI:
     
     def save_usage(self):
         """Save usage tracking with exclusive file lock"""
-        import fcntl
         self.usage_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.usage_file, 'w') as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                import fcntl
+                fcntl.flock(f, fcntl.LOCK_EX)
+                _has_fcntl = True
+            except ImportError:
+                _has_fcntl = False
             try:
                 json.dump(self.usage, f, indent=2)
             finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+                if _has_fcntl:
+                    fcntl.flock(f, fcntl.LOCK_UN)
     
     def check_provision_limit(self) -> bool:
         """Check if user has provisions remaining this month"""
         self._maybe_reset_monthly_usage()
+        if self.tier is None:
+            return True  # Open source mode: unlimited provisions
         limit = self.tier['provisions_per_month']
         if limit == 'unlimited':
             return True
@@ -341,17 +357,6 @@ class TerradevAPI:
             creds['reports_enabled'] = self.credentials.get('wandb_reports_enabled', 'false')
             creds['alerts_enabled'] = self.credentials.get('wandb_alerts_enabled', 'false')
             creds['integration_enabled'] = self.credentials.get('wandb_integration_enabled', 'false')
-        elif provider_name == 'ray':
-            creds['dashboard_uri'] = self.credentials.get('ray_dashboard_uri', '')
-            creds['cluster_name'] = self.credentials.get('ray_cluster_name', '')
-            creds['auth_token'] = self.credentials.get('ray_auth_token', '')
-            creds['head_node_ip'] = self.credentials.get('ray_head_node_ip', '')
-            creds['head_node_port'] = str(self.credentials.get('ray_head_node_port', 6379))
-            creds['namespace'] = self.credentials.get('ray_namespace', 'default')
-            creds['monitoring_enabled'] = self.credentials.get('ray_monitoring_enabled', 'false')
-            creds['prometheus_enabled'] = self.credentials.get('ray_prometheus_enabled', 'false')
-            creds['grafana_enabled'] = self.credentials.get('ray_grafana_enabled', 'false')
-            creds['metrics_export_port'] = self.credentials.get('ray_metrics_export_port', '8080')
         
         return creds
 
@@ -2954,7 +2959,7 @@ def run(gpu, image, command, mount, port, env, max_price, providers, keep_alive,
 
     # ── Tier gate with telemetry ──
     if not api.check_provision_limit():
-        # License checks removed for open source - unlimited provisions
+        pass  # Open source mode: always allowed
 
     print(f"Deploying terradev run")
     print(f"   GPU:     {gpu}")

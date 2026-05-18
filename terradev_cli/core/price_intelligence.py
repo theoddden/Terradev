@@ -23,6 +23,7 @@ The module exposes:
     refresh_stats()              – batch recompute δ/γ/σ for all series
 """
 
+import logging
 import sqlite3
 import math
 import json
