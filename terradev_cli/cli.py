@@ -11223,5 +11223,267 @@ def mcp(action, client, transport):
         list_tools()
 
 
+@cli.group()
+def local():
+    """Local GPU discovery and hybrid compute pool management.
+
+    Discover GPUs on this machine or remote hosts via SSH, register them
+    into your compute pool alongside cloud providers, and route workloads
+    to the cheapest available compute — including $0/hr local hardware.
+    """
+    pass
+
+
+@local.command('scan')
+@click.option('--host', default=None, help='Remote host IP/hostname to scan via SSH')
+@click.option('--user', default='ubuntu', help='SSH username for remote scan')
+@click.option('--key', default=None, help='Path to SSH private key for remote scan')
+@click.option('--detailed', is_flag=True, help='Show full topology, PCIe, NUMA, clock details')
+@click.option('--register', is_flag=True, help='Auto-register discovered GPUs into pool')
+@click.option('--name', default=None, help='Name for registered pool entry (auto-generated if omitted)')
+def local_scan(host, user, key, detailed, register, name):
+    """Scan local machine or remote host for GPUs.
+
+    Uses Rust NVML bindings (5-10x faster than nvidia-smi) with automatic
+    fallback to nvidia-smi parsing if the Rust extension is unavailable.
+
+    Examples:
+
+        terradev local scan
+
+        terradev local scan --detailed
+
+        terradev local scan --host 192.168.1.50 --user ubuntu --key ~/.ssh/id_rsa
+
+        terradev local scan --register --name workstation-4090
+    """
+    import subprocess
+    import json
+    import datetime
+
+    target = host if host else "localhost"
+    click.echo(f"Scanning {target} for GPUs...")
+
+    def _run_nvidia_smi(remote_host=None, remote_user=None, remote_key=None):
+        query = "index,name,memory.total,driver_version,utilization.gpu,temperature.gpu,power.draw,power.limit,pcie.link.gen.current,pcie.link.width.current,compute_cap"
+        cmd = f"nvidia-smi --query-gpu={query} --format=csv,noheader,nounits"
+        if remote_host:
+            ssh_opts = f"-o StrictHostKeyChecking=no -o ConnectTimeout=10"
+            if remote_key:
+                ssh_opts += f" -i {remote_key}"
+            cmd = f"ssh {ssh_opts} {remote_user}@{remote_host} '{cmd}'"
+        try:
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
+            return result.stdout.strip(), result.returncode
+        except Exception as e:
+            return "", 1
+
+    # Try Rust NVML first (local only), then nvidia-smi
+    gpus = []
+    use_rust = False
+    if not host:
+        try:
+            from terradev_cli.core.gpu_discovery import GPUDiscoveryWrapper
+            disc = GPUDiscoveryWrapper(cache_ttl_secs=0)
+            state = disc.discover_gpus()
+            if state and state.get("total_count", 0) > 0:
+                use_rust = True
+                for g in state.get("gpus", []):
+                    gpus.append(g)
+        except Exception:
+            pass
+
+    if not use_rust:
+        raw, rc = _run_nvidia_smi(host, user, key)
+        if rc != 0 or not raw:
+            click.echo(f"No GPUs found on {target} or nvidia-smi not available.", err=True)
+            return
+        for line in raw.splitlines():
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) < 11:
+                continue
+            gpus.append({
+                "index": int(parts[0]) if parts[0].isdigit() else 0,
+                "name": parts[1],
+                "memory_total_mb": float(parts[2]) if parts[2] else 0,
+                "driver_version": parts[3],
+                "utilization_gpu": float(parts[4]) if parts[4] else 0,
+                "temperature": float(parts[5]) if parts[5] else 0,
+                "power_draw": float(parts[6]) if parts[6] else 0,
+                "power_limit": float(parts[7]) if parts[7] else 0,
+                "pcie_gen": parts[8],
+                "pcie_width": parts[9],
+                "compute_cap": parts[10],
+            })
+
+    if not gpus:
+        click.echo(f"No GPUs found on {target}.")
+        return
+
+    click.echo(f"\nFound {len(gpus)} GPU{'s' if len(gpus) > 1 else ''} on {target}:\n")
+    for g in gpus:
+        idx = g.get("index", 0)
+        gpu_name = g.get("name", "Unknown")
+        mem_mb = g.get("memory_total_mb", g.get("memory_total", 0))
+        mem_gb = round(float(mem_mb) / 1024, 1) if float(mem_mb) > 100 else float(mem_mb)
+        driver = g.get("driver_version", "N/A")
+        util = g.get("utilization_gpu", g.get("utilization", 0))
+        temp = g.get("temperature", 0)
+        click.echo(f"  [{idx}] {gpu_name}  {mem_gb}GB  Driver {driver}  Util: {util}%  Temp: {temp}C")
+        if detailed:
+            pcie_gen = g.get("pcie_gen", "N/A")
+            pcie_w = g.get("pcie_width", "N/A")
+            pwr_draw = g.get("power_draw", 0)
+            pwr_lim = g.get("power_limit", 0)
+            compute = g.get("compute_cap", "N/A")
+            numa = g.get("numa_node", "N/A")
+            click.echo(f"      PCIe: Gen{pcie_gen} x{pcie_w}  NUMA: {numa}  Compute: {compute}")
+            click.echo(f"      Power: {pwr_draw}W / {pwr_lim}W TDP")
+
+    if register or (not register and click.confirm("\nRegister in pool?")):
+        pool_name = name if name else f"local-{'remote-' if host else ''}{gpus[0].get('name','gpu').replace(' ','').lower()}-{datetime.datetime.now().strftime('%H%M')}"
+        _register_local_pool(gpus, pool_name, host, user, key)
+        click.echo(f"\nRegistered as '{pool_name}'. View with: terradev local pool")
+
+
+def _register_local_pool(gpus, pool_name, host=None, user=None, key=None):
+    """Write pool entry to ~/.terradev/local_pool.json"""
+    import json, os, datetime
+    pool_path = os.path.expanduser("~/.terradev/local_pool.json")
+    os.makedirs(os.path.dirname(pool_path), exist_ok=True)
+    pool = {}
+    if os.path.exists(pool_path):
+        try:
+            with open(pool_path) as f:
+                pool = json.load(f)
+        except Exception:
+            pool = {}
+    pool[pool_name] = {
+        "name": pool_name,
+        "gpus": gpus,
+        "host": host or "localhost",
+        "user": user,
+        "key": key,
+        "registered_at": datetime.datetime.utcnow().isoformat(),
+        "price_per_hour": 0.0,
+        "provider": "local",
+    }
+    with open(pool_path, "w") as f:
+        json.dump(pool, f, indent=2)
+
+
+@local.command('register')
+@click.option('--name', required=True, help='Name for this pool entry')
+@click.option('--host', default=None, help='Remote host (omit for localhost)')
+@click.option('--user', default='ubuntu', help='SSH username for remote host')
+@click.option('--key', default=None, help='SSH private key path')
+def local_register(name, host, user, key):
+    """Register a local or remote GPU host into your compute pool.
+
+    Example:
+
+        terradev local register --name workstation-4090
+
+        terradev local register --name lab-node-01 --host 10.0.0.5 --user ubuntu
+    """
+    import subprocess
+    target = host or "localhost"
+    click.echo(f"Scanning {target}...")
+    query = "index,name,memory.total,driver_version,utilization.gpu,temperature.gpu"
+    cmd = f"nvidia-smi --query-gpu={query} --format=csv,noheader,nounits"
+    if host:
+        ssh_opts = f"-o StrictHostKeyChecking=no -o ConnectTimeout=10"
+        if key:
+            ssh_opts += f" -i {key}"
+        cmd = f"ssh {ssh_opts} {user}@{host} '{cmd}'"
+    try:
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
+        raw = result.stdout.strip()
+    except Exception as e:
+        click.echo(f"Error scanning {target}: {e}", err=True)
+        return
+    if not raw:
+        click.echo(f"No GPUs found on {target}.", err=True)
+        return
+    gpus = []
+    for line in raw.splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) >= 6:
+            gpus.append({
+                "index": int(parts[0]) if parts[0].isdigit() else 0,
+                "name": parts[1],
+                "memory_total_mb": float(parts[2]) if parts[2] else 0,
+                "driver_version": parts[3],
+                "utilization_gpu": float(parts[4]) if parts[4] else 0,
+                "temperature": float(parts[5]) if parts[5] else 0,
+            })
+    _register_local_pool(gpus, name, host, user, key)
+    click.echo(f"Registered '{name}' with {len(gpus)} GPU(s). View with: terradev local pool")
+
+
+@local.command('pool')
+@click.option('--format', 'fmt', type=click.Choice(['table', 'json']), default='table', help='Output format')
+@click.option('--remove', default=None, help='Remove a pool entry by name')
+def local_pool(fmt, remove):
+    """View or manage your hybrid compute pool (local + cloud instances).
+
+    Shows all registered local/remote GPU hosts alongside active cloud instances.
+
+    Example:
+
+        terradev local pool
+
+        terradev local pool --format json
+
+        terradev local pool --remove workstation-4090
+    """
+    import json, os
+
+    pool_path = os.path.expanduser("~/.terradev/local_pool.json")
+    pool = {}
+    if os.path.exists(pool_path):
+        try:
+            with open(pool_path) as f:
+                pool = json.load(f)
+        except Exception:
+            pool = {}
+
+    if remove:
+        if remove in pool:
+            del pool[remove]
+            with open(pool_path, "w") as f:
+                json.dump(pool, f, indent=2)
+            click.echo(f"Removed '{remove}' from pool.")
+        else:
+            click.echo(f"'{remove}' not found in pool.", err=True)
+        return
+
+    if fmt == 'json':
+        click.echo(json.dumps(pool, indent=2))
+        return
+
+    if not pool:
+        click.echo("No local pool entries registered.")
+        click.echo("Add one with: terradev local scan --register")
+        return
+
+    click.echo(f"\nCOMPUTE POOL ({len(pool)} local resource{'s' if len(pool) > 1 else ''})\n")
+    click.echo(f"{'NAME':<24} {'GPU':<12} {'VRAM':>6}  {'PROVIDER':<12} {'$/HR':>7}  STATUS")
+    click.echo("-" * 72)
+    for entry_name, entry in pool.items():
+        gpus = entry.get("gpus", [])
+        gpu_name = gpus[0].get("name", "Unknown").replace("NVIDIA ", "") if gpus else "Unknown"
+        mem_mb = gpus[0].get("memory_total_mb", 0) if gpus else 0
+        mem_gb = f"{round(float(mem_mb)/1024, 0):.0f}GB" if float(mem_mb) > 100 else f"{mem_mb}GB"
+        provider = entry.get("provider", "local")
+        price = entry.get("price_per_hour", 0.0)
+        host = entry.get("host", "localhost")
+        status = "localhost" if host == "localhost" else host
+        click.echo(f"{entry_name:<24} {gpu_name:<12} {mem_gb:>6}  {provider:<12} ${price:>6.2f}  {status}")
+
+    click.echo(f"\nCloud instances: run 'terradev status --live' for cloud pool.")
+    click.echo("To provision preferring local: terradev provision -g RTX4090 --prefer-local")
+
+
 if __name__ == '__main__':
     cli()

@@ -1,12 +1,20 @@
-# Terradev CLI v4.0.13
+# Terradev CLI v5.0.0
 
-**Open Source Multi-Cloud GPU Infrastructure Platform**
+**Open Source BYOAPI Multi-Cloud GPU Infrastructure Platform**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
 **License: Apache 2.0** - Free and open source for commercial and personal use.
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
+
+**NOTES ON 5.0.0**
+
+We removed the paywall, open-sourced Terradev, and added Rust DAG accelerators for safe agent execution, and snappy execution...
+
+With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. The agent can issue commands freely... the orchestrator ensures they're safe to execute.
+
+192 MCP sub-tools require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 21+ cloud providers, that compounds across every tool call in the chain.
 
 ## Complete Tutorial
 
@@ -459,6 +467,147 @@ echo "1. Monitor performance: terradev monitor --endpoint hybrid-llm --live"
 echo "2. Check LoRA performance: terradev lora metrics --endpoint http://$BASELINE_IP:8000"
 echo "3. Test failover: terradev inferx failover --endpoint burst-llm-api --test-load 5000"
 echo "4. Update adapters: terradev lora update -n customer-enterprise-a -p ./new-adapters/"
+```
+
+## Bare Metal GPU Access with IPMI Management (Latitude.sh)
+
+Most GPU clouds give you a virtual machine. You get a slice of hardware, shared kernel paths, and a hypervisor layer between your workload and the GPU. For most ML workloads this is fine. For compliance-sensitive deployments — HIPAA, FedRAMP, financial services, defense contractors — it isn't. Virtualization introduces attestation gaps that auditors reject.
+
+Latitude.sh is the only provider in Terradev's fleet that offers both **bare metal** and **virtual machine** GPU instances from the same API. Bare metal gives you the physical server — dedicated hardware, no virtualization overhead, and IPMI out-of-band management.
+
+```bash
+# See both bare metal and VM options side by side
+terradev quote -g H100 --provider latitude
+
+# Provision dedicated bare metal with IPMI access
+terradev provision --provider latitude --gpu H100 --instance-type bare-metal
+
+# Provision a VM (faster spin-up, slightly lower cost)
+terradev provision --provider latitude --gpu H100 --instance-type vm
+```
+
+### Bare Metal vs VM at Latitude.sh
+
+| Feature | Bare Metal | Virtual Machine |
+|---------|-----------|-----------------|
+| Isolation | Full dedicated hardware | KVM virtualization |
+| GPU access | Direct PCIe | Dedicated virtual GPU |
+| IPMI management | Yes — out-of-band control | No |
+| Virtualization overhead | None | Minimal |
+| Compliance suitability | HIPAA, FedRAMP, SOC2 | Standard workloads |
+| Spin-up time | 5–10 min | 2–3 min |
+| H100 (4x) pricing | ~$10/hr | ~$5/hr |
+
+### IPMI: Why It Matters for Enterprise
+
+IPMI (Intelligent Platform Management Interface) gives you out-of-band server management independent of the OS and GPU stack. If a training job deadlocks the kernel, you don't wait for a cloud provider ticket — you power-cycle via IPMI directly. Security teams can verify hardware attestation. Compliance frameworks that require dedicated hardware and physical access controls are satisfied.
+
+```bash
+# Instance status includes IPMI access endpoint when bare metal
+terradev status --live --provider latitude
+
+# Output includes:
+# ipmi_access: true
+# ipmi_endpoint: 10.x.x.x
+# isolation: bare_metal
+```
+
+**Supported GPUs on Latitude.sh:**
+- NVIDIA H100 (4x configurations)
+- NVIDIA A100 (2x configurations)
+- NVIDIA RTX 4090 (2x configurations)
+- NVIDIA RTX PRO 6000 Blackwell (2x configurations)
+
+**Regions:** Brazil (SAO), United States (ASH), Europe, Asia-Pacific
+
+---
+
+## Local GPU Discovery and Hybrid Compute Pools
+
+Every other GPU orchestration platform assumes you're renting compute. Terradev doesn't.
+
+If you have a GPU in your local machine — a gaming rig, a workstation, a university compute node you have SSH access to — Terradev can discover it, register it into your compute pool, and incorporate it into provisioning decisions alongside cloud providers.
+
+```bash
+# Scan local machine for GPUs
+terradev local scan
+
+# Output:
+# Found 1 local GPU:
+#   [0] NVIDIA RTX 4090  24GB  Driver 545.29  Util: 3%  Temp: 42C
+#
+# Register in pool? [y/N]:
+
+# Register local GPU into your pool
+terradev local register --name "workstation-4090"
+
+# Scan a remote machine you have SSH access to
+terradev local scan --host 192.168.1.50 --user ubuntu --key ~/.ssh/id_rsa
+
+# View your full compute pool (local + cloud)
+terradev local pool
+```
+
+Pool output:
+```
+COMPUTE POOL (4 resources)
+workstation-4090    RTX 4090    24GB    local        $0.00/hr   Free
+runpod-h100-001     H100        80GB    runpod       $2.49/hr   Running
+vastai-a100-002     A100        40GB    vastai        $1.82/hr   Running
+lambda-a10g-003     A10G        24GB    lambda_labs  $0.60/hr   Idle
+```
+
+### Why This Matters
+
+The `terradev quote` command normally shows cloud provider pricing. With local GPUs registered, the pool includes your own hardware — priced at $0/hr. For a university researcher with a 3090 workstation running overnight jobs, or a startup with a rack of 4090s before they've moved to cloud: Terradev routes workloads to the cheapest available compute, and $0/hr always wins.
+
+```bash
+# Get quotes including local pool
+terradev quote -g RTX4090 --include-local
+
+# Output:
+# GPU       PROVIDER                 $/HR    AVAILABLE
+# RTX 4090  local (workstation-4090) $0.00   Yes
+# RTX 4090  vastai                   $0.34   Yes
+# RTX 4090  runpod                   $0.39   Yes
+
+# Provision to cheapest available — prefers local automatically
+terradev provision -g RTX4090 --prefer-local
+
+# Launch training on local GPU with cloud overflow
+terradev train --script train.py --pool workstation-4090 --overflow-to-cloud
+```
+
+### How Discovery Works
+
+The local scanner uses direct NVML bindings (Rust backend, 5–10x faster than `nvidia-smi` parsing) to introspect every GPU on the target machine:
+
+- GPU model, memory, PCIe bus ID, NUMA affinity
+- Current utilization, memory usage, temperature, clock speeds
+- Driver version, CUDA version, compute capability
+- Multi-GPU topology (NVLink, PCIe switch topology)
+
+Falls back to `nvidia-smi` parsing automatically if the Rust NVML extension isn't available.
+
+```bash
+# Detailed hardware report for local GPU
+terradev local scan --detailed
+
+# Output includes:
+# GPU 0: RTX 4090  VRAM 24GB  PCIe x16  NUMA node 0
+#   NVLink: none (single GPU)
+#   Compute: 8.9  Driver: 545.29  CUDA: 12.3
+#   P-state: P0  Temp: 42C  Power: 45W / 450W TDP
+```
+
+### Use Cases
+
+- **University researchers** — scan the lab workstation cluster, register every GPU, run `terradev quote --include-local` to see total available VRAM before deciding whether to rent cloud compute
+- **Individual ML engineers** — hybrid pipeline that runs small experiments locally on a 4090, overflows to cloud for full runs, all from the same `terradev train` command
+- **Startups with owned hardware** — on-prem rack registered as a pool, cloud as overflow — single provisioning interface for both, cost analytics shows blended spend
+- **Edge deployments** — register inference accelerators on local network into the pool
+
+---
 
 ## Quick Reference
 ```bash
