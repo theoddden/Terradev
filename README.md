@@ -10,11 +10,11 @@ Terradev is a cross-cloud compute-provisioning CLI that compresses + stages data
 
 **NOTES ON 5.0.0**
 
-We removed the paywall, open-sourced Terradev, and added Rust DAG accelerators for safe agent execution, and snappy execution...
+We removed the paywall, open-sourced Terradev, and added Rust accelerators for safe and snappy delivery...
 
-With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. The agent can issue commands freely... the orchestrator ensures they're safe to execute.
+With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. You or the agent can issue commands freely... the orchestrator ensures they're safe to execute.
 
-192 MCP sub-tools require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 21+ cloud providers, that compounds across every tool call in the chain.
+104 tools and sub-tools require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 21+ cloud providers, that compounds across every tool call in the chain.
 
 ## Complete Tutorial
 
