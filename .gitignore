@@ -125,3 +125,7 @@ coverage.xml
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Security scan reports — generated as CI artifacts, must not be committed
+bandit-report.json
+safety-report.json

@@ -16,14 +16,23 @@ from pathlib import Path
 
 @dataclass
 class KubernetesConfig:
-    """Kubernetes configuration"""
+    """Kubernetes configuration (canonical — imported by kubernetes_enhanced.py)"""
     kubeconfig_path: Optional[str] = None
     cluster_name: Optional[str] = None
     namespace: str = "default"
     karpenter_enabled: bool = False
-    karpenter_version: str = "v0.32.0"
+    karpenter_version: str = "v1.10.0"
     aws_region: str = "us-east-1"
     aws_account_id: Optional[str] = None
+    # Enhanced monitoring fields (used by EnhancedKubernetesService)
+    monitoring_enabled: bool = False
+    prometheus_enabled: bool = False
+    grafana_enabled: bool = False
+    dashboard_port: int = 3000
+    # DRA (Dynamic Resource Allocation) - K8s 1.32+ GA
+    dra_enabled: bool = False
+    dra_driver_name: str = "nvidia.com/gpu"
+    device_plugin_enabled: bool = True
 
 
 class KubernetesService:
@@ -458,7 +467,7 @@ def create_kubernetes_service_from_credentials(credentials: Dict[str, str]) -> K
         cluster_name=credentials.get("cluster_name"),
         namespace=credentials.get("namespace", "default"),
         karpenter_enabled=credentials.get("karpenter_enabled", "false").lower() == "true",
-        karpenter_version=credentials.get("karpenter_version", "v0.32.0"),
+        karpenter_version=credentials.get("karpenter_version", "v1.10.0"),
         aws_region=credentials.get("aws_region", "us-east-1"),
         aws_account_id=credentials.get("aws_account_id")
     )
@@ -510,7 +519,7 @@ def get_kubernetes_setup_instructions() -> str:
 - cluster_name: Kubernetes cluster name (optional)
 - namespace: Kubernetes namespace (default: "default")
 - karpenter_enabled: Enable Karpenter (default: "false")
-- karpenter_version: Karpenter version (default: "v0.32.0")
+- karpenter_version: Karpenter version (default: "v1.10.0")
 - aws_region: AWS region (default: "us-east-1")
 - aws_account_id: AWS account ID (optional)
 

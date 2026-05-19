@@ -855,10 +855,13 @@ class SGLangService:
 
     # ── SSH helpers ──
 
-    def _build_ssh_command(self, ip: str, user: str, key: Optional[str], script: str) -> str:
-        """Build SSH command for remote execution"""
-        ssh_base = f"ssh -i {key} {user}@{ip}" if key else f"ssh {user}@{ip}"
-        return f'{ssh_base} "{script}"'
+    def _build_ssh_args(self, ip: str, user: str, key: Optional[str]) -> List[str]:
+        """Build SSH argument list for subprocess (no shell=True, injection-safe)."""
+        args = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes"]
+        if key:
+            args.extend(["-i", key])
+        args.extend([f"{user}@{ip}", "bash", "-s"])
+        return args
 
     # ── Remote Installation ──
 
@@ -874,8 +877,10 @@ pip install --upgrade pip
 pip install "sglang[all]" --find-links https://flashinfer.ai/whl/cu124/torch2.5/flashinfer-python
 python3 -c "import sglang; print('SGLang', sglang.__version__, 'installed')"
 """
-            ssh_cmd = self._build_ssh_command(instance_ip, ssh_user, ssh_key, install_script)
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                self._build_ssh_args(instance_ip, ssh_user, ssh_key),
+                input=install_script, capture_output=True, text=True, timeout=300,
+            )
 
             if result.returncode == 0:
                 return {
@@ -947,7 +952,9 @@ WantedBy=multi-user.target
 
             setup_script = f"""#!/bin/bash
 set -e
-echo '{service_content}' > /etc/systemd/system/sglang.service
+cat > /etc/systemd/system/sglang.service << 'SERVICEEOF'
+{service_content}
+SERVICEEOF
 systemctl daemon-reload
 systemctl enable sglang
 systemctl start sglang
@@ -955,8 +962,10 @@ sleep 10
 systemctl status sglang
 """
 
-            ssh_cmd = self._build_ssh_command(instance_ip, ssh_user, ssh_key, setup_script)
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True, timeout=60)
+            result = subprocess.run(
+                self._build_ssh_args(instance_ip, ssh_user, ssh_key),
+                input=setup_script, capture_output=True, text=True, timeout=60,
+            )
 
             if result.returncode == 0:
                 return {
@@ -986,8 +995,10 @@ systemctl disable sglang
 rm -f /etc/systemd/system/sglang.service
 systemctl daemon-reload
 """
-            ssh_cmd = self._build_ssh_command(instance_ip, ssh_user, ssh_key, stop_script)
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(
+                self._build_ssh_args(instance_ip, ssh_user, ssh_key),
+                input=stop_script, capture_output=True, text=True, timeout=30,
+            )
 
             if result.returncode == 0:
                 return {

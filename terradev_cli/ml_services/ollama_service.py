@@ -87,9 +87,10 @@ sleep 5
 ollama --version
 """
             
-            # Execute installation via SSH
-            ssh_cmd = self._build_ssh_command(instance_ip, ssh_user, ssh_key, install_script)
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                self._build_ssh_args(instance_ip, ssh_user, ssh_key),
+                input=install_script, capture_output=True, text=True, timeout=300,
+            )
             
             if result.returncode == 0:
                 return {
@@ -110,14 +111,13 @@ ollama --version
                 "error": f"Failed to install Ollama: {str(e)}"
             }
     
-    def _build_ssh_command(self, ip: str, user: str, key: Optional[str], script: str) -> str:
-        """Build SSH command for remote execution"""
+    def _build_ssh_args(self, ip: str, user: str, key: Optional[str]) -> List[str]:
+        """Build SSH argument list for subprocess (no shell=True, injection-safe)."""
+        args = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes"]
         if key:
-            ssh_cmd = f"ssh -i {key} {user}@{ip}"
-        else:
-            ssh_cmd = f"ssh {user}@{ip}"
-        
-        return f'{ssh_cmd} "{script}"'
+            args.extend(["-i", key])
+        args.extend([f"{user}@{ip}", "bash", "-s"])
+        return args
     
     async def pull_model(self, model_name: str, instance_ip: str, ssh_user: str = "root", ssh_key: Optional[str] = None) -> Dict[str, Any]:
         """Pull a model on remote instance"""
@@ -131,8 +131,10 @@ ollama pull {model_name}
 ollama list | grep {model_name}
 """
             
-            ssh_cmd = self._build_ssh_command(instance_ip, ssh_user, ssh_key, pull_script)
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True, timeout=600)  # 10 minutes for large models
+            result = subprocess.run(
+                self._build_ssh_args(instance_ip, ssh_user, ssh_key),
+                input=pull_script, capture_output=True, text=True, timeout=600,
+            )
             
             if result.returncode == 0:
                 return {
@@ -356,8 +358,10 @@ ollama rm {model}
 ollama list
 """
             
-            ssh_cmd = self._build_ssh_command(instance_ip, ssh_user, ssh_key, delete_script)
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True, timeout=60)
+            result = subprocess.run(
+                self._build_ssh_args(instance_ip, ssh_user, ssh_key),
+                input=delete_script, capture_output=True, text=True, timeout=60,
+            )
             
             if result.returncode == 0:
                 return {
@@ -469,8 +473,10 @@ netstat -tlnp | grep :11434 || ss -tlnp | grep :11434
 ollama --version 2>/dev/null || echo "Ollama not installed"
 """
             
-            ssh_cmd = self._build_ssh_command(instance_ip, ssh_user, ssh_key, status_script)
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(
+                self._build_ssh_args(instance_ip, ssh_user, ssh_key),
+                input=status_script, capture_output=True, text=True, timeout=30,
+            )
             
             if result.returncode == 0:
                 return {

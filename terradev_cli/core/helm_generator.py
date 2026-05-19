@@ -655,7 +655,7 @@ spec:
             'env': {
                 'CUDA_VISIBLE_DEVICES': '0,1,2,3,4,5,6,7',
                 'NCCL_P2P_DISABLE': '0', 'NCCL_IB_DISABLE': '0', 'NCCL_SOCKET_IFNAME': 'eth0',
-                'VLLM_ATTENTION_BACKEND': 'FLASHINFER', 'VLLM_USE_DEEP_GEMM': '1', 'VLLM_SERVER_DEV_MODE': '1',
+                'VLLM_ATTENTION_BACKEND': 'FLASHINFER', 'VLLM_USE_DEEP_GEMM': '1',
             },
         }
 

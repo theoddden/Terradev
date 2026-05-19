@@ -376,7 +376,7 @@ class TerradevAPI:
             creds['cluster_name'] = self.credentials.get('kubernetes_cluster_name', '')
             creds['namespace'] = self.credentials.get('kubernetes_namespace', 'default')
             creds['karpenter_enabled'] = self.credentials.get('kubernetes_karpenter_enabled', 'false')
-            creds['karpenter_version'] = self.credentials.get('kubernetes_karpenter_version', 'v0.32.0')
+            creds['karpenter_version'] = self.credentials.get('kubernetes_karpenter_version', 'v1.10.0')
             creds['aws_region'] = self.credentials.get('aws_region', 'us-east-1')
             creds['aws_account_id'] = self.credentials.get('aws_account_id', '')
             creds['monitoring_enabled'] = self.credentials.get('kubernetes_monitoring_enabled', 'false')
@@ -1323,7 +1323,8 @@ def configure(provider):
 @click.option('--parallel', default=6, help='Number of parallel queries (default: 6)')
 @click.option('--region', '-r', help='Filter by region (e.g., us-east-1, eu-west-1)')
 @click.option('--quick', '-q', is_flag=True, help='Show quick provision command for best quote')
-def quote(gpu_type, providers, parallel, region, quick):
+@click.option('--include-local', is_flag=True, help='Include local GPUs from your registered pool (priced at $0/hr)')
+def quote(gpu_type, providers, parallel, region, quick, include_local):
     """Get real-time GPU pricing quotes from all configured providers.
 
     Queries all configured cloud providers in parallel and displays pricing sorted
@@ -1335,6 +1336,7 @@ def quote(gpu_type, providers, parallel, region, quick):
       terradev quote -g H100 -p runpod,vastai   # Quote H100 from specific providers
       terradev quote -g RTX4090 -r us-east-1     # Quote RTX4090 in specific region
       terradev quote -g A100 -q                  # Show quick provision command
+      terradev quote -g RTX4090 --include-local  # Include local GPUs from your pool
 
     Next Steps:
       After quoting, use: terradev provision -g <gpu-type>
@@ -1354,6 +1356,36 @@ def quote(gpu_type, providers, parallel, region, quick):
         })
 
     api = TerradevAPI()
+
+    # ── Load local pool if --include-local is set ──
+    local_quotes = []
+    if include_local:
+        import json, os
+        pool_path = os.path.expanduser("~/.terradev/local_pool.json")
+        if os.path.exists(pool_path):
+            try:
+                with open(pool_path) as f:
+                    pool = json.load(f)
+                for pool_name, entry in pool.items():
+                    gpus = entry.get("gpus", [])
+                    for gpu in gpus:
+                        gpu_name = gpu.get("name", "")
+                        # Fuzzy match GPU type (e.g., "RTX 4090" matches "RTX4090")
+                        gpu_normalized = gpu_name.replace(" ", "").replace("NVIDIA", "").upper()
+                        gpu_type_normalized = gpu_type.replace(" ", "").upper()
+                        if gpu_type_normalized in gpu_normalized or gpu_normalized in gpu_type_normalized:
+                            local_quotes.append({
+                                'provider': 'local',
+                                'region': entry.get("host", "localhost"),
+                                'price': 0.0,
+                                'availability': 'on-demand',
+                                'gpu_name': gpu_name,
+                                'pool_name': pool_name,
+                            })
+                if local_quotes:
+                    print(f"Included {len(local_quotes)} local GPU(s) from your pool")
+            except Exception as e:
+                print(f"Warning: Could not load local pool: {e}")
 
     # ── Fetch quotes from all providers in parallel ──
     print(f"Querying providers for {gpu_type} pricing...")
@@ -1379,6 +1411,9 @@ def quote(gpu_type, providers, parallel, region, quick):
 
     all_quotes = asyncio.run(_fetch_all())
 
+    # Merge local quotes with cloud quotes
+    all_quotes = local_quotes + all_quotes
+
     if not all_quotes:
         print("ERROR: No quotes returned from any provider")
         print("\nTo fix this:")
@@ -1402,7 +1437,10 @@ def quote(gpu_type, providers, parallel, region, quick):
     print("-" * 58)
     for i, q in enumerate(all_quotes[:10]):
         spot = "spot" if q.get('availability') == 'spot' else 'on-demand'
-        print(f"{i+1:<4} {q['provider']:<14} {q['region']:<16} ${q['price']:<9.2f} {spot:<10}")
+        provider_display = q.get('provider', q.get('gpu_name', 'unknown'))
+        if q.get('provider') == 'local':
+            provider_display = f"{q['pool_name']}"
+        print(f"{i+1:<4} {provider_display:<14} {q['region']:<16} ${q['price']:<9.2f} {spot:<10}")
 
     print(f"\nBest: ${best['price']:.2f}/hr on {best['provider']} ({best['region']})")
     monthly = best['price'] * 730
@@ -1670,7 +1708,8 @@ def setup(provider, quick):
               default='balanced', help='Spot instance strategy: aggressive (cheapest), balanced, conservative (most stable)')
 @click.option('--backend', type=click.Choice(['vllm', 'sglang', 'dynamo', 'tensorrt_llm', 'llmd']),
               default='vllm', help='Inference backend: vllm (default), sglang, dynamo, tensorrt_llm, llmd')
-def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, model_name, endpoint_name, min_workers, max_workers, spot, on_demand, spot_strategy, backend):
+@click.option('--prefer-local', is_flag=True, help='Prefer local GPUs from your pool over cloud providers')
+def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, model_name, endpoint_name, min_workers, max_workers, spot, on_demand, spot_strategy, backend, prefer_local):
     """Provision GPU instances across multiple clouds with auto-optimization.
 
     Performs multi-cloud arbitrage: queries all configured providers, builds a
@@ -1684,6 +1723,7 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
       terradev provision -g RTX4090 --spot                # Force spot instances
       terradev provision -g A100 --type inference        # Inference workload (auto-selects spot)
       terradev provision -g H100 -n 8 --parallel 12       # High-throughput training
+      terradev provision -g RTX4090 --prefer-local        # Prefer local GPUs from your pool
 
     Spot vs On-Demand:
       - Spot: 60-80% savings, 2-minute termination notice, auto-checkpointing
@@ -1763,6 +1803,44 @@ def provision(gpu_type, count, max_price, providers, parallel, dry_run, type, mo
         print(f"   Tip: Use --spot for cost savings on interruptible workloads")
 
     # Tier gates removed - unlimited concurrent instances and provisions (open source)
+
+    # ── Check local pool if --prefer-local is set ──
+    if prefer_local:
+        import json, os
+        pool_path = os.path.expanduser("~/.terradev/local_pool.json")
+        if os.path.exists(pool_path):
+            try:
+                with open(pool_path) as f:
+                    pool = json.load(f)
+                matching_local = []
+                for pool_name, entry in pool.items():
+                    gpus = entry.get("gpus", [])
+                    for gpu in gpus:
+                        gpu_name = gpu.get("name", "")
+                        # Fuzzy match GPU type
+                        gpu_normalized = gpu_name.replace(" ", "").replace("NVIDIA", "").upper()
+                        gpu_type_normalized = gpu_type.replace(" ", "").upper()
+                        if gpu_type_normalized in gpu_normalized or gpu_normalized in gpu_type_normalized:
+                            matching_local.append({
+                                'pool_name': pool_name,
+                                'gpu': gpu,
+                                'host': entry.get("host", "localhost"),
+                                'user': entry.get("user", ""),
+                                'key': entry.get("key", ""),
+                            })
+                if matching_local:
+                    print(f"\nFOUND {len(matching_local)} local GPU(s) matching {gpu_type} in your pool")
+                    print("Using local GPUs instead of cloud providers (cost: $0/hr)")
+                    for match in matching_local[:count]:
+                        print(f"  - {match['pool_name']}: {match['gpu'].get('name', 'Unknown')} ({match['host']})")
+                    print("\nTo use cloud providers instead, omit --prefer-local")
+                    print(f"Your local pool is registered. Use: terradev train --script train.py --pool {matching_local[0]['pool_name']}")
+                    return
+            except Exception as e:
+                print(f"Warning: Could not load local pool: {e}")
+        else:
+            print("No local pool found. Register GPUs with: terradev local scan --register")
+            print("Proceeding with cloud providers...")
 
     # ── Step 1: Fetch quotes from ALL providers in parallel ──
     print(f"Provisioning {count}x {gpu_type} (parallel={parallel})")
@@ -7226,6 +7304,8 @@ def preflight(nodes, ssh_user, ssh_key, provision_group, quick, fmt):
 @click.option('--nodes', '-n', multiple=True, help='Node IP addresses (multiple allowed)')
 @click.option('--from-provision', 'provision_group', default='',
               help='Use nodes from provision group (pg_xxx or "latest" for most recent)')
+@click.option('--pool', default='', help='Use local pool entry by name (e.g., workstation-4090)')
+@click.option('--overflow-to-cloud', is_flag=True, help='Fall back to cloud providers if local pool unavailable or insufficient')
 @click.option('--gpus-per-node', default=8, help='GPUs per node (default: 8)')
 @click.option('--tp', default=1, help='Tensor parallel size for model parallelism')
 @click.option('--pp', default=1, help='Pipeline parallel size for model parallelism')
@@ -7233,7 +7313,7 @@ def preflight(nodes, ssh_user, ssh_key, provision_group, quick, fmt):
 @click.option('--skip-preflight', is_flag=True, help='Skip preflight GPU/NCCL/RDMA validation checks')
 @click.option('--format', '-f', 'fmt', type=click.Choice(['json', 'text']), default='text', help='Output format: text (default) or json')
 @click.argument('script_args', nargs=-1, type=click.UNPROCESSED)
-def train(config_path, script, framework, backend, nodes, provision_group,
+def train(config_path, script, framework, backend, nodes, provision_group, pool, overflow_to_cloud,
           gpus_per_node, tp, pp, total_steps, skip_preflight, fmt, script_args):
     """Launch distributed training jobs across provisioned GPU nodes.
 
@@ -7247,6 +7327,8 @@ def train(config_path, script, framework, backend, nodes, provision_group,
       terradev train -s train.py -n 10.0.0.1 -n 10.0.0.2 --tp 2 -- --lr 1e-4
       terradev train -s train.py --from-provision latest             # Auto-resolve nodes
       terradev train -s train.py --from-provision pg_1709123456_abc12345
+      terradev train -s train.py --pool workstation-4090             # Use local pool entry
+      terradev train -s train.py --pool workstation-4090 --overflow-to-cloud  # Cloud fallback
 
     Workflow:
       1. Provision nodes: terradev provision -g H100 -n 4
@@ -7280,6 +7362,50 @@ def train(config_path, script, framework, backend, nodes, provision_group,
         resolved_nodes, resolved_ssh_key = _resolve_provision_nodes(provision_group, fmt)
         if not resolved_nodes:
             sys.exit(1)
+
+    # ── Resolve nodes from local pool if --pool is specified ──
+    if pool and not resolved_nodes:
+        import json, os
+        pool_path = os.path.expanduser("~/.terradev/local_pool.json")
+        if os.path.exists(pool_path):
+            try:
+                with open(pool_path) as f:
+                    pool_data = json.load(f)
+                if pool in pool_data:
+                    entry = pool_data[pool]
+                    host = entry.get("host", "localhost")
+                    if host == "localhost":
+                        resolved_nodes = ["127.0.0.1"]
+                    else:
+                        resolved_nodes = [host]
+                    resolved_ssh_key = entry.get("key", "")
+                    print(f"Using local pool entry '{pool}': {host}")
+                else:
+                    print(f"ERROR: Pool entry '{pool}' not found in local pool")
+                    print(f"Available entries: {', '.join(pool_data.keys())}")
+                    if overflow_to_cloud:
+                        print("Proceeding with cloud providers (overflow-to-cloud enabled)...")
+                    else:
+                        sys.exit(1)
+            except Exception as e:
+                print(f"ERROR: Could not load local pool: {e}")
+                if overflow_to_cloud:
+                    print("Proceeding with cloud providers (overflow-to-cloud enabled)...")
+                else:
+                    sys.exit(1)
+        else:
+            print("ERROR: No local pool found")
+            print("Register GPUs with: terradev local scan --register")
+            if overflow_to_cloud:
+                print("Proceeding with cloud providers (overflow-to-cloud enabled)...")
+            else:
+                sys.exit(1)
+
+    # ── Cloud fallback if pool specified but no nodes resolved ──
+    if pool and not resolved_nodes and overflow_to_cloud:
+        print(f"WARNING: Local pool '{pool}' unavailable, falling back to cloud providers")
+        print("Run: terradev provision -g <gpu-type> -n <count>")
+        sys.exit(1)
 
     if config_path:
         config = TrainingConfig.from_yaml(config_path)

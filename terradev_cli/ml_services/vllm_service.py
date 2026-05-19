@@ -91,7 +91,7 @@ class VLLMConfig:
     router_session_key: str = "x-session-id"
 
     # ── LMCache Integration (Distributed KV Cache) ───────────────────────
-    enable_lmcache: bool = True
+    enable_lmcache: bool = False
     lmcache_backend: str = "redis"  # redis, s3, disk, cpu
     lmcache_remote_url: Optional[str] = None  # Redis, S3, etc.
     lmcache_chunk_size: int = 256
@@ -121,7 +121,7 @@ class VLLMConfig:
         - Applies reasoning-specific optimizations: 70% KV cache, speculative decoding, capped sequences
         """
         # Detect reasoning models from model name
-        reasoning_keywords = ["o3", "r1", "thinking", "reasoning", "deepseek-r1", "qwen-qq", "claude-thinking", "qwen-thinking"]
+        reasoning_keywords = ["o3", "r1", "thinking", "reasoning", "deepseek-r1", "qwen-qwq", "claude-thinking", "qwen-thinking"]
         is_reasoning = any(kw in model_name.lower() for kw in reasoning_keywords)
 
         # Apply reasoning-workload profile if detected
@@ -430,9 +430,10 @@ pip install vllm
 python3 -c "import vllm; print('vLLM installed successfully')"
 """
             
-            # Execute installation via SSH
-            ssh_cmd = self._build_ssh_command(instance_ip, ssh_user, ssh_key, install_script)
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                self._build_ssh_args(instance_ip, ssh_user, ssh_key),
+                input=install_script, capture_output=True, text=True, timeout=300,
+            )
             
             if result.returncode == 0:
                 return {
@@ -453,14 +454,13 @@ python3 -c "import vllm; print('vLLM installed successfully')"
                 "error": f"Failed to install vLLM: {str(e)}"
             }
     
-    def _build_ssh_command(self, ip: str, user: str, key: Optional[str], script: str) -> str:
-        """Build SSH command for remote execution"""
+    def _build_ssh_args(self, ip: str, user: str, key: Optional[str]) -> List[str]:
+        """Build SSH argument list for subprocess (no shell=True, injection-safe)."""
+        args = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes"]
         if key:
-            ssh_cmd = f"ssh -i {key} {user}@{ip}"
-        else:
-            ssh_cmd = f"ssh {user}@{ip}"
-        
-        return f'{ssh_cmd} "{script}"'
+            args.extend(["-i", key])
+        args.extend([f"{user}@{ip}", "bash", "-s"])
+        return args
     
     async def start_server(self, 
                           instance_ip: str,
@@ -506,24 +506,22 @@ Environment=PYTHONPATH=/root
 WantedBy=multi-user.target
 """
             
-            # Create and start service
-            setup_script = f"""
-#!/bin/bash
-# Create vLLM service
-echo '{service_content}' > /etc/systemd/system/vllm.service
-
-# Reload systemd and start service
+            # Create and start service — use heredoc to safely handle single quotes
+            setup_script = f"""#!/bin/bash
+cat > /etc/systemd/system/vllm.service << 'SERVICEEOF'
+{service_content}
+SERVICEEOF
 systemctl daemon-reload
 systemctl enable vllm
 systemctl start vllm
-
-# Wait for service to start
 sleep 10
 systemctl status vllm
 """
             
-            ssh_cmd = self._build_ssh_command(instance_ip, ssh_user, ssh_key, setup_script)
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True, timeout=60)
+            result = subprocess.run(
+                self._build_ssh_args(instance_ip, ssh_user, ssh_key),
+                input=setup_script, capture_output=True, text=True, timeout=60,
+            )
             
             if result.returncode == 0:
                 return {
@@ -679,8 +677,10 @@ rm -f /etc/systemd/system/vllm.service
 systemctl daemon-reload
 """
             
-            ssh_cmd = self._build_ssh_command(instance_ip, ssh_user, ssh_key, stop_script)
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(
+                self._build_ssh_args(instance_ip, ssh_user, ssh_key),
+                input=stop_script, capture_output=True, text=True, timeout=30,
+            )
             
             if result.returncode == 0:
                 return {

@@ -5378,7 +5378,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     cmd_parts.extend(["--api-key", api_key])
                 exec_line = " ".join(cmd_parts)
                 service = f"""[Unit]\nDescription=vLLM {model}\nAfter=network.target\n[Service]\nType=simple\nExecStart={exec_line}\nRestart=always\nRestartSec=10\nEnvironment=VLLM_SERVER_DEV_MODE=1\n[Install]\nWantedBy=multi-user.target"""
-                setup = f"echo '{service}' > /etc/systemd/system/vllm.service && systemctl daemon-reload && systemctl enable vllm && systemctl start vllm && sleep 5 && systemctl status vllm"
+                service_b64 = base64.b64encode(service.encode()).decode()
+                setup = f"echo {service_b64} | base64 -d > /etc/systemd/system/vllm.service && systemctl daemon-reload && systemctl enable vllm && systemctl start vllm && sleep 5 && systemctl status vllm"
                 ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + key if key else ''} {user}@{ip}"
                 full_cmd = f"{ssh_base} '{setup}'"
                 result = await execute_shell_command(full_cmd)
@@ -5844,7 +5845,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     cmd_parts.append("--enable-expert-parallel")
                 exec_line = " ".join(cmd_parts)
                 service = f"""[Unit]\nDescription=SGLang {model}\nAfter=network.target\n[Service]\nType=simple\nExecStart={exec_line}\nRestart=always\nRestartSec=10\nEnvironment=VLLM_USE_DEEP_GEMM=1\nEnvironment=VLLM_ALL2ALL_BACKEND=deepep_low_latency\n[Install]\nWantedBy=multi-user.target"""
-                setup = f"echo '{service}' > /etc/systemd/system/sglang.service && systemctl daemon-reload && systemctl enable sglang && systemctl start sglang && sleep 5 && systemctl status sglang"
+                service_b64 = base64.b64encode(service.encode()).decode()
+                setup = f"echo {service_b64} | base64 -d > /etc/systemd/system/sglang.service && systemctl daemon-reload && systemctl enable sglang && systemctl start sglang && sleep 5 && systemctl status sglang"
                 ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + key if key else ''} {user}@{ip}"
                 result = await execute_shell_command(f"{ssh_base} '{setup}'")
                 if result["success"]:

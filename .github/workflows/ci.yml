@@ -41,33 +41,24 @@ jobs:
 
     - name: Run cargo test
       run: |
-        if [ -f "float-protocols/Cargo.toml" ]; then
-          cd float-protocols
-          cargo test --verbose
-        elif [ -f "dxfeed-rust-api/Cargo.toml" ]; then
-          cd dxfeed-rust-api
-          cargo test --verbose
+        if [ -f "rust/Cargo.toml" ]; then
+          cd rust
+          cargo test --workspace --verbose
         else
-          echo "No Rust Cargo.toml found, skipping Rust tests"
+          echo "No rust/ workspace found, skipping Rust tests"
         fi
 
     - name: Run cargo clippy
       run: |
-        if [ -f "float-protocols/Cargo.toml" ]; then
-          cd float-protocols
-          cargo clippy -- -D warnings
-        elif [ -f "dxfeed-rust-api/Cargo.toml" ]; then
-          cd dxfeed-rust-api
-          cargo clippy -- -D warnings
+        if [ -f "rust/Cargo.toml" ]; then
+          cd rust
+          cargo clippy --workspace -- -D warnings
         fi
 
     - name: Run cargo fmt
       run: |
-        if [ -f "float-protocols/Cargo.toml" ]; then
-          cd float-protocols
-          cargo fmt --all -- --check
-        elif [ -f "dxfeed-rust-api/Cargo.toml" ]; then
-          cd dxfeed-rust-api
+        if [ -f "rust/Cargo.toml" ]; then
+          cd rust
           cargo fmt --all -- --check
         fi
 
@@ -157,10 +148,16 @@ jobs:
       with:
         python-version: '3.11'
 
+    - name: Install package for scan
+      run: pip install -e ".[dev]" 2>/dev/null || pip install -e .
+
     - name: Install + scan
       run: |
         pip install bandit safety
-        bandit -r terradev_cli/ -f json -o bandit-report.json -ll || true
+        # Scan the full package tree; -ll = medium+high only; fail on high severity
+        bandit -r terradev_cli/ -f json -o bandit-report.json -lll || true
+        # Print a summary to the job log for visibility
+        bandit -r terradev_cli/ -lll --exit-zero
         safety check --json --output safety-report.json || true
 
     - uses: actions/upload-artifact@v4

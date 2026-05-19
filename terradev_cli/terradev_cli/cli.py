@@ -336,7 +336,7 @@ class TerradevAPI:
             creds['cluster_name'] = self.credentials.get('kubernetes_cluster_name', '')
             creds['namespace'] = self.credentials.get('kubernetes_namespace', 'default')
             creds['karpenter_enabled'] = self.credentials.get('kubernetes_karpenter_enabled', 'false')
-            creds['karpenter_version'] = self.credentials.get('kubernetes_karpenter_version', 'v0.32.0')
+            creds['karpenter_version'] = self.credentials.get('kubernetes_karpenter_version', 'v1.10.0')
             creds['aws_region'] = self.credentials.get('aws_region', 'us-east-1')
             creds['aws_account_id'] = self.credentials.get('aws_account_id', '')
             creds['monitoring_enabled'] = self.credentials.get('kubernetes_monitoring_enabled', 'false')

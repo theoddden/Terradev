@@ -335,7 +335,7 @@ def _reasoning_auto_config(
     else:
         args_str = " ".join(config.script_args).lower()
         reasoning_keywords = [
-            "o3", "r1", "thinking", "reasoning", "deepseek-r1", "qwen-qq",
+            "o3", "r1", "thinking", "reasoning", "deepseek-r1", "qwen-qwq",
             "claude-thinking", "qwen-thinking", "chain-of-thought", "cot",
         ]
         if any(kw in args_str for kw in reasoning_keywords):
