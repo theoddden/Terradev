@@ -12,9 +12,9 @@ pyo3 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-nvidia = { version = "0.6", optional = true }
+nvml-wrapper = { version = "0.10", optional = true }
 pci-ids = "0.3"
 
 [features]
 default = ["nvml"]
-nvml = ["nvidia"]
+nvml = ["nvml-wrapper"]

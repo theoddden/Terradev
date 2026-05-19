@@ -325,13 +325,13 @@ class TestVLLMConfigOtherOptimizations:
         assert config.enable_flashinfer == True
     
     def test_lmcache_integration(self):
-        """LMCache integration is enabled by default"""
+        """LMCache integration is available but disabled by default"""
         config = VLLMConfig(model_name="test-model")
         
         assert hasattr(config, 'enable_lmcache')
         assert hasattr(config, 'lmcache_backend')
         
-        assert config.enable_lmcache == True
+        assert config.enable_lmcache == False  # Disabled by default, can be enabled via config
         assert config.lmcache_backend == "redis"
 
 
