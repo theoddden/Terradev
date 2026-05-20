@@ -3,7 +3,7 @@ mod types;
 
 use graph::EgressGraph;
 use pyo3::prelude::*;
-use types::{EgressEdge, Region, TransferPlan};
+use types::{EgressEdge, Region};
 
 #[pymodule]
 fn terradev_egress_optimizer(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -39,10 +39,10 @@ impl PyEgressGraph {
     fn find_cheapest_route(&self, from: String, to: String) -> Option<PyTransferPlan> {
         self.inner.find_cheapest_route(&from, &to).map(|(route, cost)| {
             PyTransferPlan {
-                route,
                 total_cost_per_gb: cost,
                 estimated_time_hours: 0.0, // Would need data size to calculate
                 hops: route.len() - 1,
+                route,
             }
         })
     }

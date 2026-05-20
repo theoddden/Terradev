@@ -1,6 +1,7 @@
 use crate::types::{EgressEdge, Region};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::algo::dijkstra;
+use petgraph::visit::EdgeRef;
 use std::collections::HashMap;
 
 pub struct EgressGraph {
@@ -39,34 +40,33 @@ impl EgressGraph {
         let from_idx = *self.region_to_index.get(from)?;
         let to_idx = *self.region_to_index.get(to)?;
         
-        let result = dijkstra(&self.graph, from_idx, Some(to_idx), |e| *e.weight());
+        let distances = dijkstra(&self.graph, from_idx, Some(to_idx), |e| *e.weight());
         
-        if let Some((cost, _preds)) = result {
-            // Reconstruct path
-            let mut path = vec![to.to_string()];
-            let mut current = to_idx;
-            
-            while current != from_idx {
-                let mut found = false;
-                for edge in self.graph.edges_directed(current, petgraph::Direction::Incoming) {
-                    if let Some(&pred_cost) = result.0.get(&edge.source()) {
-                        let edge_cost = edge.weight();
-                        if (pred_cost + edge_cost - cost).abs() < 0.001 {
-                            current = edge.source();
-                            path.insert(0, self.index_to_region.get(&current)?.clone());
-                            found = true;
-                            break;
-                        }
+        let cost = *distances.get(&to_idx)?;
+        
+        // Reconstruct path using distances
+        let mut path = vec![to.to_string()];
+        let mut current = to_idx;
+        
+        while current != from_idx {
+            let mut found = false;
+            for edge in self.graph.edges_directed(current, petgraph::Direction::Incoming) {
+                let pred_idx = edge.source();
+                if let Some(&pred_cost) = distances.get(&pred_idx) {
+                    let edge_cost = edge.weight();
+                    if (pred_cost + edge_cost - cost).abs() < 0.001 {
+                        current = pred_idx;
+                        path.insert(0, self.index_to_region.get(&current)?.clone());
+                        found = true;
+                        break;
                     }
                 }
-                if !found {
-                    break;
-                }
             }
-            
-            Some((path, cost))
-        } else {
-            None
+            if !found {
+                break;
+            }
         }
+        
+        Some((path, cost))
     }
 }
