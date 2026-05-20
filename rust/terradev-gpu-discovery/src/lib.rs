@@ -205,7 +205,7 @@ impl PyGPUDiscovery {
                 gpu_dict.set_item("pci_bus_id", &gpu.pci_bus_id).unwrap();
                 gpu_dict.set_item("driver_version", &gpu.driver_version).unwrap();
                 gpu_dict.set_item("cuda_version", &gpu.cuda_version).unwrap();
-                <&PyDict as pyo3::IntoPy<PyObject>>::into_py(gpu_dict, py)
+                gpu_dict.to_object(py)
             }));
             
             dict.set_item("gpus", gpu_list)?;
