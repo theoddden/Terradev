@@ -58,7 +58,7 @@ impl HelmGenerator {
         Ok(yaml_str)
     }
 
-    fn generate_deployment(&self, name: String, image: String, replicas: Option<u32>, resources: Option<&PyDict>) -> PyResult<String> {
+    fn generate_deployment(&mut self, name: String, image: String, replicas: Option<u32>, resources: Option<&PyDict>) -> PyResult<String> {
         let mut ctx = Context::new();
         ctx.insert("name", &name);
         ctx.insert("image", &image);
