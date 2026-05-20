@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict, PyBytes;
+use pyo3::types::{PyDict, PyBytes};
 use serde::{Deserialize, Serialize};
 use simd_json::from_str;
 use std::collections::HashMap;
