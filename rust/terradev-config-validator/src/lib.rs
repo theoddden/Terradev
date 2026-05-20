@@ -18,6 +18,7 @@ pub struct PyConfigValidator {
     inner: ConfigValidator,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyConfigValidator {
     #[new]

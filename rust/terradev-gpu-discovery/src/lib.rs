@@ -177,6 +177,7 @@ pub struct PyGPUDiscovery {
     inner: GPUDiscovery,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyGPUDiscovery {
     #[new]

@@ -98,12 +98,9 @@ impl PyMCPOptimizer {
                 .into_iter()
                 .map(|obj| {
                     let tool_dict: &pyo3::types::PyDict = obj.extract(py)?;
-                    let name = tool_dict.get_item("name")
-                        .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("name field missing"))?;
-                    let description = tool_dict.get_item("description")
-                        .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("description field missing"))?;
-                    let input_schema = tool_dict.get_item("inputSchema")
-                        .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("inputSchema field missing"))?;
+                    let name = tool_dict.get_item("name")?;
+                    let description = tool_dict.get_item("description")?;
+                    let input_schema = tool_dict.get_item("inputSchema")?;
                     Ok(Tool {
                         name: name.extract()?,
                         description: description.extract()?,
@@ -125,7 +122,8 @@ impl PyMCPOptimizer {
                     let schema_py: PyObject = pyo3::types::PyString::new(py, &schema_str).into();
                     let schema_value: PyObject = pyo3::types::PyModule::import(py, "json")?
                         .getattr("loads")?
-                        .call1((schema_py,))?;
+                        .call1((schema_py,))?
+                        .into();
                     dict.set_item("inputSchema", schema_value)?;
                     Ok(dict.into())
                 })
@@ -156,7 +154,8 @@ impl PyMCPOptimizer {
                     let v_py: PyObject = pyo3::types::PyString::new(py, &v_str).into();
                     let v_value: PyObject = pyo3::types::PyModule::import(py, "json")?
                         .getattr("loads")?
-                        .call1((v_py,))?;
+                        .call1((v_py,))?
+                        .into();
                     Ok((k, v_value))
                 })
                 .collect()

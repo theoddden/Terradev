@@ -33,6 +33,7 @@ pub struct WarmPoolManager {
     max_idle_seconds: i64,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl WarmPoolManager {
     #[new]

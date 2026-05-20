@@ -18,6 +18,7 @@ pub struct PyQuotaManager {
     inner: QuotaManager,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyQuotaManager {
     #[new]

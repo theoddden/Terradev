@@ -8,6 +8,7 @@ pub struct ResultCompressor {
     compression_level: u32,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl ResultCompressor {
     #[new]

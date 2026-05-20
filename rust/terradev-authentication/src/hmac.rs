@@ -2,11 +2,9 @@ use crate::encoding::{encode_parameters, percent_encode_rfc3986};
 use crate::types::{AlibabaCredentials, OVHCredentials, SignatureResult};
 use hmac::{Hmac, Mac};
 use sha1::Sha1;
-use sha2::Sha256;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 type HmacSha1 = Hmac<Sha1>;
-type HmacSha256 = Hmac<Sha256>;
 
 pub struct AlibabaSigner;
 

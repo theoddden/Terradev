@@ -51,6 +51,7 @@ pub struct DAGExecutor {
     max_workers: usize,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl DAGExecutor {
     #[new]

@@ -21,6 +21,7 @@ pub struct JobStateMachine {
     topology: Option<JobTopology>,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl JobStateMachine {
     #[new]

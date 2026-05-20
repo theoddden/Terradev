@@ -16,6 +16,7 @@ pub struct ToolRegistry {
     tools: HashMap<String, ToolSchema>,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl ToolRegistry {
     #[new]

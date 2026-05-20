@@ -33,6 +33,7 @@ pub struct CostScaler {
     scaling_window_hours: i64,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl CostScaler {
     #[new]

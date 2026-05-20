@@ -17,6 +17,7 @@ pub struct PyEventBus {
     inner: EventBus,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyEventBus {
     #[new]

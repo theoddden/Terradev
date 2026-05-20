@@ -28,6 +28,7 @@ pub struct GovernanceEngine {
     policies: HashMap<String, serde_json::Value>,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl GovernanceEngine {
     #[new]

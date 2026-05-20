@@ -73,7 +73,7 @@ impl TelemetryPipeline {
             p95: hist.value_at_quantile(0.95) as f64,
             p99: hist.value_at_quantile(0.99) as f64,
             count: hist.len(),
-            sum: hist.iter_all().map(|v| v * v.count()).sum::<u64>() as f64,
+            sum: hist.iter_all().map(|v| v.value() as u64 * v.count() as u64).sum::<u64>() as f64,
         }
     }
 }

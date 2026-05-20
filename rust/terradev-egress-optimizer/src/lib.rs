@@ -19,6 +19,7 @@ pub struct PyEgressGraph {
     inner: EgressGraph,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyEgressGraph {
     #[new]

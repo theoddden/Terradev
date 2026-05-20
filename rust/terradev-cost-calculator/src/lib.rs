@@ -18,6 +18,7 @@ pub struct PyCostCalculator {
     inner: CostCalculator,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyCostCalculator {
     #[new]

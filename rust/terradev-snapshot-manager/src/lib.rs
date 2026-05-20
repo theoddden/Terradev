@@ -17,6 +17,7 @@ pub struct PySnapshotManager {
     inner: SnapshotManager,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PySnapshotManager {
     #[new]
@@ -79,7 +80,7 @@ impl From<PyModelState> for ModelState {
             model_weights: p.model_weights,
             optimizer_state: p.optimizer_state,
             metadata: serde_json::from_str(&p.metadata).unwrap_or(serde_json::Value::Null),
-            created_at: chrono::DateTime::parse_from_rfc3339(&p.created_at).unwrap().with_timezone(&chrono::Utc).into(),
+            created_at: chrono::DateTime::parse_from_rfc3339(&p.created_at).unwrap().with_timezone(&chrono::Utc),
         }
     }
 }

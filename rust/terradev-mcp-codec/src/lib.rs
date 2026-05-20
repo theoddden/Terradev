@@ -23,6 +23,7 @@ pub struct MCPCodec {
     use_simd: bool,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl MCPCodec {
     #[new]

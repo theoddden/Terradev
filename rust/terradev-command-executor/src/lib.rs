@@ -106,6 +106,7 @@ pub struct PyCommandExecutor {
     inner: CommandExecutor,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyCommandExecutor {
     #[new]

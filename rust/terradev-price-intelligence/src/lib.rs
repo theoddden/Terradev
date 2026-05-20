@@ -40,6 +40,7 @@ pub struct PriceIntelligence {
     ticks: Vec<PriceTick>,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PriceIntelligence {
     #[new]

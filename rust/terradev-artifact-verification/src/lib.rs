@@ -15,6 +15,7 @@ fn terradev_artifact_verification(_py: Python, m: &PyModule) -> PyResult<()> {
 #[pyclass]
 pub struct PyArtifactVerifier;
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyArtifactVerifier {
     #[new]

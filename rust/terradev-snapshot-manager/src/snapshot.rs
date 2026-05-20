@@ -1,5 +1,4 @@
 use crate::types::{ModelState, SnapshotError};
-use bincode;
 use zstd::stream::{decode_all as read_all, encode_all};
 use std::io::Cursor;
 
@@ -10,7 +9,7 @@ pub struct SnapshotManager {
 impl SnapshotManager {
     pub fn new(compression_level: i32) -> Self {
         Self {
-            compression_level: compression_level.max(1).min(22),
+            compression_level: compression_level.clamp(1, 22),
         }
     }
     
