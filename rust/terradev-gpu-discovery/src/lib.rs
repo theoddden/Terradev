@@ -77,9 +77,9 @@ impl GPUDiscovery {
 
     #[cfg(feature = "nvml")]
     fn query_gpus_nvml(&self) -> Result<Vec<GPUInfo>, String> {
-        use nvml_wrapper::NVML;
+        use nvml_wrapper::Nvml;
 
-        let nvml = NVML::init().map_err(|e| e.to_string())?;
+        let nvml = Nvml::init().map_err(|e| e.to_string())?;
         let device_count = nvml.device_count().map_err(|e| e.to_string())?;
 
         let mut gpus = Vec::new();
@@ -205,7 +205,7 @@ impl PyGPUDiscovery {
                 gpu_dict.set_item("pci_bus_id", &gpu.pci_bus_id).unwrap();
                 gpu_dict.set_item("driver_version", &gpu.driver_version).unwrap();
                 gpu_dict.set_item("cuda_version", &gpu.cuda_version).unwrap();
-                gpu_dict.into()
+                gpu_dict.into_py(py)
             }));
             
             dict.set_item("gpus", gpu_list)?;

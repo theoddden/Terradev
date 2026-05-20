@@ -62,9 +62,17 @@ impl MCPCodec {
         Python::with_gil(|py| {
             let content_vec: Vec<serde_json::Value> = if let Ok(list) = content.extract::<Vec<PyObject>>(py) {
                 list.iter().map(|obj| {
-                    serde_json::to_string(obj).ok()
-                        .and_then(|s| serde_json::from_str(&s).ok())
-                        .unwrap_or(serde_json::Value::Null)
+                    if let Ok(s) = obj.extract::<String>(py) {
+                        serde_json::from_str(&s).ok().unwrap_or(serde_json::Value::String(s))
+                    } else if let Ok(n) = obj.extract::<i64>(py) {
+                        serde_json::Value::Number(n.into())
+                    } else if let Ok(f) = obj.extract::<f64>(py) {
+                        serde_json::json!(f)
+                    } else if let Ok(b) = obj.extract::<bool>(py) {
+                        serde_json::Value::Bool(b)
+                    } else {
+                        serde_json::Value::Null
+                    }
                 }).collect()
             } else {
                 vec![]
@@ -119,9 +127,17 @@ impl MCPCodec {
                     if let Ok(tuple) = obj.extract::<(String, PyObject, bool)>(py) {
                         let content_vec: Vec<serde_json::Value> = if let Ok(list) = tuple.1.extract::<Vec<PyObject>>(py) {
                             list.iter().map(|item| {
-                                serde_json::to_string(item).ok()
-                                    .and_then(|s| serde_json::from_str(&s).ok())
-                                    .unwrap_or(serde_json::Value::Null)
+                                if let Ok(s) = item.extract::<String>(py) {
+                                    serde_json::from_str(&s).ok().unwrap_or(serde_json::Value::String(s))
+                                } else if let Ok(n) = item.extract::<i64>(py) {
+                                    serde_json::Value::Number(n.into())
+                                } else if let Ok(f) = item.extract::<f64>(py) {
+                                    serde_json::json!(f)
+                                } else if let Ok(b) = item.extract::<bool>(py) {
+                                    serde_json::Value::Bool(b)
+                                } else {
+                                    serde_json::Value::Null
+                                }
                             }).collect()
                         } else {
                             vec![]
