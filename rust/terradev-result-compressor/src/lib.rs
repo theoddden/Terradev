@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
-use lz4::compress;
-use lz4::decompress;
+use lz4::block::compress;
+use lz4::block::decompress;
 
 #[pyclass]
 pub struct ResultCompressor {
