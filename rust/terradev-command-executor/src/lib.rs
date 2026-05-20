@@ -47,7 +47,7 @@ impl CommandExecutor {
             }
         }
 
-        match cmd.output() {
+        match cmd.output().await {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -123,7 +123,7 @@ impl PyCommandExecutor {
         env: Option<HashMap<String, String>>,
     ) -> PyResult<&'p PyAny> {
         let executor = self.inner.clone();
-        future_into_py(py, async move {
+        future_into_py::<_, PyObject>(py, async move {
             let result = executor.execute_command(program, args, env).await;
             Python::with_gil(|py| {
                 let dict = pyo3::types::PyDict::new(py);
@@ -142,7 +142,7 @@ impl PyCommandExecutor {
         commands: Vec<(String, Vec<String>, Option<HashMap<String, String>>)>,
     ) -> PyResult<&'p PyAny> {
         let executor = self.inner.clone();
-        future_into_py(py, async move {
+        future_into_py::<_, PyObject>(py, async move {
             let results = executor.execute_parallel(commands).await;
             Python::with_gil(|py| {
                 let list = pyo3::types::PyList::empty(py);

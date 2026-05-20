@@ -1,4 +1,4 @@
-use crate::types::{Artifact, VerificationError, VerificationResult};
+use crate::types::{VerificationError, VerificationResult};
 use sha2::{Digest, Sha256};
 use std::io::Read;
 

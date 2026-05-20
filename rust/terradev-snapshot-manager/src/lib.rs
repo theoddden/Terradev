@@ -2,9 +2,8 @@ mod snapshot;
 mod types;
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 use snapshot::SnapshotManager;
-use types::{ModelState, SnapshotError};
+use types::ModelState;
 
 #[pymodule]
 fn terradev_snapshot_manager(_py: Python, m: &PyModule) -> PyResult<()> {

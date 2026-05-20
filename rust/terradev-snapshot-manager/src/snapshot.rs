@@ -1,7 +1,7 @@
 use crate::types::{ModelState, SnapshotError};
 use bincode;
-use zstd::stream::{read_all, encode_all};
-use std::io::{Cursor, Read};
+use zstd::stream::{decode_all as read_all, encode_all};
+use std::io::Cursor;
 
 pub struct SnapshotManager {
     compression_level: i32,
