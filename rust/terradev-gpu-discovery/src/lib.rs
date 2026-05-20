@@ -89,7 +89,7 @@ impl GPUDiscovery {
             let name = device.name().map_err(|e| e.to_string())?;
             let memory_info = device.memory_info().map_err(|e| e.to_string())?;
             let compute_capability = device
-                .compute_capability()
+                .cuda_compute_capability()
                 .map(|cc| format!("{}.{}", cc.major, cc.minor))
                 .unwrap_or_else(|_| "unknown".to_string());
             let pci_bus_id = device.pci_info().map_err(|e| e.to_string())?.bus_id;
@@ -98,7 +98,7 @@ impl GPUDiscovery {
                 .map_err(|e| e.to_string())?
                 .to_string();
             let cuda_version = nvml
-                .sys_cuda_version()
+                .sys_cuda_driver_version()
                 .map_err(|e| e.to_string())?
                 .to_string();
 
@@ -205,7 +205,7 @@ impl PyGPUDiscovery {
                 gpu_dict.set_item("pci_bus_id", &gpu.pci_bus_id).unwrap();
                 gpu_dict.set_item("driver_version", &gpu.driver_version).unwrap();
                 gpu_dict.set_item("cuda_version", &gpu.cuda_version).unwrap();
-                gpu_dict.into_py(py)
+                <&PyDict as pyo3::IntoPy<PyObject>>::into_py(gpu_dict, py)
             }));
             
             dict.set_item("gpus", gpu_list)?;
