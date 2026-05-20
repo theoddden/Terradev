@@ -36,7 +36,7 @@ terradev configure --provider gcp
 - **Up to 90% cost savings** with automatic provider switching
 - **<2 minute spot recovery** with KV cache checkpointing
 - **3.6x faster cold starts** with weight streaming
-- **57.3% cost savings** with MLA-aware VRAM estimation
+- **57% cost savings** with MLA-aware VRAM estimation
   
 ## Complete Tutorial
 
