@@ -28,7 +28,7 @@ impl SnapshotManager {
     
     pub fn load_snapshot(&self, data: &[u8]) -> Result<ModelState, SnapshotError> {
         // Decompress using zstd
-        let decompressed = read_all(data, 0)
+        let decompressed = read_all(data)
             .map_err(|e| SnapshotError::CompressionFailed(e.to_string()))?;
         
         // Deserialize using bincode
