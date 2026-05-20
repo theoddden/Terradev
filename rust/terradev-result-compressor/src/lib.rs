@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
-use lz4::block::compress;
+use lz4::block::{compress, CompressionMode};
 use lz4::block::decompress;
 
 #[pyclass]
@@ -20,7 +20,8 @@ impl ResultCompressor {
 
     fn compress(&self, data: &[u8]) -> PyResult<PyObject> {
         Python::with_gil(|py| {
-            let compressed = compress(data, self.compression_level as usize)
+            let mode = CompressionMode::default();
+            let compressed = compress(data, Some(mode), false)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             Ok(PyBytes::new(py, &compressed).into())
         })
@@ -36,7 +37,8 @@ impl ResultCompressor {
 
     fn compress_json(&self, json_str: &str) -> PyResult<PyObject> {
         Python::with_gil(|py| {
-            let compressed = compress(json_str.as_bytes(), self.compression_level as usize)
+            let mode = CompressionMode::default();
+            let compressed = compress(json_str.as_bytes(), Some(mode), false)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             
             let dict = pyo3::types::PyDict::new(py);
