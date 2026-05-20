@@ -14,3 +14,4 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 zeroize = { version = "1.7", features = ["derive"] }
 parking_lot = "0.12"
+chrono = { workspace = true }

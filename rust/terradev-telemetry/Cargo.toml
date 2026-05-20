@@ -16,3 +16,4 @@ tokio = { workspace = true }
 chrono = { workspace = true }
 hdrhistogram = { workspace = true }
 crossbeam = { workspace = true }
+parking_lot = "0.12"
