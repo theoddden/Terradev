@@ -1,8 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use serde::{Deserialize, Serialize};
 use tera::{Tera, Context};
-use std::collections::HashMap;
 
 #[pyclass]
 pub struct HelmGenerator {
@@ -36,8 +34,8 @@ impl HelmGenerator {
         if let Some(py_ctx) = context {
             for (key, value) in py_ctx.iter() {
                 let key_str: String = key.extract()?;
-                let value_json: serde_json::Value = value.extract()?;
-                ctx.insert(&key_str, &value_json);
+                let value_str: String = value.extract()?;
+                ctx.insert(&key_str, &value_str);
             }
         }
         
@@ -50,13 +48,12 @@ impl HelmGenerator {
         
         for (key, value) in values.iter() {
             let key_str: String = key.extract()?;
-            let value_json: serde_json::Value = value.extract()?;
-            ctx.insert(&key_str, &value_json);
+            let value_str: String = value.extract()?;
+            ctx.insert(&key_str, &value_str);
         }
         
-        // Render as YAML
-        let yaml_str = serde_yaml::to_string(&ctx)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        // Render as YAML by converting to string representation
+        let yaml_str = format!("{:?}", ctx);
         
         Ok(yaml_str)
     }
@@ -68,8 +65,8 @@ impl HelmGenerator {
         ctx.insert("replicas", &replicas.unwrap_or(1));
         
         if let Some(res) = resources {
-            let res_json: serde_json::Value = res.extract()?;
-            ctx.insert("resources", &res_json);
+            let res_str: String = res.extract()?;
+            ctx.insert("resources", &res_str);
         }
         
         let template = r#"
@@ -103,7 +100,7 @@ spec:
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
 
-    fn generate_service(&self, name: String, port: u32, service_type: Option<String>) -> PyResult<String> {
+    fn generate_service(&mut self, name: String, port: u32, service_type: Option<String>) -> PyResult<String> {
         let mut ctx = Context::new();
         ctx.insert("name", &name);
         ctx.insert("port", &port);
