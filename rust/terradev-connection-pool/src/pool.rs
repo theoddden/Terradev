@@ -31,7 +31,7 @@ impl ConnectionPool {
         })
     }
     
-    pub async fn acquire(&self) -> Result<AcquiredConnection, PoolError> {
+    pub async fn acquire(&self) -> Result<AcquiredConnection<'_>, PoolError> {
         let permit = self.semaphore.acquire().await
             .map_err(|_| PoolError::Exhausted)?;
         
@@ -54,12 +54,12 @@ impl ConnectionPool {
     }
 }
 
-pub struct AcquiredConnection {
+pub struct AcquiredConnection<'a> {
     client: Client,
-    _permit: tokio::sync::SemaphorePermit<'static>,
+    _permit: tokio::sync::SemaphorePermit<'a>,
 }
 
-impl AcquiredConnection {
+impl<'a> AcquiredConnection<'a> {
     pub fn client(&self) -> &Client {
         &self.client
     }

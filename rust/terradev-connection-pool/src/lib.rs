@@ -22,10 +22,10 @@ pub struct PyConnectionPool {
 impl PyConnectionPool {
     #[new]
     fn new(config: PyConnectionConfig) -> PyResult<Self> {
-        Self {
+        Ok(Self {
             inner: ConnectionPool::new(config.into())
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
-        }
+        })
     }
     
     fn max_connections(&self) -> usize {

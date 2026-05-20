@@ -49,8 +49,9 @@ impl MCPOptimizer {
 
     fn strip_optional_fields(&self, mut tool: Tool) -> Tool {
         if let Some(obj) = tool.input_schema.as_object_mut() {
+            let required_clone = obj.get("required").and_then(|r| r.as_array()).cloned();
             if let Some(props) = obj.get_mut("properties").and_then(|p| p.as_object_mut()) {
-                if let Some(required) = obj.get("required").and_then(|r| r.as_array()) {
+                if let Some(required) = required_clone {
                     let required_set: std::collections::HashSet<&str> =
                         required.iter().filter_map(|v| v.as_str()).collect();
 
@@ -97,10 +98,16 @@ impl PyMCPOptimizer {
                 .into_iter()
                 .map(|obj| {
                     let tool_dict: &pyo3::types::PyDict = obj.extract(py)?;
+                    let name = tool_dict.get_item("name")
+                        .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("name field missing"))?;
+                    let description = tool_dict.get_item("description")
+                        .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("description field missing"))?;
+                    let input_schema = tool_dict.get_item("inputSchema")
+                        .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("inputSchema field missing"))?;
                     Ok(Tool {
-                        name: tool_dict.get_item("name")?.extract()?,
-                        description: tool_dict.get_item("description")?.extract()?,
-                        input_schema: tool_dict.get_item("inputSchema")?.extract()?,
+                        name: name.extract()?,
+                        description: description.extract()?,
+                        input_schema: input_schema.extract()?,
                     })
                 })
                 .collect::<PyResult<Vec<_>>>()?;
@@ -113,7 +120,13 @@ impl PyMCPOptimizer {
                     let dict = pyo3::types::PyDict::new(py);
                     dict.set_item("name", tool.name)?;
                     dict.set_item("description", tool.description)?;
-                    dict.set_item("inputSchema", tool.input_schema)?;
+                    let schema_str = serde_json::to_string(&tool.input_schema)
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                    let schema_py: PyObject = pyo3::types::PyString::new(py, &schema_str).into();
+                    let schema_value: PyObject = pyo3::types::PyModule::import(py, "json")?
+                        .getattr("loads")?
+                        .call1((schema_py,))?;
+                    dict.set_item("inputSchema", schema_value)?;
                     Ok(dict.into())
                 })
                 .collect()
@@ -137,7 +150,15 @@ impl PyMCPOptimizer {
         let result_args = Python::with_gil(|py| {
             new_args
                 .into_iter()
-                .map(|(k, v)| Ok((k, v.to_object(py))))
+                .map(|(k, v)| {
+                    let v_str = serde_json::to_string(&v)
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                    let v_py: PyObject = pyo3::types::PyString::new(py, &v_str).into();
+                    let v_value: PyObject = pyo3::types::PyModule::import(py, "json")?
+                        .getattr("loads")?
+                        .call1((v_py,))?;
+                    Ok((k, v_value))
+                })
                 .collect()
         })?;
 
