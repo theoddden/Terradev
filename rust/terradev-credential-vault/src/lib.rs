@@ -17,6 +17,7 @@ pub struct PyCredentialVault {
     inner: CredentialVault,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyCredentialVault {
     #[new]

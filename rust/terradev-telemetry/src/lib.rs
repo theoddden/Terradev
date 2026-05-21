@@ -18,6 +18,7 @@ pub struct PyTelemetryPipeline {
     inner: TelemetryPipeline,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyTelemetryPipeline {
     #[new]

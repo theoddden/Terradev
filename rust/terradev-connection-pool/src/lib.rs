@@ -18,6 +18,7 @@ pub struct PyConnectionPool {
     inner: ConnectionPool,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyConnectionPool {
     #[new]

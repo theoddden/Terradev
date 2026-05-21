@@ -19,6 +19,7 @@ pub struct PyCacheEngine {
     inner: CacheEngine,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyCacheEngine {
     #[new]

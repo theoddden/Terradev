@@ -7,6 +7,7 @@ pub struct HelmGenerator {
     tera: Tera,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl HelmGenerator {
     #[new]

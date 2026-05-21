@@ -83,6 +83,7 @@ pub struct PyMCPOptimizer {
     inner: MCPOptimizer,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyMCPOptimizer {
     #[new]
