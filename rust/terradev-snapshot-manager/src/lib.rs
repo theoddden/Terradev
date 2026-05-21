@@ -13,6 +13,7 @@ fn terradev_snapshot_manager(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 #[pyclass]
+#[allow(non_local_definitions)]
 pub struct PySnapshotManager {
     inner: SnapshotManager,
 }
