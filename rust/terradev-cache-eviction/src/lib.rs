@@ -70,8 +70,8 @@ impl PyCacheEngine {
     
     fn policy(&self) -> String {
         match self.inner.policy() {
-            EvictionPolicy::LRU => "lru".to_string(),
-            EvictionPolicy::ARC => "arc".to_string(),
+            EvictionPolicy::Lru => "lru".to_string(),
+            EvictionPolicy::Arc => "arc".to_string(),
             EvictionPolicy::TinyLFU => "tinylfu".to_string(),
         }
     }
