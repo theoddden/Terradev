@@ -191,7 +191,7 @@ impl DAGExecutor {
             };
             
             let dict = PyDict::new(py);
-            dict.set_item("waves", serde_json::to_value(&plan.waves).unwrap())?;
+            dict.set_item("waves", serde_json::to_string(&plan.waves).unwrap())?;
             dict.set_item("total_nodes", plan.total_nodes)?;
             dict.set_item("max_parallelism", plan.max_parallelism)?;
             dict.set_item("critical_path_depth", plan.critical_path_depth)?;
@@ -205,9 +205,8 @@ impl DAGExecutor {
             let plan = self.plan()?;
             let plan_dict: &PyDict = plan.extract(py)?;
             
-            let waves: Vec<ExecutionWave> = serde_json::from_value(
-                plan_dict.get_item("waves").unwrap().extract()?
-            ).unwrap();
+            let waves_json: String = plan_dict.get_item("waves").unwrap().extract()?;
+            let waves: Vec<ExecutionWave> = serde_json::from_str(&waves_json).unwrap();
             
             let mut context: HashMap<String, serde_json::Value> = if let Some(ctx) = initial_context {
                 ctx.extract()?
@@ -234,10 +233,10 @@ impl DAGExecutor {
                 thread::scope(|s| {
                     let handles: Vec<_> = wave.nodes.iter().map(|node_name| {
                         let nodes_ref = nodes.clone();
-                        let ctx_ref = &context;
+                        let node_name = node_name.clone();
                         s.spawn(move |_| {
                             let nodes = nodes_ref.read();
-                            let node = nodes.get(node_name).unwrap();
+                            let node = nodes.get(&node_name).unwrap();
                             
                             let start = std::time::Instant::now();
                             
@@ -249,7 +248,7 @@ impl DAGExecutor {
                             
                             let latency = start.elapsed().as_secs_f64() * 1000.0;
                             
-                            (node_name.clone(), output, latency)
+                            (node_name, output, latency)
                         })
                     }).collect();
                     
@@ -276,13 +275,13 @@ impl DAGExecutor {
             result.parallelism_achieved = if wall_ms > 0.0 { total_node_ms / wall_ms } else { 1.0 };
             
             let dict = PyDict::new(py);
-            dict.set_item("outputs", serde_json::to_value(&result.outputs).unwrap())?;
-            dict.set_item("node_latencies", serde_json::to_value(&result.node_latencies).unwrap())?;
-            dict.set_item("node_statuses", serde_json::to_value(&result.node_statuses).unwrap())?;
+            dict.set_item("outputs", serde_json::to_string(&result.outputs).unwrap())?;
+            dict.set_item("node_latencies", serde_json::to_string(&result.node_latencies).unwrap())?;
+            dict.set_item("node_statuses", serde_json::to_string(&result.node_statuses).unwrap())?;
             dict.set_item("total_latency_ms", result.total_latency_ms)?;
             dict.set_item("wall_clock_ms", result.wall_clock_ms)?;
             dict.set_item("parallelism_achieved", result.parallelism_achieved)?;
-            dict.set_item("errors", serde_json::to_value(&result.errors).unwrap())?;
+            dict.set_item("errors", serde_json::to_string(&result.errors).unwrap())?;
             
             Ok(dict.into())
         })
