@@ -1,7 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::*;
 
@@ -51,12 +50,14 @@ impl PriceIntelligence {
     }
 
     fn add_tick(&mut self, tick: &PyDict) -> PyResult<()> {
-        let timestamp: i64 = tick.get_item("timestamp")?.extract()?;
-        let price: f64 = tick.get_item("price")?.extract()?;
-        let provider: String = tick.get_item("provider")?.extract()?;
-        let region: String = tick.get_item("region")?.extract()?;
-        let gpu_type: String = tick.get_item("gpu_type")?.extract()?;
-        let availability: String = tick.get_item("availability").unwrap_or_else(|_| "on-demand".to_string()).extract()?;
+        let timestamp: i64 = tick.get_item("timestamp")?.unwrap().extract()?;
+        let price: f64 = tick.get_item("price")?.unwrap().extract()?;
+        let provider: String = tick.get_item("provider")?.unwrap().extract()?;
+        let region: String = tick.get_item("region")?.unwrap().extract()?;
+        let gpu_type: String = tick.get_item("gpu_type")?.unwrap().extract()?;
+        let availability: String = tick.get_item("availability")
+            .unwrap_or_else(|_| "on-demand".into())
+            .extract()?;
 
         self.ticks.push(PriceTick {
             timestamp,
@@ -102,7 +103,21 @@ impl PriceIntelligence {
                 Decimal::ZERO
             };
 
-            let std_dev = variance.sqrt().unwrap_or(Decimal::ZERO);
+            let std_dev = if variance >= Decimal::ZERO {
+                // Use Newton's method for square root approximation
+                let mut approx = variance / Decimal::from(2);
+                for _ in 0..20 {
+                    let new_approx = (approx + variance / approx) / Decimal::from(2);
+                    if (new_approx - approx).abs() < Decimal::from(1e-10) {
+                        approx = new_approx;
+                        break;
+                    }
+                    approx = new_approx;
+                }
+                approx
+            } else {
+                Decimal::ZERO
+            };
 
             let min = prices.first().unwrap_or(&Decimal::ZERO).clone();
             let max = prices.last().unwrap_or(&Decimal::ZERO).clone();
@@ -191,7 +206,20 @@ impl PriceIntelligence {
                 let variance: Decimal = prices.iter()
                     .map(|p| (p - mean) * (p - mean))
                     .sum::<Decimal>() / Decimal::from_usize(prices.len()).unwrap();
-                variance.sqrt().unwrap_or(Decimal::ZERO)
+                if variance >= Decimal::ZERO {
+                    let mut approx = variance / Decimal::from(2);
+                    for _ in 0..20 {
+                        let new_approx = (approx + variance / approx) / Decimal::from(2);
+                        if (new_approx - approx).abs() < Decimal::from(1e-10) {
+                            approx = new_approx;
+                            break;
+                        }
+                        approx = new_approx;
+                    }
+                    approx
+                } else {
+                    Decimal::ZERO
+                }
             } else {
                 Decimal::ZERO
             };

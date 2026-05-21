@@ -117,7 +117,7 @@ impl DAGExecutor {
             }
             
             // Topological sort
-            let sorted = match toposort(&graph, None) {
+            let _sorted = match toposort(&graph, None) {
                 Ok(sorted) => sorted,
                 Err(_) => {
                     return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -208,8 +208,17 @@ impl DAGExecutor {
             let waves: Vec<ExecutionWave> = serde_json::from_str(&waves_json).unwrap();
             
             let mut context: HashMap<String, serde_json::Value> = if let Some(ctx) = initial_context {
-                let ctx_str: String = serde_json::to_string(ctx).unwrap();
-                serde_json::from_str(&ctx_str).unwrap()
+                let mut ctx_map = HashMap::new();
+                for (key, value) in ctx.iter() {
+                    if let Ok(key_str) = key.extract::<String>() {
+                        if let Ok(value_str) = value.extract::<String>() {
+                            if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&value_str) {
+                                ctx_map.insert(key_str, json_val);
+                            }
+                        }
+                    }
+                }
+                ctx_map
             } else {
                 HashMap::new()
             };

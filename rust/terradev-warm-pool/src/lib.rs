@@ -1,11 +1,10 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use moka::future::Cache;
-use chrono::{Utc, Duration};
+use chrono::Utc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WarmInstance {
@@ -39,8 +38,9 @@ impl WarmPoolManager {
     #[new]
     #[pyo3(signature = (max_instances=100, max_idle_seconds=3600))]
     fn new(max_instances: usize, max_idle_seconds: i64) -> Self {
-        let cache = Cache::builder(max_instances)
-            .time_to_idle(Duration::seconds(max_idle_seconds as i64))
+        let cache = Cache::builder()
+            .max_capacity(max_instances)
+            .time_to_idle(std::time::Duration::from_secs(max_idle_seconds as u64))
             .build();
 
         Self {
@@ -57,11 +57,11 @@ impl WarmPoolManager {
         let gpu_type: String = instance.get_item("gpu_type")?.unwrap().extract()?;
         let region: String = instance.get_item("region")?.unwrap().extract()?;
         let priority: i32 = instance.get_item("priority")
-            .map(|p| p.extract())
-            .unwrap_or(Ok(0))?;
+            .unwrap_or_else(|_| 0.into())
+            .extract()?;
         let cost_usd_per_hour: f64 = instance.get_item("cost_usd_per_hour")
-            .map(|c| c.extract())
-            .unwrap_or(Ok(0.0))?;
+            .unwrap_or_else(|_| 0.into())
+            .extract()?;
 
         let warm_instance = WarmInstance {
             instance_id: instance_id.clone(),
