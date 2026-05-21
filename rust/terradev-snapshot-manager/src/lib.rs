@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 mod snapshot;
 mod types;
 
