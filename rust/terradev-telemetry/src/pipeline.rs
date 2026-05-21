@@ -67,7 +67,7 @@ impl TelemetryPipeline {
         let count = hist.len();
         let sum = if count > 0 {
             hist.iter_recorded()
-                .map(|(value, count)| value * count as u64)
+                .map(|v| v.value_iterated_to() * v.count_at_value() as u64)
                 .sum::<u64>() as f64
         } else {
             0.0

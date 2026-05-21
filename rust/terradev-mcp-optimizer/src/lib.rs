@@ -167,7 +167,7 @@ impl PyMCPOptimizer {
                         .into();
                     Ok::<(String, Py<PyAny>), pyo3::PyErr>((k, v_value))
                 })
-                .collect()
+                .collect::<PyResult<HashMap<_, _>>>()
         })?;
 
         Ok((new_name, result_args))
