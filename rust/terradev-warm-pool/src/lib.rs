@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
-use moka::future::Cache;
+use moka::sync::Cache;
 use chrono::Utc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

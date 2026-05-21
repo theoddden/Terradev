@@ -1,6 +1,5 @@
 use crate::types::{CostBreakdown, InstanceType};
 use rust_decimal::Decimal;
-use rust_decimal::prelude::*;
 use std::collections::HashMap;
 
 pub struct CostCalculator {
@@ -27,19 +26,19 @@ impl CostCalculator {
         let instance_type = self.instance_types.get(instance_type_name)?;
         
         let hourly_cost = if use_spot {
-            let discount = instance_type.spot_discount_percent / dec!(100);
-            instance_type.hourly_cost_usd * (dec!(1) - discount)
+            let discount = instance_type.spot_discount_percent / Decimal::from(100);
+            instance_type.hourly_cost_usd * (Decimal::from(1) - discount)
         } else {
             instance_type.hourly_cost_usd
         };
         
         let total_cost = hourly_cost * hours;
-        let monthly_hours = dec!(730); // 24 * 30.4
+        let monthly_hours = Decimal::from(730); // 24 * 30.4
         let monthly_cost = hourly_cost * monthly_hours;
         
         let spot_hourly_cost = {
-            let discount = instance_type.spot_discount_percent / dec!(100);
-            instance_type.hourly_cost_usd * (dec!(1) - discount)
+            let discount = instance_type.spot_discount_percent / Decimal::from(100);
+            instance_type.hourly_cost_usd * (Decimal::from(1) - discount)
         };
         
         let spot_monthly_cost = spot_hourly_cost * monthly_hours;
@@ -59,10 +58,10 @@ impl CostCalculator {
         &self,
         instances: &[(String, Decimal, bool)],
     ) -> CostBreakdown {
-        let mut total_hourly = dec!(0);
-        let mut total_monthly = dec!(0);
-        let mut total_spot_monthly = dec!(0);
-        let mut total_spot_savings = dec!(0);
+        let mut total_hourly = Decimal::from(0);
+        let mut total_monthly = Decimal::from(0);
+        let mut total_spot_monthly = Decimal::from(0);
+        let mut total_spot_savings = Decimal::from(0);
         let mut total_gpu_count = 0;
         
         for (instance_type_name, hours, use_spot) in instances {
@@ -78,7 +77,7 @@ impl CostCalculator {
         CostBreakdown {
             hourly_cost_usd: total_hourly,
             monthly_cost_usd: total_monthly,
-            spot_hourly_cost_usd: dec!(0),
+            spot_hourly_cost_usd: Decimal::from(0),
             spot_monthly_cost_usd: total_spot_monthly,
             spot_savings_usd: total_spot_savings,
             gpu_count: total_gpu_count,
