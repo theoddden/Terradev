@@ -5,7 +5,6 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
 
 pub struct TelemetryPipeline {
     metric_tx: Sender<Metric>,
@@ -67,7 +66,9 @@ impl TelemetryPipeline {
     fn snapshot_histogram(hist: &Histogram<u64>) -> HistogramSnapshot {
         let count = hist.len();
         let sum = if count > 0 {
-            hist.iter_all().map(|v| v as u64).sum::<u64>() as f64
+            hist.iter_all()
+                .map(|v| v.value() * v.count() as u64)
+                .sum::<u64>() as f64
         } else {
             0.0
         };
