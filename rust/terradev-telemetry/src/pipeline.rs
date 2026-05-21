@@ -66,8 +66,8 @@ impl TelemetryPipeline {
     fn snapshot_histogram(hist: &Histogram<u64>) -> HistogramSnapshot {
         let count = hist.len();
         let sum = if count > 0 {
-            hist.iter_all()
-                .map(|v| v.value() * v.count() as u64)
+            hist.iter_recorded()
+                .map(|(value, count)| value * count)
                 .sum::<u64>() as f64
         } else {
             0.0
