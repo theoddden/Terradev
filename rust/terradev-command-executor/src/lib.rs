@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use pyo3::prelude::*;
 use pyo3_asyncio::tokio::future_into_py;
 use serde::{Deserialize, Serialize};
@@ -68,6 +70,7 @@ impl CommandExecutor {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub async fn execute_parallel(
         &self,
         commands: Vec<(String, Vec<String>, Option<HashMap<String, String>>)>,
@@ -106,8 +109,6 @@ pub struct PyCommandExecutor {
     inner: CommandExecutor,
 }
 
-#[allow(non_local_definitions)]
-#[allow(non_local_definitions)]
 #[pymethods]
 impl PyCommandExecutor {
     #[new]
@@ -138,6 +139,7 @@ impl PyCommandExecutor {
         })
     }
 
+    #[allow(clippy::type_complexity)]
     fn execute_parallel<'p>(
         &self,
         py: Python<'p>,
