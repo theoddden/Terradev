@@ -32,7 +32,7 @@ impl CostCalculator {
             instance_type.hourly_cost_usd
         };
         
-        let total_cost = hourly_cost * hours;
+        let _total_cost = hourly_cost * hours;
         let monthly_hours = Decimal::from(730); // 24 * 30.4
         let monthly_cost = hourly_cost * monthly_hours;
         

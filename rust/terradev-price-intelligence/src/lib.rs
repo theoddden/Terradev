@@ -55,9 +55,11 @@ impl PriceIntelligence {
         let provider: String = tick.get_item("provider")?.unwrap().extract()?;
         let region: String = tick.get_item("region")?.unwrap().extract()?;
         let gpu_type: String = tick.get_item("gpu_type")?.unwrap().extract()?;
-        let availability: String = tick.get_item("availability")
-            .unwrap_or_else(|_| "on-demand".into())
-            .extract()?;
+        let availability: String = match tick.get_item("availability") {
+            Ok(Some(a)) => a.extract().unwrap_or("on-demand".to_string()),
+            Ok(None) => "on-demand".to_string(),
+            Err(_) => "on-demand".to_string(),
+        };
 
         self.ticks.push(PriceTick {
             timestamp,
@@ -108,7 +110,7 @@ impl PriceIntelligence {
                 let mut approx = variance / Decimal::from(2);
                 for _ in 0..20 {
                     let new_approx = (approx + variance / approx) / Decimal::from(2);
-                    if (new_approx - approx).abs() < Decimal::from(1e-10) {
+                    if (new_approx - approx).abs() < Decimal::from_str("0.0000000001").unwrap_or(Decimal::ZERO) {
                         approx = new_approx;
                         break;
                     }
@@ -210,7 +212,7 @@ impl PriceIntelligence {
                     let mut approx = variance / Decimal::from(2);
                     for _ in 0..20 {
                         let new_approx = (approx + variance / approx) / Decimal::from(2);
-                        if (new_approx - approx).abs() < Decimal::from(1e-10) {
+                        if (new_approx - approx).abs() < Decimal::from_str("0.0000000001").unwrap_or(Decimal::ZERO) {
                             approx = new_approx;
                             break;
                         }

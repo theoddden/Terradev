@@ -3,7 +3,7 @@ mod types;
 
 use cache::CacheEngine;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use serde::{Deserialize, Serialize};
 use types::{CacheEntry, EvictionPolicy};
 
 #[pymodule]
