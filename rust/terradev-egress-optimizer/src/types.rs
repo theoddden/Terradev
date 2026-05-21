@@ -16,6 +16,7 @@ pub struct EgressEdge {
     pub bandwidth_gbps: f64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferPlan {
     pub route: Vec<String>,

@@ -20,6 +20,7 @@ fn terradev_authentication(_py: Python, m: &PyModule) -> PyResult<()> {
 pub struct PyAlibabaSigner;
 
 #[allow(non_local_definitions)]
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyAlibabaSigner {
     #[new]
@@ -46,6 +47,7 @@ impl PyAlibabaSigner {
 #[pyclass]
 pub struct PyOVHSigner;
 
+#[allow(non_local_definitions)]
 #[allow(non_local_definitions)]
 #[pymethods]
 impl PyOVHSigner {

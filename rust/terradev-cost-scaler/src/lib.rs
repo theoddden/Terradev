@@ -1,10 +1,9 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::*;
-use chrono::{DateTime, Utc, Duration};
+use chrono::{Utc, Duration};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CostMetric {
@@ -47,12 +46,36 @@ impl CostScaler {
     }
 
     fn add_metric(&mut self, metric: &PyDict) -> PyResult<()> {
-        let timestamp: i64 = metric.get_item("timestamp")?.extract()?;
-        let instance_id: String = metric.get_item("instance_id")?.extract()?;
-        let cost_usd: f64 = metric.get_item("cost_usd")?.extract()?;
-        let gpu_type: String = metric.get_item("gpu_type")?.extract()?;
-        let region: String = metric.get_item("region")?.extract()?;
-        let provider: String = metric.get_item("provider")?.extract()?;
+        let timestamp: i64 = match metric.get_item("timestamp") {
+            Ok(Some(t)) => t.extract()?,
+            Ok(None) => return Err(pyo3::exceptions::PyKeyError::new_err("timestamp not found")),
+            Err(_) => return Err(pyo3::exceptions::PyKeyError::new_err("timestamp not found")),
+        };
+        let instance_id: String = match metric.get_item("instance_id") {
+            Ok(Some(i)) => i.extract()?,
+            Ok(None) => return Err(pyo3::exceptions::PyKeyError::new_err("instance_id not found")),
+            Err(_) => return Err(pyo3::exceptions::PyKeyError::new_err("instance_id not found")),
+        };
+        let cost_usd: f64 = match metric.get_item("cost_usd") {
+            Ok(Some(c)) => c.extract()?,
+            Ok(None) => return Err(pyo3::exceptions::PyKeyError::new_err("cost_usd not found")),
+            Err(_) => return Err(pyo3::exceptions::PyKeyError::new_err("cost_usd not found")),
+        };
+        let gpu_type: String = match metric.get_item("gpu_type") {
+            Ok(Some(g)) => g.extract()?,
+            Ok(None) => return Err(pyo3::exceptions::PyKeyError::new_err("gpu_type not found")),
+            Err(_) => return Err(pyo3::exceptions::PyKeyError::new_err("gpu_type not found")),
+        };
+        let region: String = match metric.get_item("region") {
+            Ok(Some(r)) => r.extract()?,
+            Ok(None) => return Err(pyo3::exceptions::PyKeyError::new_err("region not found")),
+            Err(_) => return Err(pyo3::exceptions::PyKeyError::new_err("region not found")),
+        };
+        let provider: String = match metric.get_item("provider") {
+            Ok(Some(p)) => p.extract()?,
+            Ok(None) => return Err(pyo3::exceptions::PyKeyError::new_err("provider not found")),
+            Err(_) => return Err(pyo3::exceptions::PyKeyError::new_err("provider not found")),
+        };
 
         self.metrics.push(CostMetric {
             timestamp,

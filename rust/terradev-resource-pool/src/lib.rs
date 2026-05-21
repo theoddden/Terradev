@@ -2,9 +2,9 @@ mod pool;
 mod types;
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 use pool::ResourcePool;
 use types::{EvictionPolicy, PooledResource};
+use chrono::{DateTime, Utc};
 
 #[pymodule]
 fn terradev_resource_pool(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -15,10 +15,12 @@ fn terradev_resource_pool(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 #[pyclass]
+#[allow(non_local_definitions)]
 pub struct PyResourcePool {
     inner: ResourcePool,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyResourcePool {
     #[new]

@@ -16,8 +16,10 @@ fn terradev_gpu_topology(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 #[pyclass]
+#[allow(non_local_definitions)]
 pub struct PyGPUNICOptimizer;
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyGPUNICOptimizer {
     #[new]

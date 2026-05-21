@@ -107,6 +107,7 @@ pub struct PyCommandExecutor {
 }
 
 #[allow(non_local_definitions)]
+#[allow(non_local_definitions)]
 #[pymethods]
 impl PyCommandExecutor {
     #[new]

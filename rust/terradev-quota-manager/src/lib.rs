@@ -3,7 +3,7 @@ mod types;
 
 use manager::QuotaManager;
 use pyo3::prelude::*;
-use types::{Quota, QuotaError, QuotaRequest};
+use types::{Quota, QuotaRequest};
 
 #[pymodule]
 fn terradev_quota_manager(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -14,6 +14,7 @@ fn terradev_quota_manager(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 #[pyclass]
+#[allow(non_local_definitions)]
 pub struct PyQuotaManager {
     inner: QuotaManager,
 }

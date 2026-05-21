@@ -111,7 +111,16 @@ impl From<PyEvent> for Event {
                     }
                 }
                 _ => {
-                    let data_json = serde_json::to_value(&p.data).unwrap_or(serde_json::Value::Null);
+                    let data_json = Python::with_gil(|py| {
+                        // Convert PyObject to a string representation for serialization
+                        let py_obj = p.data.as_ref(py);
+                        let data_str = if let Ok(repr) = py_obj.repr() {
+                            repr.to_string()
+                        } else {
+                            py_obj.str().unwrap_or_else(|_| pyo3::types::PyString::new(py, "null")).to_string()
+                        };
+                        serde_json::to_value(data_str).unwrap_or(serde_json::Value::Null)
+                    });
                     Event::Custom {
                         name: p.event_type,
                         data: data_json,

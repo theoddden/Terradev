@@ -8,6 +8,7 @@ pub struct ResourcePool {
     resources: Arc<RwLock<HashMap<String, PooledResource>>>,
     max_size: usize,
     policy: EvictionPolicy,
+    #[allow(dead_code)]
     pool_name: String,
 }
 

@@ -1,8 +1,5 @@
-use crate::types::{JobConfig, JobTopology};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use uuid::Uuid;
 
 /// Type-safe job state with compile-time enforced transitions
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -121,7 +118,7 @@ impl JobState {
     /// Transition to Launching state
     pub fn to_launching(self, nodes: Vec<String>) -> Result<Self, crate::types::StateTransitionError> {
         match self {
-            JobState::Preflight { created_at, started_at } => Ok(JobState::Launching {
+            JobState::Preflight { created_at, started_at: _ } => Ok(JobState::Launching {
                 created_at,
                 preflight_completed_at: Utc::now(),
                 nodes,
@@ -170,7 +167,7 @@ impl JobState {
     /// Transition to Checkpointing state
     pub fn to_checkpointing(self, step: u32) -> Result<Self, crate::types::StateTransitionError> {
         match self {
-            JobState::Running { created_at, started_at, checkpoint_id, current_step, total_steps } => {
+            JobState::Running { created_at, started_at, checkpoint_id: _, current_step: _, total_steps: _ } => {
                 Ok(JobState::Checkpointing {
                     created_at,
                     started_at,
@@ -216,7 +213,7 @@ impl JobState {
     /// Transition to Paused state
     pub fn to_paused(self, checkpoint_id: String) -> Result<Self, crate::types::StateTransitionError> {
         match self {
-            JobState::Running { created_at, started_at, current_step, total_steps, .. } => {
+            JobState::Running { created_at, started_at: _, current_step: _, total_steps: _, .. } => {
                 Ok(JobState::Paused {
                     created_at,
                     paused_at: Utc::now(),

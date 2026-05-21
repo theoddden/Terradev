@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "terradev_event_bus"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 pyo3 = { workspace = true }
@@ -15,3 +15,5 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 crossbeam = { workspace = true }
 chrono = { workspace = true }
+parking_lot = { workspace = true }
+uuid = { workspace = true }

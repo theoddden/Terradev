@@ -15,6 +15,7 @@ fn terradev_vram_estimator(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 #[pyclass]
+#[allow(non_local_definitions)]
 pub struct PyVRAMEstimator;
 
 #[allow(non_local_definitions)]

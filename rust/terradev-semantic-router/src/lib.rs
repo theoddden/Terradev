@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict, PyList;
+use pyo3::types::{PyDict, PyList};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -18,17 +18,20 @@ pub struct Route {
 }
 
 #[pyclass]
+#[allow(non_local_definitions)]
 pub struct SemanticRouter {
     routes: HashMap<String, RouteConfig>,
 }
 
 #[derive(Debug, Clone)]
 struct RouteConfig {
+    #[allow(dead_code)]
     name: String,
     keywords: Vec<String>,
     threshold: f64,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl SemanticRouter {
     #[new]
@@ -53,13 +56,13 @@ impl SemanticRouter {
 
             for (route_name, config) in &self.routes {
                 let mut score = 0.0;
-                let mut matches = 0;
+                let _matches = 0;
 
                 for keyword in &config.keywords {
                     let keyword_lower = keyword.to_lowercase();
                     if query_lower.contains(&keyword_lower) {
                         score += 1.0;
-                        matches += 1;
+                        // matches += 1;
                     }
                 }
 
@@ -71,8 +74,10 @@ impl SemanticRouter {
                 // Apply signals if provided
                 if let Some(sigs) = signals {
                     if let Ok(signal_value) = sigs.get_item(route_name) {
-                        if let Ok(val) = signal_value.extract::<f64>() {
-                            score = score * 0.7 + val * 0.3; // Weighted combination
+                        if let Some(py_val) = signal_value {
+                            if let Ok(val) = py_val.extract::<f64>() {
+                                score = score * 0.7 + val * 0.3; // Weighted combination
+                            }
                         }
                     }
                 }
@@ -102,7 +107,7 @@ impl SemanticRouter {
                 dict.set_item("reason", "No route matched threshold")?;
             }
 
-            dict.set_item("all_scores", serde_json::to_value(&scores).unwrap())?;
+            dict.set_item("all_scores", serde_json::to_string(&scores).unwrap())?;
 
             Ok(dict.into())
         })

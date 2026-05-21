@@ -23,11 +23,14 @@ pub enum EvictionPolicy {
 #[derive(Debug, Error)]
 pub enum PoolError {
     #[error("Pool exhausted: {0}")]
+    #[allow(dead_code)]
     PoolExhausted(String),
     
     #[error("Resource not found: {0}")]
+    #[allow(dead_code)]
     ResourceNotFound(String),
     
     #[error("Invalid pool configuration")]
+    #[allow(dead_code)]
     InvalidConfiguration,
 }

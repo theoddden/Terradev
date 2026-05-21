@@ -53,19 +53,19 @@ impl EventBus {
     
     fn dispatch_events(event_rx: Receiver<Event>, subscribers: Arc<RwLock<HashMap<String, Sender<Event>>>>) {
         for event in event_rx {
-            let subscribers = subscribers.read();
-            let failed: Vec<String> = subscribers
+            let subscribers_read = subscribers.read();
+            let failed: Vec<String> = subscribers_read
                 .iter()
                 .filter(|(_, tx)| tx.send(event.clone()).is_err())
                 .map(|(id, _)| id.clone())
                 .collect();
             
-            drop(subscribers);
+            drop(subscribers_read);
             
             if !failed.is_empty() {
-                let mut subscribers = subscribers.write();
+                let mut subscribers_write = subscribers.write();
                 for id in failed {
-                    subscribers.remove(&id);
+                    subscribers_write.remove(&id);
                 }
             }
         }

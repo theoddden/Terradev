@@ -1,7 +1,7 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
+use crate::state::JobState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobConfig {
@@ -42,5 +42,6 @@ pub enum StateTransitionError {
     CheckpointRequired,
     
     #[error("Job not found: {id}")]
+    #[allow(dead_code)]
     JobNotFound { id: String },
 }

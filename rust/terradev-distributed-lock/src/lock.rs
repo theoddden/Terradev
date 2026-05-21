@@ -132,10 +132,11 @@ impl DistributedLock {
             .map(|(key, _)| key.clone())
             .collect();
         
+        let count = expired.len();
         for key in expired {
             locks.remove(&key);
         }
         
-        expired.len()
+        count
     }
 }

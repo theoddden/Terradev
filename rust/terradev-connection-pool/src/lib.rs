@@ -3,8 +3,7 @@ mod types;
 
 use pool::ConnectionPool;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use types::{ConnectionConfig, PoolError};
+use types::ConnectionConfig;
 
 #[pymodule]
 fn terradev_connection_pool(_py: Python, m: &PyModule) -> PyResult<()> {

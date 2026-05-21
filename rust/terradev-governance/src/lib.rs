@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsentRecord {
@@ -23,6 +23,7 @@ pub struct PolicyEvaluation {
 }
 
 #[pyclass]
+#[allow(non_local_definitions)]
 pub struct GovernanceEngine {
     consents: HashMap<String, ConsentRecord>,
     policies: HashMap<String, serde_json::Value>,
@@ -82,12 +83,16 @@ impl GovernanceEngine {
     }
 
     fn add_policy(&mut self, policy_id: String, policy: &PyDict) -> PyResult<()> {
-        let policy_value: serde_json::Value = policy.extract()?;
+        let policy_value: serde_json::Value = Python::with_gil(|py| {
+            // Convert PyDict to string representation, then parse as JSON
+            let policy_str = policy.str().unwrap_or_else(|_| pyo3::types::PyString::new(py, "{}")).to_string();
+            serde_json::from_str(&policy_str).unwrap_or_else(|_| serde_json::json!({}))
+        });
         self.policies.insert(policy_id, policy_value);
         Ok(())
     }
 
-    fn evaluate_policy(&self, policy_id: String, context: &PyDict) -> PyResult<PyObject> {
+    fn evaluate_policy(&self, policy_id: String, _context: &PyDict) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             if let Some(policy) = self.policies.get(&policy_id) {
                 // Simple policy evaluation - in real implementation would use OPA or similar
@@ -135,7 +140,7 @@ impl GovernanceEngine {
 
     fn revoke_consent(&mut self, data_type: String, user_id: String, purpose: String) -> PyResult<bool> {
         let id = format!("{}:{}:{}", user_id, data_type, purpose);
-        if let Some(mut record) = self.consents.get_mut(&id) {
+        if let Some(record) = self.consents.get_mut(&id) {
             record.granted = false;
             record.timestamp = Utc::now().timestamp();
             Ok(true)
