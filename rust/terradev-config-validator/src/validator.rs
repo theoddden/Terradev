@@ -19,7 +19,7 @@ impl ConfigValidator {
             if let Some(arr) = required_fields.as_array() {
                 for field in arr {
                     if let Some(field_str) = field.as_str() {
-                        if !config.get(field_str).is_some() {
+                        if config.get(field_str).is_none() {
                             errors.push(format!("Missing required field: {}", field_str));
                         }
                     }
