@@ -5,7 +5,6 @@ mod types;
 
 use cache::CacheEngine;
 use pyo3::prelude::*;
-use serde::{Deserialize, Serialize};
 use types::{CacheEntry, EvictionPolicy};
 
 #[pymodule]
@@ -101,8 +100,8 @@ impl From<PyCacheEntry> for CacheEntry {
             key: p.key,
             value: serde_json::from_str(&p.value).unwrap_or(serde_json::Value::Null),
             size_bytes: p.size_bytes,
-            created_at: chrono::DateTime::parse_from_rfc3339(&p.created_at).unwrap().with_timezone(&chrono::Utc).into(),
-            last_accessed: chrono::DateTime::parse_from_rfc3339(&p.last_accessed).unwrap().with_timezone(&chrono::Utc).into(),
+            created_at: chrono::DateTime::parse_from_rfc3339(&p.created_at).unwrap().with_timezone(&chrono::Utc),
+            last_accessed: chrono::DateTime::parse_from_rfc3339(&p.last_accessed).unwrap().with_timezone(&chrono::Utc),
             access_count: p.access_count,
         }
     }

@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EvictionPolicy {
-    LRU,
-    ARC,
+    Lru,
+    Arc,
     TinyLFU,
 }
 
