@@ -58,11 +58,11 @@ impl WarmPoolManager {
         let gpu_type: String = instance.get_item("gpu_type")?.unwrap().extract()?;
         let region: String = instance.get_item("region")?.unwrap().extract()?;
         let priority: i32 = instance.get_item("priority")
-            .unwrap_or_else(|_| 0.into())
-            .extract()?;
+            .map(|p| p.extract())
+            .unwrap_or(Ok(0))?;
         let cost_usd_per_hour: f64 = instance.get_item("cost_usd_per_hour")
-            .unwrap_or_else(|_| 0.into())
-            .extract()?;
+            .map(|c| c.extract())
+            .unwrap_or(Ok(0))?;
 
         let warm_instance = WarmInstance {
             instance_id: instance_id.clone(),
