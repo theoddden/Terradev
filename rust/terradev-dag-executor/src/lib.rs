@@ -205,8 +205,9 @@ impl DAGExecutor {
             let plan_dict: &PyDict = plan.extract(py)?;
             
             let waves_json: String = match plan_dict.get_item("waves") {
-                Some(w) => w.extract::<&str>()?.to_string(),
-                None => return Err(pyo3::exceptions::PyKeyError::new_err("waves not found")),
+                Ok(Some(w)) => w.extract::<&str>()?.to_string(),
+                Ok(None) => return Err(pyo3::exceptions::PyKeyError::new_err("waves not found")),
+                Err(_) => return Err(pyo3::exceptions::PyKeyError::new_err("waves not found")),
             };
             let waves: Vec<ExecutionWave> = serde_json::from_str(&waves_json).unwrap();
             
