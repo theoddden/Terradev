@@ -2,7 +2,6 @@ use crate::types::{CredentialMetadata, Secret};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use zeroize::Zeroize;
 
 pub struct CredentialVault {
     secrets: Arc<RwLock<HashMap<String, Secret>>>,
