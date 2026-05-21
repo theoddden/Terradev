@@ -43,7 +43,7 @@ impl TelemetryPipeline {
     
     pub fn get_histogram(&self, name: &str) -> Option<HistogramSnapshot> {
         let histograms = self.histograms.read();
-        histograms.get(name).map(|h| Self::snapshot_histogram(h))
+        histograms.get(name).map(Self::snapshot_histogram)
     }
     
     pub fn list_histograms(&self) -> Vec<String> {
@@ -67,7 +67,7 @@ impl TelemetryPipeline {
         let count = hist.len();
         let sum = if count > 0 {
             hist.iter_recorded()
-                .map(|v| v.value_iterated_to() * v.count_at_value() as u64)
+                .map(|v| v.value_iterated_to() * v.count_at_value())
                 .sum::<u64>() as f64
         } else {
             0.0
