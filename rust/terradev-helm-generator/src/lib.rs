@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use tera::{Tera, Context};
@@ -7,7 +9,6 @@ pub struct HelmGenerator {
     tera: Tera,
 }
 
-#[allow(non_local_definitions)]
 #[pymethods]
 impl HelmGenerator {
     #[new]
