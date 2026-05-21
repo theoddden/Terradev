@@ -14,3 +14,4 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 moka = { workspace = true }
 chrono = { workspace = true }
+parking_lot = { workspace = true }

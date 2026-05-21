@@ -102,9 +102,9 @@ impl PyMCPOptimizer {
                     let description = tool_dict.get_item("description")?;
                     let input_schema = tool_dict.get_item("inputSchema")?;
                     Ok(Tool {
-                        name: name.extract()?,
-                        description: description.extract()?,
-                        input_schema: input_schema.extract()?,
+                        name: name.unwrap().extract()?,
+                        description: description.unwrap().extract()?,
+                        input_schema: input_schema.unwrap().extract()?,
                     })
                 })
                 .collect::<PyResult<Vec<_>>>()?;
@@ -139,7 +139,12 @@ impl PyMCPOptimizer {
         let args_json: HashMap<String, serde_json::Value> = Python::with_gil(|py| {
             arguments
                 .into_iter()
-                .map(|(k, v)| Ok((k, v.extract(py)?)))
+                .map(|(k, v)| {
+                    let v_str: String = v.extract(py)?;
+                    let v_json: serde_json::Value = serde_json::from_str(&v_str)
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                    Ok((k, v_json))
+                })
                 .collect()
         })?;
 

@@ -65,6 +65,13 @@ impl TelemetryPipeline {
     }
     
     fn snapshot_histogram(hist: &Histogram<u64>) -> HistogramSnapshot {
+        let count = hist.len();
+        let sum = if count > 0 {
+            hist.iter_all().map(|v| v as u64).sum::<u64>() as f64
+        } else {
+            0.0
+        };
+        
         HistogramSnapshot {
             min: hist.min() as f64,
             max: hist.max() as f64,
@@ -72,8 +79,8 @@ impl TelemetryPipeline {
             p50: hist.value_at_quantile(0.5) as f64,
             p95: hist.value_at_quantile(0.95) as f64,
             p99: hist.value_at_quantile(0.99) as f64,
-            count: hist.len(),
-            sum: hist.iter_all().map(|v| v.value() as u64 * v.count() as u64).sum::<u64>() as f64,
+            count,
+            sum,
         }
     }
 }

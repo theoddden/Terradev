@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use moka::future::Cache;
-use chrono::{DateTime, Utc, Duration};
+use chrono::{Utc, Duration};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WarmInstance {
@@ -52,12 +52,16 @@ impl WarmPoolManager {
     }
 
     fn add_instance(&self, instance: &PyDict) -> PyResult<()> {
-        let instance_id: String = instance.get_item("instance_id")?.extract()?;
-        let model_name: String = instance.get_item("model_name")?.extract()?;
-        let gpu_type: String = instance.get_item("gpu_type")?.extract()?;
-        let region: String = instance.get_item("region")?.extract()?;
-        let priority: i32 = instance.get_item("priority").unwrap_or(0).extract()?;
-        let cost_usd_per_hour: f64 = instance.get_item("cost_usd_per_hour").unwrap_or(0.0).extract()?;
+        let instance_id: String = instance.get_item("instance_id")?.unwrap().extract()?;
+        let model_name: String = instance.get_item("model_name")?.unwrap().extract()?;
+        let gpu_type: String = instance.get_item("gpu_type")?.unwrap().extract()?;
+        let region: String = instance.get_item("region")?.unwrap().extract()?;
+        let priority: i32 = instance.get_item("priority")
+            .map(|p| p.extract())
+            .unwrap_or(Ok(0))?;
+        let cost_usd_per_hour: f64 = instance.get_item("cost_usd_per_hour")
+            .map(|c| c.extract())
+            .unwrap_or(Ok(0.0))?;
 
         let warm_instance = WarmInstance {
             instance_id: instance_id.clone(),
@@ -161,7 +165,7 @@ impl WarmPoolManager {
             dict.set_item("active_instances", total_instances - idle_instances)?;
             dict.set_item("total_cost_usd_per_hour", total_cost)?;
             dict.set_item("max_instances", self.max_instances)?;
-            dict.set_item("utilization_pct", (total_instances as f64 / self.max_instances as f64 * 100.0))?;
+            dict.set_item("utilization_pct", total_instances as f64 / self.max_instances as f64 * 100.0)?;
             
             Ok(dict.into())
         })
