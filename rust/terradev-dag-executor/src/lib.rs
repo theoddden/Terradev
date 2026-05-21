@@ -204,7 +204,7 @@ impl DAGExecutor {
             let plan = self.plan()?;
             let plan_dict: &PyDict = plan.extract(py)?;
             
-            let waves_json: String = plan_dict.get_item("waves").unwrap().extract::<&str>()?.to_string();
+            let waves_json: String = plan_dict.get_item("waves").expect("waves not found").extract::<&str>()?.to_string();
             let waves: Vec<ExecutionWave> = serde_json::from_str(&waves_json).unwrap();
             
             let mut context: HashMap<String, serde_json::Value> = if let Some(ctx) = initial_context {

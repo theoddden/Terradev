@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -39,7 +40,7 @@ impl WarmPoolManager {
     #[pyo3(signature = (max_instances=100, max_idle_seconds=3600))]
     fn new(max_instances: usize, max_idle_seconds: i64) -> Self {
         let cache = Cache::builder()
-            .max_capacity(max_instances)
+            .max_capacity(max_instances as u64)
             .time_to_idle(std::time::Duration::from_secs(max_idle_seconds as u64))
             .build();
 
