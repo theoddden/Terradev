@@ -165,7 +165,7 @@ impl PyMCPOptimizer {
                         .getattr("loads")?
                         .call1((v_py,))?
                         .into();
-                    Ok((k, v_value))
+                    Ok::<(String, Py<PyAny>), pyo3::PyErr>((k, v_value))
                 })
                 .collect()
         })?;
