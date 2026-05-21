@@ -11,12 +11,14 @@ pub struct ConnectionConfig {
 
 #[derive(Debug, Error)]
 pub enum PoolError {
+    #[allow(dead_code)]
     #[error("Connection pool exhausted")]
     Exhausted,
     
     #[error("Connection failed: {0}")]
     ConnectionFailed(String),
     
+    #[allow(dead_code)]
     #[error("Invalid configuration")]
     InvalidConfig,
 }

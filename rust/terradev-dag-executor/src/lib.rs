@@ -47,6 +47,7 @@ pub struct ExecutionResult {
 pub struct DAGExecutor {
     name: String,
     nodes: Arc<RwLock<HashMap<String, DAGNode>>>,
+    #[allow(dead_code)]
     max_workers: usize,
 }
 
@@ -243,13 +244,13 @@ impl DAGExecutor {
             for wave in waves {
                 let mut wave_results: HashMap<String, (serde_json::Value, f64)> = HashMap::new();
                 
-                thread::scope(|s| {
+                let _ = thread::scope(|s| {
                     let handles: Vec<_> = wave.nodes.iter().map(|node_name| {
                         let nodes_ref = nodes.clone();
                         let node_name = node_name.clone();
                         s.spawn(move |_| {
                             let nodes = nodes_ref.read();
-                            let node = nodes.get(&node_name).unwrap();
+                            let _node = nodes.get(&node_name).unwrap();
                             
                             let start = std::time::Instant::now();
                             

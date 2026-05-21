@@ -12,7 +12,7 @@ impl ConfigValidator {
     
     pub fn validate(&self, config: &Value) -> Result<ValidationReport, ValidationError> {
         let mut errors = Vec::new();
-        let mut warnings = Vec::new();
+        let warnings = Vec::new();
         
         // Basic validation logic
         if let Some(required_fields) = self.schema.get("required") {
@@ -63,6 +63,7 @@ impl ConfigValidator {
         })
     }
     
+    #[allow(dead_code)]
     pub fn validate_str(&self, config_str: &str) -> Result<ValidationReport, ValidationError> {
         let config: Value = serde_json::from_str(config_str)
             .map_err(|e| ValidationError::SchemaError(e.to_string()))?;

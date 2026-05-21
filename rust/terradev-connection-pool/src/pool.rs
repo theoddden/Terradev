@@ -6,7 +6,7 @@ use tokio::sync::Semaphore;
 use std::sync::Arc;
 
 pub struct ConnectionPool {
-    client: Client,
+    _client: Client,
     config: ConnectionConfig,
     semaphore: Arc<Semaphore>,
 }
@@ -25,24 +25,26 @@ impl ConnectionPool {
         let semaphore = Arc::new(Semaphore::new(config.max_connections));
         
         Ok(Self {
-            client,
+            _client: client,
             config,
             semaphore,
         })
     }
     
+    #[allow(dead_code)]
     pub async fn acquire(&self) -> Result<AcquiredConnection<'_>, PoolError> {
         let permit = self.semaphore.acquire().await
             .map_err(|_| PoolError::Exhausted)?;
         
         Ok(AcquiredConnection {
-            client: self.client.clone(),
+            client: self._client.clone(),
             _permit: permit,
         })
     }
     
+    #[allow(dead_code)]
     pub async fn get(&self) -> &Client {
-        &self.client
+        &self._client
     }
     
     pub fn max_connections(&self) -> usize {
@@ -54,12 +56,14 @@ impl ConnectionPool {
     }
 }
 
+#[allow(dead_code)]
 pub struct AcquiredConnection<'a> {
     client: Client,
     _permit: tokio::sync::SemaphorePermit<'a>,
 }
 
 impl<'a> AcquiredConnection<'a> {
+    #[allow(dead_code)]
     pub fn client(&self) -> &Client {
         &self.client
     }

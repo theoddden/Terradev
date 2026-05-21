@@ -15,7 +15,7 @@ impl CredentialVault {
         }
     }
     
-    pub fn store(&self, name: String, value: Vec<u8>, provider: String) {
+    pub fn store(&self, name: String, value: Vec<u8>, _provider: String) {
         let secret = Secret {
             name: name.clone(),
             value,

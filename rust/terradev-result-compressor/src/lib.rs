@@ -5,6 +5,7 @@ use lz4::block::decompress;
 
 #[pyclass]
 pub struct ResultCompressor {
+    #[allow(dead_code)]
     compression_level: u32,
 }
 

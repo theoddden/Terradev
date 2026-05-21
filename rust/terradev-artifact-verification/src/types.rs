@@ -6,6 +6,7 @@ pub enum VerificationError {
     #[error("Hash mismatch: expected {expected}, got {actual}")]
     HashMismatch { expected: String, actual: String },
     
+    #[allow(dead_code)]
     #[error("Invalid signature")]
     InvalidSignature,
     
@@ -13,6 +14,7 @@ pub enum VerificationError {
     NotFound(String),
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Artifact {
     pub name: String,

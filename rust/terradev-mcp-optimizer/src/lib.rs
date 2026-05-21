@@ -19,6 +19,7 @@ pub struct CompressedTool {
 pub struct MCPOptimizer {
     enable_compression: bool,
     strip_optional: bool,
+    #[allow(dead_code)]
     enable_parallel: bool,
 }
 
