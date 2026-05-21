@@ -1,13 +1,12 @@
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::algo::toposort;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyAny};
+use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use crossbeam::thread;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DAGNode {
@@ -55,7 +54,7 @@ pub struct DAGExecutor {
 #[pymethods]
 impl DAGExecutor {
     #[new]
-    #[pyo3(signature = (name="dag_executor", max_workers=None))]
+    #[pyo3(signature = (name="dag_executor".to_string(), max_workers=None))]
     fn new(name: String, max_workers: Option<usize>) -> Self {
         let max_workers = max_workers.unwrap_or_else(|| {
             let cpu_count = num_cpus::get();
@@ -81,7 +80,7 @@ impl DAGExecutor {
             ));
         }
         
-        nodes.insert(name, DAGNode {
+        nodes.insert(name.clone(), DAGNode {
             name: name.clone(),
             dependencies: dependencies.unwrap_or_default(),
             output: None,
@@ -111,7 +110,7 @@ impl DAGExecutor {
                 if let Some(from_idx) = node_indices.get(name) {
                     for dep in &node.dependencies {
                         if let Some(to_idx) = node_indices.get(dep) {
-                            graph.add_edge(*to_idx, *from_idx);
+                            graph.add_edge(*to_idx, *from_idx, ());
                         }
                     }
                 }
@@ -205,11 +204,12 @@ impl DAGExecutor {
             let plan = self.plan()?;
             let plan_dict: &PyDict = plan.extract(py)?;
             
-            let waves_json: String = plan_dict.get_item("waves").unwrap().extract()?;
+            let waves_json: String = plan_dict.get_item("waves").unwrap().extract::<&str>()?.to_string();
             let waves: Vec<ExecutionWave> = serde_json::from_str(&waves_json).unwrap();
             
             let mut context: HashMap<String, serde_json::Value> = if let Some(ctx) = initial_context {
-                ctx.extract()?
+                let ctx_str: String = serde_json::to_string(ctx).unwrap();
+                serde_json::from_str(&ctx_str).unwrap()
             } else {
                 HashMap::new()
             };

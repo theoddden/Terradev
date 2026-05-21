@@ -104,7 +104,11 @@ impl PyMCPOptimizer {
                     Ok(Tool {
                         name: name.unwrap().extract()?,
                         description: description.unwrap().extract()?,
-                        input_schema: input_schema.unwrap().extract()?,
+                        input_schema: {
+                            let schema_str: String = input_schema.unwrap().extract()?;
+                            serde_json::from_str(&schema_str)
+                                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
+                        },
                     })
                 })
                 .collect::<PyResult<Vec<_>>>()?;
@@ -143,9 +147,9 @@ impl PyMCPOptimizer {
                     let v_str: String = v.extract(py)?;
                     let v_json: serde_json::Value = serde_json::from_str(&v_str)
                         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-                    Ok((k, v_json))
+                    Ok::<(String, serde_json::Value), pyo3::PyErr>((k, v_json))
                 })
-                .collect()
+                .collect::<PyResult<HashMap<_, _>>>()
         })?;
 
         let (new_name, new_args) = self.inner.expand_call(tool_name, args_json);
