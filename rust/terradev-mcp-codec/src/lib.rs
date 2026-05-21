@@ -19,6 +19,7 @@ pub struct MCPToolResult {
 }
 
 #[pyclass]
+#[allow(non_local_definitions)]
 pub struct MCPCodec {
     use_simd: bool,
 }
