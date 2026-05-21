@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use lz4::block::{compress, CompressionMode};

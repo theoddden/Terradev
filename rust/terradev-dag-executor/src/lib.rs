@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::algo::toposort;
 use pyo3::prelude::*;

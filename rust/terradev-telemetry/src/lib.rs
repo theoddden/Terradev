@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 mod pipeline;
 mod types;
 
