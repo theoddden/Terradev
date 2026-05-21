@@ -67,7 +67,7 @@ impl From<PyMetric> for Metric {
         Self {
             name: p.name,
             value: p.value,
-            timestamp: chrono::DateTime::parse_from_rfc3339(&p.timestamp).unwrap().with_timezone(&chrono::Utc).into(),
+            timestamp: chrono::DateTime::parse_from_rfc3339(&p.timestamp).unwrap().with_timezone(&chrono::Utc),
             tags: p.tags,
         }
     }
