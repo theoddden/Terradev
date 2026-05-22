@@ -113,7 +113,8 @@ impl GovernanceEngine {
         Python::with_gil(|py| {
             if let Some(policy) = self.policies.get(&policy_id) {
                 // Simple policy evaluation - in real implementation would use OPA or similar
-                let allowed = policy.get("default_allow")
+                let allowed = policy
+                    .get("default_allow")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
 

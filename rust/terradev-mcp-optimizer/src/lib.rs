@@ -110,8 +110,9 @@ impl PyMCPOptimizer {
                         description: description.unwrap().extract()?,
                         input_schema: {
                             let schema_str: String = input_schema.unwrap().extract()?;
-                            serde_json::from_str(&schema_str)
-                                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
+                            serde_json::from_str(&schema_str).map_err(|e| {
+                                pyo3::exceptions::PyValueError::new_err(e.to_string())
+                            })?
                         },
                     })
                 })

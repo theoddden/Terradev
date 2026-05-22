@@ -68,21 +68,21 @@ impl JobState {
             created_at: Utc::now(),
         }
     }
-    
+
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
             JobState::Completed { .. } | JobState::Failed { .. } | JobState::Cancelled { .. }
         )
     }
-    
+
     pub fn is_active(&self) -> bool {
         matches!(
             self,
             JobState::Running { .. } | JobState::Checkpointing { .. }
         )
     }
-    
+
     pub fn status_str(&self) -> &'static str {
         match self {
             JobState::Created { .. } => "created",
@@ -184,10 +184,10 @@ impl JobState {
                 current_step: _,
                 total_steps: _,
             } => Ok(JobState::Checkpointing {
-                    created_at,
-                    started_at,
-                    checkpoint_step: step,
-                }),
+                created_at,
+                started_at,
+                checkpoint_step: step,
+            }),
             _ => Err(crate::types::StateTransitionError::InvalidTransition {
                 from: self,
                 to: JobState::Checkpointing {
@@ -211,12 +211,12 @@ impl JobState {
                 started_at,
                 checkpoint_step,
             } => Ok(JobState::Running {
-                    created_at,
-                    started_at,
-                    checkpoint_id: Some(new_checkpoint_id),
-                    current_step: checkpoint_step,
-                    total_steps,
-                }),
+                created_at,
+                started_at,
+                checkpoint_id: Some(new_checkpoint_id),
+                current_step: checkpoint_step,
+                total_steps,
+            }),
             _ => Err(crate::types::StateTransitionError::InvalidTransition {
                 from: self,
                 to: JobState::Running {
@@ -242,13 +242,11 @@ impl JobState {
                 current_step: _,
                 total_steps: _,
                 ..
-            } => {
-                Ok(JobState::Paused {
-                    created_at,
-                    paused_at: Utc::now(),
-                    checkpoint_id,
-                })
-            }
+            } => Ok(JobState::Paused {
+                created_at,
+                paused_at: Utc::now(),
+                checkpoint_id,
+            }),
             _ => Err(crate::types::StateTransitionError::CheckpointRequired),
         }
     }
@@ -256,7 +254,11 @@ impl JobState {
     /// Transition to Completed state
     pub fn to_completed(self, final_step: u32) -> Result<Self, crate::types::StateTransitionError> {
         match self {
-            JobState::Running { created_at, started_at, .. } => Ok(JobState::Completed {
+            JobState::Running {
+                created_at,
+                started_at,
+                ..
+            } => Ok(JobState::Completed {
                 created_at,
                 started_at,
                 finished_at: Utc::now(),
@@ -267,11 +269,11 @@ impl JobState {
                 started_at,
                 checkpoint_step,
             } => Ok(JobState::Completed {
-                    created_at,
-                    started_at,
-                    finished_at: Utc::now(),
-                    final_step: checkpoint_step,
-                }),
+                created_at,
+                started_at,
+                finished_at: Utc::now(),
+                final_step: checkpoint_step,
+            }),
             _ => Err(crate::types::StateTransitionError::TerminalState { state: self }),
         }
     }
@@ -283,7 +285,11 @@ impl JobState {
         step: u32,
     ) -> Result<Self, crate::types::StateTransitionError> {
         match self {
-            JobState::Running { created_at, started_at, .. } => Ok(JobState::Failed {
+            JobState::Running {
+                created_at,
+                started_at,
+                ..
+            } => Ok(JobState::Failed {
                 created_at,
                 started_at: Some(started_at),
                 failed_at: Utc::now(),
@@ -315,14 +321,8 @@ impl JobState {
     pub fn to_cancelled(self) -> Result<Self, crate::types::StateTransitionError> {
         match self {
             JobState::Created { created_at }
-            | JobState::Preflight {
-                created_at,
-                ..
-            }
-            | JobState::Launching {
-                created_at,
-                ..
-            } => Ok(JobState::Cancelled {
+            | JobState::Preflight { created_at, .. }
+            | JobState::Launching { created_at, .. } => Ok(JobState::Cancelled {
                 created_at,
                 cancelled_at: Utc::now(),
             }),
@@ -337,7 +337,11 @@ impl JobState {
         checkpoint_id: Option<String>,
     ) -> Result<Self, crate::types::StateTransitionError> {
         match self {
-            JobState::Running { created_at, started_at, .. } => Ok(JobState::Preempted {
+            JobState::Running {
+                created_at,
+                started_at,
+                ..
+            } => Ok(JobState::Preempted {
                 created_at,
                 started_at,
                 preempted_at: Utc::now(),

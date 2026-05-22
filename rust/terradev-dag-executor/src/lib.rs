@@ -174,7 +174,7 @@ impl DAGExecutor {
                         }
                     }
                 }
-                
+
                 queue = next_queue;
                 depth += 1;
             }
@@ -223,19 +223,19 @@ impl DAGExecutor {
                 for (key, value) in ctx.iter() {
                     if let Ok(key_str) = key.extract::<String>() {
                         if let Ok(value_str) = value.extract::<String>() {
-                    if let Ok(json_val) =
-                        serde_json::from_str::<serde_json::Value>(&value_str)
-                    {
-                            ctx_map.insert(key_str, json_val);
+                            if let Ok(json_val) =
+                                serde_json::from_str::<serde_json::Value>(&value_str)
+                            {
+                                ctx_map.insert(key_str, json_val);
+                            }
                         }
                     }
-                }
                 }
                 ctx_map
             } else {
                 HashMap::new()
             };
-            
+
             let wall_start = std::time::Instant::now();
             let mut result = ExecutionResult {
                 outputs: HashMap::new(),

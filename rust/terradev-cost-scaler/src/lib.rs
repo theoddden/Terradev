@@ -144,7 +144,9 @@ impl CostScaler {
             let cutoff = Utc::now() - Duration::hours(window);
             let cutoff_ts = cutoff.timestamp();
 
-            let recent: Vec<&CostMetric> = self.metrics.iter()
+            let recent: Vec<&CostMetric> = self
+                .metrics
+                .iter()
                 .filter(|m| m.timestamp >= cutoff_ts)
                 .collect();
 
@@ -179,7 +181,9 @@ impl CostScaler {
             let cutoff = Utc::now() - Duration::hours(window);
             let cutoff_ts = cutoff.timestamp();
 
-            let recent: Vec<&CostMetric> = self.metrics.iter()
+            let recent: Vec<&CostMetric> = self
+                .metrics
+                .iter()
                 .filter(|m| m.timestamp >= cutoff_ts)
                 .collect();
 
@@ -272,9 +276,11 @@ impl CostScaler {
             .unwrap();
         dict.set_item("current_instances", decision.current_instances)
             .unwrap();
-        dict
-            .set_item("projected_cost_usd", decision.projected_cost_usd.to_string())
-            .unwrap();
+        dict.set_item(
+            "projected_cost_usd",
+            decision.projected_cost_usd.to_string(),
+        )
+        .unwrap();
         dict.set_item("confidence", decision.confidence).unwrap();
         dict.into()
     }

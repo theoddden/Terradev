@@ -20,7 +20,7 @@ impl TelemetryPipeline {
         thread::spawn(move || {
             Self::process_metrics(metric_rx, histograms_clone);
         });
-        
+
         Self {
             metric_tx,
             histograms,
@@ -31,7 +31,12 @@ impl TelemetryPipeline {
         self.metric_tx.send(metric)
     }
 
-    pub fn record_value(&self, name: String, value: f64, tags: Vec<(String, String)>) -> Result<(), crossbeam::channel::SendError<Metric>> {
+    pub fn record_value(
+        &self,
+        name: String,
+        value: f64,
+        tags: Vec<(String, String)>,
+    ) -> Result<(), crossbeam::channel::SendError<Metric>> {
         let metric = Metric {
             name,
             value,

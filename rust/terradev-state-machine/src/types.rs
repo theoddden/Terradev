@@ -1,7 +1,7 @@
+use crate::state::JobState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
-use crate::state::JobState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobConfig {
@@ -34,13 +34,13 @@ pub struct GPUInfo {
 pub enum StateTransitionError {
     #[error("Invalid transition from {from:?} to {to:?}")]
     InvalidTransition { from: JobState, to: JobState },
-    
+
     #[error("Job is in terminal state {state:?}")]
     TerminalState { state: JobState },
-    
+
     #[error("Checkpoint required for transition")]
     CheckpointRequired,
-    
+
     #[error("Job not found: {id}")]
     #[allow(dead_code)]
     JobNotFound { id: String },

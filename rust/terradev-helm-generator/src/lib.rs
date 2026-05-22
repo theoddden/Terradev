@@ -112,11 +112,19 @@ spec:
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
 
-    fn generate_service(&mut self, name: String, port: u32, service_type: Option<String>) -> PyResult<String> {
+    fn generate_service(
+        &mut self,
+        name: String,
+        port: u32,
+        service_type: Option<String>,
+    ) -> PyResult<String> {
         let mut ctx = Context::new();
         ctx.insert("name", &name);
         ctx.insert("port", &port);
-        ctx.insert("type", &service_type.unwrap_or_else(|| "ClusterIP".to_string()));
+        ctx.insert(
+            "type",
+            &service_type.unwrap_or_else(|| "ClusterIP".to_string()),
+        );
 
         let template = r#"
 apiVersion: v1

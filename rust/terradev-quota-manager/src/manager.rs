@@ -13,7 +13,7 @@ impl QuotaManager {
             quotas: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-    
+
     pub fn set_quota(&self, resource: String, limit: u64) {
         let mut quotas = self.quotas.write();
         quotas.insert(
@@ -33,7 +33,7 @@ impl QuotaManager {
         let quota = quotas
             .get(&request.resource)
             .ok_or_else(|| QuotaError::ResourceNotFound(request.resource.clone()))?;
-        
+
         if quota.remaining >= request.amount {
             Ok(())
         } else {
@@ -51,7 +51,7 @@ impl QuotaManager {
         let quota = quotas
             .get_mut(&request.resource)
             .ok_or_else(|| QuotaError::ResourceNotFound(request.resource.clone()))?;
-        
+
         if quota.remaining >= request.amount {
             quota.used += request.amount;
             quota.remaining -= request.amount;
@@ -67,7 +67,7 @@ impl QuotaManager {
 
     pub fn release_quota(&self, resource: &str, amount: u64) {
         let mut quotas = self.quotas.write();
-        
+
         if let Some(quota) = quotas.get_mut(resource) {
             quota.used = quota.used.saturating_sub(amount);
             quota.remaining = (quota.remaining + amount).min(quota.limit);
@@ -86,7 +86,7 @@ impl QuotaManager {
 
     pub fn reset_quota(&self, resource: &str) {
         let mut quotas = self.quotas.write();
-        
+
         if let Some(quota) = quotas.get_mut(resource) {
             quota.used = 0;
             quota.remaining = quota.limit;

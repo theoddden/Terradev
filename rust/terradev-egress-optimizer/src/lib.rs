@@ -42,13 +42,13 @@ impl PyEgressGraph {
         self.inner
             .find_cheapest_route(&from, &to)
             .map(|(route, cost)| {
-            PyTransferPlan {
-                total_cost_per_gb: cost,
-                estimated_time_hours: 0.0, // Would need data size to calculate
-                hops: route.len() - 1,
-                route,
-            }
-        })
+                PyTransferPlan {
+                    total_cost_per_gb: cost,
+                    estimated_time_hours: 0.0, // Would need data size to calculate
+                    hops: route.len() - 1,
+                    route,
+                }
+            })
     }
 }
 

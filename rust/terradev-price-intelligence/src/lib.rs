@@ -2,8 +2,8 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::*;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,9 +75,15 @@ impl PriceIntelligence {
     fn calculate_statistics(&self, gpu_type: &str, region: Option<&str>) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let filtered: Vec<&PriceTick> = if let Some(r) = region {
-                self.ticks.iter().filter(|t| t.gpu_type == gpu_type && t.region == r).collect()
+                self.ticks
+                    .iter()
+                    .filter(|t| t.gpu_type == gpu_type && t.region == r)
+                    .collect()
             } else {
-                self.ticks.iter().filter(|t| t.gpu_type == gpu_type).collect()
+                self.ticks
+                    .iter()
+                    .filter(|t| t.gpu_type == gpu_type)
+                    .collect()
             };
 
             if filtered.is_empty() {
@@ -173,9 +179,15 @@ impl PriceIntelligence {
     ) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let filtered: Vec<&PriceTick> = if let Some(r) = region {
-                self.ticks.iter().filter(|t| t.gpu_type == gpu_type && t.region == r).collect()
+                self.ticks
+                    .iter()
+                    .filter(|t| t.gpu_type == gpu_type && t.region == r)
+                    .collect()
             } else {
-                self.ticks.iter().filter(|t| t.gpu_type == gpu_type).collect()
+                self.ticks
+                    .iter()
+                    .filter(|t| t.gpu_type == gpu_type)
+                    .collect()
             };
 
             if filtered.len() < 2 {
@@ -267,9 +279,15 @@ impl PriceIntelligence {
     fn get_best_price(&self, gpu_type: &str, region: Option<&str>) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let filtered: Vec<&PriceTick> = if let Some(r) = region {
-                self.ticks.iter().filter(|t| t.gpu_type == gpu_type && t.region == r).collect()
+                self.ticks
+                    .iter()
+                    .filter(|t| t.gpu_type == gpu_type && t.region == r)
+                    .collect()
             } else {
-                self.ticks.iter().filter(|t| t.gpu_type == gpu_type).collect()
+                self.ticks
+                    .iter()
+                    .filter(|t| t.gpu_type == gpu_type)
+                    .collect()
             };
 
             if filtered.is_empty() {

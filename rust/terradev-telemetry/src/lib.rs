@@ -29,21 +29,23 @@ impl PyTelemetryPipeline {
             inner: TelemetryPipeline::new(),
         }
     }
-    
+
     fn record(&self, metric: PyMetric) -> PyResult<()> {
-        self.inner.record(metric.into())
+        self.inner
+            .record(metric.into())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
-    
+
     fn record_value(&self, name: String, value: f64, tags: Vec<(String, String)>) -> PyResult<()> {
-        self.inner.record_value(name, value, tags)
+        self.inner
+            .record_value(name, value, tags)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
-    
+
     fn get_histogram(&self, name: String) -> Option<PyHistogramSnapshot> {
         self.inner.get_histogram(&name).map(|s| s.into())
     }
-    
+
     fn list_histograms(&self) -> Vec<String> {
         self.inner.list_histograms()
     }
@@ -67,7 +69,9 @@ impl From<PyMetric> for Metric {
         Self {
             name: p.name,
             value: p.value,
-            timestamp: chrono::DateTime::parse_from_rfc3339(&p.timestamp).unwrap().with_timezone(&chrono::Utc),
+            timestamp: chrono::DateTime::parse_from_rfc3339(&p.timestamp)
+                .unwrap()
+                .with_timezone(&chrono::Utc),
             tags: p.tags,
         }
     }
