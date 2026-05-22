@@ -63,7 +63,7 @@ impl GovernanceEngine {
             let now = Utc::now().timestamp();
 
             if let Some(record) = self.consents.get(&id) {
-                let expired = record.expires_at.map_or(false, |exp| exp < now);
+                let expired = record.expires_at.is_some_and(|exp| exp < now);
                 let allowed = record.granted && !expired;
 
                 let dict = PyDict::new(py);
@@ -124,7 +124,7 @@ impl GovernanceEngine {
             let list = pyo3::types::PyList::empty(py);
             
             for record in self.consents.values() {
-                if user_id.as_ref().map_or(true, |uid| uid == &record.user_id) {
+                if user_id.as_ref().is_none_or(|uid| uid == &record.user_id) {
                     let dict = PyDict::new(py);
                     dict.set_item("id", &record.id)?;
                     dict.set_item("data_type", &record.data_type)?;

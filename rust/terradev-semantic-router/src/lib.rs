@@ -70,16 +70,14 @@ impl SemanticRouter {
 
                 // Normalize score
                 if !config.keywords.is_empty() {
-                    score = score / config.keywords.len() as f64;
+                    score /= config.keywords.len() as f64;
                 }
 
                 // Apply signals if provided
                 if let Some(sigs) = signals {
-                    if let Ok(signal_value) = sigs.get_item(route_name) {
-                        if let Some(py_val) = signal_value {
-                            if let Ok(val) = py_val.extract::<f64>() {
-                                score = score * 0.7 + val * 0.3; // Weighted combination
-                            }
+                    if let Ok(Some(py_val)) = sigs.get_item(route_name) {
+                        if let Ok(val) = py_val.extract::<f64>() {
+                            score = score * 0.7 + val * 0.3; // Weighted combination
                         }
                     }
                 }
