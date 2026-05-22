@@ -20,6 +20,6 @@ pub enum SnapshotError {
     #[error("Compression failed: {0}")]
     CompressionFailed(String),
 
-    #[error("IO error: {0}")]]
+    #[error("IO error: {0}")]
     IoError(String),
 }
