@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "5.0.1"
+version = "5.0.2"
 description = "Open Source BYOAPI Multi-Cloud GPU Infrastructure Platform"
 readme = "README.md"
 license = {text = "Apache-2.0"}
