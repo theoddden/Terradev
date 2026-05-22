@@ -12,10 +12,10 @@ impl GPUNICOptimizer {
         
         let locality_score = |loc: &PciLocality| -> u32 {
             match loc {
-                PciLocality::PIX => 0,
-                PciLocality::PXB => 1,
-                PciLocality::PHB => 2,
-                PciLocality::SYS => 3,
+                PciLocality::Pix => 0,
+                PciLocality::Pxb => 1,
+                PciLocality::Phb => 2,
+                PciLocality::Sys => 3,
             }
         };
         

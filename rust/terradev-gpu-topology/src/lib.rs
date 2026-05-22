@@ -60,11 +60,11 @@ impl From<PyGPUDevice> for GPUDevice {
             bus_id: p.bus_id,
             numa_node: p.numa_node,
             locality: match p.locality.as_str() {
-                "PIX" => PciLocality::PIX,
-                "PXB" => PciLocality::PXB,
-                "PHB" => PciLocality::PHB,
-                "SYS" => PciLocality::SYS,
-                _ => PciLocality::SYS,
+                "PIX" => PciLocality::Pix,
+                "PXB" => PciLocality::Pxb,
+                "PHB" => PciLocality::Phb,
+                "SYS" => PciLocality::Sys,
+                _ => PciLocality::Sys,
             },
         }
     }
@@ -113,10 +113,10 @@ impl From<GPUNICPair> for PyGPUNICPair {
             gpu_index: p.gpu_index,
             nic_name: p.nic_name,
             locality: match p.locality {
-                PciLocality::PIX => "PIX".to_string(),
-                PciLocality::PXB => "PXB".to_string(),
-                PciLocality::PHB => "PHB".to_string(),
-                PciLocality::SYS => "SYS".to_string(),
+                PciLocality::Pix => "PIX".to_string(),
+                PciLocality::Pxb => "PXB".to_string(),
+                PciLocality::Phb => "PHB".to_string(),
+                PciLocality::Sys => "SYS".to_string(),
             },
             score: p.score,
         }
