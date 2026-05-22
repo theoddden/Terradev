@@ -19,7 +19,7 @@ impl HelmGenerator {
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?
         } else {
             Tera::default()
-        }
+        };
 
         Ok(Self { tera })
     }
