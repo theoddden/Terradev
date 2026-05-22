@@ -115,13 +115,13 @@ pub struct PyEvictionPolicy {
 impl From<PyEvictionPolicy> for EvictionPolicy {
     fn from(p: PyEvictionPolicy) -> Self {
         match p.policy_type.as_str() {
-            "lru" => EvictionPolicy::LRU,
-            "lfu" => EvictionPolicy::LFU,
+            "lru" => EvictionPolicy::Lru,
+            "lfu" => EvictionPolicy::Lfu,
             "priority" => EvictionPolicy::Priority,
             "idle_timeout" => EvictionPolicy::IdleTimeout {
                 seconds: p.timeout_seconds.unwrap_or(300),
             },
-            _ => EvictionPolicy::LRU,
+            _ => EvictionPolicy::Lru,
         }
     }
 }

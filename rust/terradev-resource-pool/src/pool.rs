@@ -75,7 +75,7 @@ impl ResourcePool {
         }
         
         match &self.policy {
-            EvictionPolicy::LRU => {
+            EvictionPolicy::Lru => {
                 let oldest = resources
                     .iter()
                     .min_by_key(|(_, r)| r.last_used)
@@ -118,7 +118,7 @@ impl ResourcePool {
                     resources.remove(&id);
                 }
             }
-            EvictionPolicy::LFU => {
+            EvictionPolicy::Lfu => {
                 // Simplified LFU - evict oldest (would need frequency tracking)
                 let oldest = resources
                     .iter()
