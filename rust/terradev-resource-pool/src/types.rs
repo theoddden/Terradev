@@ -30,7 +30,7 @@ pub enum PoolError {
     #[allow(dead_code)]
     ResourceNotFound(String),
 
-    #[error("Invalid pool configuration")]]
+    #[error("Invalid pool configuration")]
     #[allow(dead_code)]
     InvalidConfiguration,
 }

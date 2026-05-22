@@ -35,6 +35,6 @@ pub enum LockError {
     #[allow(dead_code)]
     Expired,
 
-    #[error("Invalid holder: {holder}")]]
+    #[error("Invalid holder: {holder}")]
     InvalidHolder { holder: String },
 }

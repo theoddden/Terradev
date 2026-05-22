@@ -10,7 +10,7 @@ pub enum QuotaError {
         requested: u64,
     },
 
-    #[error("Resource not found: {0}")]]
+    #[error("Resource not found: {0}")]
     ResourceNotFound(String),
 }
 
