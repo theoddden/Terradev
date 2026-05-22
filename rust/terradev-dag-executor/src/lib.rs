@@ -257,26 +257,27 @@ impl DAGExecutor {
                         .nodes
                         .iter()
                         .map(|node_name| {
-                        let nodes_ref = nodes.clone();
-                        let node_name = node_name.clone();
-                        s.spawn(move |_| {
-                            let nodes = nodes_ref.read();
-                            let _node = nodes.get(&node_name).unwrap();
+                            let nodes_ref = nodes.clone();
+                            let node_name = node_name.clone();
+                            s.spawn(move |_| {
+                                let nodes = nodes_ref.read();
+                                let _node = nodes.get(&node_name).unwrap();
 
-                            let start = std::time::Instant::now();
+                                let start = std::time::Instant::now();
 
-                            // Simulate node execution (in real implementation, this would call Python callable)
-                            let output = serde_json::json!({
-                                "node": node_name,
-                                "status": "done"
-                            });
+                                // Simulate node execution (in real implementation, this would call Python callable)
+                                let output = serde_json::json!({
+                                    "node": node_name,
+                                    "status": "done"
+                                });
 
-                            let latency = start.elapsed().as_secs_f64() * 1000.0;
+                                let latency = start.elapsed().as_secs_f64() * 1000.0;
 
-                            (node_name, output, latency)
+                                (node_name, output, latency)
+                            })
                         })
                         .collect();
-                    
+
                     for handle in handles {
                         let (name, output, latency) = handle.join().unwrap();
                         wave_results.insert(name, (output, latency));
