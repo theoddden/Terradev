@@ -273,7 +273,6 @@ impl JobState {
                     finished_at: Utc::now(),
                     final_step: checkpoint_step,
                 })
-            }
             _ => Err(crate::types::StateTransitionError::TerminalState { state: self }),
         }
     }
