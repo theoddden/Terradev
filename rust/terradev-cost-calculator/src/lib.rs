@@ -50,13 +50,10 @@ impl PyCostCalculator {
         &self,
         instances: Vec<(String, String, bool)>,
     ) -> PyCostBreakdown {
-        let rust_instances: Vec<(String, rust_decimal::Decimal, bool)> =
-            instances
-                .into_iter()
-                .filter_map(|(name, hours, use_spot)| {
-                    Some((name, hours.parse().ok()?, use_spot))
-                })
-                .collect();
+        let rust_instances: Vec<(String, rust_decimal::Decimal, bool)> = instances
+            .into_iter()
+            .filter_map(|(name, hours, use_spot)| Some((name, hours.parse().ok()?, use_spot)))
+            .collect();
 
         self.inner
             .calculate_multi_instance_cost(&rust_instances)

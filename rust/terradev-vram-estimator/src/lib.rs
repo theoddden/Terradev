@@ -27,7 +27,7 @@ impl PyVRAMEstimator {
     fn new() -> Self {
         Self
     }
-    
+
     fn estimate_vram(
         &self,
         architecture: PyModelArchitecture,
@@ -44,7 +44,7 @@ impl PyVRAMEstimator {
             vocab_size: architecture.vocab_size,
             max_sequence_length: architecture.max_sequence_length,
         };
-        
+
         let prec = match precision.as_str() {
             "fp32" => Precision::FP32,
             "fp16" => Precision::FP16,
@@ -54,7 +54,7 @@ impl PyVRAMEstimator {
             "int4" => Precision::INT4,
             _ => Precision::FP16,
         };
-        
+
         VRAMEstimator::estimate_vram(&arch, context_tokens, batch_size, prec, use_mla).into()
     }
 }

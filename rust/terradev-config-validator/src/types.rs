@@ -13,18 +13,11 @@ pub enum ValidationError {
 
     #[allow(dead_code)]
     #[error("Invalid value for field {field}: {message}")]
-    InvalidValue {
-        field: String,
-        message: String,
-    },
+    InvalidValue { field: String, message: String },
 
     #[allow(dead_code)]
     #[error("Type mismatch for field {field}: expected {expected}, got {actual}")]
-    TypeMismatch {
-        field: String,
-        expected: String,
-        actual: String,
-    },
+    TypeMismatch { field: String, expected: String, actual: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -27,18 +27,29 @@ impl ToolRegistry {
         }
     }
 
-    fn register_tool(&mut self, name: String, description: String, input_schema: &PyDict) -> PyResult<()> {
+    fn register_tool(
+        &mut self,
+        name: String,
+        description: String,
+        input_schema: &PyDict,
+    ) -> PyResult<()> {
         let schema: serde_json::Value = Python::with_gil(|py| {
             // Convert PyDict to string representation, then parse as JSON
-            let schema_str = input_schema.str().unwrap_or_else(|_| pyo3::types::PyString::new(py, "{}")).to_string();
+            let schema_str = input_schema
+                .str()
+                .unwrap_or_else(|_| pyo3::types::PyString::new(py, "{}"))
+                .to_string();
             serde_json::from_str(&schema_str).unwrap_or_else(|_| serde_json::json!({}))
         });
 
-        self.tools.insert(name.clone(), ToolSchema {
-            name,
-            description,
-            input_schema: schema,
-        });
+        self.tools.insert(
+            name.clone(),
+            ToolSchema {
+                name,
+                description,
+                input_schema: schema,
+            },
+        );
         Ok(())
     }
 
@@ -48,7 +59,8 @@ impl ToolRegistry {
                 let dict = PyDict::new(py);
                 dict.set_item("name", &tool.name)?;
                 dict.set_item("description", &tool.description)?;
-                let schema_str = serde_json::to_string(&tool.input_schema).unwrap_or_else(|_| "{}".to_string());
+                let schema_str =
+                    serde_json::to_string(&tool.input_schema).unwrap_or_else(|_| "{}".to_string());
                 dict.set_item("input_schema", schema_str)?;
                 Ok(dict.into())
             } else {
@@ -64,7 +76,8 @@ impl ToolRegistry {
                 let dict = PyDict::new(py);
                 dict.set_item("name", &tool.name)?;
                 dict.set_item("description", &tool.description)?;
-                let schema_str = serde_json::to_string(&tool.input_schema).unwrap_or_else(|_| "{}".to_string());
+                let schema_str =
+                    serde_json::to_string(&tool.input_schema).unwrap_or_else(|_| "{}".to_string());
                 dict.set_item("input_schema", schema_str)?;
                 list.append(dict)?;
             }

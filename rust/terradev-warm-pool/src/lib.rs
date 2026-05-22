@@ -1,13 +1,13 @@
 #![allow(non_local_definitions)]
 
+use chrono::Utc;
+use moka::sync::Cache;
+use parking_lot::RwLock;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
-use moka::sync::Cache;
-use chrono::Utc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WarmInstance {
@@ -80,7 +80,9 @@ impl WarmPoolManager {
             cost_usd_per_hour,
         };
 
-        self.instances.write().insert(instance_id.clone(), warm_instance.clone());
+        self.instances
+            .write()
+            .insert(instance_id.clone(), warm_instance.clone());
         self.cache.insert(instance_id, warm_instance);
         Ok(())
     }
@@ -88,11 +90,11 @@ impl WarmPoolManager {
     fn get_instance(&self, instance_id: &str) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let instances = self.instances.read();
-            
+
             if let Some(mut instance) = instances.get(instance_id).cloned() {
                 instance.last_accessed = Utc::now().timestamp();
                 self.cache.insert(instance_id.to_string(), instance.clone());
-                
+
                 let dict = PyDict::new(py);
                 dict.set_item("instance_id", &instance.instance_id)?;
                 dict.set_item("model_name", &instance.model_name)?;
@@ -101,7 +103,7 @@ impl WarmPoolManager {
                 dict.set_item("last_accessed", instance.last_accessed)?;
                 dict.set_item("priority", instance.priority)?;
                 dict.set_item("cost_usd_per_hour", instance.cost_usd_per_hour)?;
-                
+
                 Ok(dict.into())
             } else {
                 Ok(py.None())
@@ -113,26 +115,29 @@ impl WarmPoolManager {
         Python::with_gil(|py| {
             let instances = self.instances.read();
             let now = Utc::now().timestamp();
-            
-            let mut candidates: Vec<EvictionCandidate> = instances.iter()
+
+            let mut candidates: Vec<EvictionCandidate> = instances
+                .iter()
                 .map(|(id, instance)| {
                     let idle_seconds = now - instance.last_accessed;
                     let idle_score = (idle_seconds as f64) / (self.max_idle_seconds as f64);
                     let priority_score = (instance.priority as f64) / 100.0;
                     let cost_score = instance.cost_usd_per_hour / 10.0;
-                    
+
                     EvictionCandidate {
                         instance_id: id.clone(),
-                        reason: format!("Idle for {}s, priority {}, cost ${:.2}/hr", 
-                                       idle_seconds, instance.priority, instance.cost_usd_per_hour),
+                        reason: format!(
+                            "Idle for {}s, priority {}, cost ${:.2}/hr",
+                            idle_seconds, instance.priority, instance.cost_usd_per_hour
+                        ),
                         score: idle_score * 0.5 + priority_score * 0.3 + cost_score * 0.2,
                     }
                 })
                 .collect();
-            
+
             candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
             candidates.truncate(count);
-            
+
             let list = pyo3::types::PyList::empty(py);
             for candidate in candidates {
                 let dict = PyDict::new(py);
@@ -141,7 +146,7 @@ impl WarmPoolManager {
                 dict.set_item("score", candidate.score)?;
                 list.append(dict)?;
             }
-            
+
             Ok(list.into())
         })
     }
@@ -156,24 +161,26 @@ impl WarmPoolManager {
         Python::with_gil(|py| {
             let instances = self.instances.read();
             let now = Utc::now().timestamp();
-            
+
             let total_instances = instances.len();
-            let idle_instances = instances.values()
+            let idle_instances = instances
+                .values()
                 .filter(|i| now - i.last_accessed > self.max_idle_seconds / 2)
                 .count();
-            
-            let total_cost: f64 = instances.values()
-                .map(|i| i.cost_usd_per_hour)
-                .sum();
-            
+
+            let total_cost: f64 = instances.values().map(|i| i.cost_usd_per_hour).sum();
+
             let dict = PyDict::new(py);
             dict.set_item("total_instances", total_instances)?;
             dict.set_item("idle_instances", idle_instances)?;
             dict.set_item("active_instances", total_instances - idle_instances)?;
             dict.set_item("total_cost_usd_per_hour", total_cost)?;
             dict.set_item("max_instances", self.max_instances)?;
-            dict.set_item("utilization_pct", total_instances as f64 / self.max_instances as f64 * 100.0)?;
-            
+            dict.set_item(
+                "utilization_pct",
+                total_instances as f64 / self.max_instances as f64 * 100.0,
+            )?;
+
             Ok(dict.into())
         })
     }
