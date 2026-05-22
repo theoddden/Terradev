@@ -10,7 +10,7 @@ impl ArtifactVerifier {
         hasher.update(data);
         hex::encode(hasher.finalize())
     }
-    
+
     pub fn verify_artifact(
         data: &[u8],
         expected_checksum: &str,
@@ -18,12 +18,14 @@ impl ArtifactVerifier {
     ) -> Result<VerificationResult, VerificationError> {
         let computed = match algorithm {
             "sha256" => Self::compute_sha256(data),
-            _ => return Err(VerificationError::HashMismatch {
-                expected: expected_checksum.to_string(),
-                actual: "unsupported algorithm".to_string(),
-            }),
+            _ => {
+                return Err(VerificationError::HashMismatch {
+                    expected: expected_checksum.to_string(),
+                    actual: "unsupported algorithm".to_string(),
+                })
+            }
         };
-        
+
         if computed == expected_checksum {
             Ok(VerificationResult {
                 is_valid: true,
@@ -40,19 +42,19 @@ impl ArtifactVerifier {
             })
         }
     }
-    
+
     pub fn verify_file(
         path: &str,
         expected_checksum: &str,
         algorithm: &str,
     ) -> Result<VerificationResult, VerificationError> {
-        let mut file = std::fs::File::open(path)
-            .map_err(|_| VerificationError::NotFound(path.to_string()))?;
-        
+        let mut file =
+            std::fs::File::open(path).map_err(|_| VerificationError::NotFound(path.to_string()))?;
+
         let mut data = Vec::new();
         file.read_to_end(&mut data)
             .map_err(|_| VerificationError::NotFound(path.to_string()))?;
-        
+
         Self::verify_artifact(&data, expected_checksum, algorithm)
     }
 }

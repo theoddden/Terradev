@@ -29,25 +29,38 @@ impl PyCostCalculator {
             inner: CostCalculator::new(),
         }
     }
-    
+
     fn add_instance_type(&mut self, instance_type: PyInstanceType) {
         self.inner.add_instance_type(instance_type.into());
     }
-    
-    fn calculate_cost(&self, instance_type_name: String, hours: String, use_spot: bool) -> Option<PyCostBreakdown> {
+
+    fn calculate_cost(
+        &self,
+        instance_type_name: String,
+        hours: String,
+        use_spot: bool,
+    ) -> Option<PyCostBreakdown> {
         let hours_decimal = hours.parse::<rust_decimal::Decimal>().ok()?;
-        self.inner.calculate_cost(&instance_type_name, hours_decimal, use_spot).map(|b| b.into())
+        self.inner
+            .calculate_cost(&instance_type_name, hours_decimal, use_spot)
+            .map(|b| b.into())
     }
-    
-    fn calculate_multi_instance_cost(&self, instances: Vec<(String, String, bool)>) -> PyCostBreakdown {
-        let rust_instances: Vec<(String, rust_decimal::Decimal, bool)> = instances
-            .into_iter()
-            .filter_map(|(name, hours, use_spot)| {
-                Some((name, hours.parse().ok()?, use_spot))
-            })
-            .collect();
-        
-        self.inner.calculate_multi_instance_cost(&rust_instances).into()
+
+    fn calculate_multi_instance_cost(
+        &self,
+        instances: Vec<(String, String, bool)>,
+    ) -> PyCostBreakdown {
+        let rust_instances: Vec<(String, rust_decimal::Decimal, bool)> =
+            instances
+                .into_iter()
+                .filter_map(|(name, hours, use_spot)| {
+                    Some((name, hours.parse().ok()?, use_spot))
+                })
+                .collect();
+
+        self.inner
+            .calculate_multi_instance_cost(&rust_instances)
+            .into()
     }
 }
 
@@ -74,8 +87,14 @@ impl From<PyInstanceType> for InstanceType {
             name: p.name,
             provider: p.provider,
             region: p.region,
-            hourly_cost_usd: p.hourly_cost_usd.parse().unwrap_or(rust_decimal::Decimal::ZERO),
-            spot_discount_percent: p.spot_discount_percent.parse().unwrap_or(rust_decimal::Decimal::ZERO),
+            hourly_cost_usd: p
+                .hourly_cost_usd
+                .parse()
+                .unwrap_or(rust_decimal::Decimal::ZERO),
+            spot_discount_percent: p
+                .spot_discount_percent
+                .parse()
+                .unwrap_or(rust_decimal::Decimal::ZERO),
             gpu_count: p.gpu_count,
         }
     }

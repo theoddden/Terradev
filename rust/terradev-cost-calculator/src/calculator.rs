@@ -12,11 +12,12 @@ impl CostCalculator {
             instance_types: HashMap::new(),
         }
     }
-    
+
     pub fn add_instance_type(&mut self, instance_type: InstanceType) {
-        self.instance_types.insert(instance_type.name.clone(), instance_type);
+        self.instance_types
+            .insert(instance_type.name.clone(), instance_type);
     }
-    
+
     pub fn calculate_cost(
         &self,
         instance_type_name: &str,
@@ -24,26 +25,26 @@ impl CostCalculator {
         use_spot: bool,
     ) -> Option<CostBreakdown> {
         let instance_type = self.instance_types.get(instance_type_name)?;
-        
+
         let hourly_cost = if use_spot {
             let discount = instance_type.spot_discount_percent / Decimal::from(100);
             instance_type.hourly_cost_usd * (Decimal::from(1) - discount)
         } else {
             instance_type.hourly_cost_usd
         };
-        
+
         let _total_cost = hourly_cost * hours;
         let monthly_hours = Decimal::from(730); // 24 * 30.4
         let monthly_cost = hourly_cost * monthly_hours;
-        
+
         let spot_hourly_cost = {
             let discount = instance_type.spot_discount_percent / Decimal::from(100);
             instance_type.hourly_cost_usd * (Decimal::from(1) - discount)
         };
-        
+
         let spot_monthly_cost = spot_hourly_cost * monthly_hours;
         let spot_savings = (instance_type.hourly_cost_usd - spot_hourly_cost) * monthly_hours;
-        
+
         Some(CostBreakdown {
             hourly_cost_usd: instance_type.hourly_cost_usd,
             monthly_cost_usd: monthly_cost,
@@ -53,7 +54,7 @@ impl CostCalculator {
             gpu_count: instance_type.gpu_count,
         })
     }
-    
+
     pub fn calculate_multi_instance_cost(
         &self,
         instances: &[(String, Decimal, bool)],
@@ -63,7 +64,7 @@ impl CostCalculator {
         let mut total_spot_monthly = Decimal::from(0);
         let mut total_spot_savings = Decimal::from(0);
         let mut total_gpu_count = 0;
-        
+
         for (instance_type_name, hours, use_spot) in instances {
             if let Some(breakdown) = self.calculate_cost(instance_type_name, *hours, *use_spot) {
                 total_hourly += breakdown.hourly_cost_usd;
@@ -73,7 +74,7 @@ impl CostCalculator {
                 total_gpu_count += breakdown.gpu_count;
             }
         }
-        
+
         CostBreakdown {
             hourly_cost_usd: total_hourly,
             monthly_cost_usd: total_monthly,

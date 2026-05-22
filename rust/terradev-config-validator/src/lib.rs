@@ -31,11 +31,12 @@ impl PyConfigValidator {
             inner: ConfigValidator::new(schema),
         })
     }
-    
+
     fn validate(&self, config_json: String) -> PyResult<PyValidationReport> {
         let config: Value = serde_json::from_str(&config_json)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        self.inner.validate(&config)
+        self.inner
+            .validate(&config)
             .map(|r| r.into())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }

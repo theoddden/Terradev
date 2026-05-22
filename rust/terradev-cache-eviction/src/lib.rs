@@ -29,11 +29,11 @@ impl PyCacheEngine {
             inner: CacheEngine::new(max_capacity, policy.into()),
         }
     }
-    
+
     fn put(&self, entry: PyCacheEntry) {
         self.inner.put(entry.into());
     }
-    
+
     fn get(&self, key: String) -> Option<PyCacheEntry> {
         self.inner.get(&key).map(|e| {
             let entry = (*e).clone();
@@ -47,27 +47,27 @@ impl PyCacheEngine {
             }
         })
     }
-    
+
     fn remove(&self, key: String) {
         self.inner.remove(&key);
     }
-    
+
     fn contains(&self, key: String) -> bool {
         self.inner.contains(&key)
     }
-    
+
     fn size(&self) -> u64 {
         self.inner.size()
     }
-    
+
     fn clear(&mut self) {
         self.inner.clear();
     }
-    
+
     fn access_count(&self, key: String) -> u64 {
         self.inner.access_count(&key)
     }
-    
+
     fn policy(&self) -> String {
         match self.inner.policy() {
             EvictionPolicy::Lru => "lru".to_string(),
@@ -100,8 +100,12 @@ impl From<PyCacheEntry> for CacheEntry {
             key: p.key,
             value: serde_json::from_str(&p.value).unwrap_or(serde_json::Value::Null),
             size_bytes: p.size_bytes,
-            created_at: chrono::DateTime::parse_from_rfc3339(&p.created_at).unwrap().with_timezone(&chrono::Utc),
-            last_accessed: chrono::DateTime::parse_from_rfc3339(&p.last_accessed).unwrap().with_timezone(&chrono::Utc),
+            created_at: chrono::DateTime::parse_from_rfc3339(&p.created_at)
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            last_accessed: chrono::DateTime::parse_from_rfc3339(&p.last_accessed)
+                .unwrap()
+                .with_timezone(&chrono::Utc),
             access_count: p.access_count,
         }
     }

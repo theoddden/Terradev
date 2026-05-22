@@ -28,27 +28,27 @@ impl PyCredentialVault {
             inner: CredentialVault::new(),
         }
     }
-    
+
     fn store(&self, name: String, value: Vec<u8>, provider: String) {
         self.inner.store(name, value, provider);
     }
-    
+
     fn retrieve(&self, name: String) -> Option<Vec<u8>> {
         self.inner.retrieve(&name)
     }
-    
+
     fn get_metadata(&self, name: String) -> Option<PyCredentialMetadata> {
         self.inner.get_metadata(&name).map(|m| m.into())
     }
-    
+
     fn delete(&self, name: String) -> bool {
         self.inner.delete(&name)
     }
-    
+
     fn list(&self) -> Vec<String> {
         self.inner.list()
     }
-    
+
     fn clear(&mut self) {
         self.inner.clear();
     }

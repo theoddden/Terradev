@@ -24,18 +24,28 @@ impl PyArtifactVerifier {
     fn new() -> Self {
         Self
     }
-    
+
     fn compute_sha256(&self, data: Vec<u8>) -> String {
         ArtifactVerifier::compute_sha256(&data)
     }
-    
-    fn verify_artifact(&self, data: Vec<u8>, expected_checksum: String, algorithm: String) -> PyResult<PyVerificationResult> {
+
+    fn verify_artifact(
+        &self,
+        data: Vec<u8>,
+        expected_checksum: String,
+        algorithm: String,
+    ) -> PyResult<PyVerificationResult> {
         ArtifactVerifier::verify_artifact(&data, &expected_checksum, &algorithm)
             .map(|r| r.into())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
-    
-    fn verify_file(&self, path: String, expected_checksum: String, algorithm: String) -> PyResult<PyVerificationResult> {
+
+    fn verify_file(
+        &self,
+        path: String,
+        expected_checksum: String,
+        algorithm: String,
+    ) -> PyResult<PyVerificationResult> {
         ArtifactVerifier::verify_file(&path, &expected_checksum, &algorithm)
             .map(|r| r.into())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))

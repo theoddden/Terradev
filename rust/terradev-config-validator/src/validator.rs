@@ -9,11 +9,11 @@ impl ConfigValidator {
     pub fn new(schema: Value) -> Self {
         Self { schema }
     }
-    
+
     pub fn validate(&self, config: &Value) -> Result<ValidationReport, ValidationError> {
         let mut errors = Vec::new();
         let warnings = Vec::new();
-        
+
         // Basic validation logic
         if let Some(required_fields) = self.schema.get("required") {
             if let Some(arr) = required_fields.as_array() {
@@ -26,7 +26,7 @@ impl ConfigValidator {
                 }
             }
         }
-        
+
         // Type validation
         if let Some(properties) = self.schema.get("properties") {
             if let Some(obj) = properties.as_object() {
@@ -42,7 +42,7 @@ impl ConfigValidator {
                                     Value::Object(_) => "object",
                                     Value::Null => "null",
                                 };
-                                
+
                                 if type_str != actual_type {
                                     errors.push(format!(
                                         "Type mismatch for field {}: expected {}, got {}",
@@ -55,14 +55,14 @@ impl ConfigValidator {
                 }
             }
         }
-        
+
         Ok(ValidationReport {
             is_valid: errors.is_empty(),
             errors,
             warnings,
         })
     }
-    
+
     #[allow(dead_code)]
     pub fn validate_str(&self, config_str: &str) -> Result<ValidationReport, ValidationError> {
         let config: Value = serde_json::from_str(config_str)

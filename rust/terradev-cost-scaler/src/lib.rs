@@ -1,11 +1,11 @@
 #![allow(non_local_definitions)]
 
+use chrono::{Duration, Utc};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use serde::{Deserialize, Serialize};
-use rust_decimal::Decimal;
 use rust_decimal::prelude::*;
-use chrono::{Utc, Duration};
+use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CostMetric {
@@ -55,8 +55,16 @@ impl CostScaler {
         };
         let instance_id: String = match metric.get_item("instance_id") {
             Ok(Some(i)) => i.extract()?,
-            Ok(None) => return Err(pyo3::exceptions::PyKeyError::new_err("instance_id not found")),
-            Err(_) => return Err(pyo3::exceptions::PyKeyError::new_err("instance_id not found")),
+            Ok(None) => {
+                return Err(pyo3::exceptions::PyKeyError::new_err(
+                    "instance_id not found",
+                ))
+            }
+            Err(_) => {
+                return Err(pyo3::exceptions::PyKeyError::new_err(
+                    "instance_id not found",
+                ))
+            }
         };
         let cost_usd: f64 = match metric.get_item("cost_usd") {
             Ok(Some(c)) => c.extract()?,
@@ -96,7 +104,9 @@ impl CostScaler {
             let cutoff = Utc::now() - Duration::hours(window);
             let cutoff_ts = cutoff.timestamp();
 
-            let total: Decimal = self.metrics.iter()
+            let total: Decimal = self
+                .metrics
+                .iter()
                 .filter(|m| m.timestamp >= cutoff_ts)
                 .map(|m| m.cost_usd)
                 .sum();
@@ -105,13 +115,17 @@ impl CostScaler {
             dict.set_item("total_cost_usd", total.to_string())?;
             dict.set_item("window_hours", window)?;
             dict.set_item("budget_usd", self.budget_usd.to_string())?;
-            dict.set_item("budget_remaining_usd", (self.budget_usd - total).to_string())?;
-            dict.set_item("budget_utilization_pct", 
+            dict.set_item(
+                "budget_remaining_usd",
+                (self.budget_usd - total).to_string(),
+            )?;
+            dict.set_item(
+                "budget_utilization_pct",
                 if self.budget_usd > Decimal::ZERO {
                     (total / self.budget_usd * Decimal::from(100)).to_string()
                 } else {
                     "0".to_string()
-                }
+                },
             )?;
 
             Ok(dict.into())
@@ -122,7 +136,7 @@ impl CostScaler {
         Python::with_gil(|py| {
             if self.metrics.len() < 2 {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Insufficient metrics for prediction"
+                    "Insufficient metrics for prediction",
                 ));
             }
 
@@ -136,13 +150,12 @@ impl CostScaler {
 
             if recent.is_empty() {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "No recent metrics for prediction"
+                    "No recent metrics for prediction",
                 ));
             }
 
-            let hourly_rate: Decimal = recent.iter()
-                .map(|m| m.cost_usd)
-                .sum::<Decimal>() / Decimal::from(window);
+            let hourly_rate: Decimal =
+                recent.iter().map(|m| m.cost_usd).sum::<Decimal>() / Decimal::from(window);
 
             let predicted_cost = hourly_rate * Decimal::from(hours_ahead);
 
@@ -155,7 +168,11 @@ impl CostScaler {
         })
     }
 
-    fn make_scaling_decision(&self, current_instances: usize, target_utilization: Option<f64>) -> PyResult<PyObject> {
+    fn make_scaling_decision(
+        &self,
+        current_instances: usize,
+        target_utilization: Option<f64>,
+    ) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let target_util = target_utilization.unwrap_or(0.7);
             let window = self.scaling_window_hours;
@@ -185,25 +202,48 @@ impl CostScaler {
                 Decimal::ZERO
             };
 
-            let (action, target_instances, reason) = if utilization > Decimal::from_f64(target_util).unwrap() {
-                let scale_factor = (utilization / Decimal::from_f64(target_util).unwrap()).to_f64().unwrap();
-                let new_instances = ((current_instances as f64) * scale_factor).ceil() as usize;
-                ("scale_down".to_string(), new_instances, 
-                 format!("Budget utilization {:.1}% exceeds target {:.1}%", 
-                         utilization * Decimal::from(100), target_util * 100.0))
-            } else if utilization < Decimal::from_f64(target_util * 0.5).unwrap() {
-                let scale_factor = (Decimal::from_f64(target_util).unwrap() / utilization).to_f64().unwrap();
-                let new_instances = ((current_instances as f64) * scale_factor).ceil() as usize;
-                ("scale_up".to_string(), new_instances,
-                 format!("Budget utilization {:.1}% below target {:.1}%",
-                         utilization * Decimal::from(100), target_util * 100.0))
-            } else {
-                ("no_change".to_string(), current_instances,
-                 format!("Budget utilization {:.1}% within target range",
-                         utilization * Decimal::from(100)))
-            };
+            let (action, target_instances, reason) =
+                if utilization > Decimal::from_f64(target_util).unwrap() {
+                    let scale_factor = (utilization / Decimal::from_f64(target_util).unwrap())
+                        .to_f64()
+                        .unwrap();
+                    let new_instances = ((current_instances as f64) * scale_factor).ceil() as usize;
+                    (
+                        "scale_down".to_string(),
+                        new_instances,
+                        format!(
+                            "Budget utilization {:.1}% exceeds target {:.1}%",
+                            utilization * Decimal::from(100),
+                            target_util * 100.0
+                        ),
+                    )
+                } else if utilization < Decimal::from_f64(target_util * 0.5).unwrap() {
+                    let scale_factor = (Decimal::from_f64(target_util).unwrap() / utilization)
+                        .to_f64()
+                        .unwrap();
+                    let new_instances = ((current_instances as f64) * scale_factor).ceil() as usize;
+                    (
+                        "scale_up".to_string(),
+                        new_instances,
+                        format!(
+                            "Budget utilization {:.1}% below target {:.1}%",
+                            utilization * Decimal::from(100),
+                            target_util * 100.0
+                        ),
+                    )
+                } else {
+                    (
+                        "no_change".to_string(),
+                        current_instances,
+                        format!(
+                            "Budget utilization {:.1}% within target range",
+                            utilization * Decimal::from(100)
+                        ),
+                    )
+                };
 
-            let projected_cost = total_cost / Decimal::from(window) * Decimal::from(self.scaling_window_hours);
+            let projected_cost =
+                total_cost / Decimal::from(window) * Decimal::from(self.scaling_window_hours);
 
             let decision = ScalingDecision {
                 action,
@@ -228,9 +268,13 @@ impl CostScaler {
         let dict = PyDict::new(py);
         dict.set_item("action", decision.action).unwrap();
         dict.set_item("reason", decision.reason).unwrap();
-        dict.set_item("target_instances", decision.target_instances).unwrap();
-        dict.set_item("current_instances", decision.current_instances).unwrap();
-        dict.set_item("projected_cost_usd", decision.projected_cost_usd.to_string()).unwrap();
+        dict.set_item("target_instances", decision.target_instances)
+            .unwrap();
+        dict.set_item("current_instances", decision.current_instances)
+            .unwrap();
+        dict
+            .set_item("projected_cost_usd", decision.projected_cost_usd.to_string())
+            .unwrap();
         dict.set_item("confidence", decision.confidence).unwrap();
         dict.into()
     }

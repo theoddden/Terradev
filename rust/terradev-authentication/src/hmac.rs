@@ -16,10 +16,10 @@ impl AlibabaSigner {
         params: &[(String, String)],
     ) -> SignatureResult {
         let timestamp = Self::get_timestamp();
-        
+
         // Build canonical query string
         let canonical_query = encode_parameters(params);
-        
+
         // Build string to sign
         let string_to_sign = format!(
             "{}&{}&{}",
@@ -27,18 +27,18 @@ impl AlibabaSigner {
             percent_encode_rfc3986(url),
             percent_encode_rfc3986(&canonical_query)
         );
-        
+
         // Create HMAC-SHA1 signature
         let mut mac = HmacSha1::new_from_slice(credentials.access_key_secret.as_bytes()).unwrap();
         mac.update(string_to_sign.as_bytes());
         let signature = hex::encode(mac.finalize().into_bytes());
-        
+
         SignatureResult {
             signature,
             timestamp,
         }
     }
-    
+
     fn get_timestamp() -> String {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -68,12 +68,12 @@ impl OVHSigner {
             timestamp,
             credentials.consumer_key
         );
-        
+
         // Create SHA1 signature
         let mut mac = HmacSha1::new_from_slice(credentials.application_secret.as_bytes()).unwrap();
         mac.update(signature_string.as_bytes());
         let signature = hex::encode(mac.finalize().into_bytes());
-        
+
         SignatureResult {
             signature,
             timestamp: timestamp.to_string(),

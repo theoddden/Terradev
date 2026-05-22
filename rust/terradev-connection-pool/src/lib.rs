@@ -29,11 +29,11 @@ impl PyConnectionPool {
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
         })
     }
-    
+
     fn max_connections(&self) -> usize {
         self.inner.max_connections()
     }
-    
+
     fn active_connections(&self) -> usize {
         self.inner.active_connections()
     }

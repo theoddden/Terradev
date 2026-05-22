@@ -79,9 +79,7 @@ impl CommandExecutor {
             .into_iter()
             .map(|(program, args, env)| {
                 let executor = self.clone();
-                tokio::spawn(async move {
-                    executor.execute_command(program, args, env).await
-                })
+                tokio::spawn(async move { executor.execute_command(program, args, env).await })
             })
             .collect::<Vec<_>>();
 

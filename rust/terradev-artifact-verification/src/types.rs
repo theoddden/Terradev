@@ -4,12 +4,15 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum VerificationError {
     #[error("Hash mismatch: expected {expected}, got {actual}")]
-    HashMismatch { expected: String, actual: String },
-    
+    HashMismatch {
+        expected: String,
+        actual: String,
+    },
+
     #[allow(dead_code)]
     #[error("Invalid signature")]
     InvalidSignature,
-    
+
     #[error("Artifact not found: {0}")]
     NotFound(String),
 }

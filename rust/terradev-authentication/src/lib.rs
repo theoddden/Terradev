@@ -27,7 +27,7 @@ impl PyAlibabaSigner {
     fn new() -> Self {
         Self
     }
-    
+
     fn sign_request(
         &self,
         credentials: PyAlibabaCredentials,
@@ -39,7 +39,7 @@ impl PyAlibabaSigner {
             access_key_id: credentials.access_key_id,
             access_key_secret: credentials.access_key_secret,
         };
-        
+
         AlibabaSigner::sign_request(&creds, &http_method, &url, &params).into()
     }
 }
@@ -53,7 +53,7 @@ impl PyOVHSigner {
     fn new() -> Self {
         Self
     }
-    
+
     fn sign_request(
         &self,
         credentials: PyOvhCredentials,
@@ -67,7 +67,7 @@ impl PyOVHSigner {
             application_secret: credentials.application_secret,
             consumer_key: credentials.consumer_key,
         };
-        
+
         OVHSigner::sign_request(&creds, &http_method, &url, &body, &timestamp).into()
     }
 }

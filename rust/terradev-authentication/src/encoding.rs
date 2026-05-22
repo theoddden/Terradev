@@ -8,7 +8,11 @@ pub fn encode_parameters(params: &[(String, String)]) -> String {
     params
         .iter()
         .map(|(key, value)| {
-            format!("{}={}", percent_encode_rfc3986(key), percent_encode_rfc3986(value))
+            format!(
+                "{}={}",
+                percent_encode_rfc3986(key),
+                percent_encode_rfc3986(value)
+            )
         })
         .collect::<Vec<_>>()
         .join("&")
