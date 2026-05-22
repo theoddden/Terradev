@@ -19,8 +19,8 @@ impl HelmGenerator {
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?
         } else {
             Tera::default()
-        };
-        
+        }
+
         Ok(Self { tera })
     }
 
@@ -32,7 +32,7 @@ impl HelmGenerator {
 
     fn render_template(&self, name: String, context: Option<&PyDict>) -> PyResult<String> {
         let mut ctx = Context::new();
-        
+
         if let Some(py_ctx) = context {
             for (key, value) in py_ctx.iter() {
                 let key_str: String = key.extract()?;
@@ -40,37 +40,43 @@ impl HelmGenerator {
                 ctx.insert(&key_str, &value_str);
             }
         }
-        
+
         self.tera.render(&name, &ctx)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
 
     fn render_values(&self, values: &PyDict) -> PyResult<String> {
         let mut ctx = Context::new();
-        
+
         for (key, value) in values.iter() {
             let key_str: String = key.extract()?;
             let value_str: String = value.extract()?;
             ctx.insert(&key_str, &value_str);
         }
-        
+
         // Render as YAML by converting to string representation
         let yaml_str = format!("{:?}", ctx);
-        
+
         Ok(yaml_str)
     }
 
-    fn generate_deployment(&mut self, name: String, image: String, replicas: Option<u32>, resources: Option<&PyDict>) -> PyResult<String> {
+    fn generate_deployment(
+        &mut self,
+        name: String,
+        image: String,
+        replicas: Option<u32>,
+        resources: Option<&PyDict>,
+    ) -> PyResult<String> {
         let mut ctx = Context::new();
         ctx.insert("name", &name);
         ctx.insert("image", &image);
         ctx.insert("replicas", &replicas.unwrap_or(1));
-        
+
         if let Some(res) = resources {
             let res_str: String = res.extract()?;
             ctx.insert("resources", &res_str);
         }
-        
+
         let template = r#"
 apiVersion: apps/v1
 kind: Deployment
@@ -94,11 +100,13 @@ spec:
           {{ resources }}
         {{/if}}
 "#;
-        
-        self.tera.add_raw_template("deployment", template)
+
+        self.tera
+            .add_raw_template("deployment", template)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        
-        self.tera.render("deployment", &ctx)
+
+        self.tera
+            .render("deployment", &ctx)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
 
@@ -107,7 +115,7 @@ spec:
         ctx.insert("name", &name);
         ctx.insert("port", &port);
         ctx.insert("type", &service_type.unwrap_or_else(|| "ClusterIP".to_string()));
-        
+
         let template = r#"
 apiVersion: v1
 kind: Service
@@ -121,11 +129,13 @@ spec:
   - port: {{ port }}
     targetPort: {{ port }}
 "#;
-        
-        self.tera.add_raw_template("service", template)
+
+        self.tera
+            .add_raw_template("service", template)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        
-        self.tera.render("service", &ctx)
+
+        self.tera
+            .render("service", &ctx)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
 }

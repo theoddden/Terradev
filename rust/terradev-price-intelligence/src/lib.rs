@@ -2,9 +2,9 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use serde::{Deserialize, Serialize};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceTick {
@@ -46,9 +46,7 @@ pub struct PriceIntelligence {
 impl PriceIntelligence {
     #[new]
     fn new() -> Self {
-        Self {
-            ticks: Vec::new(),
-        }
+        Self { ticks: Vec::new() }
     }
 
     fn add_tick(&mut self, tick: &PyDict) -> PyResult<()> {
@@ -84,7 +82,7 @@ impl PriceIntelligence {
 
             if filtered.is_empty() {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "No price ticks found for the given criteria"
+                    "No price ticks found for the given criteria",
                 ));
             }
 
@@ -99,9 +97,7 @@ impl PriceIntelligence {
             };
 
             let variance: Decimal = if count > 0 {
-                let sum_sq_diff: Decimal = prices.iter()
-                    .map(|p| (p - mean) * (p - mean))
-                    .sum();
+                let sum_sq_diff: Decimal = prices.iter().map(|p| (p - mean) * (p - mean)).sum();
                 sum_sq_diff / Decimal::from_usize(count).unwrap()
             } else {
                 Decimal::ZERO
@@ -112,7 +108,9 @@ impl PriceIntelligence {
                 let mut approx = variance / Decimal::from(2);
                 for _ in 0..20 {
                     let new_approx = (approx + variance / approx) / Decimal::from(2);
-                    if (new_approx - approx).abs() < Decimal::from_str("0.0000000001").unwrap_or(Decimal::ZERO) {
+                    if (new_approx - approx).abs()
+                        < Decimal::from_str("0.0000000001").unwrap_or(Decimal::ZERO)
+                    {
                         approx = new_approx;
                         break;
                     }
@@ -167,7 +165,12 @@ impl PriceIntelligence {
         })
     }
 
-    fn calculate_trend(&self, gpu_type: &str, region: Option<&str>, window_minutes: Option<u64>) -> PyResult<PyObject> {
+    fn calculate_trend(
+        &self,
+        gpu_type: &str,
+        region: Option<&str>,
+        window_minutes: Option<u64>,
+    ) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let filtered: Vec<&PriceTick> = if let Some(r) = region {
                 self.ticks.iter().filter(|t| t.gpu_type == gpu_type && t.region == r).collect()
@@ -177,7 +180,7 @@ impl PriceIntelligence {
 
             if filtered.len() < 2 {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Insufficient price ticks for trend calculation"
+                    "Insufficient price ticks for trend calculation",
                 ));
             }
 
@@ -185,14 +188,15 @@ impl PriceIntelligence {
             let now = filtered.last().unwrap().timestamp;
             let cutoff = now - window as i64;
 
-            let recent: Vec<&PriceTick> = filtered.iter()
+            let recent: Vec<&PriceTick> = filtered
+                .iter()
                 .filter(|t| t.timestamp >= cutoff)
                 .cloned()
                 .collect();
 
             if recent.len() < 2 {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Insufficient recent price ticks for trend calculation"
+                    "Insufficient recent price ticks for trend calculation",
                 ));
             }
 
@@ -206,15 +210,20 @@ impl PriceIntelligence {
 
             let volatility: Decimal = if recent.len() > 1 {
                 let prices: Vec<Decimal> = recent.iter().map(|t| t.price).collect();
-                let mean: Decimal = prices.iter().sum::<Decimal>() / Decimal::from_usize(prices.len()).unwrap();
-                let variance: Decimal = prices.iter()
+                let mean: Decimal =
+                    prices.iter().sum::<Decimal>() / Decimal::from_usize(prices.len()).unwrap();
+                let variance: Decimal = prices
+                    .iter()
                     .map(|p| (p - mean) * (p - mean))
-                    .sum::<Decimal>() / Decimal::from_usize(prices.len()).unwrap();
+                    .sum::<Decimal>()
+                    / Decimal::from_usize(prices.len()).unwrap();
                 if variance >= Decimal::ZERO {
                     let mut approx = variance / Decimal::from(2);
                     for _ in 0..20 {
                         let new_approx = (approx + variance / approx) / Decimal::from(2);
-                        if (new_approx - approx).abs() < Decimal::from_str("0.0000000001").unwrap_or(Decimal::ZERO) {
+                        if (new_approx - approx).abs()
+                            < Decimal::from_str("0.0000000001").unwrap_or(Decimal::ZERO)
+                        {
                             approx = new_approx;
                             break;
                         }
@@ -265,11 +274,14 @@ impl PriceIntelligence {
 
             if filtered.is_empty() {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "No price ticks found"
+                    "No price ticks found",
                 ));
             }
 
-            let best = filtered.iter().min_by(|a, b| a.price.cmp(&b.price)).unwrap();
+            let best = filtered
+                .iter()
+                .min_by(|a, b| a.price.cmp(&b.price))
+                .unwrap();
 
             let dict = PyDict::new(py);
             dict.set_item("price", best.price.to_string())?;

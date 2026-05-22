@@ -1,9 +1,9 @@
 #![allow(non_local_definitions)]
 
+use lz4::block::decompress;
+use lz4::block::{compress, CompressionMode};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
-use lz4::block::{compress, CompressionMode};
-use lz4::block::decompress;
 
 #[pyclass]
 pub struct ResultCompressor {
@@ -44,12 +44,15 @@ impl ResultCompressor {
             let mode = CompressionMode::default();
             let compressed = compress(json_str.as_bytes(), Some(mode), false)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-            
+
             let dict = pyo3::types::PyDict::new(py);
             dict.set_item("compressed", PyBytes::new(py, &compressed))?;
             dict.set_item("original_size", json_str.len())?;
             dict.set_item("compressed_size", compressed.len())?;
-            dict.set_item("compression_ratio", json_str.len() as f64 / compressed.len() as f64)?;
+            dict.set_item(
+                "compression_ratio",
+                json_str.len() as f64 / compressed.len() as f64,
+            )?;
             Ok(dict.into())
         })
     }
@@ -57,7 +60,7 @@ impl ResultCompressor {
     fn decompress_json(&self, compressed: &[u8]) -> PyResult<String> {
         let decompressed = decompress(compressed, None)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        
+
         String::from_utf8(decompressed)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyUnicodeDecodeError, _>(e.to_string()))
     }

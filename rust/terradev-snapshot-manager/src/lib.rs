@@ -29,31 +29,36 @@ impl PySnapshotManager {
             inner: SnapshotManager::new(compression_level),
         }
     }
-    
+
     fn save_snapshot(&self, state: PyModelState) -> PyResult<Vec<u8>> {
-        self.inner.save_snapshot(&state.into())
+        self.inner
+            .save_snapshot(&state.into())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
-    
+
     fn load_snapshot(&self, data: Vec<u8>) -> PyResult<PyModelState> {
-        self.inner.load_snapshot(&data)
+        self.inner
+            .load_snapshot(&data)
             .map(|s| s.into())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
-    
+
     fn save_snapshot_to_file(&self, state: PyModelState, path: String) -> PyResult<()> {
-        self.inner.save_snapshot_to_file(&state.into(), &path)
+        self.inner
+            .save_snapshot_to_file(&state.into(), &path)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
-    
+
     fn load_snapshot_from_file(&self, path: String) -> PyResult<PyModelState> {
-        self.inner.load_snapshot_from_file(&path)
+        self.inner
+            .load_snapshot_from_file(&path)
             .map(|s| s.into())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
-    
+
     fn get_compression_ratio(&self, state: PyModelState) -> PyResult<f64> {
-        self.inner.get_compression_ratio(&state.into())
+        self.inner
+            .get_compression_ratio(&state.into())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 }
@@ -83,7 +88,9 @@ impl From<PyModelState> for ModelState {
             model_weights: p.model_weights,
             optimizer_state: p.optimizer_state,
             metadata: serde_json::from_str(&p.metadata).unwrap_or(serde_json::Value::Null),
-            created_at: chrono::DateTime::parse_from_rfc3339(&p.created_at).unwrap().with_timezone(&chrono::Utc),
+            created_at: chrono::DateTime::parse_from_rfc3339(&p.created_at)
+                .unwrap()
+                .with_timezone(&chrono::Utc),
         }
     }
 }

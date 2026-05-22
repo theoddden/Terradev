@@ -44,11 +44,14 @@ impl SemanticRouter {
     }
 
     fn add_route(&mut self, name: String, keywords: Vec<String>, threshold: Option<f64>) {
-        self.routes.insert(name.clone(), RouteConfig {
-            name,
-            keywords,
-            threshold: threshold.unwrap_or(0.5),
-        });
+        self.routes.insert(
+            name.clone(),
+            RouteConfig {
+                name,
+                keywords,
+                threshold: threshold.unwrap_or(0.5),
+            },
+        );
     }
 
     fn route(&self, query: &str, signals: Option<&PyDict>) -> PyResult<PyObject> {
@@ -88,7 +91,8 @@ impl SemanticRouter {
             }
 
             // Find best match
-            let best_route = scores.iter()
+            let best_route = scores
+                .iter()
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
                 .map(|(name, score)| Route {
                     name: name.clone(),
@@ -113,7 +117,11 @@ impl SemanticRouter {
         })
     }
 
-    fn batch_route(&self, queries: Vec<String>, signals: Option<Vec<&PyDict>>) -> PyResult<PyObject> {
+    fn batch_route(
+        &self,
+        queries: Vec<String>,
+        signals: Option<Vec<&PyDict>>,
+    ) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let results = PyList::empty(py);
 

@@ -26,10 +26,10 @@ impl QuotaManager {
             },
         );
     }
-    
+
     pub fn check_quota(&self, request: &QuotaRequest) -> Result<(), QuotaError> {
         let quotas = self.quotas.read();
-        
+
         let quota = quotas
             .get(&request.resource)
             .ok_or_else(|| QuotaError::ResourceNotFound(request.resource.clone()))?;
@@ -44,10 +44,10 @@ impl QuotaManager {
             })
         }
     }
-    
+
     pub fn consume_quota(&self, request: &QuotaRequest) -> Result<(), QuotaError> {
         let mut quotas = self.quotas.write();
-        
+
         let quota = quotas
             .get_mut(&request.resource)
             .ok_or_else(|| QuotaError::ResourceNotFound(request.resource.clone()))?;
@@ -64,7 +64,7 @@ impl QuotaManager {
             })
         }
     }
-    
+
     pub fn release_quota(&self, resource: &str, amount: u64) {
         let mut quotas = self.quotas.write();
         
@@ -73,17 +73,17 @@ impl QuotaManager {
             quota.remaining = (quota.remaining + amount).min(quota.limit);
         }
     }
-    
+
     pub fn get_quota(&self, resource: &str) -> Option<Quota> {
         let quotas = self.quotas.read();
         quotas.get(resource).cloned()
     }
-    
+
     pub fn list_quotas(&self) -> Vec<Quota> {
         let quotas = self.quotas.read();
         quotas.values().cloned().collect()
     }
-    
+
     pub fn reset_quota(&self, resource: &str) {
         let mut quotas = self.quotas.write();
         

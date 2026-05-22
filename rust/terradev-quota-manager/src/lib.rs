@@ -30,35 +30,41 @@ impl PyQuotaManager {
             inner: QuotaManager::new(),
         }
     }
-    
+
     fn set_quota(&self, resource: String, limit: u64) {
         self.inner.set_quota(resource, limit);
     }
-    
+
     fn check_quota(&self, resource: String, amount: u64) -> PyResult<()> {
         let request = QuotaRequest { resource, amount };
-        self.inner.check_quota(&request)
+        self.inner
+            .check_quota(&request)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
-    
+
     fn consume_quota(&self, resource: String, amount: u64) -> PyResult<()> {
         let request = QuotaRequest { resource, amount };
-        self.inner.consume_quota(&request)
+        self.inner
+            .consume_quota(&request)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
-    
+
     fn release_quota(&self, resource: String, amount: u64) {
         self.inner.release_quota(&resource, amount);
     }
-    
+
     fn get_quota(&self, resource: String) -> Option<PyQuota> {
         self.inner.get_quota(&resource).map(|q| q.into())
     }
-    
+
     fn list_quotas(&self) -> Vec<PyQuota> {
-        self.inner.list_quotas().into_iter().map(|q| q.into()).collect()
+        self.inner
+            .list_quotas()
+            .into_iter()
+            .map(|q| q.into())
+            .collect()
     }
-    
+
     fn reset_quota(&self, resource: String) {
         self.inner.reset_quota(&resource);
     }

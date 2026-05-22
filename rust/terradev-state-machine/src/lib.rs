@@ -38,87 +38,117 @@ impl JobStateMachine {
             topology: None,
         }
     }
-    
+
     #[getter]
     fn id(&self) -> String {
         self.id.clone()
     }
-    
+
     #[getter]
     fn status(&self) -> String {
         self.state.status_str().to_string()
     }
-    
+
     #[getter]
     fn is_terminal(&self) -> bool {
         self.state.is_terminal()
     }
-    
+
     #[getter]
     fn is_active(&self) -> bool {
         self.state.is_active()
     }
-    
+
     fn to_preflight(&mut self) -> PyResult<()> {
-        self.state = self.state.clone().to_preflight()
+        self.state = self
+            .state
+            .clone()
+            .to_preflight()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
-    
+
     fn to_launching(&mut self, nodes: Vec<String>) -> PyResult<()> {
-        self.state = self.state.clone().to_launching(nodes)
+        self.state = self
+            .state
+            .clone()
+            .to_launching(nodes)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
-    
+
     fn to_running(&mut self, total_steps: u32) -> PyResult<()> {
-        self.state = self.state.clone().to_running(total_steps)
+        self.state = self
+            .state
+            .clone()
+            .to_running(total_steps)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
-    
+
     fn to_checkpointing(&mut self, step: u32) -> PyResult<()> {
-        self.state = self.state.clone().to_checkpointing(step)
+        self.state = self
+            .state
+            .clone()
+            .to_checkpointing(step)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
-    
+
     fn from_checkpointing(&mut self, checkpoint_id: String, total_steps: u32) -> PyResult<()> {
-        self.state = self.state.clone().from_checkpointing(checkpoint_id, total_steps)
+        self.state = self
+            .state
+            .clone()
+            .from_checkpointing(checkpoint_id, total_steps)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
-    
+
     fn to_paused(&mut self, checkpoint_id: String) -> PyResult<()> {
-        self.state = self.state.clone().to_paused(checkpoint_id)
+        self.state = self
+            .state
+            .clone()
+            .to_paused(checkpoint_id)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
-    
+
     fn to_completed(&mut self, final_step: u32) -> PyResult<()> {
-        self.state = self.state.clone().to_completed(final_step)
+        self.state = self
+            .state
+            .clone()
+            .to_completed(final_step)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
-    
+
     fn to_failed(&mut self, error: String, step: u32) -> PyResult<()> {
-        self.state = self.state.clone().to_failed(error, step)
+        self.state = self
+            .state
+            .clone()
+            .to_failed(error, step)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
-    
+
     fn to_cancelled(&mut self) -> PyResult<()> {
-        self.state = self.state.clone().to_cancelled()
+        self.state = self
+            .state
+            .clone()
+            .to_cancelled()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
-    
+
     fn to_preempted(&mut self, reason: String, checkpoint_id: Option<String>) -> PyResult<()> {
-        self.state = self.state.clone().to_preempted(reason, checkpoint_id)
+        self.state = self
+            .state
+            .clone()
+            .to_preempted(reason, checkpoint_id)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
-    
+
     fn to_dict(&self) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let dict = PyDict::new(py);

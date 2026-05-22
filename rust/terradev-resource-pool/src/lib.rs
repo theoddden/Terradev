@@ -3,10 +3,10 @@
 mod pool;
 mod types;
 
-use pyo3::prelude::*;
-use pool::ResourcePool;
-use types::{EvictionPolicy, PooledResource};
 use chrono::{DateTime, Utc};
+use pool::ResourcePool;
+use pyo3::prelude::*;
+use types::{EvictionPolicy, PooledResource};
 
 #[pymodule]
 fn terradev_resource_pool(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -31,32 +31,33 @@ impl PyResourcePool {
             inner: ResourcePool::new(pool_name, max_size, policy.into()),
         }
     }
-    
+
     fn add(&mut self, resource: PyPooledResource) -> PyResult<()> {
-        self.inner.add(resource.into())
+        self.inner
+            .add(resource.into())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
-    
+
     fn get(&self, id: String) -> Option<PyPooledResource> {
         self.inner.get(&id).map(|r| r.into())
     }
-    
+
     fn remove(&self, id: String) -> Option<PyPooledResource> {
         self.inner.remove(&id).map(|r| r.into())
     }
-    
+
     fn contains(&self, id: String) -> bool {
         self.inner.contains(&id)
     }
-    
+
     fn size(&self) -> usize {
         self.inner.size()
     }
-    
+
     fn clear(&mut self) {
         self.inner.clear();
     }
-    
+
     fn list(&self) -> Vec<PyPooledResource> {
         self.inner.list().into_iter().map(|r| r.into()).collect()
     }
@@ -98,8 +99,12 @@ impl From<PyPooledResource> for PooledResource {
             id: p.id,
             resource_type: p.resource_type,
             endpoint: p.endpoint,
-            created_at: DateTime::parse_from_rfc3339(&p.created_at).unwrap().with_timezone(&Utc),
-            last_used: DateTime::parse_from_rfc3339(&p.last_used).unwrap().with_timezone(&Utc),
+            created_at: DateTime::parse_from_rfc3339(&p.created_at)
+                .unwrap()
+                .with_timezone(&Utc),
+            last_used: DateTime::parse_from_rfc3339(&p.last_used)
+                .unwrap()
+                .with_timezone(&Utc),
             priority: p.priority,
         }
     }

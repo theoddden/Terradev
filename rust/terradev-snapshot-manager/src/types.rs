@@ -16,10 +16,10 @@ pub struct ModelState {
 pub enum SnapshotError {
     #[error("Serialization failed: {0}")]
     SerializationFailed(String),
-    
+
     #[error("Compression failed: {0}")]
     CompressionFailed(String),
-    
-    #[error("IO error: {0}")]
+
+    #[error("IO error: {0}")]]
     IoError(String),
 }
