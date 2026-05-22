@@ -187,7 +187,7 @@ impl JobState {
                     created_at,
                     started_at,
                     checkpoint_step: step,
-                })
+                }),
             _ => Err(crate::types::StateTransitionError::InvalidTransition {
                 from: self,
                 to: JobState::Checkpointing {
@@ -216,7 +216,7 @@ impl JobState {
                     checkpoint_id: Some(new_checkpoint_id),
                     current_step: checkpoint_step,
                     total_steps,
-                })
+                }),
             _ => Err(crate::types::StateTransitionError::InvalidTransition {
                 from: self,
                 to: JobState::Running {
@@ -271,7 +271,7 @@ impl JobState {
                     started_at,
                     finished_at: Utc::now(),
                     final_step: checkpoint_step,
-                })
+                }),
             _ => Err(crate::types::StateTransitionError::TerminalState { state: self }),
         }
     }
