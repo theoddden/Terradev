@@ -1,4 +1,5 @@
 #![allow(non_local_definitions)]
+#![allow(clippy::wrong_self_convention)]
 
 mod state;
 mod types;

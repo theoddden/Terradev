@@ -1,3 +1,6 @@
+#![allow(clippy::wrong_self_convention)]
+#![allow(clippy::result_large_err)]
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

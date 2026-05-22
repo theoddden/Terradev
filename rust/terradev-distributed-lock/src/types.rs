@@ -28,6 +28,7 @@ pub enum LockError {
     NotFound { key: String },
     
     #[error("Lock expired")]
+    #[allow(dead_code)]
     Expired,
     
     #[error("Invalid holder: {holder}")]

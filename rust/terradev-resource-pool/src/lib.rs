@@ -98,8 +98,8 @@ impl From<PyPooledResource> for PooledResource {
             id: p.id,
             resource_type: p.resource_type,
             endpoint: p.endpoint,
-            created_at: DateTime::parse_from_rfc3339(&p.created_at).unwrap().with_timezone(&Utc).into(),
-            last_used: DateTime::parse_from_rfc3339(&p.last_used).unwrap().with_timezone(&Utc).into(),
+            created_at: DateTime::parse_from_rfc3339(&p.created_at).unwrap().with_timezone(&Utc),
+            last_used: DateTime::parse_from_rfc3339(&p.last_used).unwrap().with_timezone(&Utc),
             priority: p.priority,
         }
     }

@@ -14,8 +14,8 @@ pub struct PooledResource {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EvictionPolicy {
-    LRU,
-    LFU,
+    Lru,
+    Lfu,
     Priority,
     IdleTimeout { seconds: u64 },
 }
