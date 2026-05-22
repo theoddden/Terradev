@@ -218,7 +218,6 @@ impl JobState {
                     current_step: checkpoint_step,
                     total_steps,
                 })
-            }
             _ => Err(crate::types::StateTransitionError::InvalidTransition {
                 from: self,
                 to: JobState::Running {
