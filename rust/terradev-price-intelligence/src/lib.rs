@@ -123,12 +123,12 @@ impl PriceIntelligence {
                 Decimal::ZERO
             };
 
-            let min = prices.first().unwrap_or(&Decimal::ZERO).clone();
-            let max = prices.last().unwrap_or(&Decimal::ZERO).clone();
+            let min = *prices.first().unwrap_or(&Decimal::ZERO);
+            let max = *prices.last().unwrap_or(&Decimal::ZERO);
 
             let median = if count > 0 {
                 let mid = count / 2;
-                if count % 2 == 0 {
+                if count.is_multiple_of(2) {
                     (prices[mid - 1] + prices[mid]) / Decimal::from(2)
                 } else {
                     prices[mid]
@@ -139,8 +139,8 @@ impl PriceIntelligence {
 
             let p25_idx = (count as f64 * 0.25) as usize;
             let p75_idx = (count as f64 * 0.75) as usize;
-            let percentile_25 = prices.get(p25_idx).unwrap_or(&Decimal::ZERO).clone();
-            let percentile_75 = prices.get(p75_idx).unwrap_or(&Decimal::ZERO).clone();
+            let percentile_25 = *prices.get(p25_idx).unwrap_or(&Decimal::ZERO);
+            let percentile_75 = *prices.get(p75_idx).unwrap_or(&Decimal::ZERO);
 
             let stats = PriceStatistics {
                 mean,

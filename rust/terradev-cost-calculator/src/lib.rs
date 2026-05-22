@@ -74,8 +74,8 @@ impl From<PyInstanceType> for InstanceType {
             name: p.name,
             provider: p.provider,
             region: p.region,
-            hourly_cost_usd: p.hourly_cost_usd.parse().unwrap_or_else(|_| rust_decimal::Decimal::ZERO),
-            spot_discount_percent: p.spot_discount_percent.parse().unwrap_or_else(|_| rust_decimal::Decimal::ZERO),
+            hourly_cost_usd: p.hourly_cost_usd.parse().unwrap_or(rust_decimal::Decimal::ZERO),
+            spot_discount_percent: p.spot_discount_percent.parse().unwrap_or(rust_decimal::Decimal::ZERO),
             gpu_count: p.gpu_count,
         }
     }
