@@ -116,10 +116,10 @@ pub struct PyEvictionPolicy {
 impl From<PyEvictionPolicy> for EvictionPolicy {
     fn from(p: PyEvictionPolicy) -> Self {
         match p.policy_type.as_str() {
-            "lru" => EvictionPolicy::LRU,
-            "arc" => EvictionPolicy::ARC,
+            "lru" => EvictionPolicy::Lru,
+            "arc" => EvictionPolicy::Arc,
             "tinylfu" => EvictionPolicy::TinyLFU,
-            _ => EvictionPolicy::LRU,
+            _ => EvictionPolicy::Lru,
         }
     }
 }
