@@ -2,10 +2,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PciLocality {
-    Pix,  // Same PCIe switch
-    Pxb,  // Same PCIe bridge
-    Phb,  // Same PCIe host bridge
-    Sys,  // Different PCIe domain
+    Pix, // Same PCIe switch
+    Pxb, // Same PCIe bridge
+    Phb, // Same PCIe host bridge
+    Sys, // Different PCIe domain
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

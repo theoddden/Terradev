@@ -15,43 +15,46 @@ impl EventBus {
     pub fn new() -> Self {
         let (event_tx, event_rx): (Sender<Event>, Receiver<Event>) = unbounded();
         let subscribers = Arc::new(RwLock::new(HashMap::new()));
-        
+
         let subscribers_clone = subscribers.clone();
         thread::spawn(move || {
             Self::dispatch_events(event_rx, subscribers_clone);
         });
-        
+
         Self {
             event_tx,
             subscribers,
         }
     }
-    
+
     pub fn publish(&self, event: Event) -> Result<(), crossbeam::channel::SendError<Event>> {
         self.event_tx.send(event)
     }
-    
+
     pub fn subscribe(&self) -> String {
         let id = Uuid::new_v4().to_string();
         let (tx, _rx): (Sender<Event>, Receiver<Event>) = unbounded();
-        
+
         let mut subscribers = self.subscribers.write();
         subscribers.insert(id.clone(), tx);
-        
+
         id
     }
-    
+
     pub fn unsubscribe(&self, id: &str) {
         let mut subscribers = self.subscribers.write();
         subscribers.remove(id);
     }
-    
+
     pub fn subscriber_count(&self) -> usize {
         let subscribers = self.subscribers.read();
         subscribers.len()
     }
-    
-    fn dispatch_events(event_rx: Receiver<Event>, subscribers: Arc<RwLock<HashMap<String, Sender<Event>>>>) {
+
+    fn dispatch_events(
+        event_rx: Receiver<Event>,
+        subscribers: Arc<RwLock<HashMap<String, Sender<Event>>>>,
+    ) {
         for event in event_rx {
             let subscribers_read = subscribers.read();
             let failed: Vec<String> = subscribers_read
@@ -59,9 +62,9 @@ impl EventBus {
                 .filter(|(_, tx)| tx.send(event.clone()).is_err())
                 .map(|(id, _)| id.clone())
                 .collect();
-            
+
             drop(subscribers_read);
-            
+
             if !failed.is_empty() {
                 let mut subscribers_write = subscribers.write();
                 for id in failed {

@@ -29,17 +29,19 @@ impl PyEgressGraph {
             inner: EgressGraph::new(),
         }
     }
-    
+
     fn add_region(&mut self, region: PyRegion) {
         self.inner.add_region(&region.into());
     }
-    
+
     fn add_edge(&mut self, edge: PyEgressEdge) {
         self.inner.add_edge(&edge.into());
     }
-    
+
     fn find_cheapest_route(&self, from: String, to: String) -> Option<PyTransferPlan> {
-        self.inner.find_cheapest_route(&from, &to).map(|(route, cost)| {
+        self.inner
+            .find_cheapest_route(&from, &to)
+            .map(|(route, cost)| {
             PyTransferPlan {
                 total_cost_per_gb: cost,
                 estimated_time_hours: 0.0, // Would need data size to calculate

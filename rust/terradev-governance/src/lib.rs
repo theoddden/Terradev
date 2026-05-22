@@ -1,10 +1,10 @@
 #![allow(non_local_definitions)]
 
+use chrono::Utc;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::Utc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsentRecord {
@@ -42,7 +42,14 @@ impl GovernanceEngine {
         }
     }
 
-    fn record_consent(&mut self, data_type: String, user_id: String, purpose: String, granted: bool, expires_at: Option<i64>) -> PyResult<String> {
+    fn record_consent(
+        &mut self,
+        data_type: String,
+        user_id: String,
+        purpose: String,
+        granted: bool,
+        expires_at: Option<i64>,
+    ) -> PyResult<String> {
         let id = format!("{}:{}:{}", user_id, data_type, purpose);
         let record = ConsentRecord {
             id: id.clone(),
@@ -57,7 +64,12 @@ impl GovernanceEngine {
         Ok(id)
     }
 
-    fn check_consent(&self, data_type: String, user_id: String, purpose: String) -> PyResult<PyObject> {
+    fn check_consent(
+        &self,
+        data_type: String,
+        user_id: String,
+        purpose: String,
+    ) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let id = format!("{}:{}:{}", user_id, data_type, purpose);
             let now = Utc::now().timestamp();
@@ -87,7 +99,10 @@ impl GovernanceEngine {
     fn add_policy(&mut self, policy_id: String, policy: &PyDict) -> PyResult<()> {
         let policy_value: serde_json::Value = Python::with_gil(|py| {
             // Convert PyDict to string representation, then parse as JSON
-            let policy_str = policy.str().unwrap_or_else(|_| pyo3::types::PyString::new(py, "{}")).to_string();
+            let policy_str = policy
+                .str()
+                .unwrap_or_else(|_| pyo3::types::PyString::new(py, "{}"))
+                .to_string();
             serde_json::from_str(&policy_str).unwrap_or_else(|_| serde_json::json!({}))
         });
         self.policies.insert(policy_id, policy_value);
@@ -104,7 +119,11 @@ impl GovernanceEngine {
 
                 let eval = PolicyEvaluation {
                     allowed,
-                    reason: if allowed { "Policy allows action".to_string() } else { "Policy denies action".to_string() },
+                    reason: if allowed {
+                        "Policy allows action".to_string()
+                    } else {
+                        "Policy denies action".to_string()
+                    },
                     policy_id,
                 };
 
@@ -114,7 +133,9 @@ impl GovernanceEngine {
                 dict.set_item("policy_id", &eval.policy_id)?;
                 Ok(dict.into())
             } else {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Policy not found"))
+                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Policy not found",
+                ))
             }
         })
     }
@@ -122,7 +143,7 @@ impl GovernanceEngine {
     fn get_consent_history(&self, user_id: Option<String>) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let list = pyo3::types::PyList::empty(py);
-            
+
             for record in self.consents.values() {
                 if user_id.as_ref().is_none_or(|uid| uid == &record.user_id) {
                     let dict = PyDict::new(py);
@@ -140,7 +161,12 @@ impl GovernanceEngine {
         })
     }
 
-    fn revoke_consent(&mut self, data_type: String, user_id: String, purpose: String) -> PyResult<bool> {
+    fn revoke_consent(
+        &mut self,
+        data_type: String,
+        user_id: String,
+        purpose: String,
+    ) -> PyResult<bool> {
         let id = format!("{}:{}:{}", user_id, data_type, purpose);
         if let Some(record) = self.consents.get_mut(&id) {
             record.granted = false;

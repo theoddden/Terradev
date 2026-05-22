@@ -3,12 +3,12 @@
 mod lock;
 mod types;
 
+use chrono::Utc;
 use lock::DistributedLock;
 use pyo3::prelude::*;
-use types::{LockGrant, LockRequest};
-use chrono::Utc;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
+use types::{LockGrant, LockRequest};
 
 #[pymodule]
 fn terradev_distributed_lock(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -35,7 +35,7 @@ impl PyDistributedLock {
             runtime,
         }
     }
-    
+
     fn acquire(&self, key: String, holder: String, ttl_seconds: u64) -> PyResult<PyLockGrant> {
         let request = LockRequest {
             key: key.clone(),
@@ -43,32 +43,43 @@ impl PyDistributedLock {
             ttl_seconds,
             requested_at: Utc::now(),
         };
-        
-        let grant = self.runtime.block_on(self.inner.acquire(request))
+
+        let grant = self
+            .runtime
+            .block_on(self.inner.acquire(request))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(grant.into())
     }
-    
+
     fn release(&self, key: String, holder: String, lease_id: String) -> PyResult<()> {
-        self.runtime.block_on(self.inner.release(&key, &holder, &lease_id))
+        self.runtime
+            .block_on(self.inner.release(&key, &holder, &lease_id))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(())
     }
-    
-    fn renew(&self, key: String, holder: String, lease_id: String, ttl_seconds: u64) -> PyResult<PyLockGrant> {
-        let grant = self.runtime.block_on(self.inner.renew(&key, &holder, &lease_id, ttl_seconds))
+
+    fn renew(
+        &self,
+        key: String,
+        holder: String,
+        lease_id: String,
+        ttl_seconds: u64,
+    ) -> PyResult<PyLockGrant> {
+        let grant = self
+            .runtime
+            .block_on(self.inner.renew(&key, &holder, &lease_id, ttl_seconds))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(grant.into())
     }
-    
+
     fn is_held(&self, key: String) -> PyResult<bool> {
         Ok(self.runtime.block_on(self.inner.is_held(&key)))
     }
-    
+
     fn get_holder(&self, key: String) -> PyResult<Option<String>> {
         Ok(self.runtime.block_on(self.inner.get_holder(&key)))
     }
-    
+
     fn cleanup_expired(&self) -> PyResult<usize> {
         Ok(self.runtime.block_on(self.inner.cleanup_expired()))
     }

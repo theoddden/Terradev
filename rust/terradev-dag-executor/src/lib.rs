@@ -1,14 +1,14 @@
 #![allow(non_local_definitions)]
 
-use petgraph::graph::{DiGraph, NodeIndex};
+use crossbeam::thread;
+use parking_lot::RwLock;
 use petgraph::algo::toposort;
+use petgraph::graph::{DiGraph, NodeIndex};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
-use crossbeam::thread;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DAGNode {
@@ -63,7 +63,7 @@ impl DAGExecutor {
             let cpu_count = num_cpus::get();
             (cpu_count * 2).clamp(4, 32)
         });
-        
+
         Self {
             name,
             nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -71,43 +71,43 @@ impl DAGExecutor {
         }
     }
 
-    fn add_node(
-        &self,
-        name: String,
-        dependencies: Option<Vec<String>>,
-    ) -> PyResult<()> {
+    fn add_node(&self, name: String, dependencies: Option<Vec<String>>) -> PyResult<()> {
         let mut nodes = self.nodes.write();
         if nodes.contains_key(&name) {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Node '{}' already exists in DAG '{}'", name, self.name)
-            ));
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Node '{}' already exists in DAG '{}'",
+                name, self.name
+            )));
         }
-        
-        nodes.insert(name.clone(), DAGNode {
-            name: name.clone(),
-            dependencies: dependencies.unwrap_or_default(),
-            output: None,
-            status: "pending".to_string(),
-            latency_ms: 0.0,
-            error: None,
-        });
+
+        nodes.insert(
+            name.clone(),
+            DAGNode {
+                name: name.clone(),
+                dependencies: dependencies.unwrap_or_default(),
+                output: None,
+                status: "pending".to_string(),
+                latency_ms: 0.0,
+                error: None,
+            },
+        );
         Ok(())
     }
 
     fn plan(&self) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let nodes = self.nodes.read();
-            
+
             // Build dependency graph
             let mut graph = DiGraph::new();
             let mut node_indices: HashMap<String, NodeIndex> = HashMap::new();
-            
+
             // Add all nodes
             for name in nodes.keys() {
                 let idx = graph.add_node(name.clone());
                 node_indices.insert(name.clone(), idx);
             }
-            
+
             // Add edges
             for (name, node) in nodes.iter() {
                 if let Some(from_idx) = node_indices.get(name) {
@@ -118,22 +118,23 @@ impl DAGExecutor {
                     }
                 }
             }
-            
+
             // Topological sort
             let _sorted = match toposort(&graph, None) {
                 Ok(sorted) => sorted,
                 Err(_) => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        format!("Cycle detected in DAG '{}'", self.name)
-                    ));
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Cycle detected in DAG '{}'",
+                        self.name
+                    )));
                 }
             };
-            
+
             // Build execution waves
             let mut waves: Vec<ExecutionWave> = Vec::new();
             let mut in_degree: HashMap<String, usize> = HashMap::new();
             let mut forward: HashMap<String, Vec<String>> = HashMap::new();
-            
+
             // Initialize in-degree
             for (name, node) in nodes.iter() {
                 in_degree.insert(name.clone(), node.dependencies.len());
@@ -141,24 +142,25 @@ impl DAGExecutor {
                     forward.entry(dep.clone()).or_default().push(name.clone());
                 }
             }
-            
+
             // Kahn's algorithm
-            let mut queue: Vec<String> = nodes.keys()
+            let mut queue: Vec<String> = nodes
+                .keys()
                 .filter(|k| in_degree.get(*k) == Some(&0))
                 .cloned()
                 .collect();
-            
+
             let mut depth = 0;
             let mut processed = 0;
-            
+
             while !queue.is_empty() {
                 waves.push(ExecutionWave {
                     depth,
                     nodes: queue.clone(),
                 });
-                
+
                 let mut next_queue: Vec<String> = Vec::new();
-                
+
                 for name in &queue {
                     processed += 1;
                     if let Some(successors) = forward.get(name) {
@@ -176,28 +178,29 @@ impl DAGExecutor {
                 queue = next_queue;
                 depth += 1;
             }
-            
+
             if processed != nodes.len() {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    format!("DAG '{}' has unreachable nodes", self.name)
-                ));
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "DAG '{}' has unreachable nodes",
+                    self.name
+                )));
             }
-            
+
             let max_parallelism = waves.iter().map(|w| w.nodes.len()).max().unwrap_or(0);
-            
+
             let plan = ExecutionPlan {
                 waves,
                 total_nodes: nodes.len(),
                 max_parallelism,
                 critical_path_depth: depth,
             };
-            
+
             let dict = PyDict::new(py);
             dict.set_item("waves", serde_json::to_string(&plan.waves).unwrap())?;
             dict.set_item("total_nodes", plan.total_nodes)?;
             dict.set_item("max_parallelism", plan.max_parallelism)?;
             dict.set_item("critical_path_depth", plan.critical_path_depth)?;
-            
+
             Ok(dict.into())
         })
     }
@@ -206,24 +209,27 @@ impl DAGExecutor {
         Python::with_gil(|py| {
             let plan = self.plan()?;
             let plan_dict: &PyDict = plan.extract(py)?;
-            
+
             let waves_json: String = match plan_dict.get_item("waves") {
                 Ok(Some(w)) => w.extract::<&str>()?.to_string(),
                 Ok(None) => return Err(pyo3::exceptions::PyKeyError::new_err("waves not found")),
                 Err(_) => return Err(pyo3::exceptions::PyKeyError::new_err("waves not found")),
             };
             let waves: Vec<ExecutionWave> = serde_json::from_str(&waves_json).unwrap();
-            
-            let mut context: HashMap<String, serde_json::Value> = if let Some(ctx) = initial_context {
+
+            let mut context: HashMap<String, serde_json::Value> = if let Some(ctx) = initial_context
+            {
                 let mut ctx_map = HashMap::new();
                 for (key, value) in ctx.iter() {
                     if let Ok(key_str) = key.extract::<String>() {
                         if let Ok(value_str) = value.extract::<String>() {
-                            if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&value_str) {
-                                ctx_map.insert(key_str, json_val);
-                            }
+                    if let Ok(json_val) =
+                        serde_json::from_str::<serde_json::Value>(&value_str)
+                    {
+                            ctx_map.insert(key_str, json_val);
                         }
                     }
+                }
                 }
                 ctx_map
             } else {
@@ -240,40 +246,43 @@ impl DAGExecutor {
                 parallelism_achieved: 0.0,
                 errors: HashMap::new(),
             };
-            
+
             let nodes = self.nodes.clone();
-            
+
             for wave in waves {
                 let mut wave_results: HashMap<String, (serde_json::Value, f64)> = HashMap::new();
-                
+
                 let _ = thread::scope(|s| {
-                    let handles: Vec<_> = wave.nodes.iter().map(|node_name| {
+                    let handles: Vec<_> = wave
+                        .nodes
+                        .iter()
+                        .map(|node_name| {
                         let nodes_ref = nodes.clone();
                         let node_name = node_name.clone();
                         s.spawn(move |_| {
                             let nodes = nodes_ref.read();
                             let _node = nodes.get(&node_name).unwrap();
-                            
+
                             let start = std::time::Instant::now();
-                            
+
                             // Simulate node execution (in real implementation, this would call Python callable)
                             let output = serde_json::json!({
                                 "node": node_name,
                                 "status": "done"
                             });
-                            
+
                             let latency = start.elapsed().as_secs_f64() * 1000.0;
-                            
+
                             (node_name, output, latency)
                         })
-                    }).collect();
+                        .collect();
                     
                     for handle in handles {
                         let (name, output, latency) = handle.join().unwrap();
                         wave_results.insert(name, (output, latency));
                     }
                 });
-                
+
                 // Merge wave results into context
                 for (name, (output, latency)) in wave_results {
                     context.insert(name.clone(), output.clone());
@@ -282,23 +291,33 @@ impl DAGExecutor {
                     result.node_statuses.insert(name, "done".to_string());
                 }
             }
-            
+
             let wall_ms = wall_start.elapsed().as_secs_f64() * 1000.0;
             let total_node_ms: f64 = result.node_latencies.values().sum();
-            
+
             result.wall_clock_ms = wall_ms;
             result.total_latency_ms = total_node_ms;
-            result.parallelism_achieved = if wall_ms > 0.0 { total_node_ms / wall_ms } else { 1.0 };
-            
+            result.parallelism_achieved = if wall_ms > 0.0 {
+                total_node_ms / wall_ms
+            } else {
+                1.0
+            };
+
             let dict = PyDict::new(py);
             dict.set_item("outputs", serde_json::to_string(&result.outputs).unwrap())?;
-            dict.set_item("node_latencies", serde_json::to_string(&result.node_latencies).unwrap())?;
-            dict.set_item("node_statuses", serde_json::to_string(&result.node_statuses).unwrap())?;
+            dict.set_item(
+                "node_latencies",
+                serde_json::to_string(&result.node_latencies).unwrap(),
+            )?;
+            dict.set_item(
+                "node_statuses",
+                serde_json::to_string(&result.node_statuses).unwrap(),
+            )?;
             dict.set_item("total_latency_ms", result.total_latency_ms)?;
             dict.set_item("wall_clock_ms", result.wall_clock_ms)?;
             dict.set_item("parallelism_achieved", result.parallelism_achieved)?;
             dict.set_item("errors", serde_json::to_string(&result.errors).unwrap())?;
-            
+
             Ok(dict.into())
         })
     }

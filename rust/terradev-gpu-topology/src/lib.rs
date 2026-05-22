@@ -5,7 +5,7 @@ mod types;
 
 use pyo3::prelude::*;
 use topology::GPUNICOptimizer;
-use types::{GPUDevice, NICDevice, GPUNICPair, PciLocality};
+use types::{GPUDevice, GPUNICPair, NICDevice, PciLocality};
 
 #[pymodule]
 fn terradev_gpu_topology(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -28,11 +28,15 @@ impl PyGPUNICOptimizer {
     fn new() -> Self {
         Self
     }
-    
-    fn compute_optimal_pairs(&self, gpus: Vec<PyGPUDevice>, nics: Vec<PyNICDevice>) -> Vec<PyGPUNICPair> {
+
+    fn compute_optimal_pairs(
+        &self,
+        gpus: Vec<PyGPUDevice>,
+        nics: Vec<PyNICDevice>,
+    ) -> Vec<PyGPUNICPair> {
         let gpu_devices: Vec<GPUDevice> = gpus.into_iter().map(|g| g.into()).collect();
         let nic_devices: Vec<NICDevice> = nics.into_iter().map(|n| n.into()).collect();
-        
+
         GPUNICOptimizer::compute_optimal_pairs(gpu_devices, nic_devices)
             .into_iter()
             .map(|p| p.into())

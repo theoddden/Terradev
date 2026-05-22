@@ -15,11 +15,11 @@ impl DistributedLock {
             locks: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-    
+
     pub async fn acquire(&self, request: LockRequest) -> Result<LockGrant, LockError> {
         let mut locks = self.locks.write();
         let now = Utc::now();
-        
+
         // Check if lock exists and is still valid
         if let Some(existing) = locks.get(&request.key) {
             if existing.expires_at > now {
@@ -30,7 +30,7 @@ impl DistributedLock {
             // Lock expired, remove it
             locks.remove(&request.key);
         }
-        
+
         // Grant new lock
         let lease_id = Uuid::new_v4().to_string();
         let grant = LockGrant {
@@ -40,14 +40,14 @@ impl DistributedLock {
             expires_at: now + Duration::seconds(request.ttl_seconds as i64),
             lease_id: lease_id.clone(),
         };
-        
+
         locks.insert(request.key, grant.clone());
         Ok(grant)
     }
-    
+
     pub async fn release(&self, key: &str, holder: &str, lease_id: &str) -> Result<(), LockError> {
         let mut locks = self.locks.write();
-        
+
         if let Some(lock) = locks.get(key) {
             if lock.holder != holder {
                 return Err(LockError::InvalidHolder {
@@ -67,18 +67,24 @@ impl DistributedLock {
             })
         }
     }
-    
-    pub async fn renew(&self, key: &str, holder: &str, lease_id: &str, ttl_seconds: u64) -> Result<LockGrant, LockError> {
+
+    pub async fn renew(
+        &self,
+        key: &str,
+        holder: &str,
+        lease_id: &str,
+        ttl_seconds: u64,
+    ) -> Result<LockGrant, LockError> {
         let mut locks = self.locks.write();
         let now = Utc::now();
-        
+
         if let Some(lock) = locks.get(key) {
             if lock.holder != holder || lock.lease_id != lease_id {
                 return Err(LockError::InvalidHolder {
                     holder: holder.to_string(),
                 });
             }
-            
+
             let renewed = LockGrant {
                 key: key.to_string(),
                 holder: holder.to_string(),
@@ -86,7 +92,7 @@ impl DistributedLock {
                 expires_at: now + Duration::seconds(ttl_seconds as i64),
                 lease_id: lease_id.to_string(),
             };
-            
+
             locks.insert(key.to_string(), renewed.clone());
             Ok(renewed)
         } else {
@@ -95,22 +101,22 @@ impl DistributedLock {
             })
         }
     }
-    
+
     pub async fn is_held(&self, key: &str) -> bool {
         let locks = self.locks.read();
         let now = Utc::now();
-        
+
         if let Some(lock) = locks.get(key) {
             lock.expires_at > now
         } else {
             false
         }
     }
-    
+
     pub async fn get_holder(&self, key: &str) -> Option<String> {
         let locks = self.locks.read();
         let now = Utc::now();
-        
+
         if let Some(lock) = locks.get(key) {
             if lock.expires_at > now {
                 Some(lock.holder.clone())
@@ -121,22 +127,22 @@ impl DistributedLock {
             None
         }
     }
-    
+
     pub async fn cleanup_expired(&self) -> usize {
         let mut locks = self.locks.write();
         let now = Utc::now();
-        
+
         let expired: Vec<String> = locks
             .iter()
             .filter(|(_, lock)| lock.expires_at <= now)
             .map(|(key, _)| key.clone())
             .collect();
-        
+
         let count = expired.len();
         for key in expired {
             locks.remove(&key);
         }
-        
+
         count
     }
 }

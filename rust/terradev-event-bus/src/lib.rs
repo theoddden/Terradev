@@ -28,20 +28,21 @@ impl PyEventBus {
             inner: EventBus::new(),
         }
     }
-    
+
     fn publish(&self, event: PyEvent) -> PyResult<()> {
-        self.inner.publish(event.into())
+        self.inner
+            .publish(event.into())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
-    
+
     fn subscribe(&self) -> String {
         self.inner.subscribe()
     }
-    
+
     fn unsubscribe(&self, id: String) {
         self.inner.unsubscribe(&id)
     }
-    
+
     fn subscriber_count(&self) -> usize {
         self.inner.subscriber_count()
     }
@@ -98,7 +99,11 @@ impl From<PyEvent> for Event {
                 }
                 "resource_acquired" => {
                     let data: PyObject = p.data;
-                    let resource_id = data.getattr(py, "resource_id").unwrap().extract(py).unwrap();
+                    let resource_id = data
+                        .getattr(py, "resource_id")
+                        .unwrap()
+                        .extract(py)
+                        .unwrap();
                     Event::ResourceAcquired {
                         resource_id,
                         timestamp: chrono::Utc::now(),
@@ -106,7 +111,11 @@ impl From<PyEvent> for Event {
                 }
                 "resource_released" => {
                     let data: PyObject = p.data;
-                    let resource_id = data.getattr(py, "resource_id").unwrap().extract(py).unwrap();
+                    let resource_id = data
+                        .getattr(py, "resource_id")
+                        .unwrap()
+                        .extract(py)
+                        .unwrap();
                     Event::ResourceReleased {
                         resource_id,
                         timestamp: chrono::Utc::now(),
@@ -119,7 +128,10 @@ impl From<PyEvent> for Event {
                         let data_str = if let Ok(repr) = py_obj.repr() {
                             repr.to_string()
                         } else {
-                            py_obj.str().unwrap_or_else(|_| pyo3::types::PyString::new(py, "null")).to_string()
+                            py_obj
+                                .str()
+                                .unwrap_or_else(|_| pyo3::types::PyString::new(py, "null"))
+                                .to_string()
                         };
                         serde_json::to_value(data_str).unwrap_or(serde_json::Value::Null)
                     });

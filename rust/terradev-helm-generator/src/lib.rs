@@ -2,7 +2,7 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use tera::{Tera, Context};
+use tera::{Context, Tera};
 
 #[pyclass]
 pub struct HelmGenerator {
@@ -25,7 +25,8 @@ impl HelmGenerator {
     }
 
     fn add_template(&mut self, name: String, content: String) -> PyResult<()> {
-        self.tera.add_raw_template(&name, &content)
+        self.tera
+            .add_raw_template(&name, &content)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(())
     }
@@ -41,7 +42,8 @@ impl HelmGenerator {
             }
         }
 
-        self.tera.render(&name, &ctx)
+        self.tera
+            .render(&name, &ctx)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
 

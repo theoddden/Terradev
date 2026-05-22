@@ -22,15 +22,19 @@ pub struct LockGrant {
 #[derive(Debug, Error)]
 pub enum LockError {
     #[error("Lock already held by {holder}")]
-    AlreadyHeld { holder: String },
-    
+    AlreadyHeld {
+        holder: String,
+    },
+
     #[error("Lock not found: {key}")]
-    NotFound { key: String },
-    
+    NotFound {
+        key: String,
+    },
+
     #[error("Lock expired")]
     #[allow(dead_code)]
     Expired,
-    
-    #[error("Invalid holder: {holder}")]
+
+    #[error("Invalid holder: {holder}")]]
     InvalidHolder { holder: String },
 }

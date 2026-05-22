@@ -197,20 +197,29 @@ impl PyGPUDiscovery {
 
         Python::with_gil(|py| {
             let dict = pyo3::types::PyDict::new(py);
-            
-            let gpu_list = pyo3::types::PyList::new(py, state.gpus.iter().map(|gpu| {
-                let gpu_dict = pyo3::types::PyDict::new(py);
-                gpu_dict.set_item("index", gpu.index).unwrap();
-                gpu_dict.set_item("name", &gpu.name).unwrap();
-                gpu_dict.set_item("memory_total", gpu.memory_total).unwrap();
-                gpu_dict.set_item("memory_free", gpu.memory_free).unwrap();
-                gpu_dict.set_item("compute_capability", &gpu.compute_capability).unwrap();
-                gpu_dict.set_item("pci_bus_id", &gpu.pci_bus_id).unwrap();
-                gpu_dict.set_item("driver_version", &gpu.driver_version).unwrap();
-                gpu_dict.set_item("cuda_version", &gpu.cuda_version).unwrap();
-                gpu_dict.to_object(py)
-            }));
-            
+
+            let gpu_list = pyo3::types::PyList::new(
+                py,
+                state.gpus.iter().map(|gpu| {
+                    let gpu_dict = pyo3::types::PyDict::new(py);
+                    gpu_dict.set_item("index", gpu.index).unwrap();
+                    gpu_dict.set_item("name", &gpu.name).unwrap();
+                    gpu_dict.set_item("memory_total", gpu.memory_total).unwrap();
+                    gpu_dict.set_item("memory_free", gpu.memory_free).unwrap();
+                    gpu_dict
+                        .set_item("compute_capability", &gpu.compute_capability)
+                        .unwrap();
+                    gpu_dict.set_item("pci_bus_id", &gpu.pci_bus_id).unwrap();
+                    gpu_dict
+                        .set_item("driver_version", &gpu.driver_version)
+                        .unwrap();
+                    gpu_dict
+                        .set_item("cuda_version", &gpu.cuda_version)
+                        .unwrap();
+                    gpu_dict.to_object(py)
+                }),
+            );
+
             dict.set_item("gpus", gpu_list)?;
             dict.set_item("total_count", state.total_count)?;
             dict.set_item("total_memory", state.total_memory)?;
