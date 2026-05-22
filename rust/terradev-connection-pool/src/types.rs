@@ -20,4 +20,5 @@ pub enum PoolError {
 
     #[allow(dead_code)]
     #[error("Invalid configuration")]
+    InvalidConfig,
 }
