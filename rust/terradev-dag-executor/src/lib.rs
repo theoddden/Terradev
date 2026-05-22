@@ -61,7 +61,7 @@ impl DAGExecutor {
     fn new(name: String, max_workers: Option<usize>) -> Self {
         let max_workers = max_workers.unwrap_or_else(|| {
             let cpu_count = num_cpus::get();
-            std::cmp::min(32, std::cmp::max(4, cpu_count * 2))
+            (cpu_count * 2).clamp(4, 32)
         });
         
         Self {
