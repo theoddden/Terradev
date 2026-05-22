@@ -164,13 +164,14 @@ impl MCPCodec {
                                         vec![]
                                     };
                                 (tuple.0, content_vec, tuple.2)
-                    } else {
-                        (String::new(), vec![], false)
-                    }
-                }).collect()
-            } else {
-                vec![]
-            };
+                            } else {
+                                (String::new(), vec![], false)
+                            }
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                };
 
             let mcp_results: Vec<MCPToolResult> = results_vec
                 .into_iter()
