@@ -1,6 +1,6 @@
 # Terradev CLI v5.1.2
 
-**Open Source BYOAPI Multi-Cloud GPU Infrastructure Platform**
+**An imperative command-line-interface for AI workload orchestration.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
