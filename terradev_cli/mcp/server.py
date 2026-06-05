@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Terradev MCP Server v2.0.9 - Complete Agentic GPU Infrastructure for Claude Code
+Terradev MCP Server v2.1.0 - Complete Agentic GPU Infrastructure for Claude Code
 
-298 MCP tools: GPU provisioning, Kubernetes clusters, Karpenter auto-provisioning, 
+223 MCP tools: GPU provisioning, Kubernetes clusters, Karpenter auto-provisioning,
 GitOps/ArgoCD automation, event-driven triggers, environment promotion, lineage tracking,
-cross-provider migration, vLLM/SGLang/Ollama inference, Arize Phoenix trace observability, 
-NeMo Guardrails output safety, Qdrant vector DB, Ray cluster management, W&B/LangSmith/MLflow/DVC, 
+cross-provider migration, vLLM/SGLang/Ollama inference, Arize Phoenix trace observability,
+NeMo Guardrails output safety, Qdrant vector DB, Ray cluster management, W&B/LangSmith/MLflow/DVC,
 HuggingFace Hub, Datadog monitoring, data governance, cost optimization, FlashOptim training,
+Langfuse LLM observability, Databricks MLOps, vLLM auto-optimization/analysis/benchmarking,
 Enterprise SSO, Latitude.sh provider, and Terraform-powered parallel provisioning across 20 cloud providers.
 """
 
@@ -3555,6 +3556,279 @@ _ALL_TOOLS = [
         ),
         # ── v5.3.0: New v4.0.11 Features - Karpenter, Triggers, Environments, Lineage, Migration ──
         # Note: ALL_NEW_TOOLS removed - mcp_new_features_tools module not available
+
+        # ── v5.4.0: Langfuse LLM Observability ────────────────────────────────────
+        Tool(
+            name="langfuse_configure",
+            description="Configure Langfuse credentials (public key, secret key, host URL).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "public_key": {"type": "string", "description": "Langfuse public key (pk-lf-...)"},
+                    "secret_key": {"type": "string", "description": "Langfuse secret key (sk-lf-...)"},
+                    "host": {"type": "string", "description": "Langfuse host URL", "default": "https://cloud.langfuse.com"},
+                },
+                "required": ["public_key", "secret_key"],
+            }
+        ),
+        Tool(
+            name="langfuse_test",
+            description="Test Langfuse connectivity and list accessible projects.",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        Tool(
+            name="langfuse_traces",
+            description="List recent LLM traces from Langfuse.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Max traces to return", "default": 20},
+                    "name": {"type": "string", "description": "Filter by trace name"},
+                }
+            }
+        ),
+        Tool(
+            name="langfuse_trace",
+            description="Get a single Langfuse trace with all observations/spans.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "trace_id": {"type": "string", "description": "Trace ID"},
+                },
+                "required": ["trace_id"],
+            }
+        ),
+        Tool(
+            name="langfuse_scores",
+            description="List evaluation scores from Langfuse, optionally filtered by trace or score name.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "trace_id": {"type": "string", "description": "Filter by trace ID"},
+                    "name": {"type": "string", "description": "Filter by score name"},
+                    "limit": {"type": "integer", "description": "Max scores to return", "default": 50},
+                }
+            }
+        ),
+        Tool(
+            name="langfuse_score",
+            description="Create an evaluation score for a Langfuse trace (e.g. quality, accuracy, relevance).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "trace_id": {"type": "string", "description": "Trace ID to score"},
+                    "name": {"type": "string", "description": "Score name (e.g. quality, accuracy)"},
+                    "value": {"type": "number", "description": "Numeric score value"},
+                    "observation_id": {"type": "string", "description": "Specific observation to score"},
+                    "comment": {"type": "string", "description": "Optional comment"},
+                },
+                "required": ["trace_id", "name", "value"],
+            }
+        ),
+        Tool(
+            name="langfuse_datasets",
+            description="List Langfuse datasets for evaluation and fine-tuning.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Max datasets to return", "default": 20},
+                }
+            }
+        ),
+        Tool(
+            name="langfuse_export_training_data",
+            description="Export Langfuse traces as instruction/response pairs for LoRA fine-tuning. Filters by quality score.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Max pairs to export", "default": 500},
+                    "name": {"type": "string", "description": "Filter traces by name"},
+                    "min_score": {"type": "number", "description": "Minimum quality score (0.0-1.0)"},
+                    "score_name": {"type": "string", "description": "Score name to filter on", "default": "quality"},
+                }
+            }
+        ),
+        Tool(
+            name="langfuse_quality",
+            description="Get aggregated quality metrics from Langfuse scores for drift detection.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "score_name": {"type": "string", "description": "Score name to aggregate", "default": "quality"},
+                    "limit": {"type": "integer", "description": "Sample size", "default": 200},
+                }
+            }
+        ),
+        Tool(
+            name="langfuse_otel_env",
+            description="Print OTEL environment variables for instrumenting LLM apps to send traces to Langfuse.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Langfuse project name", "default": "default"},
+                }
+            }
+        ),
+        Tool(
+            name="langfuse_k8s",
+            description="Generate Kubernetes deployment manifest for self-hosted Langfuse.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "namespace": {"type": "string", "description": "K8s namespace", "default": "observability"},
+                }
+            }
+        ),
+
+        # ── v5.4.0: Databricks MLOps ──────────────────────────────────────────────
+        Tool(
+            name="databricks_configure",
+            description="Configure Databricks credentials (workspace URL and personal access token).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "host": {"type": "string", "description": "Databricks workspace URL (e.g. https://adb-xxx.azuredatabricks.net)"},
+                    "token": {"type": "string", "description": "Databricks personal access token (dapi...)"},
+                },
+                "required": ["host", "token"],
+            }
+        ),
+        Tool(
+            name="databricks_test",
+            description="Test Databricks connectivity and show cluster count.",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        Tool(
+            name="databricks_jobs",
+            description="List Databricks jobs in the workspace.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Max jobs to return", "default": 25},
+                }
+            }
+        ),
+        Tool(
+            name="databricks_run",
+            description="Trigger a Databricks job run by job ID.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "integer", "description": "Databricks job ID"},
+                },
+                "required": ["job_id"],
+            }
+        ),
+        Tool(
+            name="databricks_run_status",
+            description="Get status of a Databricks job run by run ID.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "run_id": {"type": "integer", "description": "Databricks run ID"},
+                },
+                "required": ["run_id"],
+            }
+        ),
+        Tool(
+            name="databricks_clusters",
+            description="List all Databricks clusters with state and node type.",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        Tool(
+            name="databricks_serving_endpoints",
+            description="List Databricks model serving endpoints.",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        Tool(
+            name="databricks_deploy_model",
+            description="Deploy a registered MLflow model to a Databricks serving endpoint.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint_name": {"type": "string", "description": "Serving endpoint name"},
+                    "model_name": {"type": "string", "description": "Registered model name"},
+                    "model_version": {"type": "string", "description": "Model version", "default": "1"},
+                    "workload_size": {"type": "string", "enum": ["Small", "Medium", "Large"], "default": "Small"},
+                    "scale_to_zero": {"type": "boolean", "default": True},
+                },
+                "required": ["endpoint_name", "model_name"],
+            }
+        ),
+        Tool(
+            name="databricks_query",
+            description="Query a Databricks model serving endpoint with a prompt.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {"type": "string", "description": "Serving endpoint name"},
+                    "prompt": {"type": "string", "description": "Prompt text"},
+                },
+                "required": ["endpoint", "prompt"],
+            }
+        ),
+        Tool(
+            name="databricks_mlflow_experiments",
+            description="List MLflow experiments in Databricks workspace.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Max experiments to return", "default": 50},
+                }
+            }
+        ),
+        Tool(
+            name="databricks_mlflow_models",
+            description="List registered models in the Databricks MLflow Model Registry.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Max models to return", "default": 50},
+                }
+            }
+        ),
+
+        # ── v5.4.0: vLLM Extended ─────────────────────────────────────────────────
+        Tool(
+            name="vllm_auto_optimize",
+            description="Automatically optimize vLLM configuration by analyzing workload patterns. Selects optimal settings for the 6 critical knobs based on live endpoint metrics or sample request files.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string", "description": "Model name"},
+                    "endpoint": {"type": "string", "description": "Running vLLM endpoint to analyze (e.g. http://localhost:8000)"},
+                    "gpu_count": {"type": "integer", "description": "Number of GPUs available", "default": 1},
+                    "output": {"type": "string", "enum": ["config", "args", "helm"], "default": "config"},
+                },
+                "required": ["model"],
+            }
+        ),
+        Tool(
+            name="vllm_analyze",
+            description="Analyze a running vLLM server's workload and return specific optimization recommendations with before/after comparisons.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {"type": "string", "description": "vLLM endpoint URL (e.g. http://localhost:8000)"},
+                    "duration": {"type": "integer", "description": "Analysis duration in seconds", "default": 60},
+                },
+                "required": ["endpoint"],
+            }
+        ),
+        Tool(
+            name="vllm_benchmark",
+            description="Benchmark a vLLM endpoint with concurrent requests. Returns throughput (req/s), success rate, and total latency.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {"type": "string", "description": "vLLM endpoint URL"},
+                    "concurrent": {"type": "integer", "description": "Number of concurrent requests", "default": 1},
+                    "prompt": {"type": "string", "description": "Test prompt", "default": "Explain quantum computing in simple terms."},
+                    "api_key": {"type": "string", "description": "vLLM API key (if auth enabled)"},
+                },
+                "required": ["endpoint"],
+            }
+        ),
 ]
 
 # Pre-compress at module load — cached for all subsequent list_tools calls
@@ -3833,6 +4107,34 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "qdrant_k8s": ["qdrant", "k8s"],
             # v5.3.0: New v4.0.11 Features - Karpenter, Triggers, Environments, Lineage, Migration
                 **NEW_COMMAND_MAP,
+            # v5.4.0: Langfuse LLM Observability
+                "langfuse_configure": ["langfuse", "configure"],
+                "langfuse_test": ["langfuse", "test"],
+                "langfuse_traces": ["langfuse", "traces"],
+                "langfuse_trace": ["langfuse", "trace"],
+                "langfuse_scores": ["langfuse", "scores"],
+                "langfuse_score": ["langfuse", "score"],
+                "langfuse_datasets": ["langfuse", "datasets"],
+                "langfuse_export_training_data": ["langfuse", "export-training-data"],
+                "langfuse_quality": ["langfuse", "quality"],
+                "langfuse_otel_env": ["langfuse", "otel-env"],
+                "langfuse_k8s": ["langfuse", "k8s"],
+            # v5.4.0: Databricks MLOps
+                "databricks_configure": ["databricks", "configure"],
+                "databricks_test": ["databricks", "test"],
+                "databricks_jobs": ["databricks", "jobs"],
+                "databricks_run": ["databricks", "run"],
+                "databricks_run_status": ["databricks", "run-status"],
+                "databricks_clusters": ["databricks", "clusters"],
+                "databricks_serving_endpoints": ["databricks", "serving-endpoints"],
+                "databricks_deploy_model": ["databricks", "deploy-model"],
+                "databricks_query": ["databricks", "query"],
+                "databricks_mlflow_experiments": ["databricks", "mlflow", "experiments"],
+                "databricks_mlflow_models": ["databricks", "mlflow", "models"],
+            # v5.4.0: vLLM Extended
+                "vllm_auto_optimize": ["vllm", "auto-optimize"],
+                "vllm_analyze": ["vllm", "analyze"],
+                "vllm_benchmark": ["vllm", "benchmark"],
                 # v4.0.12: New ML Services and Enhanced Features
                 "phoenix": ["phoenix"],
                 "guardrails": ["guardrails"],
@@ -7897,6 +8199,145 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     cmd_args.extend(["--metrics", ",".join(arguments["metrics"])])
                 if arguments.get("duration"):
                     cmd_args.extend(["--duration", arguments["duration"]])
+
+            # ── v5.4.0: Langfuse Argument Builders ───────────────────────────────
+
+            elif tool_name == "langfuse_configure":
+                cmd_args.extend(["--public-key", arguments["public_key"],
+                                  "--secret-key", arguments["secret_key"]])
+                if arguments.get("host"):
+                    cmd_args.extend(["--host", arguments["host"]])
+
+            elif tool_name == "langfuse_traces":
+                cmd_args.extend(["--format", "json"])
+                if arguments.get("limit"):
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
+                if arguments.get("name"):
+                    cmd_args.extend(["--name", arguments["name"]])
+
+            elif tool_name == "langfuse_trace":
+                cmd_args.append(arguments["trace_id"])
+                cmd_args.extend(["--format", "json"])
+
+            elif tool_name == "langfuse_scores":
+                cmd_args.extend(["--format", "json"])
+                if arguments.get("trace_id"):
+                    cmd_args.extend(["--trace-id", arguments["trace_id"]])
+                if arguments.get("name"):
+                    cmd_args.extend(["--name", arguments["name"]])
+                if arguments.get("limit"):
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
+
+            elif tool_name == "langfuse_score":
+                cmd_args.extend([
+                    "--trace-id", arguments["trace_id"],
+                    "--name", arguments["name"],
+                    "--value", str(arguments["value"]),
+                ])
+                if arguments.get("observation_id"):
+                    cmd_args.extend(["--observation-id", arguments["observation_id"]])
+                if arguments.get("comment"):
+                    cmd_args.extend(["--comment", arguments["comment"]])
+
+            elif tool_name == "langfuse_datasets":
+                cmd_args.extend(["--format", "json"])
+                if arguments.get("limit"):
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
+
+            elif tool_name == "langfuse_export_training_data":
+                if arguments.get("limit"):
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
+                if arguments.get("name"):
+                    cmd_args.extend(["--name", arguments["name"]])
+                if arguments.get("min_score") is not None:
+                    cmd_args.extend(["--min-score", str(arguments["min_score"])])
+                if arguments.get("score_name"):
+                    cmd_args.extend(["--score-name", arguments["score_name"]])
+
+            elif tool_name == "langfuse_quality":
+                cmd_args.extend(["--format", "json"])
+                if arguments.get("score_name"):
+                    cmd_args.extend(["--score-name", arguments["score_name"]])
+                if arguments.get("limit"):
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
+
+            elif tool_name == "langfuse_otel_env":
+                if arguments.get("project"):
+                    cmd_args.extend(["--project", arguments["project"]])
+
+            elif tool_name == "langfuse_k8s":
+                if arguments.get("namespace"):
+                    cmd_args.extend(["--namespace", arguments["namespace"]])
+
+            # ── v5.4.0: Databricks Argument Builders ─────────────────────────────
+
+            elif tool_name == "databricks_configure":
+                cmd_args.extend(["--host", arguments["host"],
+                                  "--token", arguments["token"]])
+
+            elif tool_name == "databricks_jobs":
+                cmd_args.extend(["--format", "json"])
+                if arguments.get("limit"):
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
+
+            elif tool_name == "databricks_run":
+                cmd_args.extend([str(arguments["job_id"]), "--format", "json"])
+
+            elif tool_name == "databricks_run_status":
+                cmd_args.extend([str(arguments["run_id"]), "--format", "json"])
+
+            elif tool_name in ("databricks_clusters", "databricks_serving_endpoints"):
+                cmd_args.extend(["--format", "json"])
+
+            elif tool_name == "databricks_deploy_model":
+                cmd_args.extend([
+                    "--endpoint-name", arguments["endpoint_name"],
+                    "--model-name", arguments["model_name"],
+                    "--format", "json",
+                ])
+                if arguments.get("model_version"):
+                    cmd_args.extend(["--model-version", arguments["model_version"]])
+                if arguments.get("workload_size"):
+                    cmd_args.extend(["--workload-size", arguments["workload_size"]])
+                if arguments.get("scale_to_zero") is False:
+                    cmd_args.append("--no-scale-to-zero")
+
+            elif tool_name == "databricks_query":
+                cmd_args.extend([
+                    "--endpoint", arguments["endpoint"],
+                    "--prompt", arguments["prompt"],
+                    "--format", "json",
+                ])
+
+            elif tool_name in ("databricks_mlflow_experiments", "databricks_mlflow_models"):
+                cmd_args.extend(["--format", "json"])
+                if arguments.get("limit"):
+                    cmd_args.extend(["--limit", str(arguments["limit"])])
+
+            # ── v5.4.0: vLLM Extended Argument Builders ──────────────────────────
+
+            elif tool_name == "vllm_auto_optimize":
+                cmd_args.extend(["--model", arguments["model"]])
+                if arguments.get("endpoint"):
+                    cmd_args.extend(["--endpoint", arguments["endpoint"]])
+                if arguments.get("gpu_count"):
+                    cmd_args.extend(["--gpu-count", str(arguments["gpu_count"])])
+                if arguments.get("output"):
+                    cmd_args.extend(["--output", arguments["output"]])
+
+            elif tool_name == "vllm_analyze":
+                cmd_args.extend(["--endpoint", arguments["endpoint"]])
+                if arguments.get("duration"):
+                    cmd_args.extend(["--duration", str(arguments["duration"])])
+
+            elif tool_name == "vllm_benchmark":
+                cmd_args.extend(["--endpoint", arguments["endpoint"]])
+                if arguments.get("concurrent"):
+                    cmd_args.extend(["--concurrent", str(arguments["concurrent"])])
+                if arguments.get("prompt"):
+                    cmd_args.extend(["--prompt", arguments["prompt"]])
+                if arguments.get("api_key"):
+                    cmd_args.extend(["--api-key", arguments["api_key"]])
 
             # Execute the command (generic fallback for simple tools)
             result = await execute_terradev_command(cmd_args)
