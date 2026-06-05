@@ -2,7 +2,7 @@
 """
 Terradev MCP Server v2.1.0 - Complete Agentic GPU Infrastructure for Claude Code
 
-223 MCP tools: GPU provisioning, Kubernetes clusters, Karpenter auto-provisioning,
+218 MCP tools: GPU provisioning, Kubernetes clusters, Karpenter auto-provisioning,
 GitOps/ArgoCD automation, event-driven triggers, environment promotion, lineage tracking,
 cross-provider migration, vLLM/SGLang/Ollama inference, Arize Phoenix trace observability,
 NeMo Guardrails output safety, Qdrant vector DB, Ray cluster management, W&B/LangSmith/MLflow/DVC,
