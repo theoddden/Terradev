@@ -238,9 +238,6 @@ impl JobState {
         match self {
             JobState::Running {
                 created_at,
-                started_at: _,
-                current_step: _,
-                total_steps: _,
                 ..
             } => Ok(JobState::Paused {
                 created_at,
