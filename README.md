@@ -1,4 +1,4 @@
-# Terradev CLI v5.0.2
+# Terradev CLI v5.1.0
 
 **Open Source BYOAPI Multi-Cloud GPU Infrastructure Platform**
 
