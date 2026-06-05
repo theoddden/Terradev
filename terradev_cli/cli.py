@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Terradev CLI - Complete Production Version
-All 12 commands with real provider integration and tier limits (Research/Research+/Enterprise)
 """
 
 import click
@@ -789,14 +788,9 @@ def run_interactive_onboarding(api: TerradevAPI):
 def cli(config=None, verbose=False, skip_onboarding=False):
     """
     Terradev CLI - Cross-Cloud Compute Optimization Platform
-    
+
     Parallel provisioning and orchestration for cross-cloud cost optimization.
     Save 30% on end-to-end compute provisioning costs with real-time cloud arbitrage.
-    
-    Research Tier: 10 provisions/month, 1 server, 1 seat (Free)
-    Research+ Tier: 80 provisions/month, 8 servers, 1 seat, inference ($49.99/month)
-    Enterprise Tier: Unlimited provisions, 32 servers, 5 seats, full provenance ($299.99/month)
-    Enterprise+ Tier: Unlimited everything, 32 GPU min, metered at $0.09/GPU-hr
     """
     # Check for first-time user and trigger onboarding
     if not skip_onboarding and not os.environ.get("TERRADEV_SKIP_ONBOARDING"):
@@ -3705,8 +3699,6 @@ def infer_status(check):
         from core.inference_router import InferenceRouter
     except ImportError:
         print("ERROR: Inference router module not available.")
-        print("   This may require Research+ or Enterprise tier.")
-        print("   Run: terradev upgrade")
         sys.exit(1)
 
     router = InferenceRouter()
@@ -3845,7 +3837,6 @@ def infer_route(model, strategy, measure):
         from core.inference_router import InferenceRouter
     except ImportError:
         print("ERROR: Inference router module not available.")
-        print("   Run: terradev upgrade")
         sys.exit(1)
 
     router = InferenceRouter()
@@ -8393,7 +8384,7 @@ def qdrant_k8s(namespace):
 # Enterprise SSO Commands
 @click.group()
 def sso():
-    """Enterprise SSO authentication (Enterprise tiers only)"""
+    """Enterprise SSO authentication"""
     pass
 
 
@@ -8402,13 +8393,6 @@ def sso_status():
     """Show SSO configuration status"""
     api = TerradevAPI()
 
-    # Tier check removed - SSO available to all users (open source)
-    # if not api._is_enterprise_tier():
-    #     print("ERROR: SSO is available for Enterprise and Enterprise+ tiers only")
-    #     print("   Current tier:", api.tier['name'])
-    #     print("   See https://terradev.cloud/pricing")
-    #     return
-    
     if not api.enterprise_auth:
         print("WARNING:  Enterprise auth not initialized")
         print("   Install enterprise dependencies: pip install terradev-cli[enterprise]")
@@ -8436,14 +8420,7 @@ def sso_status():
 def sso_configure(provider, client_id, client_secret, domain, tenant_id, entity_id, sso_url, certificate):
     """Configure SSO provider"""
     api = TerradevAPI()
-    
-    # Tier check removed - SSO available to all users (open source)
-    # if not api._is_enterprise_tier():
-    #     print("ERROR: SSO is available for Enterprise and Enterprise+ tiers only")
-    #     print("   Current tier:", api.tier['name'])
-    #     print("   See https://terradev.cloud/pricing")
-    #     return
-    
+
     if not api.enterprise_auth:
         print("ERROR: Enterprise auth not initialized")
         print("   Install enterprise dependencies: pip install terradev-cli[enterprise]")
@@ -8515,11 +8492,6 @@ def sso_test(provider):
     """Test SSO provider configuration"""
     api = TerradevAPI()
 
-    # Tier check removed - SSO available to all users (open source)
-    # if not api._is_enterprise_tier():
-    #     print("ERROR: SSO is available for Enterprise and Enterprise+ tiers only")
-    #     return
-    
     if not api.enterprise_auth:
         print("ERROR: Enterprise auth not initialized")
         return
