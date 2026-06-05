@@ -62,7 +62,7 @@ def show_final_status():
     print('   • Southfacing: http://3.235.193.19:8080/southfacing')
     
     print('\n💳 STRIPE INTEGRATION:')
-    print('   • Webhook secret: whsec_sSE09hx8uBoRTURaQ9WxQXhunW9w8wKk')
+    print('   • Webhook secret: Load from STRIPE_WEBHOOK_SECRET env var')
     print('   • Payment endpoints: /create-payment-intent, /upgrade')
     print('   • Subscription checking: /check-subscription')
     

@@ -39,7 +39,7 @@ import os
 app = Flask(__name__)
 
 # Configuration
-STRIPE_WEBHOOK_SECRET = 'whsec_sSE09hx8uBoRTURaQ9WxQXhunW9w8wKk'
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', 'whsec_REPLACE_ME')
 PRICING_TIERS = {
     'research': {'price': 999, 'name': 'Research Tier', 'requests': 100},
     'professional': {'price': 1999, 'name': 'Professional Tier', 'requests': 500},
