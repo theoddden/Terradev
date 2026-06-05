@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "5.1.0"
-description = "Open Source BYOAPI Multi-Cloud GPU Infrastructure Platform with Langfuse, Databricks, vLLM auto-optimization, and 223 MCP tools"
+version = "5.1.1"
+description = "An imperative command-line-interface for AI workload orchestration."
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
