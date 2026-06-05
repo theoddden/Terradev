@@ -236,10 +236,7 @@ impl JobState {
         checkpoint_id: String,
     ) -> Result<Self, crate::types::StateTransitionError> {
         match self {
-            JobState::Running {
-                created_at,
-                ..
-            } => Ok(JobState::Paused {
+            JobState::Running { created_at, .. } => Ok(JobState::Paused {
                 created_at,
                 paused_at: Utc::now(),
                 checkpoint_id,
