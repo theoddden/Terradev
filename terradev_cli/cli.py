@@ -417,6 +417,7 @@ class TerradevAPI:
                     'gpu_type': q.get('gpu_type', gpu_type),
                     'region': q.get('region', 'unknown'),
                     'availability': 'spot' if q.get('spot') else 'on-demand',
+                    'gpu_count': q.get('gpu_count', 1),
                 })
             return quotes
         except Exception:
@@ -1427,14 +1428,16 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
     # ── Display results ──
     best = all_quotes[0]
     print(f"\nTerradev Quote  {gpu_type}")
-    print(f"{'#':<4} {'Provider':<14} {'Region':<16} {'$/hr':<10} {'Type':<10}")
-    print("-" * 58)
+    print(f"{'#':<4} {'Provider':<14} {'Region':<16} {'$/hr':<10} {'GPUs':<6} {'Spot':<8}")
+    print("-" * 64)
     for i, q in enumerate(all_quotes[:10]):
-        spot = "spot" if q.get('availability') == 'spot' else 'on-demand'
+        spot = "✓" if q.get('availability') == 'spot' else ""
+        gpu_count = q.get('gpu_count', 1)
+        gpu_display = f"x{gpu_count}" if gpu_count > 1 else "x1"
         provider_display = q.get('provider', q.get('gpu_name', 'unknown'))
         if q.get('provider') == 'local':
             provider_display = f"{q['pool_name']}"
-        print(f"{i+1:<4} {provider_display:<14} {q['region']:<16} ${q['price']:<9.2f} {spot:<10}")
+        print(f"{i+1:<4} {provider_display:<14} {q['region']:<16} ${q['price']:<9.2f} {gpu_display:<6} {spot:<8}")
 
     print(f"\nBest: ${best['price']:.2f}/hr on {best['provider']} ({best['region']})")
     monthly = best['price'] * 730
