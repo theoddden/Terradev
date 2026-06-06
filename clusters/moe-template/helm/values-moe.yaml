@@ -84,6 +84,22 @@ serving:
     method: "mtp"
     numTokens: 1
 
+  # ── FP8 Precision Guard (Blackwell / B200) ────────────────────────────────
+  # tcgen05.mma kind::f8f6f4 requires K>=32 minimum slab. Per-token FP8
+  # quantization uses per-128 granularity which exceeds this boundary, causing
+  # INCORRECT_NUMERICAL on GEMM2. Source: MLSys 2026 FlashInfer contest MoE
+  # track (Khera 2026) — 3 consecutive FP8/BF16 GEMM2 attempts hit this wall.
+  #
+  # If you see INCORRECT_NUMERICAL on any FP8 workload:
+  #   1. Switch fp8QuantScheme to per_tensor  (coarser; avoids K-slab conflict)
+  #   2. Or set gemm2Precision: bf16 to fall back GEMM2 to bf16 while GEMM1
+  #      stays FP8 (matches the contest's eventual correct configuration)
+  fp8PrecisionGuard:
+    enabled: true
+    fp8QuantScheme: per_tensor     # per_tensor (safe) | per_token (Blackwell K>=32 risk)
+    gemm2Precision: fp8            # fp8 | bf16 (set bf16 if INCORRECT_NUMERICAL observed)
+    kSlabMinimum: 32               # tcgen05.mma kind::f8f6f4 hardware minimum
+
   # ── LMCache Distributed KV Cache (Terradev extension) ─────────────────────
   # Enables KV cache sharing across multiple vLLM instances for 3-10x TTFT reduction
   lmcache:

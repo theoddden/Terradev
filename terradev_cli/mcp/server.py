@@ -913,7 +913,7 @@ except ImportError:
 _ALL_TOOLS = [
         Tool(
             name="quote_gpu",
-            description="Get real-time GPU prices across 21+ cloud providers (incl. Alibaba, OVHcloud, FluidStack, Hetzner, SiliconFlow, Latitude.sh, Nebius, Lepton, Paperspace)",
+            description="Get real-time GPU prices across 21+ cloud providers (incl. Alibaba, OVHcloud, FluidStack, Hetzner, SiliconFlow, Latitude.sh, Oracle, Crusoe, DigitalOcean)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -957,7 +957,7 @@ _ALL_TOOLS = [
                         "description": "Cloud providers for parallel distribution",
                         "items": {
                             "type": "string",
-                            "enum": ["runpod", "vastai", "lambda", "aws", "gcp", "azure", "coreweave", "tensordock", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude", "nebius", "lepton", "voltage_park", "genesis_cloud", "paperspace", "crusoe"]
+                            "enum": ["runpod", "vastai", "lambda", "aws", "gcp", "azure", "coreweave", "tensordock", "oracle", "crusoe", "digitalocean", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude", "huggingface", "baseten", "inferx"]
                         }
                     },
                     "max_price": {
@@ -1313,7 +1313,7 @@ _ALL_TOOLS = [
                     "provider": {
                         "type": "string",
                         "description": "Provider name",
-                        "enum": ["runpod", "aws", "vastai", "gcp", "azure", "lambda", "coreweave", "tensordock", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude", "nebius", "lepton", "voltage_park", "genesis_cloud", "paperspace", "crusoe"]
+                        "enum": ["runpod", "aws", "vastai", "gcp", "azure", "lambda", "coreweave", "tensordock", "oracle", "crusoe", "digitalocean", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude", "huggingface", "baseten", "inferx"]
                     },
                     "quick": {
                         "type": "boolean",
@@ -1333,7 +1333,7 @@ _ALL_TOOLS = [
                     "provider": {
                         "type": "string",
                         "description": "Provider to configure",
-                        "enum": ["runpod", "aws", "vastai", "gcp", "azure", "lambda", "coreweave", "tensordock", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude", "nebius", "lepton", "voltage_park", "genesis_cloud", "paperspace", "crusoe"]
+                        "enum": ["runpod", "aws", "vastai", "gcp", "azure", "lambda", "coreweave", "tensordock", "oracle", "crusoe", "digitalocean", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude", "huggingface", "baseten", "inferx"]
                     }
                 },
                 "required": ["provider"]
@@ -3250,12 +3250,17 @@ _ALL_TOOLS = [
         ),
         Tool(
             name="preflight_gpu_check",
-            description="GPU-specific preflight validation: NVIDIA drivers, CUDA version, GPU count, NCCL version, peer-to-peer access, NVLink topology.",
+            description="GPU-specific preflight validation: NVIDIA drivers, CUDA version, GPU count, NCCL, NVLink topology, NCU stall-signature profiling, and adversarial config verification (V1-V3).",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "nodes": {"type": "array", "description": "Node IPs", "items": {"type": "string"}},
-                    "from_provision": {"type": "string", "description": "Resolve nodes from provision"}
+                    "from_provision": {"type": "string", "description": "Resolve nodes from provision"},
+                    "tensor_parallel_size": {"type": "integer", "description": "TP size for V1 adversarial check (vs GPU count)"},
+                    "model_precision": {"type": "string", "description": "Model precision (fp8, bf16, fp16) for V2 FP8 wall check"},
+                    "fp8_quant_scheme": {"type": "string", "description": "FP8 quant scheme (per_tensor, per_token) for Blackwell K-slab check"},
+                    "gpu_arch": {"type": "string", "description": "GPU architecture string (e.g. blackwell, hopper) for precision wall detection"},
+                    "max_batch_size": {"type": "integer", "description": "Max batch size for V3 launch-overhead dominance check"}
                 }
             }
         ),
@@ -7748,14 +7753,27 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "preflight_gpu_check":
                 try:
                     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Terradev"))
-                    from terradev_cli.core.preflight_validator import PreflightValidator
-                    validator = PreflightValidator()
-                    result = await validator.gpu_check(
-                        nodes=arguments.get("nodes"),
-                        from_provision=arguments.get("from_provision"),
+                    from terradev_cli.core.preflight_validator import (
+                        PreflightValidator, _NCU_STALL_SIGNATURES,
                     )
-                    output_text = f"🖥️ **GPU Preflight Check**\n\n"
-                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
+                    inference_cfg = {
+                        k: arguments[k] for k in (
+                            "tensor_parallel_size", "model_precision",
+                            "fp8_quant_scheme", "gpu_arch", "max_batch_size",
+                        ) if k in arguments
+                    }
+                    validator = PreflightValidator(
+                        nodes=arguments.get("nodes"),
+                        inference_config=inference_cfg,
+                    )
+                    result = validator.run_quick()
+                    taxonomy = {k: {"label": v["label"], "category": v["category"]}
+                                for k, v in _NCU_STALL_SIGNATURES.items()}
+                    output_text = "🖥️ **GPU Preflight Check**\n\n"
+                    output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3500]}\n```\n\n"
+                    output_text += "**NCU Stall-Signature Taxonomy** (three-category framework — Khera 2026):\n"
+                    for stall, info in taxonomy.items():
+                        output_text += f"- `{stall}` → **{info['label']}** [{info['category']}]\n"
                     return CallToolResult(content=[TextContent(type="text", text=output_text)])
                 except ImportError:
                     return CallToolResult(content=[TextContent(type="text", text="❌ Terradev CLI not found.")], isError=True)

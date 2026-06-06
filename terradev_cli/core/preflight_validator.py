@@ -163,9 +163,133 @@ def _safe_float(s: str, default: float = 0.0) -> float:
 
 
 # ---------------------------------------------------------------------------
+# NCU stall-signature taxonomy
+# Source: MLSys 2026 FlashInfer contest — Full-Agent submission (Khera 2026).
+# Three-category framework: PROBLEM_SPACE (geometry-determined before code),
+# HARDWARE_REVEALED (NCU identified it), EMPIRICALLY_FIRST (measurement-first).
+# ---------------------------------------------------------------------------
+
+_NCU_STALL_SIGNATURES: Dict[str, Dict[str, str]] = {
+    "long_scoreboard": {
+        "label": "MEMORY_LATENCY",
+        "category": "HARDWARE_REVEALED",
+        "description": "Uncoalesced global loads — warp threads stride across non-contiguous addresses.",
+        "fix": "Remap (thread,warp)->(k-slice,v-column) so a warp cooperates on one column; "
+               "use LDG.E.128 / float4 vectorized loads to collapse 32 transactions to 1.",
+    },
+    "mio_throttle": {
+        "label": "MIO_THROTTLE",
+        "category": "HARDWARE_REVEALED",
+        "description": "Memory instruction throughput saturated.",
+        "fix": "Reduce LD/ST instruction count via vectorized loads (LDG.128) or SMEM staging.",
+    },
+    "lg_throttle": {
+        "label": "LAUNCH_BOUND",
+        "category": "HARDWARE_REVEALED",
+        "description": "Load/global issue throttled — often co-occurs with CPU kernel-launch overhead.",
+        "fix": "Collapse per-element host launch loops into batched GPU dispatch "
+               "(the host-loop-collapse pattern).",
+    },
+    "not_selected": {
+        "label": "COMPUTE_BOUND",
+        "category": "PROBLEM_SPACE",
+        "description": "Warp not selected for issue — ALU or tensor-core compute saturated.",
+        "fix": "Increase arithmetic intensity via tiling, operator fusion, or wider MMA tiles.",
+    },
+    "barrier": {
+        "label": "SYNC_BOUND",
+        "category": "HARDWARE_REVEALED",
+        "description": "Warp stalled at __syncthreads / mbarrier — imbalanced thread work.",
+        "fix": "Ensure uniform per-warp workloads; reduce SMEM bank conflicts.",
+    },
+}
+
+
+# ---------------------------------------------------------------------------
 # Per-node DAG check functions
 # Each: fn(ctx) -> List[CheckResult]
 # ---------------------------------------------------------------------------
+
+
+def _check_adversarial_config(ctx: Dict[str, Any]) -> List[CheckResult]:
+    """Adversarial config verification — attempts to falsify structural decisions
+    before hardware tests run.
+
+    Modelled on the V1-V4 adversarial stages from the MLSys 2026 FlashInfer
+    contest pipeline (Khera 2026): each stage tries to disprove the previous
+    structural assumption. Two paper examples: V2 caught a sort-placement bug
+    producing silent incorrect top-k; V3 caught an SMEM formula using full
+    seq length instead of tile size. Both prevented Stage 4 bisection cycles.
+
+    V1: TP size vs GPU count consistency.
+    V2: FP8 Blackwell precision wall (tcgen05.mma K>=32 slab constraint).
+    V3: Batch size vs launch-overhead dominance.
+    """
+    node = ctx.get("host") or "localhost"
+    results: List[CheckResult] = []
+
+    # V1 — Tensor-parallel size vs GPU count
+    tp_size = ctx.get("tensor_parallel_size", 0)
+    gpu_count = ctx.get("expected_gpus_per_node", 0)
+    if tp_size and gpu_count:
+        if tp_size > gpu_count:
+            results.append(CheckResult(
+                "adv_v1_tp_gpu", CheckStatus.FAIL,
+                f"V1: TP size {tp_size} > GPU count {gpu_count} — all-reduce deadlock at launch",
+                details={"tensor_parallel_size": tp_size, "gpu_count": gpu_count}, node=node))
+        elif gpu_count % tp_size != 0:
+            results.append(CheckResult(
+                "adv_v1_tp_gpu", CheckStatus.WARN,
+                f"V1: GPU count {gpu_count} not divisible by TP size {tp_size} — partial ranks idle",
+                details={"tensor_parallel_size": tp_size, "gpu_count": gpu_count}, node=node))
+        else:
+            results.append(CheckResult(
+                "adv_v1_tp_gpu", CheckStatus.PASS,
+                f"V1: TP {tp_size} x {gpu_count // tp_size} DPs = {gpu_count} GPUs consistent",
+                node=node))
+
+    # V2 — FP8 Blackwell precision wall.
+    # tcgen05.mma kind::f8f6f4 requires K>=32 minimum slab. Per-token FP8
+    # quantization uses per-128 granularity which exceeds this boundary.
+    # Source: MLSys 2026 FlashInfer contest MoE track — 3 GEMM2 attempts hit this wall.
+    precision = ctx.get("model_precision", "")
+    quant_scheme = ctx.get("fp8_quant_scheme", "")
+    gpu_arch = ctx.get("gpu_arch", "").lower()
+    if precision == "fp8":
+        if quant_scheme == "per_token" and "blackwell" in gpu_arch:
+            results.append(CheckResult(
+                "adv_v2_fp8_wall", CheckStatus.WARN,
+                "V2: FP8 per-token on Blackwell — tcgen05.mma requires K>=32 slab but per-token "
+                "FP8 uses per-128 granularity. GEMM2 INCORRECT_NUMERICAL risk. "
+                "Set fp8_quant_scheme=per_tensor or override GEMM2 to bf16.",
+                details={"precision": precision, "quant_scheme": quant_scheme, "arch": gpu_arch},
+                node=node))
+        elif quant_scheme:
+            results.append(CheckResult(
+                "adv_v2_fp8_wall", CheckStatus.PASS,
+                f"V2: FP8 quant_scheme={quant_scheme} — no K-slab conflict detected",
+                node=node))
+
+    # V3 — Batch size vs launch overhead.
+    # At small batch sizes CPU kernel-launch enqueueing dominates GPU compute.
+    # Source: FlashInfer TopK + GDN prefill — host-loop collapse was the single
+    # largest win in both kernels; actual dominant cost was CPU-side dispatch.
+    max_batch = ctx.get("max_batch_size", 0)
+    if max_batch and max_batch < 8:
+        results.append(CheckResult(
+            "adv_v3_launch_overhead", CheckStatus.WARN,
+            f"V3: max_batch_size={max_batch} — CPU kernel-launch enqueueing likely dominates "
+            f"GPU compute at this size. Consider batched dispatch (host-loop-collapse pattern).",
+            details={"max_batch_size": max_batch, "recommendation": "batched_dispatch"},
+            node=node))
+
+    if not results:
+        results.append(CheckResult(
+            "adversarial_config", CheckStatus.PASS,
+            "Adversarial config check: no structural inconsistencies detected (V1-V3 clear)",
+            node=node))
+    return results
+
 
 def _check_gpu_inventory(ctx: Dict[str, Any]) -> List[CheckResult]:
     """Validate GPU count, type, driver — catches 'GPU fell off the bus'."""
@@ -540,6 +664,88 @@ def _check_nccl_intra(ctx: Dict[str, Any]) -> List[CheckResult]:
                         "NCCL all-reduce completed (bandwidth not parsed)", node=node)]
 
 
+def _check_ncu_stall_profile(ctx: Dict[str, Any]) -> List[CheckResult]:
+    """NCU stall-signature profiling — classifies GPU bottleneck into the three-category framework.
+
+    Three categories from MLSys 2026 FlashInfer contest (Khera 2026):
+    - PROBLEM_SPACE: Architecture derivable from problem geometry before code.
+    - HARDWARE_REVEALED: NCU identified the bottleneck; structural categories explain it.
+    - EMPIRICALLY_FIRST: Found by measurement; framework justification followed.
+
+    Runs ncu on a GEMM micro-benchmark and maps the dominant stall reason to the
+    taxonomy above. Requires ncu (Nsight Compute CLI) and PyTorch+CUDA on the node.
+    """
+    host, user, key = ctx.get("host"), ctx.get("ssh_user", "root"), ctx.get("ssh_key")
+    node = host or "localhost"
+
+    rc, stdout, _ = _run_on(host, "which ncu 2>/dev/null || echo NCU_NOT_FOUND", user, key, timeout=5)
+    if "NCU_NOT_FOUND" in stdout or rc != 0:
+        return [CheckResult("ncu_stall_profile", CheckStatus.SKIP,
+                            "ncu (Nsight Compute CLI) not installed. "
+                            "Install CUDA Toolkit >=11.3 for stall-signature profiling.",
+                            details={"taxonomy": {k: v["label"] for k, v in _NCU_STALL_SIGNATURES.items()}},
+                            node=node)]
+
+    metrics = ",".join([
+        "sm__warp_issue_stalled_long_scoreboard_per_warp_active.pct",
+        "sm__warp_issue_stalled_mio_throttle_per_warp_active.pct",
+        "sm__warp_issue_stalled_lg_throttle_per_warp_active.pct",
+        "sm__warp_issue_stalled_not_selected_per_warp_active.pct",
+        "sm__warp_issue_stalled_barrier_per_warp_active.pct",
+    ])
+    bench = (
+        "import torch; "
+        "a=torch.randn(4096,4096,device='cuda',dtype=torch.float16); "
+        "[torch.mm(a,a) for _ in range(5)]; "
+        "torch.cuda.synchronize()"
+    )
+    ncu_cmd = (
+        f"ncu --set=full --csv --metrics {metrics} "
+        f"python3 -c \"{bench}\" 2>/dev/null | grep -v '^==' | tail -n +2"
+    )
+    rc, stdout, stderr = _run_on(host, ncu_cmd, user, key, timeout=120)
+
+    if rc != 0 or not stdout.strip():
+        return [CheckResult("ncu_stall_profile", CheckStatus.WARN,
+                            "ncu profiling ran but produced no output — "
+                            "ensure PyTorch is installed and a GPU is available.",
+                            details={"stderr": stderr[:200]}, node=node)]
+
+    stall_pcts: Dict[str, float] = {}
+    for line in stdout.splitlines():
+        parts = [p.strip().strip('"') for p in line.split(",")]
+        for sig_key in _NCU_STALL_SIGNATURES:
+            if any(sig_key in p for p in parts):
+                try:
+                    stall_pcts[sig_key] = max(stall_pcts.get(sig_key, 0.0), float(parts[-1]))
+                except (ValueError, IndexError):
+                    pass
+
+    if not stall_pcts:
+        return [CheckResult("ncu_stall_profile", CheckStatus.WARN,
+                            "ncu ran but stall metrics not parsed",
+                            details={"raw": stdout[:300]}, node=node)]
+
+    dominant = max(stall_pcts, key=lambda k: stall_pcts[k])
+    sig = _NCU_STALL_SIGNATURES[dominant]
+    dominant_pct = stall_pcts[dominant]
+    status = (CheckStatus.PASS if dominant_pct < 30 else
+              CheckStatus.WARN if dominant_pct < 60 else CheckStatus.FAIL)
+
+    return [CheckResult(
+        "ncu_stall_profile", status,
+        f"Dominant stall: {sig['label']} ({dominant_pct:.1f}%) [{sig['category']}] — {sig['description']}",
+        details={
+            "dominant_stall": dominant,
+            "label": sig["label"],
+            "category": sig["category"],
+            "recommendation": sig["fix"],
+            "stall_pct": {k: round(v, 1) for k, v in stall_pcts.items()},
+            "all_signatures": {k: v["label"] for k, v in _NCU_STALL_SIGNATURES.items()},
+        },
+        node=node)]
+
+
 def _check_data_integrity(ctx: Dict[str, Any]) -> List[CheckResult]:
     """Data integrity: existence, size, checksums, sample count."""
     data_config = ctx.get("data_config", {})
@@ -710,10 +916,12 @@ def _check_nccl_pair(ctx: Dict[str, Any]) -> List[CheckResult]:
 
 def _build_node_dag() -> DAGExecutor:
     """Per-node preflight DAG:
-        Wave 0: gpu_inventory ∥ dcgm_diag ∥ nvlink_topo ∥ rdma_health ∥ storage_fio
-        Wave 1: nccl_intra  (depends on gpu_inventory + rdma_health)
+        Wave 0: adversarial_config ∥ gpu_inventory ∥ dcgm_diag ∥ nvlink_topo ∥ rdma_health ∥ storage_fio
+        Wave 1: nccl_intra        (depends on gpu_inventory + rdma_health)
+                ncu_stall_profile (depends on gpu_inventory)
     """
-    dag = DAGExecutor(max_workers=6, name="preflight_node")
+    dag = DAGExecutor(max_workers=8, name="preflight_node")
+    dag.add_node("adversarial_config", _check_adversarial_config)
     dag.add_node("gpu_inventory", _check_gpu_inventory)
     dag.add_node("dcgm_diag", _check_dcgm_diag)
     dag.add_node("nvlink_topo", _check_nvlink_topo)
@@ -721,6 +929,8 @@ def _build_node_dag() -> DAGExecutor:
     dag.add_node("storage_fio", _check_storage_fio)
     dag.add_node("nccl_intra", _check_nccl_intra,
                  depends_on={"gpu_inventory", "rdma_health"})
+    dag.add_node("ncu_stall_profile", _check_ncu_stall_profile,
+                 depends_on={"gpu_inventory"})
     return dag
 
 
@@ -744,7 +954,8 @@ class PreflightValidator:
                  expected_gpus_per_node: int = 8,
                  expected_gpu_type: str = "",
                  dcgm_level: int = 2,
-                 skip_cross_node: bool = False):
+                 skip_cross_node: bool = False,
+                 inference_config: Optional[Dict[str, Any]] = None):
         self.nodes = nodes or [None]
         self.ssh_user = ssh_user
         self.ssh_key = ssh_key
@@ -753,6 +964,7 @@ class PreflightValidator:
         self.expected_type = expected_gpu_type
         self.dcgm_level = dcgm_level
         self.skip_cross_node = skip_cross_node
+        self.inference_config = inference_config or {}
 
     def run_all(self) -> PreflightReport:
         """Full preflight: per-node parallel → pairwise NCCL → data integrity."""
@@ -766,7 +978,8 @@ class PreflightValidator:
              "data_path": self.data_config.get("path", "/tmp"),
              "expected_gpus_per_node": self.expected_gpus,
              "expected_gpu_type": self.expected_type,
-             "dcgm_level": self.dcgm_level}
+             "dcgm_level": self.dcgm_level,
+             **self.inference_config}
             for n in self.nodes
         ]
         for dag_result in node_dag.batch_apply(contexts, fail_fast=False):
