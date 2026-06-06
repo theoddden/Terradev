@@ -273,6 +273,15 @@ class JobStateManager:
         if error_message:
             updates["error_message"] = error_message
 
+        # SECURITY: Column name allowlist to prevent SQL injection
+        ALLOWED_COLUMNS = {
+            "status", "current_step", "cost_usd", "started_at", "finished_at", 
+            "error_message", "provider", "instance_id", "gpu_type", "region"
+        }
+        for k in updates:
+            if k not in ALLOWED_COLUMNS:
+                raise ValueError(f"Invalid column name: {k}")
+        
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         self._conn.execute(
             f"UPDATE jobs SET {set_clause} WHERE id = ?",
@@ -364,6 +373,7 @@ class JobStateManager:
         ).fetchall()
         to_delete = [r[0] for r in rows[keep:]]
         if to_delete:
+            # SECURITY: Use parameterized query with proper placeholders
             placeholders = ",".join("?" * len(to_delete))
             self._conn.execute(
                 f"UPDATE checkpoints SET status = ? WHERE id IN ({placeholders})",

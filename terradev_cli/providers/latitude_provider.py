@@ -376,7 +376,7 @@ class LatitudeProvider(BaseProvider):
                     "created_at": attrs.get("created_at"),
                     "locked": attrs.get("locked", False)
                 }
-            except:
+            except Exception:
                 pass
                 
             # Try virtual machine
@@ -395,7 +395,7 @@ class LatitudeProvider(BaseProvider):
                     "specs": attrs.get("specs", {}),
                     "created_at": attrs.get("created_at")
                 }
-            except:
+            except Exception:
                 pass
                 
             raise Exception(f"Instance {instance_id} not found")
@@ -414,7 +414,7 @@ class LatitudeProvider(BaseProvider):
                 await self._make_request("POST", f"{self.API_BASE}/servers/{instance_id}/actions", 
                                        json={"type": "power_off"})
                 return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
-            except:
+            except Exception:
                 pass
                 
             # Try virtual machine
@@ -422,7 +422,7 @@ class LatitudeProvider(BaseProvider):
                 await self._make_request("POST", f"{self.API_BASE}/virtual-machines/{instance_id}/actions",
                                        json={"type": "power_off"})
                 return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
-            except:
+            except Exception:
                 pass
                 
             raise Exception(f"Failed to stop instance {instance_id}")
@@ -441,7 +441,7 @@ class LatitudeProvider(BaseProvider):
                 await self._make_request("POST", f"{self.API_BASE}/servers/{instance_id}/actions",
                                        json={"type": "power_on"})
                 return {"instance_id": instance_id, "action": "start", "status": "starting"}
-            except:
+            except Exception:
                 pass
                 
             # Try virtual machine  
@@ -449,7 +449,7 @@ class LatitudeProvider(BaseProvider):
                 await self._make_request("POST", f"{self.API_BASE}/virtual-machines/{instance_id}/actions",
                                        json={"type": "power_on"})
                 return {"instance_id": instance_id, "action": "start", "status": "starting"}
-            except:
+            except Exception:
                 pass
                 
             raise Exception(f"Failed to start instance {instance_id}")
@@ -467,14 +467,14 @@ class LatitudeProvider(BaseProvider):
             try:
                 await self._make_request("DELETE", f"{self.API_BASE}/servers/{instance_id}")
                 return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
-            except:
+            except Exception:
                 pass
                 
             # Try virtual machine
             try:
                 await self._make_request("DELETE", f"{self.API_BASE}/virtual-machines/{instance_id}")
                 return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
-            except:
+            except Exception:
                 pass
                 
             raise Exception(f"Failed to terminate instance {instance_id}")

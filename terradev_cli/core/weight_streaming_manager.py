@@ -211,7 +211,10 @@ class WeightStreamingManager:
             download_url = f"{self.config.model_path}/chunk_{layer_start}_{layer_end-1}.safetensors"
             
             # Generate local path
-            local_path = Path(f"/tmp/terradev_streaming/{self.config.model_id}/{chunk_id}.safetensors")
+            import tempfile
+            streaming_dir = Path(tempfile.gettempdir()) / "terradev_streaming" / self.config.model_id
+            streaming_dir.mkdir(parents=True, exist_ok=True)
+            local_path = streaming_dir / f"{chunk_id}.safetensors"
             local_path.parent.mkdir(parents=True, exist_ok=True)
             
             # Calculate size (estimate)

@@ -133,7 +133,7 @@ class RayService:
                     
                     if nodes_result.returncode == 0:
                         status_info["memory_info"] = nodes_result.stdout.strip()
-                except:
+                except Exception:
                     pass
                 
                 return status_info
@@ -361,7 +361,7 @@ class RayService:
                     
                     if detailed_result.returncode == 0:
                         resources["details"] = detailed_result.stdout.strip()
-                except:
+                except Exception:
                     pass
                 
                 return resources

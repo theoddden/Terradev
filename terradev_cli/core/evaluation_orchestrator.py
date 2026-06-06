@@ -231,7 +231,7 @@ class EvaluationOrchestrator:
                     ) as resp:
                         await resp.text()
                         return (time.time() - start) * 1000  # Convert to ms
-                except:
+                except Exception:
                     return 1000.0  # Fallback latency
         
         # Run synchronously for lightweight version
@@ -289,13 +289,13 @@ class EvaluationOrchestrator:
                     async with session.get(endpoint_url.replace("/v1/chat/completions", "/health"), 
                                          timeout=aiohttp.ClientTimeout(total=5)) as resp:
                         return resp.status < 500
-            except:
+            except Exception:
                 # Try the main endpoint if health endpoint fails
                 try:
                     async with aiohttp.ClientSession() as session:
                         async with session.get(endpoint_url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
                             return resp.status < 500
-                except:
+                except Exception:
                     return False
         
         loop = None

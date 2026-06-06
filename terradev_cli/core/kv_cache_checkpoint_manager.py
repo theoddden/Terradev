@@ -78,7 +78,7 @@ class KVCacheCheckpoint:
 class CheckpointConfig:
     """Configuration for KV cache checkpointing"""
     enable_checkpointing: bool = True
-    checkpoint_dir: str = "/tmp/terradev_checkpoints"
+    checkpoint_dir: str = None  # Will use tempfile if not provided
     max_checkpoint_age_hours: int = 24
     max_storage_gb: int = 1000
     compression_enabled: bool = True
@@ -121,7 +121,10 @@ class KVCacheCheckpointManager:
         self.termination_callback: Optional[Callable] = None
         self.logger = logging.getLogger(__name__)
         
-        # Ensure checkpoint directory exists
+        # Ensure checkpoint directory exists - use tempfile if not provided
+        if self.config.checkpoint_dir is None:
+            import tempfile
+            self.config.checkpoint_dir = tempfile.mkdtemp(prefix="terradev_checkpoints_")
         Path(self.config.checkpoint_dir).mkdir(parents=True, exist_ok=True)
         Path(self.config.nvme_path).mkdir(parents=True, exist_ok=True)
     
@@ -419,7 +422,9 @@ class KVCacheCheckpointManager:
         if self.config.compression_enabled:
             data_bytes = gzip.decompress(data_bytes)
         
-        # Deserialize
+        # Deserialize with pickle but only after decryption validation
+        # SECURITY: Data is Fernet-decrypted first, but pickle still has risks.
+        # Consider using msgpack or torch.load(weights_only=True) for future improvements.
         return pickle.loads(data_bytes)
     
     async def _save_to_storage(self, checkpoint_id: str, data: bytes) -> str:

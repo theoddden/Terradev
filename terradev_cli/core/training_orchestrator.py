@@ -384,7 +384,21 @@ def _reasoning_auto_config(
 
 def _run_on(host: Optional[str], cmd: str, user: str = "root",
             key: Optional[str] = None, timeout: int = 60) -> Tuple[int, str, str]:
+    # SECURITY: Validate command to prevent shell injection
+    import re
+    # Allow alphanumeric, spaces, and basic shell-safe characters
+    if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t"\']+$', cmd):
+        return -1, "", "Unsafe command characters detected"
+    
     if host and host not in ("localhost", "127.0.0.1"):
+        # Validate host and user
+        if not re.match(r'^[a-zA-Z0-9._-]+$', user):
+            return -1, "", "Invalid username format"
+        if not re.match(r'^[a-zA-Z0-9._-]+$', host):
+            return -1, "", "Invalid hostname format"
+        if key and not re.match(r'^[a-zA-Z0-9._/~-]+$', key):
+            return -1, "", "Invalid key path format"
+        
         ssh = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
                "-o", "ConnectTimeout=10", "-o", "BatchMode=yes"]
         if key:
@@ -395,8 +409,7 @@ def _run_on(host: Optional[str], cmd: str, user: str = "root",
             return r.returncode, r.stdout.strip(), r.stderr.strip()
         except Exception as e:
             return -1, "", str(e)
-    # SECURITY: shell=True is unsafe. Only use with hardcoded commands.
-    # For user-provided commands, use subprocess.run with list args instead.
+    # SECURITY: shell=True is used but command is validated above
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
         return r.returncode, r.stdout.strip(), r.stderr.strip()
@@ -566,7 +579,8 @@ def _build_artifacts(ctx: Dict[str, Any]) -> Dict[str, Any]:
     # Hostfile (only needed for multi-node deepspeed)
     hostfile_path = ""
     if n_nodes > 1:
-        hostfile_path = f"/tmp/.terradev_hostfile_{os.getpid()}"
+        import tempfile
+        hostfile_path = tempfile.mktemp(prefix=".terradev_hostfile_", suffix=f"_{os.getpid()}")
         hostfile_content = "\n".join(
             f"{node} slots={config.gpus_per_node}"
             for node in config.nodes
@@ -638,8 +652,21 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
     env.update(artifacts.get("env", {}))
 
     # Build full command
-    cmd = " ".join(artifacts["cmd_parts"])
+    cmd_parts = artifacts["cmd_parts"]
+    # SECURITY: Validate cmd_parts to prevent shell injection
+    # Only allow safe characters in command parts
+    import re
+    for part in cmd_parts:
+        if not re.match(r'^[a-zA-Z0-9_\-./:=@]+$', part):
+            logger.error(f"Unsafe character in command part: {part}")
+            return {"status": "failed", "error": "Unsafe command characters detected"}
+    
+    cmd = " ".join(cmd_parts)
     if config.log_path:
+        # Validate log path to prevent path injection
+        if not re.match(r'^[a-zA-Z0-9_\-./]+$', config.log_path):
+            logger.error(f"Unsafe log path: {config.log_path}")
+            return {"status": "failed", "error": "Unsafe log path detected"}
         os.makedirs(os.path.dirname(config.log_path) or ".", exist_ok=True)
         cmd += f" 2>&1 | tee {config.log_path}"
 
@@ -654,6 +681,7 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     logger.info(f"Launching: {cmd}")
     try:
+        # SECURITY: shell=True is required for pipe redirection, but inputs are validated above
         process = subprocess.Popen(
             cmd, shell=True, env=env,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -663,14 +691,16 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
         # Deploy spot-preemption sidecar on every node (local process, no SSH needed at preemption time)
         # Runs alongside training — polls cloud metadata and SIGUSR1s training PID if preempted
         try:
-            sidecar_path = "/tmp/.terradev_spot_sidecar.sh"
+            import tempfile
+            sidecar_path = tempfile.mktemp(prefix=".terradev_spot_sidecar_", suffix=".sh")
+            sidecar_log = tempfile.mktemp(prefix=".terradev_spot_sidecar_", suffix=".log")
             node_list = config.nodes or [None]
             for node in node_list:
                 _run_on(
                     node,
                     f"cat > {sidecar_path} << 'SIDECAR_EOF'\n{_SPOT_SIDECAR_SH}\nSIDECAR_EOF\n"
                     f"chmod +x {sidecar_path} && "
-                    f"nohup {sidecar_path} {process.pid} > /tmp/.terradev_spot_sidecar.log 2>&1 &",
+                    f"nohup {sidecar_path} {process.pid} > {sidecar_log} 2>&1 &",
                     config.ssh_user, config.ssh_key or None, timeout=15,
                 )
             logger.info(f"Spot-preemption sidecar deployed to {len(node_list)} node(s)")

@@ -102,7 +102,7 @@ class VLLMConfig:
     lmcache_redis_password: Optional[str] = None
     lmcache_s3_bucket: Optional[str] = None
     lmcache_s3_region: str = "us-east-1"
-    lmcache_disk_path: str = "/tmp/lmcache"
+    lmcache_disk_path: str = None  # Will use tempfile if not provided
 
     @classmethod
     def create_auto_optimized(cls, model_name: str, workload: WorkloadProfile, **kwargs) -> 'VLLMConfig':
@@ -456,7 +456,7 @@ python3 -c "import vllm; print('vLLM installed successfully')"
     
     def _build_ssh_args(self, ip: str, user: str, key: Optional[str]) -> List[str]:
         """Build SSH argument list for subprocess (no shell=True, injection-safe)."""
-        args = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes"]
+        args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes"]
         if key:
             args.extend(["-i", key])
         args.extend([f"{user}@{ip}", "bash", "-s"])

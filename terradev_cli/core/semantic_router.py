@@ -1070,7 +1070,8 @@ class SemanticRouter:
             env["NCCL_P2P_LEVEL"] = "PIX"
             env["NCCL_NET_GDR_READ"] = "1"
             env["NCCL_IB_DISABLE"] = "0"
-            env["NCCL_TOPO_DUMP_FILE"] = "/tmp/nccl_topo.xml"
+            import tempfile
+            env["NCCL_TOPO_DUMP_FILE"] = tempfile.mktemp(prefix="nccl_topo_", suffix=".xml")
         elif card.pcie_locality == "PXB":
             env["NCCL_NET_GDR_LEVEL"] = "PXB"
             env["NCCL_P2P_LEVEL"] = "PXB"

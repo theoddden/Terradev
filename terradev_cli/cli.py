@@ -11374,17 +11374,34 @@ def local_scan(host, user, key, detailed, register, name):
 
     def _run_nvidia_smi(remote_host=None, remote_user=None, remote_key=None):
         query = "index,name,memory.total,driver_version,utilization.gpu,temperature.gpu,power.draw,power.limit,pcie.link.gen.current,pcie.link.width.current,compute_cap"
-        cmd = f"nvidia-smi --query-gpu={query} --format=csv,noheader,nounits"
         if remote_host:
-            ssh_opts = f"-o StrictHostKeyChecking=no -o ConnectTimeout=10"
+            # Validate inputs to prevent shell injection
+            import re
+            if not re.match(r'^[a-zA-Z0-9._-]+$', remote_user):
+                return "", 1
+            if not re.match(r'^[a-zA-Z0-9._-]+$', remote_host):
+                return "", 1
+            if remote_key and not re.match(r'^[a-zA-Z0-9._/~-]+$', remote_key):
+                return "", 1
+            
+            # Build SSH command as argument list (no shell=True)
+            ssh_args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"]
             if remote_key:
-                ssh_opts += f" -i {remote_key}"
-            cmd = f"ssh {ssh_opts} {remote_user}@{remote_host} '{cmd}'"
-        try:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
-            return result.stdout.strip(), result.returncode
-        except Exception as e:
-            return "", 1
+                ssh_args.extend(["-i", remote_key])
+            ssh_args.extend([f"{remote_user}@{remote_host}", f"nvidia-smi --query-gpu={query} --format=csv,noheader,nounits"])
+            try:
+                result = subprocess.run(ssh_args, capture_output=True, text=True, timeout=15)
+                return result.stdout.strip(), result.returncode
+            except Exception as e:
+                return "", 1
+        else:
+            # Local execution - still safe since query is hardcoded
+            cmd = f"nvidia-smi --query-gpu={query} --format=csv,noheader,nounits"
+            try:
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
+                return result.stdout.strip(), result.returncode
+            except Exception as e:
+                return "", 1
 
     # Try Rust NVML first (local only), then nvidia-smi
     gpus = []
@@ -11498,18 +11515,39 @@ def local_register(name, host, user, key):
     target = host or "localhost"
     click.echo(f"Scanning {target}...")
     query = "index,name,memory.total,driver_version,utilization.gpu,temperature.gpu"
-    cmd = f"nvidia-smi --query-gpu={query} --format=csv,noheader,nounits"
     if host:
-        ssh_opts = f"-o StrictHostKeyChecking=no -o ConnectTimeout=10"
+        # Validate inputs to prevent shell injection
+        import re
+        if not re.match(r'^[a-zA-Z0-9._-]+$', user):
+            click.echo(f"Error: Invalid username format", err=True)
+            return
+        if not re.match(r'^[a-zA-Z0-9._-]+$', host):
+            click.echo(f"Error: Invalid hostname format", err=True)
+            return
+        if key and not re.match(r'^[a-zA-Z0-9._/~-]+$', key):
+            click.echo(f"Error: Invalid key path format", err=True)
+            return
+        
+        # Build SSH command as argument list (no shell=True)
+        ssh_args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"]
         if key:
-            ssh_opts += f" -i {key}"
-        cmd = f"ssh {ssh_opts} {user}@{host} '{cmd}'"
-    try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
-        raw = result.stdout.strip()
-    except Exception as e:
-        click.echo(f"Error scanning {target}: {e}", err=True)
-        return
+            ssh_args.extend(["-i", key])
+        ssh_args.extend([f"{user}@{host}", f"nvidia-smi --query-gpu={query} --format=csv,noheader,nounits"])
+        try:
+            result = subprocess.run(ssh_args, capture_output=True, text=True, timeout=15)
+            raw = result.stdout.strip()
+        except Exception as e:
+            click.echo(f"Error scanning {target}: {e}", err=True)
+            return
+    else:
+        # Local execution - safe since query is hardcoded
+        cmd = f"nvidia-smi --query-gpu={query} --format=csv,noheader,nounits"
+        try:
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
+            raw = result.stdout.strip()
+        except Exception as e:
+            click.echo(f"Error scanning {target}: {e}", err=True)
+            return
     if not raw:
         click.echo(f"No GPUs found on {target}.", err=True)
         return

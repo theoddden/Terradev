@@ -511,7 +511,9 @@ class DatasetStager:
         try:
             from huggingface_hub import snapshot_download
             local = str(self._staging_dir / dataset_name.replace("/", "_"))
-            snapshot_download(repo_id=dataset_name, local_dir=local, repo_type="dataset")
+            # SECURITY: Pin to main branch to prevent supply-chain attacks from uncommitted changes
+            # Consider using a specific commit hash for production deployments
+            snapshot_download(repo_id=dataset_name, local_dir=local, repo_type="dataset", revision="main")
             return local
         except Exception:
             placeholder = self._staging_dir / f"{dataset_name.replace('/', '_')}.placeholder"

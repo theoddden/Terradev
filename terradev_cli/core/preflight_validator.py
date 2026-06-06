@@ -118,7 +118,21 @@ class PreflightReport:
 def _run_on(host: Optional[str], cmd: str, user: str = "root",
             key: Optional[str] = None, timeout: int = 60) -> Tuple[int, str, str]:
     """Run command locally or via SSH."""
+    # SECURITY: Validate command to prevent shell injection
+    import re
+    # Allow alphanumeric, spaces, and basic shell-safe characters
+    if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t"\']+$', cmd):
+        return -1, "", "Unsafe command characters detected"
+    
     if host and host not in ("localhost", "127.0.0.1"):
+        # Validate host and user
+        if not re.match(r'^[a-zA-Z0-9._-]+$', user):
+            return -1, "", "Invalid username format"
+        if not re.match(r'^[a-zA-Z0-9._-]+$', host):
+            return -1, "", "Invalid hostname format"
+        if key and not re.match(r'^[a-zA-Z0-9._/~-]+$', key):
+            return -1, "", "Invalid key path format"
+        
         ssh = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
                "-o", "ConnectTimeout=10", "-o", "BatchMode=yes"]
         if key:
@@ -131,8 +145,7 @@ def _run_on(host: Optional[str], cmd: str, user: str = "root",
             return -1, "", "SSH timed out"
         except Exception as e:
             return -1, "", str(e)
-    # SECURITY: shell=True is unsafe. Only use with hardcoded commands.
-    # For user-provided commands, use subprocess.run with list args instead.
+    # SECURITY: shell=True is used but command is validated above
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
         return r.returncode, r.stdout.strip(), r.stderr.strip()

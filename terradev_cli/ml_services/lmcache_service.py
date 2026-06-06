@@ -48,7 +48,7 @@ class LMCacheConfig:
     s3_endpoint: Optional[str] = None
     
     # Disk-specific
-    disk_path: str = "/tmp/lmcache"
+    disk_path: str = None  # Will use tempfile if not provided
     
     # Performance tuning
     enable_pipelined_backend: bool = False

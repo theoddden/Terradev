@@ -96,13 +96,15 @@ alerting:
 """
             
             # Write Prometheus values
-            with open('/tmp/prometheus-karpenter.yaml', 'w') as f:
+            import tempfile
+            prometheus_file = tempfile.mktemp(prefix="prometheus-karpenter_", suffix=".yaml")
+            with open(prometheus_file, 'w') as f:
                 f.write(prometheus_values)
             
             prometheus_cmd = [
                 "helm", "install", "prometheus", "prometheus-community/prometheus",
                 "--namespace", namespace, "--create-namespace",
-                "--values", "/tmp/prometheus-karpenter.yaml",
+                "--values", prometheus_file,
                 "--wait"
             ]
             
@@ -154,13 +156,15 @@ dashboardProviders:
 """
             
             # Write Grafana values
-            with open('/tmp/grafana-karpenter.yaml', 'w') as f:
+            import tempfile
+            grafana_file = tempfile.mktemp(prefix="grafana-karpenter_", suffix=".yaml")
+            with open(grafana_file, 'w') as f:
                 f.write(grafana_values)
             
             grafana_cmd = [
                 "helm", "install", "grafana", "grafana/grafana",
                 "--namespace", namespace,
-                "--values", "/tmp/grafana-karpenter.yaml",
+                "--values", grafana_file,
                 "--wait"
             ]
             
@@ -473,7 +477,7 @@ dashboardProviders:
                         if response.status == 200:
                             data = await response.json()
                             karpenter_metrics["created_nodes"] = data.get("data", {}).get("result", [{}])[0].get("value", [{}])[0].get("value", 0)
-                except:
+                except Exception:
                     pass
             
             return {

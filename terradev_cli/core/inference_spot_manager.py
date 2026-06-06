@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 class InferenceSpotConfig:
     """Configuration for inference-on-spot"""
     enable_spot_checkpointing: bool = True
-    checkpoint_dir: str = "/tmp/terradev_inference_checkpoints"
+    checkpoint_dir: str = None  # Will use tempfile if not provided
     nvme_path: str = "/mnt/nvme"
     storage_backend: str = "s3"  # s3, gcs, azure, local
     storage_config: Dict[str, Any] = field(default_factory=dict)
@@ -87,7 +87,12 @@ class InferenceSpotManager:
 
     def __init__(self, config: InferenceSpotConfig):
         self.config = config
-        self.checkpoint_dir = Path(config.checkpoint_dir)
+        # Use tempfile if checkpoint_dir not provided
+        if config.checkpoint_dir is None:
+            import tempfile
+            self.checkpoint_dir = Path(tempfile.mkdtemp(prefix="terradev_inference_"))
+        else:
+            self.checkpoint_dir = Path(config.checkpoint_dir)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize checkpoint managers

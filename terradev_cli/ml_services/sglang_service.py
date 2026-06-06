@@ -857,7 +857,7 @@ class SGLangService:
 
     def _build_ssh_args(self, ip: str, user: str, key: Optional[str]) -> List[str]:
         """Build SSH argument list for subprocess (no shell=True, injection-safe)."""
-        args = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes"]
+        args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes"]
         if key:
             args.extend(["-i", key])
         args.extend([f"{user}@{ip}", "bash", "-s"])

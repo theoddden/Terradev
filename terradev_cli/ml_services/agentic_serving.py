@@ -67,7 +67,7 @@ class AgenticServingConfig:
     lmcache_backend: str = "cpu"  # "cpu", "disk", "redis"
     lmcache_redis_url: Optional[str] = None
     lmcache_max_cpu_gb: float = 32.0
-    lmcache_disk_path: str = "/tmp/lmcache"
+    lmcache_disk_path: str = None  # Will use tempfile if not provided
     # Prefill-decode disaggregation
     disaggregation_enabled: bool = False
     prefill_replicas: int = 1
