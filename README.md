@@ -6,6 +6,8 @@
 
 **License: Apache 2.0** - Free and open source for commercial and personal use.
 
+pypi.org/project/terradev-cli/
+
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
 
 **NOTES ON 5.0.0**
