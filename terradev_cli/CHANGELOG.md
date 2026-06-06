@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/USER_GUIDE.md`: full rewrite — replaced dead SaaS web app guide with current CLI reference
 - `docs/architecture.md`: full rewrite — replaced pre-v5 architecture with Rust MCP + CLI layer diagram
 - `docs/sitemap.xml`: removed version-pinned PyPI URL, updated all lastmod dates
-- `terradev_cli/README.md`: version sync to v5.1.5, 104 → 168 tools
+- `terradev_cli/README.md`: version sync to v5.1.5, 104 → 218 tools
 - `demo/generate_gif.py`: "15 clouds" → "21+" in closing tagline
 
 ---
@@ -72,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🎉 **Open Source Release**
 - **Removed paywall** — fully open source under Apache 2.0
 - **Rust MCP Orchestrator**: DAG sequencing, idempotency guarantees, sub-ms tool routing
-- **MCP Server expanded to 168 tools** (55 new in v5.0.0):
+- **MCP Server expanded to 218 tools** (55 new in v5.0.0, further expanded in v5.1.x+):
   - HuggingFace Hub (8): list models, datasets, create/manage endpoints, inference
   - HF Smart Templates (3): hardware recommendation, comparison
   - LangChain/LangGraph/LangSmith (9): workflow creation, orchestrator-worker, evaluation

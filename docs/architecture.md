@@ -2,7 +2,7 @@
 
 ## Overview
 
-Terradev is an imperative CLI for AI workload orchestration. It provisions topology-optimized GPU instances across 21+ cloud providers, launches distributed training jobs with automatic FlashOptim injection, and deploys inference stacks (vLLM, MoE templates, disaggregated prefill/decode, RAG) — all orchestrated via a Rust-based MCP server with 168 tools for Claude Code and other AI agents.
+Terradev is an imperative CLI for AI workload orchestration. It provisions topology-optimized GPU instances across 21+ cloud providers, launches distributed training jobs with automatic FlashOptim injection, and deploys inference stacks (vLLM, MoE templates, disaggregated prefill/decode, RAG) — all orchestrated via a Rust-based MCP server with 218 tools for Claude Code and other AI agents.
 
 ## System Layers
 
@@ -13,7 +13,7 @@ Terradev is an imperative CLI for AI workload orchestration. It provisions topol
                        │ MCP protocol (JSON-RPC 2.0)
 ┌──────────────────────▼──────────────────────────────┐
 │  Rust MCP Orchestrator  (terradev-mcp)               │
-│  168 tools · DAG sequencing · idempotency guarantees │
+│  218 tools · DAG sequencing · idempotency guarantees │
 └──────────────────────┬──────────────────────────────┘
                        │ Python interop / subprocess
 ┌──────────────────────▼──────────────────────────────┐
@@ -163,7 +163,7 @@ Terradev/
 │   └── glm-5/
 ├── rust/                           — Rust accelerators + NVML bindings
 ├── terradev-mcp/
-│   └── terradev_mcp.py             — 168-tool MCP server
+│   └── terradev_mcp.py             — 218-tool MCP server
 └── docs/
     ├── USER_GUIDE.md
     └── architecture.md

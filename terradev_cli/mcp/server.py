@@ -8,7 +8,7 @@ cross-provider migration, vLLM/SGLang/Ollama inference, Arize Phoenix trace obse
 NeMo Guardrails output safety, Qdrant vector DB, Ray cluster management, W&B/LangSmith/MLflow/DVC,
 HuggingFace Hub, Datadog monitoring, data governance, cost optimization, FlashOptim training,
 Langfuse LLM observability, Databricks MLOps, vLLM auto-optimization/analysis/benchmarking,
-Enterprise SSO, Latitude.sh provider, and Terraform-powered parallel provisioning across 20 cloud providers.
+Enterprise SSO, Latitude.sh provider, and Terraform-powered parallel provisioning across 21+ cloud providers.
 """
 
 import argparse
@@ -913,7 +913,7 @@ except ImportError:
 _ALL_TOOLS = [
         Tool(
             name="quote_gpu",
-            description="Get real-time GPU prices across 20 cloud providers (incl. Alibaba, OVHcloud, FluidStack, Hetzner, SiliconFlow, Latitude.sh)",
+            description="Get real-time GPU prices across 21+ cloud providers (incl. Alibaba, OVHcloud, FluidStack, Hetzner, SiliconFlow, Latitude.sh, Nebius, Lepton, Paperspace)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -957,7 +957,7 @@ _ALL_TOOLS = [
                         "description": "Cloud providers for parallel distribution",
                         "items": {
                             "type": "string",
-                            "enum": ["runpod", "vastai", "lambda", "aws", "gcp", "azure", "coreweave", "tensordock", "oracle", "crusoe", "digitalocean", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude"]
+                            "enum": ["runpod", "vastai", "lambda", "aws", "gcp", "azure", "coreweave", "tensordock", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude", "nebius", "lepton", "voltage_park", "genesis_cloud", "paperspace", "crusoe"]
                         }
                     },
                     "max_price": {
@@ -1313,7 +1313,7 @@ _ALL_TOOLS = [
                     "provider": {
                         "type": "string",
                         "description": "Provider name",
-                        "enum": ["runpod", "aws", "vastai", "gcp", "azure", "lambda", "coreweave", "tensordock", "oracle", "crusoe", "digitalocean", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude"]
+                        "enum": ["runpod", "aws", "vastai", "gcp", "azure", "lambda", "coreweave", "tensordock", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude", "nebius", "lepton", "voltage_park", "genesis_cloud", "paperspace", "crusoe"]
                     },
                     "quick": {
                         "type": "boolean",
@@ -1333,7 +1333,7 @@ _ALL_TOOLS = [
                     "provider": {
                         "type": "string",
                         "description": "Provider to configure",
-                        "enum": ["runpod", "aws", "vastai", "gcp", "azure", "lambda", "coreweave", "tensordock", "oracle", "crusoe", "digitalocean", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude"]
+                        "enum": ["runpod", "aws", "vastai", "gcp", "azure", "lambda", "coreweave", "tensordock", "hyperstack", "alibaba", "ovhcloud", "fluidstack", "hetzner", "siliconflow", "latitude", "nebius", "lepton", "voltage_park", "genesis_cloud", "paperspace", "crusoe"]
                     }
                 },
                 "required": ["provider"]
@@ -1432,7 +1432,7 @@ _ALL_TOOLS = [
         ),
         Tool(
             name="price_intel",
-            description="GPU price intelligence with quantitative analytics. Computes delta (rate of change), gamma (acceleration), and annualized realized volatility on GPU spot/on-demand prices across all 15 providers. Identifies cheapest time windows and provider arbitrage opportunities.",
+            description="GPU price intelligence with quantitative analytics. Computes delta (rate of change), gamma (acceleration), and annualized realized volatility on GPU spot/on-demand prices across 21+ providers. Identifies cheapest time windows and provider arbitrage opportunities.",
             inputSchema={
                 "type": "object",
                 "properties": {
