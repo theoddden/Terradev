@@ -163,16 +163,6 @@ dev = [
     "build>=0.10.0",
     "twine>=4.0.0",
 ]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-asyncio_mode = "auto"
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = "-v --tb=short"
-
-[project.optional-dependencies]
 enterprise = [
     "python3-saml>=1.13.0",
     "authlib>=1.2.0",
@@ -181,6 +171,14 @@ enterprise = [
     "redis>=5.0.0",
     "PyJWT>=2.8.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
 
 [project.urls]
 Homepage = "https://github.com/theoddden/Terradev"
