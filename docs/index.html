@@ -3,36 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Terradev CLI - Cross-Cloud GPU Optimization</title>
-    <meta name="description" content="BYOAPI: Cross-cloud GPU provisioning, distributed training orchestration, and cost optimization. 15 cloud providers, MCP server for Claude Code, provision-to-train bridge, checkpoint management.">
-    <meta name="keywords" content="GPU, cloud computing, cost optimization, multi-cloud, machine learning, distributed training, MCP server, Claude Code, checkpoint management, torchrun, deepspeed, AWS, GCP, Azure, RunPod, H100, A100">
+    <title>Terradev CLI - Cross-Cloud GPU Orchestration</title>
+    <meta name="description" content="BYOAPI: Cross-cloud GPU provisioning, distributed training, and inference orchestration. 21+ cloud providers, Rust MCP server for Claude Code, NUMA topology optimization, MoE templates, disaggregated inference.">
+    <meta name="keywords" content="GPU, cloud computing, cost optimization, multi-cloud, machine learning, distributed training, MCP server, Claude Code, vLLM, MoE, disaggregated inference, NUMA topology, torchrun, deepspeed, AWS, GCP, Azure, RunPod, H100, A100, FlashOptim, Qdrant, RAG, LoRA">
     <meta name="author" content="Terradev Team">
     
     <!-- Open Graph -->
-    <meta property="og:title" content="Terradev CLI - Cross-Cloud GPU Optimization">
-    <meta property="og:description" content="BYOAPI: Cross-cloud GPU provisioning, distributed training, and cost optimization. 15 providers, MCP for Claude Code.">
-    <meta property="og:url" content="https://theodden.github.io/">
+    <meta property="og:title" content="Terradev CLI - Cross-Cloud GPU Orchestration">
+    <meta property="og:description" content="BYOAPI: 21+ cloud providers, NUMA topology, MoE templates, disaggregated inference, FlashOptim auto-injection, 168-tool Rust MCP server for Claude Code.">
+    <meta property="og:url" content="https://theoddden.github.io/Terradev/">
     <meta property="og:type" content="website">
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Terradev CLI - Cross-Cloud GPU Optimization">
-    <meta name="twitter:description" content="BYOAPI: Cross-cloud GPU provisioning, distributed training, and cost optimization. 15 providers, MCP for Claude Code.">
+    <meta name="twitter:title" content="Terradev CLI - Cross-Cloud GPU Orchestration">
+    <meta name="twitter:description" content="BYOAPI: 21+ cloud providers, NUMA topology, MoE templates, disaggregated inference, FlashOptim auto-injection, 168-tool Rust MCP server.">
     
     <!-- Canonical URL -->
-    <link rel="canonical" href="https://github.com/theoddden/terradev">
+    <link rel="canonical" href="https://github.com/theoddden/Terradev">
     
     <!-- Redirect after 3 seconds -->
-    <meta http-equiv="refresh" content="3; url=https://github.com/theoddden/terradev">
+    <meta http-equiv="refresh" content="3; url=https://github.com/theoddden/Terradev">
     
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 40px 20px;
             line-height: 1.6;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
             color: white;
             min-height: 100vh;
             display: flex;
@@ -40,115 +40,206 @@
             justify-content: center;
         }
         .container {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(12px);
             border-radius: 20px;
             padding: 40px;
             text-align: center;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         h1 {
-            font-size: 2.5em;
-            margin-bottom: 20px;
-            font-weight: 700;
+            font-size: 2.8em;
+            margin-bottom: 8px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .version-badge {
+            display: inline-block;
+            background: rgba(99, 202, 183, 0.2);
+            border: 1px solid rgba(99, 202, 183, 0.5);
+            color: #63cab7;
+            font-size: 0.85em;
+            font-weight: 600;
+            padding: 3px 12px;
+            border-radius: 20px;
+            margin-bottom: 16px;
         }
         .subtitle {
-            font-size: 1.2em;
+            font-size: 1.15em;
             margin-bottom: 30px;
-            opacity: 0.9;
+            opacity: 0.85;
         }
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 16px;
             margin: 30px 0;
+            text-align: left;
         }
         .feature {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.07);
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            transition: border-color 0.2s;
+        }
+        .feature:hover {
+            border-color: rgba(255, 255, 255, 0.3);
         }
         .feature h3 {
-            margin: 0 0 10px 0;
+            margin: 0 0 8px 0;
             color: #fff;
+            font-size: 0.95em;
+        }
+        .feature p {
+            margin: 0;
+            font-size: 0.82em;
+            opacity: 0.75;
+            line-height: 1.4;
         }
         .btn {
             display: inline-block;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.12);
             color: white;
-            padding: 15px 30px;
+            padding: 13px 28px;
             text-decoration: none;
             border-radius: 30px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.25);
             font-weight: 600;
-            margin: 20px 10px;
-            transition: all 0.3s ease;
+            font-size: 0.9em;
+            margin: 8px 6px;
+            transition: all 0.2s ease;
         }
         .btn:hover {
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.22);
             transform: translateY(-2px);
         }
+        .btn-primary {
+            background: rgba(99, 202, 183, 0.2);
+            border-color: rgba(99, 202, 183, 0.5);
+        }
+        .btn-primary:hover {
+            background: rgba(99, 202, 183, 0.35);
+        }
         .countdown {
-            font-size: 1.1em;
+            font-size: 1em;
             margin: 20px 0;
-            opacity: 0.8;
+            opacity: 0.7;
         }
         .links {
-            margin-top: 30px;
+            margin-top: 24px;
         }
         .logo {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 20px;
-            background: rgba(255, 255, 255, 0.2);
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 16px;
+            background: rgba(99, 202, 183, 0.15);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 2em;
             font-weight: bold;
+            border: 1px solid rgba(99, 202, 183, 0.3);
+        }
+        .stat-row {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-num {
+            font-size: 1.6em;
+            font-weight: 800;
+            color: #63cab7;
+        }
+        .stat-label {
+            font-size: 0.75em;
+            opacity: 0.65;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo">🚀</div>
+        <div class="logo">⚡</div>
         <h1>Terradev CLI</h1>
-        <div class="subtitle">Cross-Cloud GPU Provisioning + Training Platform &mdash; v3.4.0</div>
+        <div class="version-badge">v5.1.5</div>
+        <div class="subtitle">Cross-Cloud GPU Provisioning · Training · Inference Orchestration</div>
+
+        <div class="stat-row">
+            <div class="stat">
+                <div class="stat-num">21+</div>
+                <div class="stat-label">Cloud Providers</div>
+            </div>
+            <div class="stat">
+                <div class="stat-num">168</div>
+                <div class="stat-label">MCP Tools</div>
+            </div>
+            <div class="stat">
+                <div class="stat-num">90%</div>
+                <div class="stat-label">Max Cost Savings</div>
+            </div>
+            <div class="stat">
+                <div class="stat-num">9x</div>
+                <div class="stat-label">vLLM Throughput</div>
+            </div>
+        </div>
         
         <div class="features">
             <div class="feature">
                 <h3>💰 Price Arbitrage</h3>
-                <p>15 providers, real-time cost optimization</p>
+                <p>21+ providers, real-time spot pricing, up to 90% savings vs on-demand</p>
+            </div>
+            <div class="feature">
+                <h3>🔬 NUMA Topology</h3>
+                <p>Auto-aligned GPU/NIC, GPUDirect RDMA, SR-IOV — eliminates 30-50% BW penalty</p>
             </div>
             <div class="feature">
                 <h3>🏋️ Training Pipeline</h3>
-                <p>torchrun / deepspeed / accelerate / megatron</p>
+                <p>torchrun · DeepSpeed · Accelerate · Megatron + FlashOptim auto-injection</p>
             </div>
             <div class="feature">
-                <h3>🤖 MCP Server</h3>
-                <p>Native Claude Code integration</p>
+                <h3>🧠 MoE Templates</h3>
+                <p>KV cache offloading, speculative decoding, sleep mode — all auto-applied</p>
             </div>
             <div class="feature">
-                <h3>🔐 Secure SSH Keys</h3>
-                <p>Auto-injected, encrypted at rest</p>
+                <h3>⚡ Disaggregated Inference</h3>
+                <p>Prefill/decode separation via NIXL + sticky routing for MoE at scale</p>
+            </div>
+            <div class="feature">
+                <h3>🤖 Rust MCP Server</h3>
+                <p>168 tools, Claude Code native, order-of-magnitude faster than Python MCP</p>
+            </div>
+            <div class="feature">
+                <h3>🗄️ RAG Stack</h3>
+                <p>Qdrant vector DB, NeMo Guardrails, Arize Phoenix tracing — deploy in one command</p>
+            </div>
+            <div class="feature">
+                <h3>☸️ K8s GPU Clusters</h3>
+                <p>Karpenter NodePools, GPU operator, MIG, time-slicing, Prometheus/Grafana</p>
             </div>
         </div>
         
         <div class="countdown">
-            Redirecting to GitHub repository in <span id="countdown">3</span> seconds...
+            Redirecting to GitHub in <span id="countdown">3</span> seconds&hellip;
         </div>
         
         <div class="links">
-            <a href="https://github.com/theoddden/terradev" class="btn">📦 GitHub</a>
-            <a href="https://pypi.org/project/terradev-cli/3.4.0/" class="btn">🐍 PyPI</a>
+            <a href="https://github.com/theoddden/Terradev" class="btn btn-primary">📦 GitHub</a>
+            <a href="https://pypi.org/project/terradev-cli/" class="btn">🐍 PyPI</a>
             <a href="https://www.npmjs.com/package/terradev-mcp" class="btn">📡 NPM (MCP)</a>
         </div>
         
-        <div style="margin-top: 30px; opacity: 0.7; font-size: 0.9em;">
-            <p>🔗 <a href="https://github.com/theoddden/terradev" style="color: white;">github.com/theoddden/terradev</a></p>
-            <p>📄 <a href="https://github.com/theoddden/terradev?tab=License-1-ov-file" style="color: white;">BUSL 1.1 License</a></p>
+        <div style="margin-top: 24px; opacity: 0.6; font-size: 0.85em;">
+            <p>🔗 <a href="https://github.com/theoddden/Terradev" style="color: #63cab7;">github.com/theoddden/Terradev</a></p>
+            <p>📄 <a href="https://github.com/theoddden/Terradev?tab=License-1-ov-file" style="color: #63cab7;">Apache 2.0 License</a></p>
         </div>
     </div>
 
@@ -159,7 +250,7 @@
             document.getElementById('countdown').textContent = countdown;
             if (countdown <= 0) {
                 clearInterval(timer);
-                window.location.href = 'https://github.com/theoddden/terradev';
+                window.location.href = 'https://github.com/theoddden/Terradev';
             }
         }, 1000);
     </script>

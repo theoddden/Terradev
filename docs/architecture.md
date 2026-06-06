@@ -1,228 +1,171 @@
-# Terradev Architecture
+# Terradev Architecture — v5.1.5
 
 ## Overview
 
-Terradev is a comprehensive platform that automates the provisioning of GPU compute resources and connects them with open source models and datasets. The platform uses Terraform for infrastructure-as-code and provides a user-friendly interface for environment generation.
+Terradev is an imperative CLI for AI workload orchestration. It provisions topology-optimized GPU instances across 21+ cloud providers, launches distributed training jobs with automatic FlashOptim injection, and deploys inference stacks (vLLM, MoE templates, disaggregated prefill/decode, RAG) — all orchestrated via a Rust-based MCP server with 168 tools for Claude Code and other AI agents.
+
+## System Layers
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Claude Code / AI Agent (MCP client)                │
+└──────────────────────┬──────────────────────────────┘
+                       │ MCP protocol (JSON-RPC 2.0)
+┌──────────────────────▼──────────────────────────────┐
+│  Rust MCP Orchestrator  (terradev-mcp)               │
+│  168 tools · DAG sequencing · idempotency guarantees │
+└──────────────────────┬──────────────────────────────┘
+                       │ Python interop / subprocess
+┌──────────────────────▼──────────────────────────────┐
+│  terradev-cli  (Python)                              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
+│  │Providers │ │ Training │ │Inference │ │  K8s   │ │
+│  │  21+     │ │Orchestr. │ │ vLLM/MoE │ │Cluster │ │
+│  └──────────┘ └──────────┘ └──────────┘ └────────┘ │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
+│  │  Qdrant  │ │ Phoenix  │ │Guardrails│ │  LoRA  │ │
+│  │  (RAG)   │ │ (Traces) │ │ (Safety) │ │Adapters│ │
+│  └──────────┘ └──────────┘ └──────────┘ └────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+---
 
 ## Core Components
 
-### 1. Model Registry
-- **Purpose**: Discovers and catalogs open source models from various repositories
-- **Sources**: Hugging Face Hub, TensorFlow Hub, PyTorch Hub
-- **Features**: Model metadata, resource requirements, popularity scoring
+### 1. Rust MCP Orchestrator (`terradev-mcp`)
 
-### 2. Dataset Registry
-- **Purpose**: Manages dataset discovery and integration
-- **Sources**: Public datasets, custom data feeds
-- **Features**: Automatic preprocessing, format conversion, versioning
+- **Protocol**: JSON-RPC 2.0 over stdio (MCP spec)
+- **Tools**: 168 Tool() definitions with full JSON Schema validation
+- **DAG execution**: Enforces correct sequencing and idempotency — agents can issue commands freely, orchestrator ensures safe execution
+- **Performance**: Sub-millisecond overhead per tool call vs ~50ms for Python MCP servers
 
-### 3. Compute Optimizer
-- **Purpose**: Recommends optimal GPU instances based on requirements
-- **Features**: Cost optimization, performance matching, budget constraints
+### 2. Provider Layer (21+ clouds)
 
-### 4. Environment Generator
-- **Purpose**: Creates complete ML environments with a single command
-- **Features**: Interactive setup, Terraform generation, dependency management
+Each provider implements the `BaseProvider` async interface: `list_instances()`, `provision()`, `terminate()`, `get_status()`. Providers with non-standard auth (Alibaba HMAC, OVHcloud HMAC) bypass `_make_request()` and use raw aiohttp to avoid auth header clobbering.
 
-### 5. Infrastructure Modules
-- **GPU Compute**: Auto-scaling GPU instances with monitoring
-- **Storage**: S3, EFS, EBS integration
-- **Data Feeds**: Automated data ingestion and processing
-- **Networking**: VPC, security groups, load balancing
+**Providers**: RunPod, Vast.ai, Lambda Labs, CoreWeave, AWS, GCP, Azure, Hyperstack, TensorDock, Latitude.sh (bare metal + VM), FluidStack, Alibaba Cloud, OVHcloud, Hetzner, SiliconFlow, Paperspace, Crusoe, Lepton, Voltage Park, Genesis Cloud, Nebius.
 
-## How It Works
+### 3. NUMA Topology Engine
 
-### 1. Model Discovery
+Auto-applied on every `terradev provision` — no user config required:
+- **NUMA alignment** — GPU and NIC forced to same NUMA node
+- **GPUDirect RDMA** — `nvidia_peermem`, zero-copy GPU↔GPU transfers
+- **CPU pinning** — static CPU manager policy, no core migration
+- **SR-IOV** — virtual functions per GPU for isolated RDMA paths
+- **NCCL tuning** — InfiniBand enabled, `GDR_LEVEL=PIX`, `GDR_READ=1`
+
+### 4. Training Orchestrator (`core/training_orchestrator.py`)
+
+- **Frameworks**: torchrun, DeepSpeed, Accelerate, Megatron-LM
+- **FlashOptim** (Databricks): auto-injected when `bf16`/`fp16` detected and total VRAM ≥ 40GB. Injects `FLASHOPTIM_*` env vars, pre-installs package on all nodes
+- **Checkpoint management**: save/restore/verify/repair with integrity checksums
+- **Dataset staging**: parallel compression + multi-region S3 pre-placement
+- **Straggler detection**: identifies slow nodes in distributed runs
+
+### 5. vLLM / Inference Services (`ml_services/vllm_service.py`)
+
+**Auto-applied for MoE templates** (zero config):
+- KV cache offloading (`--kv-connector=offloading`) — up to 9x throughput
+- MTP speculative decoding (`--speculative-config.method=mtp`) — up to 2.8x speed
+- Sleep mode (`--enable-sleep-mode`) — 18–200x faster than cold restart
+
+**User opt-in**: Multi-LoRA (`terradev lora add/list/remove`), vLLM Router for P/D disaggregation.
+
+**Disaggregated Prefill/Decode**: prefill pool (compute-bound) + decode pool (memory-bound) connected via NIXL zero-copy RDMA with sticky routing for KV cache locality.
+
+### 6. RAG Stack
+
+| Service | File | Port | Auth |
+|---------|------|------|------|
+| Qdrant (vector DB) | `ml_services/qdrant_service.py` | 6333/6334 | `api-key` header |
+| Arize Phoenix (traces) | `ml_services/phoenix_service.py` | 6006 | Bearer (cloud) / none (self-hosted) |
+| NeMo Guardrails (safety) | `ml_services/guardrails_service.py` | 8000 | config_id |
+
+RAG template (`clusters/rag-template/`) deploys all three + embedding model + Redis in one command.
+
+### 7. Kubernetes Layer
+
+`terradev_cli/kubernetes/` + `kubernetes_enhanced.py`
+
+- **Karpenter NodePools**: NUMA-aligned kubelet Topology Manager, GPUDirect RDMA, PCIe locality enforcement
+- **GPU Operator**: NVIDIA device plugin, MIG configuration, time-slicing
+- **Monitoring stack**: Prometheus + Grafana + DCGM exporter
+- **API versions**: `karpenter.sh/v1`, `karpenter.k8s.aws/v1`
+
+---
+
+## Data Flows
+
+### Training
 ```
-User selects task type → Framework selection → Model catalog → Model selection
+terradev train
+  → preflight (GPU / NCCL / RDMA validation)
+  → stage (dataset compress + pre-place to S3)
+  → _flashoptim_auto_config()   (inject if eligible)
+  → _launch_native()            (torchrun / deepspeed)
+  → monitor (live GPU util + cost)
+  → checkpoint (periodic save)
 ```
 
-### 2. Dataset Integration
+### Inference (MoE)
 ```
-Task type → Available datasets → Dataset selection → Data ingestion
-```
-
-### 3. Compute Optimization
-```
-Model requirements + Dataset size → Instance matching → Cost analysis → Recommendation
-```
-
-### 4. Environment Generation
-```
-All selections → Terraform templates → Infrastructure deployment → Ready-to-use environment
+terradev provision --task clusters/moe-template/task.yaml
+  → NUMA topology applied
+  → vLLM deployed with auto-flags:
+      --kv-connector=offloading
+      --speculative-config.method=mtp
+      --enable-sleep-mode
+  → LMCache (Redis KV sharing across replicas)
+  → (opt-in) vLLM Router for P/D disaggregation
 ```
 
-## Technical Architecture
-
-### Frontend Interface
-- **CLI Tool**: `environment-generator.py` - Interactive environment setup
-- **Query Tools**: `query-gpu.py`, `data-manager.py` - Resource management
-
-### Backend Services
-- **Model Registry Service**: Lambda-based model discovery
-- **Data Processing Service**: Automated dataset preprocessing
-- **Compute Optimization Engine**: Instance recommendation algorithm
-
-### Infrastructure Layer
-- **Terraform Modules**: Reusable infrastructure components
-- **AWS Services**: EC2, S3, Lambda, API Gateway, CloudWatch
-- **Multi-cloud Support**: AWS, GCP, Azure integration
-
-### Data Flow
+### MCP Tool Call
 ```
-User Input → Model Registry → Dataset Registry → Compute Optimizer → Terraform Generation → AWS Deployment
+Agent: tool_call("provision_gpu", {...})
+  → Rust MCP router
+  → command_map["provision_gpu"]
+  → Python CLI handler (async)
+  → BaseProvider.provision() + NUMA topology
+  → result JSON streamed to agent
 ```
 
-## Supported Models and Frameworks
+---
 
-### Computer Vision
-- **TensorFlow**: EfficientNet, ResNet, MobileNet
-- **PyTorch**: ResNet, Vision Transformer, CLIP
-- **Hugging Face**: ViT, CLIP, DETR
+## Credential Security
 
-### Natural Language Processing
-- **Hugging Face**: BERT, GPT-2, T5, RoBERTa
-- **TensorFlow**: Universal Sentence Encoder, BERT
-- **PyTorch**: TransformerXL, GPT
+All credentials stored at `~/.terradev/credentials.json` — **never transmitted to Terradev servers**. SSH keys are auto-generated per-provision, encrypted at rest. BYOAPI means Terradev has zero visibility into your cloud accounts.
 
-### Reinforcement Learning
-- **PyTorch**: PPO, A2C, DQN (via Stable Baselines3)
-- **TensorFlow**: TF-Agents implementations
+---
 
-### Time Series
-- **TensorFlow**: LSTM, Prophet
-- **PyTorch**: LSTM, GRU models
+## Repository Structure
 
-## Instance Types and Pricing
+```
+Terradev/
+├── terradev_cli/
+│   ├── cli.py                      — Main CLI entry (Click)
+│   ├── providers/                  — 21+ cloud provider implementations
+│   ├── core/
+│   │   ├── training_orchestrator.py
+│   │   ├── provision_orchestrator.py
+│   │   └── trace_viewer.py
+│   ├── ml_services/
+│   │   ├── vllm_service.py
+│   │   ├── qdrant_service.py
+│   │   ├── phoenix_service.py
+│   │   └── guardrails_service.py
+│   └── kubernetes/
+│       ├── kubernetes_service.py
+│       └── kubernetes_enhanced.py
+├── clusters/
+│   ├── moe-template/               — MoE deployment (all opts auto-applied)
+│   ├── rag-template/               — Qdrant + Phoenix + Guardrails
+│   └── glm-5/
+├── rust/                           — Rust accelerators + NVML bindings
+├── terradev-mcp/
+│   └── terradev_mcp.py             — 168-tool MCP server
+└── docs/
+    ├── USER_GUIDE.md
+    └── architecture.md
+```
 
-### AWS GPU Instances
-| Instance | GPU Memory | RAM | On-Demand | Spot | Use Cases |
-|----------|-------------|-----|-----------|------|-----------|
-| p3.2xlarge | 16GB | 61GB | $3.06/hr | $0.92/hr | Medium training |
-| p3.8xlarge | 64GB | 244GB | $12.24/hr | $3.68/hr | Large training |
-| p4d.24xlarge | 320GB | 1152GB | $32.77/hr | $9.83/hr | Large models |
-| g4dn.xlarge | 16GB | 16GB | $0.53/hr | $0.16/hr | Inference |
-| g5.xlarge | 24GB | 16GB | $1.01/hr | $0.30/hr | Training/Inference |
-
-## Security and Compliance
-
-### Data Security
-- **Encryption**: All data encrypted at rest and in transit
-- **Access Control**: IAM roles and policies
-- **Network Security**: VPC isolation, security groups
-
-### Model Security
-- **Model Verification**: Checksums and integrity validation
-- **Secure Storage**: Encrypted model storage
-- **Access Logging**: Audit trails for model access
-
-## Cost Optimization
-
-### Spot Instances
-- **Cost Savings**: Up to 90% savings vs on-demand
-- **Interruption Handling**: Automatic checkpointing
-- **Mixed Strategy**: Combine spot and on-demand
-
-### Auto-scaling
-- **Dynamic Scaling**: Scale based on workload
-- **Cost Controls**: Budget limits and alerts
-- **Resource Optimization**: Right-sizing recommendations
-
-## Monitoring and Observability
-
-### Infrastructure Monitoring
-- **CloudWatch Metrics**: CPU, GPU, memory utilization
-- **Custom Dashboards**: Real-time performance views
-- **Alerting**: Cost and performance alerts
-
-### Model Monitoring
-- **Training Metrics**: Loss, accuracy, convergence
-- **Resource Usage**: GPU memory, compute time
-- **Performance Tracking**: Model benchmarking
-
-## Extensibility
-
-### Adding New Models
-1. Update model registry with new model metadata
-2. Add requirements and compute specifications
-3. Update discovery service
-
-### Supporting New Clouds
-1. Create cloud-specific Terraform modules
-2. Update compute optimizer with pricing
-3. Add cloud provider configurations
-
-### Custom Frameworks
-1. Add framework to enum definitions
-2. Create framework-specific requirements
-3. Update model discovery logic
-
-## Use Cases
-
-### 1. ML Research
-- Rapid prototyping with different models
-- Dataset experimentation
-- Cost-effective training
-
-### 2. Production Deployment
-- Scalable inference endpoints
-- Model versioning
-- A/B testing support
-
-### 3. Education
-- Learning environments for students
-- Pre-configured setups
-- Budget controls
-
-### 4. Enterprise
-- Standardized environments
-- Compliance and security
-- Cost management
-
-## Future Enhancements
-
-### 1. Advanced Model Registry
-- Model performance benchmarks
-- Automated model selection
-- Fine-tuning recommendations
-
-### 2. Multi-cloud Orchestration
-- Cross-cloud deployments
-- Cost optimization across providers
-- Disaster recovery
-
-### 3. Collaboration Features
-- Team workspaces
-- Model sharing
-- Experiment tracking
-
-### 4. Advanced Analytics
-- Usage analytics
-- Cost optimization insights
-- Performance recommendations
-
-## Implementation Timeline
-
-### Phase 1: Core Platform (Current)
-- ✅ Basic infrastructure modules
-- ✅ Model and dataset registries
-- ✅ Environment generator
-- ✅ AWS integration
-
-### Phase 2: Enhanced Features
-- 🔄 Advanced model discovery
-- 🔄 Multi-cloud support
-- 🔄 Performance optimization
-- 🔄 Collaboration features
-
-### Phase 3: Enterprise Features
-- ⏳ Advanced security
-- ⏳ Compliance frameworks
-- ⏳ Advanced monitoring
-- ⏳ Cost optimization
-
-## Conclusion
-
-Terradev provides a comprehensive solution for automating GPU compute provisioning and connecting it with open source models and datasets. The platform is designed to be extensible, cost-effective, and user-friendly, making it suitable for researchers, data scientists, and enterprises alike.
-
-The modular architecture allows for easy customization and extension, while the Terraform-based infrastructure ensures reproducibility and scalability.

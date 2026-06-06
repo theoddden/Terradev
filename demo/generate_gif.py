@@ -290,7 +290,7 @@ def build_frames():
         ("", FG),
         [("   ", FG), ("pip install terradev-cli", GREEN)],
         ("", FG),
-        [("   15 clouds", YELLOW), (" · ", DIM), ("NUMA topology", MAGENTA),
+        [("   21+ clouds", YELLOW), (" · ", DIM), ("NUMA topology", MAGENTA),
          (" · ", DIM), ("price intelligence", ORANGE)],
         [("   disaggregated inference", BLUE), (" · ", DIM), ("MoE templates", CYAN)],
         ("", FG),
