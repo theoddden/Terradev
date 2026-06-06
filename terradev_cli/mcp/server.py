@@ -318,10 +318,39 @@ async def execute_terradev_command(args: List[str]) -> Dict[str, Any]:
         }
 
 async def execute_shell_command(cmd: str, timeout: int = 120) -> Dict[str, Any]:
-    """Execute a raw shell command (e.g. SSH) and return stdout/stderr/success."""
+    """Execute a raw shell command (e.g. SSH) and return stdout/stderr/success.
+    
+    SECURITY WARNING: This function uses shell=True and is vulnerable to injection.
+    Only use with hardcoded commands or fully sanitized inputs. For user/AI-provided
+    commands, use execute_safe_command instead.
+    """
     try:
         process = await asyncio.create_subprocess_shell(
             cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=timeout)
+        return {
+            "success": process.returncode == 0,
+            "stdout": stdout.decode().strip(),
+            "stderr": stderr_bytes.decode().strip(),
+            "returncode": process.returncode,
+        }
+    except asyncio.TimeoutError:
+        return {"success": False, "stdout": "", "stderr": f"Command timed out after {timeout}s", "returncode": -1}
+    except Exception as e:
+        return {"success": False, "stdout": "", "stderr": str(e), "returncode": -1}
+
+
+async def execute_safe_command(args: List[str], timeout: int = 120) -> Dict[str, Any]:
+    """Execute a command safely using subprocess with list args (no shell=True).
+    
+    This is injection-safe. Use this for all commands with user/AI-provided inputs.
+    """
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -5673,6 +5702,17 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 user = arguments.get("ssh_user", "root")
                 key = arguments.get("ssh_key")
                 api_key = arguments.get("api_key")
+                
+                # Validate inputs to prevent injection
+                if not re.match(r'^[a-zA-Z0-9_\-\.\/:]+$', model):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid model name")], isError=True)
+                if not re.match(r'^[0-9]+$', str(port)):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid port")], isError=True)
+                if not re.match(r'^[a-zA-Z0-9_\-\.]+$', ip):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid IP address")], isError=True)
+                if not re.match(r'^[a-zA-Z0-9_\-]+$', user):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid username")], isError=True)
+                
                 cmd_parts = ["vllm", "serve", model, "--host", "0.0.0.0", "--port", str(port),
                       "--gpu-memory-utilization", str(mem), "--tensor-parallel-size", str(tp),
                       "--enable-sleep-mode", "--kv-connector", "offloading"]
@@ -5681,10 +5721,15 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 exec_line = " ".join(cmd_parts)
                 service = f"""[Unit]\nDescription=vLLM {model}\nAfter=network.target\n[Service]\nType=simple\nExecStart={exec_line}\nRestart=always\nRestartSec=10\nEnvironment=VLLM_SERVER_DEV_MODE=1\n[Install]\nWantedBy=multi-user.target"""
                 service_b64 = base64.b64encode(service.encode()).decode()
+                
+                # Build SSH command safely using shell=True only for base64 decode chain
                 setup = f"echo {service_b64} | base64 -d > /etc/systemd/system/vllm.service && systemctl daemon-reload && systemctl enable vllm && systemctl start vllm && sleep 5 && systemctl status vllm"
-                ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + key if key else ''} {user}@{ip}"
-                full_cmd = f"{ssh_base} '{setup}'"
-                result = await execute_shell_command(full_cmd)
+                ssh_args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"]
+                if key:
+                    ssh_args.extend(["-i", key])
+                ssh_args.extend([f"{user}@{ip}", setup])
+                
+                result = await execute_safe_command(ssh_args)
                 if result["success"]:
                     output_text = f"✅ **vLLM Server Started**\n\n**Model:** {model}\n**Endpoint:** http://{ip}:{port}/v1\n**TP:** {tp}\n**Sleep Mode:** enabled\n**KV Offloading:** enabled\n\n{result['stdout']}\n\n"
                     output_text += f"**suggest_action:** Test with `vllm_inference`. Manage power with `vllm_sleep`/`vllm_wake`."
@@ -5696,9 +5741,19 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 ip = arguments["instance_ip"]
                 user = arguments.get("ssh_user", "root")
                 key = arguments.get("ssh_key")
-                ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + key if key else ''} {user}@{ip}"
-                full_cmd = f"{ssh_base} 'systemctl stop vllm && systemctl disable vllm && rm -f /etc/systemd/system/vllm.service && systemctl daemon-reload'"
-                result = await execute_shell_command(full_cmd)
+                
+                # Validate inputs
+                if not re.match(r'^[a-zA-Z0-9_\-\.]+$', ip):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid IP address")], isError=True)
+                if not re.match(r'^[a-zA-Z0-9_\-]+$', user):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid username")], isError=True)
+                
+                ssh_args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"]
+                if key:
+                    ssh_args.extend(["-i", key])
+                ssh_args.extend([f"{user}@{ip}", "systemctl stop vllm && systemctl disable vllm && rm -f /etc/systemd/system/vllm.service && systemctl daemon-reload"])
+                
+                result = await execute_safe_command(ssh_args)
                 output_text = f"⏹️ **vLLM Server Stopped** on {ip}\n\n{result['stdout']}" if result["success"] else f"❌ {result['stderr']}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
@@ -6055,8 +6110,18 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     
                     ssh_user = arguments.get("ssh_user", "root")
                     ssh_key = arguments.get("ssh_key")
-                    ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + ssh_key if ssh_key else ''} {ssh_user}@{instance_ip}"
-                    result = await execute_shell_command(f"{ssh_base} 'systemctl stop sglang && systemctl disable sglang && rm -f /etc/systemd/system/sglang.service && systemctl daemon-reload'")
+                    
+                    # Validate inputs
+                    if not re.match(r'^[a-zA-Z0-9_\-\.]+$', instance_ip):
+                        return CallToolResult(content=[TextContent(type="text", text="❌ Invalid IP address")], isError=True)
+                    if not re.match(r'^[a-zA-Z0-9_\-]+$', ssh_user):
+                        return CallToolResult(content=[TextContent(type="text", text="❌ Invalid username")], isError=True)
+                    
+                    ssh_args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"]
+                    if ssh_key:
+                        ssh_args.extend(["-i", ssh_key])
+                    ssh_args.extend([f"{ssh_user}@{instance_ip}", "systemctl stop sglang && systemctl disable sglang && rm -f /etc/systemd/system/sglang.service && systemctl daemon-reload"])
+                    result = await execute_safe_command(ssh_args)
                     output_text = f"⏹️ **SGLang Server Stopped** on {instance_ip}" if result["success"] else f"❌ {result['stderr']}"
                     return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
         
@@ -6140,6 +6205,17 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 ep = arguments.get("enable_expert_parallel", False)
                 user = arguments.get("ssh_user", "root")
                 key = arguments.get("ssh_key")
+                
+                # Validate inputs
+                if not re.match(r'^[a-zA-Z0-9_\-\.\/:]+$', model):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid model name")], isError=True)
+                if not re.match(r'^[0-9]+$', str(port)):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid port")], isError=True)
+                if not re.match(r'^[a-zA-Z0-9_\-\.]+$', ip):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid IP address")], isError=True)
+                if not re.match(r'^[a-zA-Z0-9_\-]+$', user):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid username")], isError=True)
+                
                 cmd_parts = ["python3", "-m", "sglang.launch_server", "--model-path", model,
                       "--host", "0.0.0.0", "--port", str(port),
                       "--tp-size", str(tp), "--dp-size", str(dp), "--trust-remote-code"]
@@ -6149,8 +6225,12 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 service = f"""[Unit]\nDescription=SGLang {model}\nAfter=network.target\n[Service]\nType=simple\nExecStart={exec_line}\nRestart=always\nRestartSec=10\nEnvironment=VLLM_USE_DEEP_GEMM=1\nEnvironment=VLLM_ALL2ALL_BACKEND=deepep_low_latency\n[Install]\nWantedBy=multi-user.target"""
                 service_b64 = base64.b64encode(service.encode()).decode()
                 setup = f"echo {service_b64} | base64 -d > /etc/systemd/system/sglang.service && systemctl daemon-reload && systemctl enable sglang && systemctl start sglang && sleep 5 && systemctl status sglang"
-                ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + key if key else ''} {user}@{ip}"
-                result = await execute_shell_command(f"{ssh_base} '{setup}'")
+                ssh_args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"]
+                if key:
+                    ssh_args.extend(["-i", key])
+                ssh_args.extend([f"{user}@{ip}", setup])
+                
+                result = await execute_safe_command(ssh_args)
                 if result["success"]:
                     output_text = f"✅ **SGLang Server Started**\n\n**Model:** {model}\n**Endpoint:** http://{ip}:{port}/v1\n**TP:** {tp}, **DP:** {dp}\n**Expert Parallel:** {ep}\n\n{result['stdout']}\n\n"
                     output_text += "**suggest_action:** Test with `sglang_inference`. Check metrics with `sglang_metrics`."
@@ -6162,8 +6242,19 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 ip = arguments["instance_ip"]
                 user = arguments.get("ssh_user", "root")
                 key = arguments.get("ssh_key")
-                ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + key if key else ''} {user}@{ip}"
-                result = await execute_shell_command(f"{ssh_base} 'systemctl stop sglang && systemctl disable sglang && rm -f /etc/systemd/system/sglang.service && systemctl daemon-reload'")
+                
+                # Validate inputs
+                if not re.match(r'^[a-zA-Z0-9_\-\.]+$', ip):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid IP address")], isError=True)
+                if not re.match(r'^[a-zA-Z0-9_\-]+$', user):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid username")], isError=True)
+                
+                ssh_args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"]
+                if key:
+                    ssh_args.extend(["-i", key])
+                ssh_args.extend([f"{user}@{ip}", "systemctl stop sglang && systemctl disable sglang && rm -f /etc/systemd/system/sglang.service && systemctl daemon-reload"])
+                
+                result = await execute_safe_command(ssh_args)
                 output_text = f"⏹️ **SGLang Server Stopped** on {ip}" if result["success"] else f"❌ {result['stderr']}"
                 return CallToolResult(content=[TextContent(type="text", text=output_text)], isError=not result["success"])
 
@@ -6248,8 +6339,21 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 ip = arguments["instance_ip"]
                 user = arguments.get("ssh_user", "root")
                 key = arguments.get("ssh_key")
-                ssh_base = f"ssh -o StrictHostKeyChecking=no{' -i ' + key if key else ''} {user}@{ip}"
-                result = await execute_shell_command(f"{ssh_base} 'ollama pull {model}'", timeout=600)
+                
+                # Validate inputs
+                if not re.match(r'^[a-zA-Z0-9_\-\.\/:]+$', model):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid model name")], isError=True)
+                if not re.match(r'^[a-zA-Z0-9_\-\.]+$', ip):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid IP address")], isError=True)
+                if not re.match(r'^[a-zA-Z0-9_\-]+$', user):
+                    return CallToolResult(content=[TextContent(type="text", text="❌ Invalid username")], isError=True)
+                
+                ssh_args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"]
+                if key:
+                    ssh_args.extend(["-i", key])
+                ssh_args.extend([f"{user}@{ip}", f"ollama pull {model}"])
+                
+                result = await execute_safe_command(ssh_args, timeout=600)
                 if result["success"]:
                     output_text = f"📥 **Model Pulled: {model}** on {ip}\n\n{result['stdout']}\n\n"
                     output_text += f"**suggest_action:** Generate with `ollama_generate` or chat with `ollama_chat`."

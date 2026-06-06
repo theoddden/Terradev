@@ -131,6 +131,8 @@ def _run_on(host: Optional[str], cmd: str, user: str = "root",
             return -1, "", "SSH timed out"
         except Exception as e:
             return -1, "", str(e)
+    # SECURITY: shell=True is unsafe. Only use with hardcoded commands.
+    # For user-provided commands, use subprocess.run with list args instead.
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
         return r.returncode, r.stdout.strip(), r.stderr.strip()

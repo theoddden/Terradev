@@ -62,7 +62,9 @@ class DriftDetector:
         extra_nodes = [n for n in actual_nodes if n['pod_id'] in extra_pod_ids]
         
         # Check dataset drift (if applicable)
-        dataset_drift = False  # TODO: Implement dataset hash checking
+        dataset_drift = False
+        # Dataset hash checking would require tracking dataset fingerprints
+        # This is a placeholder for future implementation
         
         return DriftReport(
             job=job,
@@ -231,9 +233,12 @@ class DriftDetector:
         try:
             provider = self.provider_factory.get_provider(node.provider)
             
-            # Use existing parallel provisioner
+            # Use instance_type from manifest node, not instance_id
+            # The manifest should store the instance type (e.g., "p3.8xlarge") separately
+            instance_type = getattr(node, 'instance_type', None) or node.instance_id
+            
             result = await provider.provision_instance(
-                instance_type=node.instance_id,  # This would be the instance type, not ID
+                instance_type=instance_type,
                 region=node.region,
                 gpu_type=node.gpu_type
             )

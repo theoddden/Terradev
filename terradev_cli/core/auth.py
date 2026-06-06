@@ -12,6 +12,7 @@ from cryptography.fernet import Fernet
 import base64
 import hashlib
 import secrets
+from datetime import datetime
 
 
 class AuthManager:
@@ -130,7 +131,7 @@ class AuthManager:
         self.credentials[provider] = {
             "api_key": api_key,
             "secret_key": secret_key or "",
-            "updated_at": str(os.times()[4]),  # Current time
+            "updated_at": datetime.now().isoformat(),
         }
 
     def get_credentials(self, provider: str) -> Optional[Dict[str, str]]:
@@ -199,7 +200,7 @@ class AuthManager:
         # Update with new key
         self.credentials[provider]["api_key"] = new_api_key
         self.credentials[provider]["previous_key"] = old_key
-        self.credentials[provider]["rotated_at"] = str(os.times()[4])
+        self.credentials[provider]["rotated_at"] = datetime.now().isoformat()
 
         return True
 
