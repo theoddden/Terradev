@@ -1,10 +1,10 @@
-# 📋 Complete Terradev CLI Command Reference
+# Complete Terradev CLI Command Reference
 
-**All commands and subcommands for Terradev CLI v4.0.1**
+**All commands and subcommands for Terradev CLI v5.1.5**
 
 ---
 
-## 🚀 **Main Commands (60+ Commands)**
+## Main Commands (218+ MCP Tools)
 
 ### **Core Infrastructure Commands**
 
@@ -843,7 +843,7 @@ Options:
 
 ---
 
-## 🎯 **ML Subcommands**
+##  **ML Subcommands**
 
 ### **ml wandb** - Weights & Biases integration
 ```bash
@@ -908,7 +908,7 @@ Commands:
 
 ---
 
-## 🚀 **SGLang Subcommands**
+##  **SGLang Subcommands**
 
 ### **sglang optimize** - Auto-optimize SGLang configuration
 ```bash
@@ -979,7 +979,7 @@ Options:
 
 ---
 
-## 🎯 **vLLM Subcommands**
+##  **vLLM Subcommands**
 
 ### **vllm optimize** - Generate optimized vLLM configurations
 ```bash
@@ -1028,7 +1028,7 @@ Options:
 
 ---
 
-## 🎯 **LoRA Subcommands**
+##  **LoRA Subcommands**
 
 ### **lora add** - Add LoRA adapter
 ```bash
@@ -1096,7 +1096,7 @@ Options:
 
 ---
 
-## 🎯 **Checkpoint Subcommands**
+##  **Checkpoint Subcommands**
 
 ### **checkpoint list** - List all checkpoints
 ```bash
@@ -1160,7 +1160,7 @@ Options:
 
 ---
 
-## 🎯 **InferX Subcommands**
+##  **InferX Subcommands**
 
 ### **inferx deploy** - Deploy serverless endpoint
 ```bash
@@ -1207,7 +1207,7 @@ Options:
 
 ---
 
-## 🎯 **Phoenix Subcommands**
+##  **Phoenix Subcommands**
 
 ### **phoenix projects** - List Phoenix projects
 ```bash
@@ -1274,7 +1274,7 @@ Options:
 
 ---
 
-## 🎯 **Qdrant Subcommands**
+##  **Qdrant Subcommands**
 
 ### **qdrant create-collection** - Create new collection
 ```bash
@@ -1325,7 +1325,7 @@ Options:
 
 ---
 
-## 🎯 **Guardrails Subcommands**
+##  **Guardrails Subcommands**
 
 ### **guardrails deploy** - Deploy guardrails service
 ```bash
@@ -1382,7 +1382,7 @@ Options:
 
 ---
 
-## 🎯 **GitOps Subcommands**
+##  **GitOps Subcommands**
 
 ### **gitops init** - Initialize GitOps repository
 ```bash
@@ -1438,7 +1438,278 @@ Options:
 
 ---
 
-## 🎯 **HF Spaces Subcommands**
+##  **Qdrant Subcommands**
+
+### **qdrant** - Vector database for RAG
+```bash
+terradev qdrant [SUBCOMMAND]
+
+Subcommands:
+  test           Test Qdrant connection
+  collections    List all collections
+  create-collection  Create a new collection
+  info           Get collection info
+  count          Count points in collection
+  k8s            Deploy Qdrant on Kubernetes
+```
+
+### **qdrant create-collection**
+```bash
+terradev qdrant create-collection [OPTIONS]
+
+Options:
+  -n, --name TEXT               Collection name
+  -e, --embedding-model TEXT    Embedding model (e.g., sentence-transformers/all-MiniLM-L6-v2)
+  --dimension INTEGER          Vector dimension (auto-detected from model)
+```
+
+---
+
+##  **Phoenix Subcommands**
+
+### **phoenix** - Arize Phoenix LLM tracing
+```bash
+terradev phoenix [SUBCOMMAND]
+
+Subcommands:
+  test           Test Phoenix connection
+  projects       List Phoenix projects
+  spans          Query spans
+  trace          Get specific trace
+  otel-env       Generate OTLP environment variables
+  snippet        Generate tracing code snippet
+  k8s            Deploy Phoenix on Kubernetes
+```
+
+### **phoenix spans**
+```bash
+terradev phoenix spans [OPTIONS]
+
+Options:
+  -p, --project TEXT           Project name
+  -f, --filter TEXT            SpanQuery DSL filter
+  -l, --limit INTEGER          Max spans to return
+```
+
+---
+
+##  **Guardrails Subcommands**
+
+### **guardrails** - NeMo Guardrails output safety
+```bash
+terradev guardrails [SUBCOMMAND]
+
+Subcommands:
+  test           Test Guardrails connection
+  chat           Chat with guardrails
+  generate-config  Generate Colang config
+  k8s            Deploy Guardrails on Kubernetes
+```
+
+### **guardrails generate-config**
+```bash
+terradev guardrails generate-config [OPTIONS]
+
+Options:
+  -c, --config-type TEXT       Config type (topical, jailbreak, pii, factcheck)
+  -o, --output PATH            Output file path
+```
+
+---
+
+##  **Langfuse Subcommands**
+
+### **langfuse** - LLM observability
+```bash
+terradev langfuse [SUBCOMMAND]
+
+Subcommands:
+  configure      Set Langfuse credentials
+  test           Test connection
+  traces         List traces
+  trace          Get specific trace
+  scores         List scores
+  score          Add a score
+  datasets       List datasets
+  export-training-data  Export training data
+  quality        Quality metrics
+  otel-env       Generate OTLP environment
+  k8s            Deploy on Kubernetes
+```
+
+### **langfuse configure**
+```bash
+terradev langfuse configure [OPTIONS]
+
+Options:
+  --public-key TEXT            Langfuse public key
+  --secret-key TEXT            Langfuse secret key
+  --host TEXT                  Langfuse host URL
+```
+
+---
+
+##  **Databricks Subcommands**
+
+### **databricks** - Databricks MLOps integration
+```bash
+terradev databricks [SUBCOMMAND]
+
+Subcommands:
+  configure      Set Databricks credentials
+  test           Test connection
+  jobs           List jobs
+  run            Run a job
+  run-status     Get job run status
+  clusters       List clusters
+  serving-endpoints  List serving endpoints
+  deploy-model   Deploy model to serving endpoint
+  query          Query a serving endpoint
+  mlflow         MLflow operations
+```
+
+### **databricks deploy-model**
+```bash
+terradev databricks deploy-model [OPTIONS]
+
+Options:
+  --endpoint-name TEXT         Endpoint name (required)
+  --model-name TEXT            Model name (required)
+  --model-version TEXT         Model version
+  --workload-size TEXT         Small|Medium|Large
+  --scale-to-zero              Enable scale-to-zero
+  --no-scale-to-zero           Disable scale-to-zero
+```
+
+---
+
+## 🤖 **Agentic Serving Subcommands**
+
+### **agentic-serving** - Multi-backend inference serving
+```bash
+terradev agentic-serving [SUBCOMMAND]
+
+Subcommands:
+  configure      Configure serving settings
+  show-config    Show current configuration
+  launch-args    Show launch arguments
+  lmcache-env    Generate LMCache environment
+  k8s            Deploy on Kubernetes
+  helm-values    Generate Helm values
+```
+
+---
+
+##  **Retrain Subcommands**
+
+### **retrain** - Automated model retraining
+```bash
+terradev retrain [SUBCOMMAND]
+
+Subcommands:
+  detect         Detect drift
+  trigger        Trigger retraining
+  deploy         Deploy retrained model
+```
+
+### **retrain detect**
+```bash
+terradev retrain detect [OPTIONS]
+
+Options:
+  -m, --model TEXT              Model ID (required)
+  --source phoenix-traces       Use Phoenix traces as data source
+  --method lora                 Use LoRA fine-tuning
+  --eval-threshold FLOAT        Evaluation threshold
+  --deploy canary|direct        Deployment strategy
+  --auto-swap                   Auto-swap after deployment
+  --phoenix-endpoint TEXT       Phoenix endpoint URL
+  --phoenix-project TEXT        Phoenix project name
+  -e, --endpoint TEXT          vLLM endpoint URL
+  --vllm-api-key TEXT           vLLM API key
+  --baseline FLOAT             Baseline performance
+  --threshold FLOAT             Drift threshold
+  --min-samples INTEGER         Minimum samples
+```
+
+---
+
+##  **Migrate Subcommands**
+
+### **migrate** - Cross-cloud migration
+```bash
+terradev migrate [SUBCOMMAND]
+
+Subcommands:
+  plan           Plan migration
+  execute        Execute migration
+  status         Migration status
+  rollback       Rollback migration
+```
+
+---
+
+##  **Eval Subcommands**
+
+### **eval** - Model evaluation
+```bash
+terradev eval [SUBCOMMAND]
+
+Subcommands:
+  run            Run evaluation
+  compare        Compare models
+  benchmark      Benchmark performance
+```
+
+---
+
+##  **Triggers Subcommands**
+
+### **triggers** - Event-driven automation
+```bash
+terradev triggers [SUBCOMMAND]
+
+Subcommands:
+  list           List triggers
+  create         Create trigger
+  delete         Delete trigger
+  enable         Enable trigger
+  disable        Disable trigger
+```
+
+---
+
+##  **Environments Subcommands**
+
+### **environments** - Environment management
+```bash
+terradev environments [SUBCOMMAND]
+
+Subcommands:
+  list           List environments
+  create         Create environment
+  delete         Delete environment
+  promote        Promote to next environment
+  rollback       Rollback environment
+```
+
+---
+
+##  **Lineage Subcommands**
+
+### **lineage** - Data/model lineage tracking
+```bash
+terradev lineage [SUBCOMMAND]
+
+Subcommands:
+  trace          Trace data flow
+  graph          Generate lineage graph
+  export         Export lineage data
+```
+
+---
+
+##  **HF Spaces Subcommands**
 
 ### **hf-space** - One-click HuggingFace Spaces deployment
 ```bash
@@ -1457,7 +1728,7 @@ Options:
 
 ---
 
-## 🎯 **Complete Command Summary**
+##  **Complete Command Summary**
 
 ### **Total Commands: 60+ Main Commands + 200+ Subcommands**
 
@@ -1475,4 +1746,4 @@ Options:
 | **Monitoring** | 6 | Observability, metrics, status |
 | **Utilities** | 10 | Job management, deployment, setup |
 
-**All commands are production-ready and fully documented with comprehensive options and examples.** 🚀
+**All commands are production-ready and fully documented with comprehensive options and examples.** 
