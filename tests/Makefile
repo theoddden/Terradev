@@ -38,7 +38,7 @@ test-setup:
 # Run unit tests only
 test-unit:
 	@echo "Running unit tests..."
-	./test_env/bin/python -m pytest tests/unit/ --cov=terradev_cli --cov-report=html --cov-report=xml -v
+	./test_env/bin/python -m pytest tests/ --cov=terradev_cli --cov-report=html --cov-report=xml --cov-fail-under=70 -v --ignore=tests/test_mcp_handlers.py --ignore=tests/test_integration.py
 
 # Run integration tests
 test-integration:

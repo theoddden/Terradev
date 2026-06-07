@@ -1,0 +1,45 @@
+# Dockerfile for running Terradev CI tests in a container
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    gcc \
+    g++ \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust for testing Rust components
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt || true
+
+# Install test dependencies
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    pytest-xdist \
+    black \
+    flake8 \
+    mypy \
+    ruff \
+    bandit \
+    safety \
+    build
+
+# Copy source code
+COPY . .
+
+# Install Terradev in editable mode
+RUN pip install -e ".[dev]" 2>/dev/null || pip install -e .
+
+# Run tests by default
+CMD ["pytest", "tests/", "-v", "--tb=short", "--ignore=tests/test_mcp_handlers.py", "--ignore=tests/test_integration.py"]
