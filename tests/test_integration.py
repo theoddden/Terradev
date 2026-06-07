@@ -528,8 +528,8 @@ def test_integration(mock, performance, suite, parallel, timeout):
 
     framework = IntegrationTestFramework(config)
 
-    async def run_tests():
-        if suite:
+    async def run_tests(suite_param=suite):
+        if suite_param is not None:
             # Run specific test suite
             test_methods = {
                 "core": framework.test_core_functionality,
@@ -542,13 +542,13 @@ def test_integration(mock, performance, suite, parallel, timeout):
                 "errors": framework.test_error_scenarios,
             }
 
-            if suite in test_methods:
-                result = await test_methods[suite]()
+            if suite_param in test_methods:
+                result = await test_methods[suite_param]()
                 print(
-                    f"\n{suite} test results: {result['passed']}/{result['total']} passed"
+                    f"\n{suite_param} test results: {result['passed']}/{result['total']} passed"
                 )
             else:
-                print(f"Unknown test suite: {suite}")
+                print(f"Unknown test suite: {suite_param}")
                 print(f"Available suites: {', '.join(test_methods.keys())}")
         else:
             # Run all tests

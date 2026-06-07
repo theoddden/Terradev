@@ -25,7 +25,7 @@ class InferXK8sSetup:
                 config.load_kube_config(config_file=kubeconfig)
             else:
                 config.load_kube_config()
-        except:
+        except Exception:
             config.load_incluster_config()
 
         self.v1 = client.CoreV1Api()
@@ -304,7 +304,7 @@ class InferXK8sSetup:
                 ):
                     ingress = service.status.load_balancer.ingress[0]
                     return ingress.ip or ingress.hostname
-            except:
+            except Exception:
                 pass
 
             await asyncio.sleep(10)
@@ -373,7 +373,7 @@ class InferXK8sSetup:
                     plural="modelfunctions",
                 )
                 status["models_deployed"] = len(model_functions.get("items", []))
-            except:
+            except Exception:
                 pass
 
             return status

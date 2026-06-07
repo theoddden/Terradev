@@ -281,7 +281,7 @@ class QuickStart:
                         price_hr=best_quote.get("price", 0),
                         spot=best_quote.get("availability") == "spot",
                     )
-                except:
+                except Exception:
                     pass
 
                 return {

@@ -929,39 +929,6 @@ def onboarding(force):
 # Entire upgrade function body removed - tier system eliminated (open source CLI)
 
 
-def validate_credentials(provider: str, credentials: Dict[str, str]) -> bool:
-    """Validate that all required credentials are present for a provider"""
-    required_creds = {
-        "aws": ["api_key", "secret_key"],
-        "gcp": ["project_id", "credentials_file"],
-        "azure": ["subscription_id", "tenant_id", "client_id", "client_secret"],
-        "runpod": ["api_key"],
-        "vastai": ["api_key"],
-        "lambda_labs": ["api_key"],
-        "coreweave": ["api_key"],
-        "tensordock": ["api_key", "api_token"],
-        "huggingface": ["api_key", "namespace"],
-        "baseten": ["api_key"],
-        "oracle": ["api_key", "tenancy_ocid", "compartment_ocid", "region"],
-        "crusoe": ["access_key", "secret_key", "project_id"],
-    }
-
-    provider_lower = provider.lower()
-    if provider_lower not in required_creds:
-        return False
-
-    missing = []
-    for req in required_creds[provider_lower]:
-        if req not in credentials or not credentials[req].strip():
-            missing.append(req)
-
-    if missing:
-        print(f"   ERROR: Missing required credentials: {', '.join(missing)}")
-        return False
-
-    return True
-
-
 @cli.command()
 @click.option(
     "--provider", "-p", help="Configure specific provider (e.g., runpod, vastai, aws)"
@@ -6424,7 +6391,7 @@ def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph)
 @click.option("--port", help="Serving port (default: 8000)")
 @click.option("--metrics", is_flag=True, help="Get SGLang metrics")
 @click.option("--dashboard", is_flag=True, help="Access SGLang dashboard")
-def sglang(test, create_pipeline, model_path, serve, port, metrics, dashboard):
+def sglang_legacy(test, create_pipeline, model_path, serve, port, metrics, dashboard):
     """Enhanced SGLang model serving with monitoring"""
     try:
         from ml_services.sglang_service import (
@@ -6837,7 +6804,7 @@ def dvc(test, init, add_remote, add_data, push, pull, status):
 @click.option("--create-experiment", help="Create a new experiment")
 @click.option("--list-runs", help="List runs in experiment")
 @click.option("--export", help="Export experiment data (json/csv)")
-def mlflow(test, list_experiments, create_experiment, list_runs, export):
+def mlflow_legacy(test, list_experiments, create_experiment, list_runs, export):
     """MLflow experiment tracking and model registry"""
     try:
         from ml_services.mlflow_service import (
@@ -8170,7 +8137,7 @@ def inferx():
     default=True,
     help="Enable multi-tenant isolation",
 )
-def configure(api_key, endpoint, region, snapshot, gpu_slicing, multi_tenant):
+def inferx_configure(api_key, endpoint, region, snapshot, gpu_slicing, multi_tenant):
     """Configure InferX provider credentials"""
     from pathlib import Path
 
@@ -8280,7 +8247,7 @@ def deploy(
 
 @inferx.command()
 @click.option("--model-id", required=True, help="Model deployment ID")
-def status(model_id):
+def inferx_status(model_id):
     """Get model deployment status"""
     import json
     from pathlib import Path
@@ -8317,7 +8284,7 @@ def status(model_id):
 
 @inferx.command()
 @click.option("--model-id", required=True, help="Model deployment ID")
-def delete(model_id):
+def inferx_delete(model_id):
     """Delete model deployment"""
     import json
     from pathlib import Path
@@ -8434,7 +8401,7 @@ def usage():
 @inferx.command()
 @click.option("--gpu-type", default="A100", help="GPU type to quote")
 @click.option("--region", help="Region for quote")
-def quote(gpu_type, region):
+def inferx_quote(gpu_type, region):
     """Get pricing quotes for InferX"""
     import json
     from pathlib import Path
@@ -8496,7 +8463,7 @@ def quote(gpu_type, region):
 @click.option(
     "--implement", is_flag=True, help="Implement cost optimizations automatically"
 )
-def optimize(cluster_config, usage_metrics, tier, output, implement):
+def inferx_optimize(cluster_config, usage_metrics, tier, output, implement):
     """Analyze and optimize InferX costs with AI-powered recommendations"""
     import json
     from k8s.t_optimizer import InferXCostOptimizer, CostTier
@@ -9433,10 +9400,10 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
         # Generate and apply Helm values
         terradev vllm auto-optimize -e http://localhost:8000 -m codellama/CodeLlama-34b-hf -o helm
     """
-    from ml_services.vllm_service import VLLMConfig, VLLMService
     import asyncio
 
     async def run_optimization():
+        from ml_services.vllm_service import VLLMConfig, VLLMService
         try:
             # Load samples if provided
             sample_data = None
@@ -9467,20 +9434,16 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
                 result = {
                     "status": "success",
                     "workload_profile": workload,
-                    "optimized_config": (
-                        svc._config_to_dict(optimized_config)
-                        if endpoint
-                        else {
-                            "model_name": optimized_config.model_name,
-                            "max_num_batched_tokens": optimized_config.max_num_batched_tokens,
-                            "max_num_seqs": optimized_config.max_num_seqs,
-                            "gpu_memory_utilization": optimized_config.gpu_memory_utilization,
-                            "enable_prefix_caching": optimized_config.enable_prefix_caching,
-                            "enable_chunked_prefill": optimized_config.enable_chunked_prefill,
-                            "cpu_cores": optimized_config.cpu_cores,
-                            "tensor_parallel_size": optimized_config.tensor_parallel_size,
-                        }
-                    ),
+                    "optimized_config": {
+                        "model_name": optimized_config.model_name,
+                        "max_num_batched_tokens": optimized_config.max_num_batched_tokens,
+                        "max_num_seqs": optimized_config.max_num_seqs,
+                        "gpu_memory_utilization": optimized_config.gpu_memory_utilization,
+                        "enable_prefix_caching": optimized_config.enable_prefix_caching,
+                        "enable_chunked_prefill": optimized_config.enable_chunked_prefill,
+                        "cpu_cores": optimized_config.cpu_cores,
+                        "tensor_parallel_size": optimized_config.tensor_parallel_size,
+                    },
                     "recommendations": "Configuration optimized based on workload analysis",
                 }
 
@@ -10306,7 +10269,7 @@ def sglang():
 @click.option(
     "--dry-run", is_flag=True, help="Show optimization plan without launching"
 )
-def optimize(model_path, workload_type, user_description, host, port, dry_run):
+def sglang_optimize(model_path, workload_type, user_description, host, port, dry_run):
     """Auto-optimize SGLang configuration for workload type and hardware"""
     from ml_services.sglang_service import SGLangService, WorkloadType
 

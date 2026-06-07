@@ -7600,6 +7600,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 mem_util = arguments.get("gpu_memory_utilization", 0.85)
                 max_len = arguments.get("max_model_len", 32768)
                 try:
+                    import sys
                     sys.path.insert(
                         0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
                     )

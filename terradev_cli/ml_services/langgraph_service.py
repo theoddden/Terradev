@@ -380,9 +380,8 @@ class LangGraphService:
             # This would integrate with LangGraph's workflow APIs
             # For now, we'll return a mock status
             return {
-                "status": "running",
-                "workflow_id": workflow_id,
                 "status": "active",
+                "workflow_id": workflow_id,
                 "metrics": {"nodes": 4, "edges": 3, "runs": 12, "success_rate": 0.95},
                 "monitoring": {
                     "tracing": self.config.tracing_enabled,
