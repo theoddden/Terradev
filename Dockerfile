@@ -30,12 +30,8 @@ RUN useradd --create-home --shell /bin/bash terradev
 USER terradev
 WORKDIR /home/terradev
 
-# Copy CLI to user home
-COPY --chown=terradev:terradev /app /home/terradev/terradev-cli
-RUN pip install -e /home/terradev/terradev-cli
-
 # Add CLI to PATH
-ENV PATH="/home/terradev/terradev-cli:$PATH"
+ENV PATH="/app:$PATH"
 
 # Expose common ports
 EXPOSE 8000 8080 8888
