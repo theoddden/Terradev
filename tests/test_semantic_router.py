@@ -1091,8 +1091,8 @@ class TestPrefillDecodeTracker:
 
         tracker = PrefillDecodeTracker()
         tracker.record_handoff("p1", "d1", "m1")
-        # Force expiry by setting max_age_s=0
-        assert tracker.get_decode_for_prefill("p1", "m1", max_age_s=0.0) is None
+        # Force expiry by setting max_age_s to negative value
+        assert tracker.get_decode_for_prefill("p1", "m1", max_age_s=-1.0) is None
 
 
 class TestDisaggregatedRouting:

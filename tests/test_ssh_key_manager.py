@@ -1,6 +1,7 @@
 """Tests for the SSH key manager — keygen, encrypt/decrypt, cleanup."""
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -42,6 +43,7 @@ class TestGenerateProvisionKeypair:
         raw = Path(priv_path).read_bytes()
         assert b"OPENSSH PRIVATE KEY" not in raw  # Fernet-encrypted, not plaintext
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows doesn't support Unix file permissions")
     def test_permissions_are_strict(self, isolated_ssh_dir):
         from terradev_cli.core.ssh_key_manager import generate_provision_keypair
 
@@ -58,6 +60,7 @@ class TestGenerateProvisionKeypair:
 
 
 class TestDecryptPrivateKey:
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows doesn't support Unix file permissions")
     def test_decrypt_returns_temp_path_with_valid_pem(self, isolated_ssh_dir):
         from terradev_cli.core.ssh_key_manager import (
             generate_provision_keypair,
