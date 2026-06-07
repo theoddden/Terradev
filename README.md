@@ -1,4 +1,4 @@
-# Terradev CLI v5.1.5
+# Terradev CLI v5.1.7
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -37,8 +37,8 @@ terradev configure --provider gcp
 - **2-5x CUDA Graph speedup** with optimal topology
 - **Up to 90% cost savings** with automatic provider switching
 - **<2 minute spot recovery** with KV cache checkpointing
-- **3.6x faster cold starts** with weight streaming
-- **57% cost savings** with MLA-aware VRAM estimation
+- **up to 3.6x faster cold starts** with weight streaming
+- **Up to 50% cost savings** with MLA-aware VRAM estimation
   
 ## Complete Tutorial
 
