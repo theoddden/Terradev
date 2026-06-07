@@ -1,10 +1,12 @@
-# Terradev CLI v5.1.5
+# Terradev CLI v5.1.7
 
-**Open Source BYOAPI Multi-Cloud GPU Infrastructure Platform**
+**An imperative command-line-interface for AI workload orchestration.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
 **License: Apache 2.0** - Free and open source for commercial and personal use.
+
+pypi.org/project/terradev-cli/
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
 
@@ -14,7 +16,7 @@ We removed the paywall, open-sourced Terradev, and added Rust accelerators for s
 
 With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. You or the agent can issue commands freely... the orchestrator ensures they're safe to execute.
 
-218 tools and sub-tools require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 21+ cloud providers, that compounds across every tool call in the chain.
+218 tools not including subcommand/flags require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 21+ cloud providers, that compounds across every tool call in the chain.
 
 ## BYOAPI Configuration
 
@@ -35,8 +37,8 @@ terradev configure --provider gcp
 - **2-5x CUDA Graph speedup** with optimal topology
 - **Up to 90% cost savings** with automatic provider switching
 - **<2 minute spot recovery** with KV cache checkpointing
-- **3.6x faster cold starts** with weight streaming
-- **57.3% cost savings** with MLA-aware VRAM estimation
+- **up to 3.6x faster cold starts** with weight streaming
+- **Up to 50% cost savings** with MLA-aware VRAM estimation
   
 ## Complete Tutorial
 
