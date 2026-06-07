@@ -429,14 +429,9 @@ class LangfuseService:
             )
         else:
             pg_env = (
-                f"\n            - name: DATABASE_URL\n"
-                f'              value: "postgresql://langfuse:langfuse@langfuse-postgres:5432/langfuse"'
+                "\n            - name: DATABASE_URL\n"
+                '              value: "postgresql://langfuse:langfuse@langfuse-postgres:5432/langfuse"'
             )
-        sc = (
-            f"\n          storageClassName: {self.config.storage_class}"
-            if self.config.storage_class
-            else ""
-        )
         return (
             f"---\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: {namespace}\n"
             f"---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n"

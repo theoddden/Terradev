@@ -4,11 +4,8 @@ Enhanced Price Discovery Engine - FIXED VERSION
 Uses real price tick data instead of mock data
 """
 
-import asyncio
 import aiohttp
-import json
 import logging
-import sqlite3
 import statistics
 
 try:
@@ -33,7 +30,7 @@ except ImportError:
             return max(x)
 
     np = _NpShim()
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from pathlib import Path

@@ -21,9 +21,7 @@ import os
 import secrets
 import subprocess
 import sys
-import tempfile
 import time
-import shutil
 
 # Import new feature tools
 try:
@@ -35,8 +33,8 @@ try:
     import aiohttp
 except ImportError:
     aiohttp = None  # type: ignore[assignment]
-from typing import Any, Dict, List, Optional
-from urllib.parse import urlencode, parse_qs, urlparse
+from typing import Any, Dict, List
+from urllib.parse import urlencode
 
 try:
     from mcp.server import Server
@@ -5711,14 +5709,14 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     "providers", ["runpod", "vastai", "lambda", "aws"]
                 )
                 max_price = arguments.get("max_price")
-                plan_only = arguments.get("plan_only", False)
+                arguments.get("plan_only", False)
 
                 result = await execute_terraform_parallel(
                     gpu_type, count, providers, max_price
                 )
 
                 if result["success"]:
-                    output_text = f"✅ GPU provisioning via Terraform successful!\n\n"
+                    output_text = "✅ GPU provisioning via Terraform successful!\n\n"
                     output_text += f"**GPU Type:** {gpu_type}\n"
                     output_text += f"**Count:** {count}\n"
                     output_text += f"**Providers:** {', '.join(providers)}\n"
@@ -5738,7 +5736,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                 f"**Provider Costs:** {outputs['provider_costs']}\n"
                             )
 
-                    output_text += f"\n**Terraform State:** Managed\n"
+                    output_text += "\n**Terraform State:** Managed\n"
                     output_text += f"**Full Output:**\n{result['stdout']}"
 
                     return CallToolResult(
@@ -5915,7 +5913,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
                         if apply_result["success"]:
                             output_text = (
-                                f"✅ Kubernetes cluster created via Terraform!\n\n"
+                                "✅ Kubernetes cluster created via Terraform!\n\n"
                             )
                             output_text += f"**Cluster Name:** {cluster_name}\n"
                             output_text += f"**GPU Type:** {gpu_type}\n"
@@ -6011,7 +6009,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
                         if apply_result["success"]:
                             output_text = (
-                                f"✅ Inference endpoint deployed via Terraform!\n\n"
+                                "✅ Inference endpoint deployed via Terraform!\n\n"
                             )
                             output_text += f"**Model:** {model}\n"
                             output_text += f"**GPU Type:** {gpu_type}\n"
@@ -6070,7 +6068,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 if output_result["success"] and show_outputs:
                     try:
                         outputs = json.loads(output_result["stdout"])
-                        output_text = f"✅ Terraform Status (from state):\n\n"
+                        output_text = "✅ Terraform Status (from state):\n\n"
 
                         for key, value in outputs.items():
                             if isinstance(value, dict) and "value" in value:
@@ -6090,7 +6088,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                             output_text += (
                                 f"\n**Resources Managed:** {resource_count}\n"
                             )
-                            output_text += f"**State File:** Terraform managed\n"
+                            output_text += "**State File:** Terraform managed\n"
 
                         return CallToolResult(
                             content=[TextContent(type="text", text=output_text)]
@@ -6153,8 +6151,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output_text = "🧠 **Semantic Inference Routing**\n\n"
                 if result["success"]:
                     output_text += f"**Strategy:** {strategy}\n"
-                    output_text += f"**Signals:** modality, complexity, domain, language, safety, keywords\n"
-                    output_text += f"**NUMA scoring:** enabled\n\n"
+                    output_text += "**Signals:** modality, complexity, domain, language, safety, keywords\n"
+                    output_text += "**NUMA scoring:** enabled\n\n"
                     output_text += output
                 else:
                     output_text += f"⚠️ {output}\n\n"
@@ -6363,7 +6361,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
 
-                output_text = f"🧬 **MoE Cluster Deployment**\n\n"
+                output_text = "🧬 **MoE Cluster Deployment**\n\n"
                 output_text += f"**Model:** {model_id}\n"
                 output_text += f"**GPU:** {gpu_type} × {tp_size} (TP={tp_size})\n"
                 output_text += f"**Backend:** {backend}\n"
@@ -6386,16 +6384,16 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 else:
                     output_text += f"⚠️ {output}\n\n"
                     output_text += "💡 **Manual deployment:**\n"
-                    output_text += f"```bash\n"
-                    output_text += f"terradev provision --task clusters/moe-template/task.yaml \\\n"
+                    output_text += "```bash\n"
+                    output_text += "terradev provision --task clusters/moe-template/task.yaml \\\n"
                     output_text += (
                         f"  --set model_id={model_id} --set tp_size={tp_size}\n"
                     )
-                    output_text += f"```\n\n"
+                    output_text += "```\n\n"
                     output_text += "**Or via Kubernetes:**\n"
-                    output_text += f"```bash\n"
-                    output_text += f"kubectl apply -f clusters/moe-template/k8s/\n"
-                    output_text += f"```"
+                    output_text += "```bash\n"
+                    output_text += "kubectl apply -f clusters/moe-template/k8s/\n"
+                    output_text += "```"
 
                 output_text += "\n\n🔗 **Next:** Use `lora_add` to hot-load fine-tuned adapters onto this endpoint."
 
@@ -6440,12 +6438,12 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 if result["success"]:
                     output_text = f"✅ **Adapter '{name}' loaded on {endpoint}**\n\n"
                     output_text += f'Use in API requests: `"model": "{name}"`\n\n'
-                    output_text += f"```bash\n"
+                    output_text += "```bash\n"
                     output_text += f"curl {endpoint}/v1/chat/completions \\\n"
                     output_text += (
                         f'  -d \'{{"model": "{name}", "messages": [...]}}\' \n'
                     )
-                    output_text += f"```"
+                    output_text += "```"
                 else:
                     output_text = f"❌ **Failed to load adapter '{name}'**\n\n{output}"
 
@@ -6614,7 +6612,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
 
-                output_text = f"🔧 **GitOps Repository Initialized**\n\n"
+                output_text = "🔧 **GitOps Repository Initialized**\n\n"
                 if result["success"]:
                     output_text += f"**Repository:** {repo}\n"
                     output_text += f"**Tool:** {tool}\n"
@@ -7623,7 +7621,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         model_id, tp, dp, mem_util, max_len
                     )
                     output_text = f"🧬 **Wide-EP Deployment Config — {model_id}**\n\n"
-                    output_text += f"**Pattern:** Wide Expert Parallelism\n"
+                    output_text += "**Pattern:** Wide Expert Parallelism\n"
                     output_text += f"**TP:** {config['engine_config']['tensor_parallel_size']}, **DP:** {config['engine_config']['data_parallel_size']}\n"
                     output_text += f"**Experts/rank:** {config['model_profile']['experts_per_rank']}\n"
                     output_text += f"**EPLB:** {config['engine_config']['enable_eplb']}, **DBO:** {config['engine_config']['enable_dbo']}\n\n"
@@ -7840,7 +7838,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 result = await execute_safe_command(ssh_args)
                 if result["success"]:
                     output_text = f"✅ **vLLM Server Started**\n\n**Model:** {model}\n**Endpoint:** http://{ip}:{port}/v1\n**TP:** {tp}\n**Sleep Mode:** enabled\n**KV Offloading:** enabled\n\n{result['stdout']}\n\n"
-                    output_text += f"**suggest_action:** Test with `vllm_inference`. Manage power with `vllm_sleep`/`vllm_wake`."
+                    output_text += "**suggest_action:** Test with `vllm_inference`. Manage power with `vllm_sleep`/`vllm_wake`."
                 else:
                     output_text = f"❌ **Failed to start vLLM**\n\n{result['stderr']}"
                 return CallToolResult(
@@ -8162,7 +8160,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     # Get optimization summary
                     summary = service.get_optimization_summary(config)
 
-                    output_text = f"🚀 **SGLang Optimization Configuration**\n\n"
+                    output_text = "🚀 **SGLang Optimization Configuration**\n\n"
                     output_text += f"**Model:** {model_path}\n"
                     output_text += f"**Workload Type:** {summary['workload_type']}\n"
                     output_text += (
@@ -8238,7 +8236,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         model_path, user_description
                     )
 
-                    output_text = f"🔍 **Workload Detection Results**\n\n"
+                    output_text = "🔍 **Workload Detection Results**\n\n"
                     output_text += f"**Model:** {model_path}\n"
                     output_text += (
                         f"**Detected Workload Type:** {detected_type.value}\n"
@@ -8316,7 +8314,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     # Generate router command
                     router_cmd = service.generate_multi_replica_command(config, dp_size)
 
-                    output_text = f"🔄 **Cache-Aware Router Configuration**\n\n"
+                    output_text = "🔄 **Cache-Aware Router Configuration**\n\n"
                     output_text += f"**Model:** {model_path}\n"
                     output_text += f"**DP Size:** {dp_size}\n"
                     output_text += (
@@ -8411,7 +8409,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     else:
                         # Local launch
                         launch_cmd = service.generate_launch_command(config)
-                        output_text = f"🚀 **Starting SGLang server locally...**\n\n"
+                        output_text = "🚀 **Starting SGLang server locally...**\n\n"
                         output_text += f"🌐 **Endpoint:** http://localhost:{port}\n\n"
                         output_text += (
                             "**💡 Launch command:**\n```\n" + launch_cmd + "\n```\n\n"
@@ -8981,7 +8979,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 result = await execute_safe_command(ssh_args, timeout=600)
                 if result["success"]:
                     output_text = f"📥 **Model Pulled: {model}** on {ip}\n\n{result['stdout']}\n\n"
-                    output_text += f"**suggest_action:** Generate with `ollama_generate` or chat with `ollama_chat`."
+                    output_text += "**suggest_action:** Generate with `ollama_generate` or chat with `ollama_chat`."
                 else:
                     output_text = f"❌ **Pull failed**\n\n{result['stderr']}"
                 return CallToolResult(
@@ -9284,7 +9282,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         headers={"x-api-key": api_key}
                     ) as session:
                         async with session.get(
-                            f"https://api.smith.langchain.com/api/v1/runs",
+                            "https://api.smith.langchain.com/api/v1/runs",
                             params={"project_name": project, "limit": limit},
                             timeout=aiohttp.ClientTimeout(total=30),
                         ) as resp:
@@ -9432,7 +9430,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         duration_seconds=arguments.get("duration_seconds", 0.0),
                         extra_metrics=arguments.get("metrics", {}),
                     )
-                    output_text = f"✅ **MLflow Run Logged**\n\n"
+                    output_text = "✅ **MLflow Run Logged**\n\n"
                     output_text += f"**Experiment:** {arguments['experiment_name']}\n"
                     output_text += f"**Run:** {arguments['run_name']}\n"
                     output_text += f"**GPU:** {arguments.get('gpu_type', 'N/A')} ({arguments.get('provider', 'N/A')})\n"
@@ -9585,7 +9583,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     result = await svc.stage_from_checkpoint(
                         checkpoint_path=ckpt, commit_message=msg, remote=remote
                     )
-                    output_text = f"✅ **Checkpoint Staged**\n\n"
+                    output_text = "✅ **Checkpoint Staged**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```\n\n"
                     output_text += "**suggest_action:** View changes with `dvc_diff` or push to remote with `dvc_push`."
                     return CallToolResult(
@@ -9795,7 +9793,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     dst = f"{arguments['dest_provider']}:{arguments['dest_region']}"
                     size_gb = arguments["size_gb"]
                     route = optimizer.find_cheapest_route(src, dst, size_gb)
-                    output_text = f"🌐 **Cheapest Egress Route**\n\n"
+                    output_text = "🌐 **Cheapest Egress Route**\n\n"
                     output_text += (
                         f"**From:** {src}\n**To:** {dst}\n**Size:** {size_gb}GB\n\n"
                     )
@@ -9830,7 +9828,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     plan = optimizer.optimize_transfer_plan(
                         source_uri, targets, size_gb
                     )
-                    output_text = f"🌐 **Optimized Staging Plan**\n\n"
+                    output_text = "🌐 **Optimized Staging Plan**\n\n"
                     output_text += f"**Source:** {source_uri}\n**Targets:** {', '.join(targets)}\n**Size:** {size_gb}GB\n\n"
                     output_text += f"```json\n{json.dumps(plan, indent=2, default=str)[:2000]}\n```\n\n"
                     output_text += "**suggest_action:** Execute with `stage` tool."
@@ -10339,7 +10337,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     result = await svc.create_workflow(
                         config, langsmith_api_key=langsmith_key
                     )
-                    output_text = f"🔗 **LangChain Workflow Created**\n\n"
+                    output_text = "🔗 **LangChain Workflow Created**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10368,7 +10366,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     svc = LangChainService(api_key=arguments["api_key"])
                     config = arguments["pipeline_config"]
                     result = await svc.create_sglang_pipeline(config)
-                    output_text = f"🔗 **SGLang Pipeline Created**\n\n"
+                    output_text = "🔗 **SGLang Pipeline Created**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10520,7 +10518,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     result = await svc.create_workflow(
                         config, langsmith_api_key=langsmith_key
                     )
-                    output_text = f"🕸️ **LangGraph Workflow Created**\n\n"
+                    output_text = "🕸️ **LangGraph Workflow Created**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10549,7 +10547,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     svc = LangGraphService(api_key=arguments["api_key"])
                     config = arguments["workflow_config"]
                     result = await svc.create_orchestrator_worker(config)
-                    output_text = f"🕸️ **Orchestrator-Worker Created**\n\n"
+                    output_text = "🕸️ **Orchestrator-Worker Created**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10578,7 +10576,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     svc = LangGraphService(api_key=arguments["api_key"])
                     config = arguments["evaluation_config"]
                     result = await svc.create_evaluation_workflow(config)
-                    output_text = f"🕸️ **Evaluation Workflow Created**\n\n"
+                    output_text = "🕸️ **Evaluation Workflow Created**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10638,7 +10636,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     )
                     config = arguments["dashboard_config"]
                     result = await svc.create_dashboard(config)
-                    output_text = f"📊 **W&B Dashboard Created**\n\n"
+                    output_text = "📊 **W&B Dashboard Created**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10708,7 +10706,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     )
                     config = arguments["report_config"]
                     result = await svc.create_report(config)
-                    output_text = f"📝 **W&B Report Created**\n\n"
+                    output_text = "📝 **W&B Report Created**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10737,7 +10735,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     )
                     metrics = arguments.get("metrics_data", {})
                     result = await svc.create_terradev_report(metrics)
-                    output_text = f"📝 **Terradev Report Generated**\n\n"
+                    output_text = "📝 **Terradev Report Generated**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10766,7 +10764,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     )
                     config = arguments["alert_config"]
                     result = await svc.setup_alerts(config)
-                    output_text = f"🔔 **W&B Alerts Configured**\n\n"
+                    output_text = "🔔 **W&B Alerts Configured**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10794,7 +10792,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         api_key=arguments["api_key"], entity=arguments.get("entity")
                     )
                     result = await svc.create_terradev_alerts()
-                    output_text = f"🔔 **Terradev Alerts Created**\n\n"
+                    output_text = "🔔 **Terradev Alerts Created**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10822,7 +10820,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         api_key=arguments["api_key"], entity=arguments.get("entity")
                     )
                     result = await svc.dashboard_status()
-                    output_text = f"📊 **W&B Monitoring Overview**\n\n"
+                    output_text = "📊 **W&B Monitoring Overview**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10857,7 +10855,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         source_location=arguments.get("source_location"),
                         target_location=arguments.get("target_location"),
                     )
-                    output_text = f"📋 **Consent Request Created**\n\n"
+                    output_text = "📋 **Consent Request Created**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:2000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -10992,7 +10990,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         dataset_name=arguments.get("dataset_name"),
                         limit=arguments.get("limit", 50),
                     )
-                    output_text = f"📜 **Data Movement History**\n\n"
+                    output_text = "📜 **Data Movement History**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -11022,7 +11020,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         start_date=arguments["start_date"],
                         end_date=arguments["end_date"],
                     )
-                    output_text = f"📋 **Compliance Report**\n\n"
+                    output_text = "📋 **Compliance Report**\n\n"
                     output_text += f"**Period:** {arguments['start_date']} → {arguments['end_date']}\n\n"
                     output_text += f"```json\n{json.dumps(report, indent=2, default=str)[:5000]}\n```"
                     return CallToolResult(
@@ -11081,7 +11079,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         target_savings=arguments.get("target_savings"),
                         constraints=arguments.get("constraints"),
                     )
-                    output_text = f"💡 **Cost Optimization Recommendations**\n\n"
+                    output_text = "💡 **Cost Optimization Recommendations**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -11110,7 +11108,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         scenario=arguments["scenario"],
                         compare_with=arguments.get("compare_with"),
                     )
-                    output_text = f"🔮 **Cost Simulation**\n\n"
+                    output_text = "🔮 **Cost Simulation**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -11207,7 +11205,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         gpu_count=arguments.get("gpu_count", 1),
                         hours=arguments.get("hours", 1.0),
                     )
-                    output_text = f"💰 **Price Budget Optimization**\n\n"
+                    output_text = "💰 **Price Budget Optimization**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -11342,7 +11340,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         if isinstance(config_result, Exception):
                             output_text += f"**Config:** ❌ {config_result}\n"
                         else:
-                            output_text += f"**Config:** ✅ Generated\n"
+                            output_text += "**Config:** ✅ Generated\n"
                             output_text += f"```json\n{json.dumps(config_result, indent=2, default=str)[:3000]}\n```"
                     else:
                         result = await orch.launch_distributed(
@@ -11452,7 +11450,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         from_provision=arguments.get("from_provision"),
                         checks=arguments.get("checks"),
                     )
-                    output_text = f"🔍 **Preflight Report**\n\n"
+                    output_text = "🔍 **Preflight Report**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:5000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -11533,7 +11531,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         nodes=arguments.get("nodes"),
                         from_provision=arguments.get("from_provision"),
                     )
-                    output_text = f"🌐 **Network Preflight Check**\n\n"
+                    output_text = "🌐 **Network Preflight Check**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
@@ -12772,7 +12770,7 @@ async def oauth_token(request: Request) -> JSONResponse:
     code = body.get("code", "")
     code_verifier = body.get("code_verifier", "")
     client_id = body.get("client_id", "")
-    redirect_uri = body.get("redirect_uri", "")
+    body.get("redirect_uri", "")
 
     logger.info(
         "OAuth token: grant_type=%s client_id=%s...", grant_type, (client_id or "")[:16]

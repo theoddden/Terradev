@@ -15,11 +15,10 @@ These tests verify:
 5. Response parsing
 """
 
-import asyncio
 import os
 import sys
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -72,7 +71,7 @@ class TestPhoenixService:
         assert config.image == "arizephoenix/phoenix:latest"
         assert config.replicas == 1
         assert config.storage_size == "50Gi"
-        assert config.auth_enabled == False
+        assert not config.auth_enabled
         assert config.otlp_protocol == "grpc"
         assert config.otlp_port == 6006
 
@@ -112,10 +111,10 @@ class TestGuardrailsService:
         assert config.replicas == 1
         assert config.deployment_mode == "standalone"
         assert config.memory_backend == "memory"
-        assert config.enable_topical == True
-        assert config.enable_jailbreak == True
-        assert config.enable_pii == True
-        assert config.enable_factcheck == False
+        assert config.enable_topical
+        assert config.enable_jailbreak
+        assert config.enable_pii
+        assert not config.enable_factcheck
         assert config.default_config_id == "terradev-default"
 
     @pytest.mark.asyncio
@@ -175,7 +174,7 @@ class TestQdrantService:
         config = QdrantConfig()
         assert config.url == "http://localhost:6333"
         assert config.grpc_port == 6334
-        assert config.prefer_grpc == False
+        assert not config.prefer_grpc
         assert config.default_collection == "terradev-embeddings"
         assert config.vector_size == 1024
         assert config.distance == "Cosine"
@@ -234,7 +233,6 @@ class TestAIServiceRetryLogic:
         service = service_class(config)
 
         # Create a proper async context manager mock
-        from unittest.mock import AsyncMock, MagicMock
 
         mock_response = MagicMock()
         mock_response.status = 200
@@ -272,7 +270,6 @@ class TestAIServiceRetryLogic:
         service = service_class(config)
 
         # Create a proper async context manager mock for 404 error
-        from unittest.mock import AsyncMock, MagicMock
 
         mock_response = MagicMock()
         mock_response.status = 404
@@ -289,7 +286,7 @@ class TestAIServiceRetryLogic:
 
         try:
             try:
-                result = await service._request("GET", "/test")
+                await service._request("GET", "/test")
                 assert False, "Should have raised exception"
             except Exception as e:
                 assert "404" in str(e)

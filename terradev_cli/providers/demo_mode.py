@@ -5,7 +5,7 @@ CLEARLY SEPARATED from real provider APIs - only used with explicit --demo flag
 """
 
 import asyncio
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from datetime import datetime
 
 

@@ -12,7 +12,7 @@ import logging
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
-from .semantic_router import NUMAEndpointScorer, NUMAScorecard
+from .semantic_router import NUMAEndpointScorer
 from .warm_pool_manager import WarmPoolManager
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class CUDAGraphIntegrator:
         # Extract CUDA Graph optimization data
         graph_score = numa_scorecard.metadata.get("cuda_graph_score", 0.0)
         use_cuda_graphs = numa_scorecard.metadata.get("cuda_graph_recommended", False)
-        numa_optimal = numa_scorecard.metadata.get("numa_optimal_for_graphs", False)
+        numa_scorecard.metadata.get("numa_optimal_for_graphs", False)
         graph_potential = numa_scorecard.metadata.get(
             "graph_optimization_potential", "low"
         )

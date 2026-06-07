@@ -5,12 +5,11 @@ Handles OIDC authentication for enterprise SSO
 """
 
 import base64
-import json
 import secrets
 import hashlib
 from typing import Dict, Any, Optional, Tuple
-from datetime import datetime, timedelta
-from urllib.parse import urlencode, urlparse, parse_qs
+from datetime import datetime
+from urllib.parse import urlencode
 import logging
 
 try:
@@ -233,7 +232,7 @@ class OIDCProvider:
                 return {}
 
             # Decode without verification first to get headers
-            unverified_header = jwt.get_unverified_header(id_token)
+            jwt.get_unverified_header(id_token)
 
             # For production, you should verify the signature using the JWKS
             # For now, we'll decode without verification

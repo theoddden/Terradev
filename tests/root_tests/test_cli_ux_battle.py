@@ -16,10 +16,8 @@ import time
 import sys
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, Any
 import tempfile
-import unittest
-from unittest.mock import patch, MagicMock
 
 
 class CLIUXBattleTest:

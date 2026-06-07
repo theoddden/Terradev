@@ -4,14 +4,11 @@ Terradev Event System - Triggers, Environment Promotion, and Artifact Lineage
 Production-grade automation infrastructure for ML workflows
 """
 
-from typing import Dict, List, Any, Optional, Union, Callable
+from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-import asyncio
-import json
 import uuid
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 import logging
 
 # Rust event bus integration

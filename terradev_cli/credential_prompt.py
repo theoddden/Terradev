@@ -145,14 +145,14 @@ def prompt_for_credentials():
     configured_providers = list(updated_creds.keys())
     if configured_providers:
         print(f"\nConfigured providers: {', '.join(configured_providers)}")
-        print(f"\nGet quotes:")
-        print(f"   terradev quote --gpu-type a100")
+        print("\nGet quotes:")
+        print("   terradev quote --gpu-type a100")
         print(
             f"   terradev quote --gpu-type h100 --providers {','.join(configured_providers[:3])}"
         )
     else:
-        print(f"\nNo providers configured")
-        print(f"   Run 'terradev configure' to add credentials")
+        print("\nNo providers configured")
+        print("   Run 'terradev configure' to add credentials")
 
     return configured_providers
 

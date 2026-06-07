@@ -4,14 +4,10 @@ LangGraph Service Integration for Terradev
 Enhanced LangGraph integration with workflow orchestration and monitoring
 """
 
-import os
-import json
-import asyncio
 import aiohttp
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
-import base64
 
 
 @dataclass
@@ -59,9 +55,6 @@ class LangGraphService:
 
             # Test LangSmith connection
             if self.config.langsmith_api_key:
-                langsmith_headers = {
-                    "Authorization": f"Bearer {self.config.langsmith_api_key}"
-                }
                 langsmith_session = langsmith_session
 
                 url = f"{self.langsmith_api_base}/v1/organizations"
@@ -162,7 +155,6 @@ class LangGraphService:
                 """Enhanced orchestrator with monitoring"""
                 try:
                     # Generate plan
-                    from langchain.chains import LLMChain
 
                     llm = LLM(llm="openai/gpt-4", temperature=0.7)
 
@@ -191,17 +183,16 @@ class LangGraphService:
             def enhanced_worker(state: WorkflowState):
                 """Enhanced worker with monitoring"""
                 try:
-                    from langchain.chains import LLMChain
 
                     llm = LLM(llm="openai/gpt-4", temperature=0.7)
 
                     section = state["current_section"]
                     if section:
-                        msg = llm.invoke(
-                            f"Write a report section following the provided name and description. Include no preamble for each section. Use markdown formatting."
+                        llm.invoke(
+                            "Write a report section following the provided name and description. Include no preamble for each section. Use markdown formatting."
                         )
                     else:
-                        msg = llm.invoke(f"Write a section about {state['topic']}")
+                        llm.invoke(f"Write a section about {state['topic']}")
 
                     return {
                         "completed_sections": [section.content],
@@ -277,7 +268,7 @@ class LangGraphService:
         """Create an evaluator-optimizer workflow"""
         try:
             # Define the workflow state
-            from langgraph.graph import StateGraph, START, END
+            from langgraph.graph import StateGraph
             from pydantic import BaseModel, Field
             from typing import Literal
 
@@ -305,7 +296,6 @@ class LangGraphService:
             def enhanced_generator(state: EvaluationState):
                 """Enhanced generator with monitoring"""
                 try:
-                    from langchain.chains import LLMChain
 
                     llm = LLM(llm="openai/gpt-4", temperature=0.7)
 

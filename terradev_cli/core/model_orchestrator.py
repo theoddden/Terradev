@@ -13,7 +13,6 @@ import asyncio
 import json
 import time
 import logging
-import heapq
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Set, Any
@@ -649,11 +648,11 @@ class ModelOrchestrator:
         # Handle the actual inference (framework-specific)
         try:
             if instance.framework == "pytorch":
-                result = await self._infer_pytorch(instance)
+                await self._infer_pytorch(instance)
             elif instance.framework == "vllm":
-                result = await self._infer_vllm(instance)
+                await self._infer_vllm(instance)
             elif instance.framework == "sglang":
-                result = await self._infer_sglang(instance)
+                await self._infer_sglang(instance)
             else:
                 return False, 0.0
 

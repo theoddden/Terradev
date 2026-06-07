@@ -15,11 +15,8 @@ import asyncio
 import subprocess
 import json
 import time
-import os
 from pathlib import Path
-from typing import Dict, List, Any
-import requests
-import pytest
+from typing import Dict, Any
 
 
 class CIPipeline:
@@ -455,7 +452,7 @@ class CIPipeline:
         with open("ci_pipeline_report.json", "w") as f:
             json.dump(report, f, indent=2)
 
-        print(f"\n📊 Pipeline Report Generated")
+        print("\n📊 Pipeline Report Generated")
         print(f"Status: {report['pipeline']['status']}")
         print(f"Duration: {total_duration:.1f}s")
         print(f"Success Rate: {report['pipeline']['success_rate']:.1f}%")

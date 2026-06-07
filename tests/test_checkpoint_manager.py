@@ -10,10 +10,8 @@ Covers:
   5. Retention policy enforcement
 """
 
-import json
 import os
 import sys
-import tempfile
 import pytest
 from pathlib import Path
 

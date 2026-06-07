@@ -14,10 +14,8 @@ import logging
 import sys
 import tempfile
 import shutil
-from typing import Dict, List, Any
+from typing import Dict, Any
 from pathlib import Path
-import pickle
-import gzip
 from datetime import datetime, timedelta
 
 # Add the parent directory to the path to import the manager
@@ -711,7 +709,7 @@ async def main():
 
     # Print results
     print(f"\n{'='*60}")
-    print(f"KV Cache Checkpoint Test Results")
+    print("KV Cache Checkpoint Test Results")
     print(f"{'='*60}")
     print(f"Total Tests: {results['total_tests']}")
     print(f"Passed: {results['passed_tests']}")
@@ -722,35 +720,35 @@ async def main():
     # Print failed tests
     failed_tests = [r for r in results["test_results"] if r["status"] == "FAILED"]
     if failed_tests:
-        print(f"\n❌ Failed Tests:")
+        print("\n❌ Failed Tests:")
         for test in failed_tests:
             print(f"  - {test['test_name']}")
             if "error" in test:
                 print(f"    Error: {test['error']}")
 
     # Print key metrics
-    print(f"\n📊 Key Validation Results:")
+    print("\n📊 Key Validation Results:")
 
     # Find checkpoint creation test
     creation_test = next(
         (r for r in results["test_results"] if "Creation" in r["test_name"]), None
     )
     if creation_test and creation_test["status"] == "PASSED":
-        print(f"  ✅ Checkpoint creation and metadata validation")
+        print("  ✅ Checkpoint creation and metadata validation")
 
     # Find restoration test
     restoration_test = next(
         (r for r in results["test_results"] if "Restoration" in r["test_name"]), None
     )
     if restoration_test and restoration_test["status"] == "PASSED":
-        print(f"  ✅ Checkpoint restoration with data integrity")
+        print("  ✅ Checkpoint restoration with data integrity")
 
     # Find spot termination test
     spot_test = next(
         (r for r in results["test_results"] if "Termination" in r["test_name"]), None
     )
     if spot_test and spot_test["status"] == "PASSED":
-        print(f"  ✅ Spot interruption handling and migration")
+        print("  ✅ Spot interruption handling and migration")
 
     return results["success_rate"] == 1.0
 

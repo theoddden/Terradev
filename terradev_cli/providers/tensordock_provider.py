@@ -4,7 +4,6 @@ TensorDock Provider - TensorDock GPU marketplace integration
 BYOAPI: Uses the end-client's TensorDock API credentials
 """
 
-import asyncio
 import os
 from typing import Dict, List, Any, Optional
 from datetime import datetime

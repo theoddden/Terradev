@@ -13,11 +13,7 @@ Run with: pytest tests/test_provider_conformance.py -v
 """
 
 import pytest
-import asyncio
-from typing import List, Dict, Any
-from dataclasses import is_dataclass
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-import aiohttp
+from unittest.mock import AsyncMock, patch
 
 # Import all providers
 from terradev_cli.providers import (
@@ -159,7 +155,7 @@ class ProviderConformanceTest:
             # Provider should handle 429 gracefully
             # In a real implementation, we'd verify backoff behavior
             try:
-                quotes = await provider.get_instance_quotes(gpu_type="A100")
+                await provider.get_instance_quotes(gpu_type="A100")
                 # If we get here, provider handled 429
             except Exception as e:
                 # Provider should have attempted retry or raised specific error
@@ -184,7 +180,7 @@ class ProviderConformanceTest:
 
         with patch("aiohttp.ClientSession", return_value=mock_session):
             try:
-                quotes = await provider.get_instance_quotes(gpu_type="A100")
+                await provider.get_instance_quotes(gpu_type="A100")
                 # If we get here without error, test fails
                 pytest.fail("Provider did not raise error on 401 response")
             except Exception as e:

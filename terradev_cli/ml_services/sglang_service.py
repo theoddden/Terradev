@@ -14,18 +14,13 @@ Implements workload-specific auto-optimization for SGLang serving with:
 Auto-applies optimizations based on model architecture, workload type, and hardware detection.
 """
 
-import os
-import json
-import asyncio
 import aiohttp
 import subprocess
-import tempfile
 import logging
-from typing import Dict, List, Any, Optional, Tuple, Union
+from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 
 
 logger = logging.getLogger(__name__)

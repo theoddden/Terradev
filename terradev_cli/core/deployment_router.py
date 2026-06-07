@@ -4,9 +4,7 @@ Smart Deployment Router
 Automatically selects optimal deployment strategy based on requirements and constraints
 """
 
-import asyncio
-import json
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum

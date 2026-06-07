@@ -5,7 +5,7 @@ CLI-native drift detection and rollback system (parallel, <30s)
 """
 
 import asyncio
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass
 
@@ -107,7 +107,7 @@ class DriftDetector:
             terminate_tasks.append(task)
 
         if terminate_tasks:
-            terminate_results = await asyncio.gather(
+            await asyncio.gather(
                 *terminate_tasks, return_exceptions=True
             )
 
@@ -118,7 +118,7 @@ class DriftDetector:
             recreate_tasks.append(task)
 
         if recreate_tasks:
-            recreate_results = await asyncio.gather(
+            await asyncio.gather(
                 *recreate_tasks, return_exceptions=True
             )
 
@@ -164,7 +164,7 @@ class DriftDetector:
             recreate_tasks.append(task)
 
         if recreate_tasks:
-            recreate_results = await asyncio.gather(
+            await asyncio.gather(
                 *recreate_tasks, return_exceptions=True
             )
 

@@ -14,10 +14,9 @@ import logging
 import math
 import os
 import shutil
-import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Tuple
 
 logger = logging.getLogger(__name__)
 

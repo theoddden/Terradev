@@ -17,10 +17,8 @@ import time
 import sys
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, Any
 import tempfile
-import unittest
-from unittest.mock import patch, MagicMock
 
 
 class CLIUXBattleTestFixed:
@@ -867,7 +865,7 @@ class CLIUXBattleTestFixed:
         for feature, description in features:
             print(f"✅ {feature}: {description}")
 
-        print(f"\n🌟 Overall Assessment: This CLI delivers an AMAZING user experience!")
+        print("\n🌟 Overall Assessment: This CLI delivers an AMAZING user experience!")
 
 
 # Run the amazing UX battle test

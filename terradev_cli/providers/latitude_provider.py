@@ -10,14 +10,11 @@ CRITICAL DESIGN NOTES:
 - Rate limiting: Built-in retry with exponential backoff
 """
 
-import asyncio
 import logging
 import os
-import json
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import aiohttp
-from urllib.parse import urlencode
 
 from .base_provider import BaseProvider
 

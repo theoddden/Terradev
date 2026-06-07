@@ -12,16 +12,13 @@ Implements GitOps patterns for Kubernetes infrastructure management:
 Based on production lessons: "GitOps isn't optional, it's survival"
 """
 
-import asyncio
-import json
 import yaml
 import subprocess
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 

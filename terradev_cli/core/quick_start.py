@@ -4,10 +4,7 @@ Quick Start - Get users to provision SOMETHING in 60 seconds
 Remove all friction, show immediate value
 """
 
-import json
-import time
-from typing import Dict, List, Any
-from pathlib import Path
+from typing import Dict, Any
 
 
 class QuickStart:
@@ -47,7 +44,7 @@ class QuickStart:
             print(f"   📝 {info['description']}")
             print(f"   🔗 Setup: {info['setup_url']}")
             if info.get("free_credit"):
-                print(f"   💰 Free credit available!")
+                print("   💰 Free credit available!")
             print()
 
         choice = input("Choose provider (1-2): ").strip()

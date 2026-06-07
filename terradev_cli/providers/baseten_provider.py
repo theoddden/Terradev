@@ -4,7 +4,6 @@ Baseten Provider - Baseten inference-focused GPU cloud integration
 BYOAPI: Uses the end-client's Baseten API key
 """
 
-import asyncio
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 

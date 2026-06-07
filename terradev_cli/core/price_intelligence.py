@@ -26,10 +26,9 @@ The module exposes:
 import logging
 import sqlite3
 import math
-import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 
 DB_PATH = Path.home() / ".terradev" / "cost_tracking.db"
 

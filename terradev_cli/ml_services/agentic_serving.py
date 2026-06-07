@@ -19,10 +19,8 @@ Based on: Continuum (arxiv 2511.02230), LMCache, llm-d, QLLM.
 
 import logging
 import time
-import math
-import json
 from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)

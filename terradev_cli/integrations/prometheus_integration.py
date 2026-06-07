@@ -12,9 +12,7 @@ Terradev pushes lightweight metrics on provision/terminate events.
 The user's existing Prometheus + Grafana stack handles storage and visualization.
 """
 
-from typing import Dict, Any, Optional, List
-import time
-import json
+from typing import Dict, Any, List
 
 
 # ── Credential keys the user provides via `terradev configure` ────────────
@@ -246,11 +244,6 @@ def generate_scrape_config(job_name: str = "terradev") -> str:
 
     This targets the Pushgateway so Prometheus picks up Terradev metrics.
     """
-    config = {
-        "job_name": job_name,
-        "honor_labels": True,
-        "static_configs": [{"targets": ["pushgateway:9091"]}],
-    }
 
     lines = [
         f"  - job_name: '{job_name}'",

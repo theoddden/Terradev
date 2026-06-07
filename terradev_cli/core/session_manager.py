@@ -7,7 +7,7 @@ Reduces connection overhead and improves scalability
 import asyncio
 import aiohttp
 import logging
-from typing import Dict, Optional, Set
+from typing import Dict, Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from contextlib import asynccontextmanager

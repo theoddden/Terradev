@@ -4,11 +4,9 @@ Terradev Data Governance Module
 Handles explicit consent, comprehensive logging, and OPA policy enforcement for data movement
 """
 
-import json
 import logging
-import asyncio
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
 import hashlib
@@ -18,8 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .config import TerradevConfig
-    from .auth import AuthManager
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -743,7 +740,7 @@ class DataGovernanceManager:
     async def _log_consent_request(self, consent_request: ConsentRequest):
         """Log consent request"""
         if self.logging_enabled:
-            log_entry = {
+            {
                 "type": "consent_request",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "data": asdict(consent_request),
@@ -753,7 +750,7 @@ class DataGovernanceManager:
     async def _log_consent_response(self, consent_response: ConsentResponse):
         """Log consent response"""
         if self.logging_enabled:
-            log_entry = {
+            {
                 "type": "consent_response",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "data": asdict(consent_response),
@@ -763,7 +760,7 @@ class DataGovernanceManager:
     async def _log_opa_evaluation(self, evaluation: OPAPolicyEvaluation):
         """Log OPA policy evaluation"""
         if self.logging_enabled:
-            log_entry = {
+            {
                 "type": "opa_evaluation",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "data": asdict(evaluation),
@@ -773,7 +770,7 @@ class DataGovernanceManager:
     async def _log_data_movement(self, movement_log: DataMovementLog):
         """Log data movement"""
         if self.logging_enabled:
-            log_entry = {
+            {
                 "type": "data_movement",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "data": asdict(movement_log),
@@ -816,7 +813,7 @@ class DataGovernanceManager:
                 user_location
             )
             reason = (
-                f"Residency constraint violated"
+                "Residency constraint violated"
                 if not allowed
                 else "Residency constraint satisfied"
             )

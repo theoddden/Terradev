@@ -7,7 +7,7 @@ CUCo optimization with Terradev's existing optimization features.
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Any
 from dataclasses import dataclass
 from enum import Enum
 import time
@@ -16,13 +16,10 @@ from pathlib import Path
 
 from .cuco_optimizer import (
     CUCoOptimizer,
-    OptimizationResult,
     OptimizationDecision,
-    WorkloadProfile,
 )
 from ..core.config import TerradevConfig
 from ..core.monitoring import MetricsCollector
-from ..providers.base import BaseProvider
 from ..core.warm_pool_manager import WarmPoolManager
 from ..core.semantic_router import SemanticRouter
 

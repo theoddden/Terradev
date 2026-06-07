@@ -7,7 +7,7 @@ Uses keyword-based heuristic classification across common domains.
 """
 
 import re
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, Set
 from .base_signal import BaseSignal, SignalResult, SignalType
 
 

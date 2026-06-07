@@ -7,7 +7,7 @@ This is the fastest signal type (<0.1ms) and runs first in the pipeline.
 """
 
 import re
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, Set
 from .base_signal import BaseSignal, SignalResult, SignalType
 
 

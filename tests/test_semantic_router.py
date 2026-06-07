@@ -30,9 +30,6 @@ from terradev_cli.core.semantic_router import (
     SemanticRouter,
     PolicyExpressionEvaluator,
     NUMAEndpointScorer,
-    NUMAScorecard,
-    RoutingRule,
-    RoutingPolicy,
     load_policy_from_dict,
     DEFAULT_POLICY_DICT,
 )
@@ -1090,7 +1087,6 @@ class TestPrefillDecodeTracker:
         assert tracker.get_decode_for_prefill("p1", "m1") == "d2"
 
     def test_expired_handoff(self):
-        import time
         from terradev_cli.core.inference_router import PrefillDecodeTracker
 
         tracker = PrefillDecodeTracker()
@@ -1249,7 +1245,6 @@ class TestDisaggregatedRouting:
         assert prefill_ep.endpoint_id == decode_ep.endpoint_id
 
     def test_sticky_routing_via_tracker(self, tmp_path):
-        from terradev_cli.core.inference_router import EndpointPhase
 
         router = self._make_router_with_endpoints(tmp_path)
         # First pair establishes a handoff
@@ -1396,7 +1391,6 @@ class TestIntraGPUTopology:
         from terradev_cli.core.gpu_topology import (
             GPUDevice,
             build_intra_gpu_topology,
-            IntraGPUNUMALocality,
         )
 
         gpu = GPUDevice(

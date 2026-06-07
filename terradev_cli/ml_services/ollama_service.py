@@ -4,14 +4,11 @@ Ollama Service Integration for Terradev
 Local LLM deployment and management
 """
 
-import os
 import json
-import asyncio
 import aiohttp
 import subprocess
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from datetime import datetime
 
 
 @dataclass

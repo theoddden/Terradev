@@ -7,9 +7,9 @@ Handles API rate limiting, retries, and provider-specific throttling
 import asyncio
 import time
 import logging
-from typing import Dict, List, Any, Optional, Callable
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, Callable
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 import aiohttp
 
@@ -254,7 +254,7 @@ class RateLimiter:
             except asyncio.TimeoutError:
                 logger.warning(f"Timeout for {provider} after {limit.timeout}s")
                 raise
-            except Exception as e:
+            except Exception:
                 metrics.failed_requests += 1
                 raise
 

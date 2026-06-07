@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from .base_signal import BaseSignal, SignalResult, SignalType
+from .base_signal import BaseSignal, SignalResult
 from .keyword_signal import KeywordSignal
 from .modality_signal import ModalitySignal
 from .complexity_signal import ComplexitySignal

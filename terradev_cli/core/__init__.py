@@ -62,15 +62,15 @@ def _enable_cuda_graph_optimization():
             return
 
         # Get default instances
-        numa_scorer = get_default_numa_scorer()
+        get_default_numa_scorer()
         warm_pool = get_default_warm_pool()
-        integrator = get_default_cuda_graph_integrator()
+        get_default_cuda_graph_integrator()
 
         # Start warm pool with CUDA Graph optimization
         if not warm_pool._running:
             loop.create_task(warm_pool.start())
 
-    except Exception as e:
+    except Exception:
         # Fail silently - CUDA Graph optimization is optional
         pass
 

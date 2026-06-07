@@ -12,17 +12,14 @@ Guarantees all integrations work well through:
 """
 
 import asyncio
-import pytest
 import json
 import subprocess
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
-from typing import Dict, List, Any, Optional
+from unittest.mock import Mock, patch
+from typing import Dict, List, Any
 from dataclasses import dataclass
-import requests
-import yaml
 import click
 
 
@@ -557,7 +554,7 @@ def test_integration(mock, performance, suite, parallel, timeout):
             # Run all tests
             results = await framework.run_all_tests()
 
-            print(f"\n🎯 Final Results:")
+            print("\n🎯 Final Results:")
             print(f"Status: {results['summary']['status']}")
             print(f"Success Rate: {results['summary']['success_rate']:.1f}%")
             print(f"Total Tests: {results['summary']['total_tests']}")

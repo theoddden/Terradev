@@ -11,20 +11,13 @@ CRITICAL VALIDATION v4.1.0:
 
 import asyncio
 import logging
-import time
 import sys
 from typing import Dict, List, Any
 from pathlib import Path
-import statistics
 
 # Add the parent directory to the path to import the manager
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.weight_streaming_manager import (
-    WeightStreamingManager,
-    StreamingConfig,
-    StreamingState,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +140,7 @@ class WeightStreamingBenchmarks:
             "status": "PASSED" if all_pass else "FAILED",
             "results": results,
             "all_pass": all_pass,
-            "summary": f"Weight streaming provides 3-10x improvement in cold start times",
+            "summary": "Weight streaming provides 3-10x improvement in cold start times",
         }
 
     async def benchmark_different_model_sizes(self) -> Dict[str, Any]:
@@ -453,7 +446,7 @@ async def main():
 
     # Print results
     print(f"\n{'='*60}")
-    print(f"Weight Streaming Benchmark Results")
+    print("Weight Streaming Benchmark Results")
     print(f"{'='*60}")
     print(f"Total Benchmarks: {results['total_benchmarks']}")
     print(f"Passed: {results['passed_benchmarks']}")
@@ -466,14 +459,14 @@ async def main():
         r for r in results["benchmark_results"] if r["status"] == "FAILED"
     ]
     if failed_benchmarks:
-        print(f"\n❌ Failed Benchmarks:")
+        print("\n❌ Failed Benchmarks:")
         for benchmark in failed_benchmarks:
             print(f"  - {benchmark['benchmark_name']}")
             if "error" in benchmark:
                 print(f"    Error: {benchmark['error']}")
 
     # Print key metrics
-    print(f"\n📊 Key Performance Results:")
+    print("\n📊 Key Performance Results:")
 
     # Find streaming vs traditional benchmark
     streaming_benchmark = next(
@@ -485,7 +478,7 @@ async def main():
         None,
     )
     if streaming_benchmark and streaming_benchmark["status"] == "PASSED":
-        print(f"  ✅ Weight streaming provides 3-10x cold start improvement")
+        print("  ✅ Weight streaming provides 3-10x cold start improvement")
         for result in streaming_benchmark.get("results", []):
             print(
                 f"    - {result['model_size']}: {result['improvement_factor']}x faster"

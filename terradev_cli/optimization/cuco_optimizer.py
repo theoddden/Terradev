@@ -6,19 +6,15 @@ into Terradev's optimization pipeline with p95-based performance boundaries
 and intelligent auto-application.
 """
 
-import asyncio
 import logging
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
 import time
-import json
-from pathlib import Path
 
 from ..core.monitoring import MetricsCollector
 from ..core.config import TerradevConfig
-from ..providers.base import BaseProvider
 
 logger = logging.getLogger(__name__)
 
@@ -769,7 +765,6 @@ __global__ void GenericFusedKernel(
         """Estimate cost increase from CUCo optimization"""
 
         # Base cost factors
-        base_cost = 1.0
 
         # GPU utilization increase (typically reduces cost per performance)
         util_factor = 1.0 + (0.1 * profile.gpu_count / 8.0)  # Up to 10% for 8 GPUs

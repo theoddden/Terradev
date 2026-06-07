@@ -21,7 +21,7 @@ References:
 import json
 import subprocess
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -1251,7 +1251,7 @@ class GPUTopologyOrchestrator:
         print(f"  RDMA Devices:    {report['rdma_devices']}")
 
         # NUMA map
-        print(f"\n  NUMA Topology:")
+        print("\n  NUMA Topology:")
         for node_id, devices in sorted(report.get("numa_map", {}).items()):
             print(f"    NUMA Node {node_id}:")
             for g in devices.get("gpus", []):
@@ -1260,7 +1260,7 @@ class GPUTopologyOrchestrator:
                 print(f"      NIC: {n}")
 
         # Pairs
-        print(f"\n  GPU-NIC Pairs:")
+        print("\n  GPU-NIC Pairs:")
         for p in report.get("pairs", []):
             status = "OK" if p["optimal"] else "WARN"
             print(
@@ -1273,7 +1273,7 @@ class GPUTopologyOrchestrator:
             print(f"\n  WARNING: {cross} cross-socket pair(s) detected!")
 
         # Recommendations
-        print(f"\n  Recommendations:")
+        print("\n  Recommendations:")
         for rec in report.get("recommendations", []):
             print(f"    - {rec}")
 

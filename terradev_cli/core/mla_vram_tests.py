@@ -12,13 +12,13 @@ CRITICAL VALIDATION v4.1.0:
 import asyncio
 import logging
 import sys
-from typing import Dict, List, Any
+from typing import Dict, Any
 from pathlib import Path
 
 # Add the parent directory to the path to import the estimator
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.mla_vram_estimator import MLA_VRAMEstimator, AttentionType, ModelArchitecture
+from core.mla_vram_estimator import MLA_VRAMEstimator
 
 logger = logging.getLogger(__name__)
 
@@ -488,7 +488,7 @@ async def main():
 
     # Print results
     print(f"\n{'='*60}")
-    print(f"MLA VRAM Estimation Test Results")
+    print("MLA VRAM Estimation Test Results")
     print(f"{'='*60}")
     print(f"Total Tests: {results['total_tests']}")
     print(f"Passed: {results['passed_tests']}")
@@ -499,21 +499,21 @@ async def main():
     # Print failed tests
     failed_tests = [r for r in results["test_results"] if r["status"] == "FAILED"]
     if failed_tests:
-        print(f"\n❌ Failed Tests:")
+        print("\n❌ Failed Tests:")
         for test in failed_tests:
             print(f"  - {test['test_name']}")
             if "error" in test:
                 print(f"    Error: {test['error']}")
 
     # Print key metrics
-    print(f"\n📊 Key Validation Results:")
+    print("\n📊 Key Validation Results:")
 
     # Find DeepSeek V3 test
     deepseek_test = next(
         (r for r in results["test_results"] if "DeepSeek V3" in r["test_name"]), None
     )
     if deepseek_test and deepseek_test["status"] == "PASSED":
-        print(f"  ✅ DeepSeek V3 MLA accuracy validated")
+        print("  ✅ DeepSeek V3 MLA accuracy validated")
 
     # Find comparison test
     comparison_test = next(
@@ -529,7 +529,7 @@ async def main():
         (r for r in results["test_results"] if "GPU Count" in r["test_name"]), None
     )
     if gpu_test and gpu_test["status"] == "PASSED":
-        print(f"  ✅ GPU count recommendations validated")
+        print("  ✅ GPU count recommendations validated")
 
     return results["success_rate"] == 1.0
 

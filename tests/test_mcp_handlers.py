@@ -21,7 +21,6 @@ This test samples key tools from each batch rather than testing all 298.
 import pytest
 import sys
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -257,7 +256,7 @@ class TestMCPHandlerPatterns:
 
             async def test_aiohttp():
                 # This is a pattern test - we won't make real HTTP calls
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession():
                     # Mock the request
                     pass
 

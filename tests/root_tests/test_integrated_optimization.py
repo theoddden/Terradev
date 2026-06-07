@@ -7,12 +7,9 @@ showing where we stand with P95/P10 standards and context-aware optimization.
 """
 
 import subprocess
-import json
 import time
 import sys
-import os
 from pathlib import Path
-from typing import Dict, List, Any
 
 
 class IntegratedOptimizationTest:
@@ -473,7 +470,7 @@ class IntegratedOptimizationTest:
                     print(f"  • {result['name']}: {result['error']}")
 
         # Final assessment
-        print(f"\n🎯 FINAL ASSESSMENT:")
+        print("\n🎯 FINAL ASSESSMENT:")
         print("=" * 30)
 
         if passed_tests == total_tests:
@@ -488,7 +485,7 @@ class IntegratedOptimizationTest:
         else:
             print("⚠️  NEEDS WORK: Integration requires significant fixes")
 
-        print(f"\n🚀 WHERE WE STAND:")
+        print("\n🚀 WHERE WE STAND:")
         print("=" * 20)
         print("✅ Cost Optimization: PRODUCTION READY")
         print("🔄 CUCo Integration: FRAMEWORK COMPLETE")

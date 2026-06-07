@@ -1,6 +1,9 @@
 """Karpenter CLI commands for Terradev."""
 
-import os, json, asyncio, click, sys
+import os
+import json
+import asyncio
+import click
 
 
 def register_karpenter_commands(cli, TerradevAPI):

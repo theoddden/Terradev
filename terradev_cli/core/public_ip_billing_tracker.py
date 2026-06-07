@@ -9,7 +9,6 @@ CRITICAL FIXES v4.0.0:
 - Cost optimization for IP address management
 """
 
-import asyncio
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta

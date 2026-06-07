@@ -10,13 +10,11 @@ CRITICAL FIXES v4.0.0:
 """
 
 import asyncio
-import json
 import logging
 import os
-import time
 import threading
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 
 try:

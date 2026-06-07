@@ -6,12 +6,9 @@ Integrates Karpenter, Prometheus, Grafana, and Terradev monitoring
 
 import os
 import json
-import asyncio
 import aiohttp
 import subprocess
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
-from pathlib import Path
 
 from .kubernetes_service import KubernetesConfig  # single canonical definition
 
@@ -65,7 +62,7 @@ class EnhancedKubernetesService:
             )
 
             if result.returncode == 0:
-                apply_result = subprocess.run(
+                subprocess.run(
                     ["kubectl", "apply", "-f", "-"],
                     input=result.stdout,
                     text=True,
@@ -74,7 +71,7 @@ class EnhancedKubernetesService:
                 )
 
             # Install Prometheus with Karpenter metrics
-            prometheus_values = f"""
+            prometheus_values = """
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -649,9 +646,9 @@ dashboardProviders:
 
             # Apply as ConfigMap
             cm_manifest = (
-                f"apiVersion: v1\nkind: ConfigMap\nmetadata:\n"
-                f"  name: nvidia-device-plugin\n  namespace: gpu-operator\n"
-                f"data:\n  config.json: |\n"
+                "apiVersion: v1\nkind: ConfigMap\nmetadata:\n"
+                "  name: nvidia-device-plugin\n  namespace: gpu-operator\n"
+                "data:\n  config.json: |\n"
             )
             for line in config_yaml.splitlines():
                 cm_manifest += f"    {line}\n"
@@ -689,16 +686,6 @@ dashboardProviders:
                 env["KUBECONFIG"] = self.config.kubeconfig_path
 
             # MIG profiles: 1g.10gb, 2g.20gb, 3g.40gb, 4g.40gb, 7g.80gb (A100)
-            valid_profiles = [
-                "all-1g.10gb",
-                "all-2g.20gb",
-                "all-3g.40gb",
-                "all-4g.40gb",
-                "all-7g.80gb",
-                "all-1g.20gb",
-                "all-1g.10gb,2g.20gb",
-                "mixed",
-            ]
 
             # Label nodes with MIG config
             label_cmd = [
@@ -1057,7 +1044,7 @@ suitableNodeCount: 1
                 env["KUBECONFIG"] = self.config.kubeconfig_path
 
             # MIG ResourceClass for DRA
-            mig_resource_class = f"""apiVersion: resource.k8s.io/v1beta1
+            mig_resource_class = """apiVersion: resource.k8s.io/v1beta1
 kind: ResourceClass
 metadata:
   name: nvidia.com/mig

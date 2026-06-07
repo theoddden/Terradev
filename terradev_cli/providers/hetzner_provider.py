@@ -17,7 +17,7 @@ Auth: Cloud = Bearer token, Robot = HTTP Basic (user + password)
 import logging
 import os
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from .base_provider import BaseProvider
 

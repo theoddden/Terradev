@@ -1,9 +1,7 @@
 """Tests for the SSH key manager — keygen, encrypt/decrypt, cleanup."""
 
 import os
-import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 

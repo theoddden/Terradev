@@ -6,10 +6,8 @@ CLI-native drift detection and rollback system (20 LOC implementation)
 
 import json
 import hashlib
-import asyncio
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 
 

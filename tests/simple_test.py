@@ -3,12 +3,9 @@
 Simple Integration Test for Terradev CLI
 """
 
-import asyncio
 import subprocess
 import tempfile
-import json
 from pathlib import Path
-from unittest.mock import Mock, patch
 import click
 
 
@@ -17,7 +14,7 @@ import click
 @click.option("--suite", help="Run specific test suite only")
 def test_integration(mock, suite):
     """Run comprehensive integration tests"""
-    print(f"🚀 Starting Terradev CLI Integration Test Suite")
+    print("🚀 Starting Terradev CLI Integration Test Suite")
     print(f"Test Mode: {'Mock' if mock else 'Live'}")
 
     if suite == "core":

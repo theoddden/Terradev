@@ -7,11 +7,9 @@ Handles secure credential storage and management
 import json
 import os
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 from cryptography.fernet import Fernet
 import base64
-import hashlib
-import secrets
 from datetime import datetime
 
 

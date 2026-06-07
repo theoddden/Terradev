@@ -19,7 +19,6 @@ import subprocess
 import aiohttp
 from typing import Dict, List, Any, Optional, AsyncIterator
 from dataclasses import dataclass
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 

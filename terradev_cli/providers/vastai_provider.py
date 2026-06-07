@@ -4,11 +4,9 @@ Vast.ai Provider - Vast.ai GPU marketplace integration
 BYOAPI: Uses the end-client's Vast.ai API key
 """
 
-import asyncio
 import logging
 import os
 from typing import Dict, List, Any, Optional
-from datetime import datetime
 
 from .base_provider import BaseProvider
 

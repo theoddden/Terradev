@@ -215,7 +215,6 @@ class TestStaleDuplicateFileCheck:
 
     def test_no_kubernetes_enhanced_fixed_file(self):
         """Bug #14: kubernetes_enhanced_fixed.py should not exist"""
-        import os
         from pathlib import Path
 
         # Check if the stale file exists

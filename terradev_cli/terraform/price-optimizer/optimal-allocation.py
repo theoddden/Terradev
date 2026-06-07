@@ -7,7 +7,6 @@ Queries real-time prices and allocates nodes across cheapest providers
 import json
 import sys
 import os
-import requests
 from datetime import datetime
 from typing import Dict, List, Tuple
 

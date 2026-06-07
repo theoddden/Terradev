@@ -515,7 +515,7 @@ class CheckpointManager:
                             shard["path"],
                             f"{job_id}/step_{step:08d}/{os.path.basename(shard['path'])}",
                         )
-                logger.info(f"Uploaded checkpoint to remote storage")
+                logger.info("Uploaded checkpoint to remote storage")
 
         # State DB updates
         if self.state_manager:

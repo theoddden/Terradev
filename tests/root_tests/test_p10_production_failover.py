@@ -7,14 +7,12 @@ No hardcoded success values - only proper error handling and failover behavior.
 """
 
 import subprocess
-import json
 import time
 import sys
 import os
 import tempfile
 import shutil
 from pathlib import Path
-from typing import Dict, List, Any, Optional
 from unittest.mock import patch, MagicMock
 import signal
 
@@ -488,7 +486,7 @@ class P10ProductionFailoverTest:
             )
             mock_api.return_value = mock_instance
 
-            result = subprocess.run(
+            subprocess.run(
                 ["python3", "terradev_cli/cli.py", "optimize"],
                 cwd=self.terradev_path,
                 capture_output=True,
@@ -606,7 +604,7 @@ class P10ProductionFailoverTest:
                 status = "✅" if passed == total else "⚠️" if passed > 0 else "❌"
                 print(f"{status} {category}: {passed}/{total} tests passed")
 
-        print(f"\n📊 OVERALL FAILOVER ASSESSMENT:")
+        print("\n📊 OVERALL FAILOVER ASSESSMENT:")
         print("=" * 40)
 
         total_tests = len(self.test_results)
@@ -621,7 +619,7 @@ class P10ProductionFailoverTest:
         print(f"Success Rate: {passed_tests/total_tests:.1%}")
 
         # Production readiness assessment
-        print(f"\n🏭 PRODUCTION READINESS:")
+        print("\n🏭 PRODUCTION READINESS:")
         print("=" * 30)
 
         if passed_tests == total_tests:
@@ -640,7 +638,7 @@ class P10ProductionFailoverTest:
             print("🚨 Not production-ready - major improvements required")
 
         # Key failover capabilities
-        print(f"\n🛡️ FAILOVER CAPABILITIES VERIFIED:")
+        print("\n🛡️ FAILOVER CAPABILITIES VERIFIED:")
         print("=" * 45)
 
         capabilities = [
@@ -725,7 +723,6 @@ class P10ProductionFailoverTest:
 
 # Run the P10 production failover test suite
 if __name__ == "__main__":
-    import asyncio
 
     p10_test = P10ProductionFailoverTest()
     results = p10_test.run_all_tests()

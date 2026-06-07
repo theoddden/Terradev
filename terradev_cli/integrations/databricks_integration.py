@@ -20,7 +20,6 @@ BYOAPI: PAT stored locally in ~/.terradev/credentials.json
 
 import json
 import logging
-import time
 from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)

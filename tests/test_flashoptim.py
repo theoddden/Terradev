@@ -55,8 +55,8 @@ class TestFlashOptimConfigFields:
         assert config.flashoptim == "auto"
         assert config.flashoptim_optimizer == "adamw"
         assert config.flashoptim_master_weight_bits == 24
-        assert config.flashoptim_compress_checkpoints == False
-        assert config.flashoptim_gradient_release == False
+        assert not config.flashoptim_compress_checkpoints
+        assert not config.flashoptim_gradient_release
 
 
 class TestFlashOptimAutoConfigRules:
@@ -69,7 +69,7 @@ class TestFlashOptimAutoConfigRules:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == False
+        assert not result["enabled"]
         assert "disabled by user" in result["reason"]
 
     def test_rule_2_megatron_framework(self):
@@ -79,7 +79,7 @@ class TestFlashOptimAutoConfigRules:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == False
+        assert not result["enabled"]
         assert "Megatron" in result["reason"]
 
     def test_rule_3_no_gpus(self):
@@ -89,7 +89,7 @@ class TestFlashOptimAutoConfigRules:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == False
+        assert not result["enabled"]
         assert "no NVIDIA GPUs" in result["reason"]
 
     def test_rule_4_tiny_gpus(self):
@@ -99,7 +99,7 @@ class TestFlashOptimAutoConfigRules:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == False
+        assert not result["enabled"]
         assert "24000MB" in result["reason"] or "24GB" in result["reason"]
 
     def test_rule_5_explicit_on(self):
@@ -109,7 +109,7 @@ class TestFlashOptimAutoConfigRules:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == True
+        assert result["enabled"]
         assert "enabled by user" in result["reason"]
 
     def test_rule_6_reduced_precision(self):
@@ -121,7 +121,7 @@ class TestFlashOptimAutoConfigRules:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == True
+        assert result["enabled"]
         assert "reduced-precision" in result["reason"]
 
     def test_rule_6_fp16_detection(self):
@@ -133,7 +133,7 @@ class TestFlashOptimAutoConfigRules:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == True
+        assert result["enabled"]
         assert "reduced-precision" in result["reason"]
 
     def test_rule_7_large_total_vram(self):
@@ -161,7 +161,7 @@ class TestFlashOptimAutoConfigRules:
 
         # Should be disabled by default conservative rule
         # (24GB is not enough to trigger auto-enable without reduced precision)
-        assert result["enabled"] == False
+        assert not result["enabled"]
         assert (
             "skipped" in result["reason"].lower()
             or "conservative" in result["reason"].lower()
@@ -178,7 +178,7 @@ class TestFlashOptimEnvVars:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == True
+        assert result["enabled"]
         assert "env_vars" in result
         assert "FLASHOPTIM_ENABLED" in result["env_vars"]
         assert result["env_vars"]["FLASHOPTIM_ENABLED"] == "1"
@@ -191,7 +191,7 @@ class TestFlashOptimEnvVars:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == True
+        assert result["enabled"]
         assert "FlashLion" in result["optimizer_class"]
 
     def test_master_weight_bits(self):
@@ -201,7 +201,7 @@ class TestFlashOptimEnvVars:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == True
+        assert result["enabled"]
         assert "FLASHOPTIM_MASTER_WEIGHT_BITS" in result["env_vars"]
 
     def test_compress_checkpoints(self):
@@ -211,7 +211,7 @@ class TestFlashOptimEnvVars:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == True
+        assert result["enabled"]
         assert "FLASHOPTIM_COMPRESS_CHECKPOINTS" in result["env_vars"]
 
 
@@ -244,7 +244,7 @@ class TestFlashOptimResultStructure:
 
         result = _flashoptim_auto_config(config, topology)
 
-        assert result["enabled"] == True
+        assert result["enabled"]
         assert "pip_install" in result
         # Should include flashoptim in pip install
         assert len(result["pip_install"]) > 0
@@ -281,7 +281,7 @@ class TestTrainingConfigHelpers:
 
     def test_from_yaml_requires_yaml(self):
         """from_yaml requires PyYAML"""
-        config = TrainingConfig()
+        TrainingConfig()
 
         # Should raise ImportError if yaml not available
         # We'll just test the method exists

@@ -6,11 +6,10 @@ AI-powered cost optimization for serverless inference workloads
 
 import asyncio
 import json
-import time
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any
 from dataclasses import dataclass, asdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -578,8 +577,8 @@ def analyze(cluster_config, usage_metrics, tier, output):
     )
 
     # Display results
-    print(f"🔍 InferX Cost Analysis Report")
-    print(f"=" * 50)
+    print("🔍 InferX Cost Analysis Report")
+    print("=" * 50)
     print(f"📊 Current Monthly Cost: ${report['summary']['current_monthly_cost']:,.2f}")
     print(
         f"💰 Potential Monthly Savings: ${report['summary']['potential_monthly_savings']:,.2f}"
@@ -592,12 +591,12 @@ def analyze(cluster_config, usage_metrics, tier, output):
     print(f"📊 Annual ROI: {report['summary']['annual_roi']:.1f}%")
     print()
 
-    print(f"🎯 Key Insights:")
+    print("🎯 Key Insights:")
     for insight in report["key_insights"]:
         print(f"   • {insight}")
     print()
 
-    print(f"📋 Top Recommendations:")
+    print("📋 Top Recommendations:")
     for i, rec in enumerate(report["recommendations"][:5], 1):
         print(f"   {i}. {rec['description']}")
         print(f"      Savings: ${rec['estimated_savings']:,.2f}/month")

@@ -12,8 +12,7 @@ Core functionality:
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from .job_state_manager import JobStateManager, JobStatus
 from .egress_optimizer import estimate_egress_cost, find_cheapest_multihop
@@ -283,11 +282,11 @@ class MigrationOrchestrator:
         total_data_gb = workload.checkpoint_size_gb + workload.data_size_gb
 
         steps = [
-            f"1. Checkpoint current job (est. 2 min)",
+            "1. Checkpoint current job (est. 2 min)",
             f"2. Transfer {total_data_gb:.1f}GB data",
             f"3. Provision {target_provider} {target_gpu} instance",
-            f"4. Setup environment and dependencies",
-            f"5. Restore checkpoint and resume training",
+            "4. Setup environment and dependencies",
+            "5. Restore checkpoint and resume training",
         ]
 
         return steps

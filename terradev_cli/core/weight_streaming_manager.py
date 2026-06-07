@@ -18,13 +18,11 @@ Time to first token: <3 minutes for 70B model (network + compute parallelized)
 import asyncio
 import aiohttp
 import logging
-import time
 from typing import Dict, List, Any, Optional, Tuple, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-import json
 import hashlib
 
 logger = logging.getLogger(__name__)
@@ -471,10 +469,10 @@ class WeightStreamingManager:
         """Load chunk using vLLM async engine"""
         try:
             # Import vLLM
-            from vllm import AsyncEngineArgs, AsyncLLMEngine
+            from vllm import AsyncEngineArgs
 
             # Create engine args for this chunk
-            engine_args = AsyncEngineArgs(
+            AsyncEngineArgs(
                 model=str(chunk.local_path),
                 tokenizer=self.config.model_path,
                 trust_remote_code=True,
@@ -502,7 +500,6 @@ class WeightStreamingManager:
         """Load chunk using SGLang chunked prefill"""
         try:
             # Import SGLang
-            import sglang as sgl
 
             # Use SGLang's chunked prefill capabilities
             # This would integrate with SGLang's streaming features

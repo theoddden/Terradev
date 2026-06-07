@@ -4,7 +4,6 @@ Kubernetes Terraform Wrapper for Terradev
 Handles multi-cloud GPU cluster provisioning and management
 """
 
-import os
 import sys
 import json
 import subprocess
@@ -60,7 +59,7 @@ class TerraformWrapper:
                     result.returncode, command, result.stdout, result.stderr
                 )
 
-            self.logger.info(f"Terraform command completed successfully")
+            self.logger.info("Terraform command completed successfully")
             return result
 
         except subprocess.TimeoutExpired:

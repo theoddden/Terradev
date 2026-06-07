@@ -4,12 +4,8 @@ Smart HuggingFace Spaces Templates with Hardware Optimization
 Implements intelligent template generation and hardware tier optimization
 """
 
-import asyncio
-import json
-import re
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from pathlib import Path
 
 
 @dataclass
@@ -991,7 +987,7 @@ class HardwareOptimizer:
         all_hardware = []
         for tier_name, tier in self.template_generator.hardware_tiers.items():
             suitable = tier.memory_gb >= model_spec.min_memory_gb
-            cost_breakdown = self.template_generator.generate_cost_breakdown(
+            self.template_generator.generate_cost_breakdown(
                 model_spec, tier
             )
 

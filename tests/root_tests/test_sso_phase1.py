@@ -5,7 +5,6 @@ Verifies that enterprise authentication components work correctly
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Add terradev_cli to path
@@ -197,7 +196,7 @@ def test_user_manager():
     print("\n🧪 Testing UserManager...")
 
     try:
-        from core.user_manager import UserManager, UserRole, AuthProvider
+        from core.user_manager import UserManager
 
         # Create manager
         manager = UserManager()

@@ -4,7 +4,6 @@ Trace Viewer — renders Phoenix span trees in terminal.
 Queries Phoenix REST API and displays execution chains like `terradev status`.
 """
 
-import asyncio
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime

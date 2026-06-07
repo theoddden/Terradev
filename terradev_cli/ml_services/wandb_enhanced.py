@@ -4,14 +4,10 @@ Enhanced Weights & Biases Service with Deep Dashboard Integration
 Integrates W&B dashboards, reports, and Terradev monitoring
 """
 
-import os
-import json
-import asyncio
 import aiohttp
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
-import base64
 
 
 @dataclass

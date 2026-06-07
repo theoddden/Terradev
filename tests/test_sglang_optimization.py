@@ -7,8 +7,7 @@ to ensure correct auto-detection and parameter application.
 """
 
 import pytest
-import asyncio
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from terradev_cli.ml_services.sglang_service import (
     SGLangService,
     SGLangConfig,
@@ -40,7 +39,7 @@ class TestSGLangOptimizer:
 
             assert profile.gpu_type == "H100"
             assert profile.memory_gb == 80
-            assert profile.supports_fp8 == True
+            assert profile.supports_fp8
             assert profile.default_attention_backend == AttentionBackend.FLASHINFER
 
     def test_hardware_detection_h20(self):
@@ -54,7 +53,7 @@ class TestSGLangOptimizer:
 
             assert profile.gpu_type == "H20"
             assert profile.memory_gb == 96
-            assert profile.supports_fa3 == True
+            assert profile.supports_fa3
             assert "swapab" in profile.special_optimizations
 
     def test_model_type_detection_deepseek(self):
@@ -118,7 +117,7 @@ class TestAgenticChatOptimizations:
 
         # Verify LPM schedule policy
         assert optimized.schedule_policy == SchedulePolicy.LPM
-        assert optimized.disable_radix_cache == False
+        assert not optimized.disable_radix_cache
 
         # Verify memory settings
         assert optimized.mem_fraction_static == 0.82
@@ -195,7 +194,7 @@ class TestBatchInferenceOptimizations:
 
         # Verify FCFS schedule policy
         assert optimized.schedule_policy == SchedulePolicy.FCFS
-        assert optimized.disable_radix_cache == True
+        assert optimized.disable_radix_cache
 
         # Verify memory settings
         assert optimized.mem_fraction_static == 0.85
@@ -210,7 +209,7 @@ class TestBatchInferenceOptimizations:
         assert optimized.kv_cache_dtype == "fp8_e4m3"
 
         # Verify torch compile
-        assert optimized.enable_torch_compile == True
+        assert optimized.enable_torch_compile
 
     def test_batch_inference_launch_command(self):
         """Test batch inference launch command generation"""
@@ -264,7 +263,7 @@ class TestLowLatencyOptimizations:
         # Verify EAGLE3 speculative decoding
         assert optimized.speculative_algorithm == SpeculativeAlgorithm.EAGLE
         assert optimized.speculative_num_steps == 3
-        assert optimized.enable_spec_v2 == True
+        assert optimized.enable_spec_v2
 
         # Verify Spec V2 environment
         assert optimized.env_vars["SGLANG_ENABLE_SPEC_V2"] == "1"
@@ -311,13 +310,13 @@ class TestMoEOptimizations:
         assert optimized.ep_num_redundant_experts == 32
 
         # Verify MoE settings
-        assert optimized.enable_dp_attention == True
+        assert optimized.enable_dp_attention
         assert optimized.moe_a2a_backend == "deepep"
         assert optimized.moe_runner_backend == "deep_gemm"
         assert optimized.deepep_mode == DeepEPMode.AUTO
-        assert optimized.enable_eplb == True
-        assert optimized.enable_two_batch_overlap == True
-        assert optimized.enable_single_batch_overlap == True
+        assert optimized.enable_eplb
+        assert optimized.enable_two_batch_overlap
+        assert optimized.enable_single_batch_overlap
 
     def test_h20_moe_optimization(self):
         """Test H20 MoE optimization"""
@@ -358,7 +357,7 @@ class TestMoEOptimizations:
 
         # Verify GB200-specific optimizations
         assert optimized.moe_dense_tp_size == 1
-        assert optimized.enable_dp_lm_head == True
+        assert optimized.enable_dp_lm_head
         assert optimized.chunked_prefill_size == 524288
 
 
@@ -386,7 +385,7 @@ class TestPDDisaggregatedOptimizations:
         assert optimized.mem_fraction_static == 0.85
         assert optimized.chunked_prefill_size == 524288
         assert optimized.max_running_requests == 8192
-        assert optimized.disable_radix_cache == True
+        assert optimized.disable_radix_cache
         assert optimized.deepep_mode == DeepEPMode.NORMAL
         assert optimized.page_size == 1
 
@@ -420,9 +419,9 @@ class TestPDDisaggregatedOptimizations:
         optimized = self.service._optimize_pd_disaggregated(config, self.hardware)
 
         # Verify common PD settings
-        assert optimized.enable_dp_attention == True
-        assert optimized.enable_dp_lm_head == True
-        assert optimized.enable_deepep_moe == True
+        assert optimized.enable_dp_attention
+        assert optimized.enable_dp_lm_head
+        assert optimized.enable_deepep_moe
 
 
 class TestStructuredOutputOptimizations:
@@ -448,7 +447,7 @@ class TestStructuredOutputOptimizations:
         assert optimized.schedule_policy == SchedulePolicy.LPM
         assert optimized.mem_fraction_static == 0.80
         assert optimized.chunked_prefill_size == 8192
-        assert optimized.enable_xgrammar == True
+        assert optimized.enable_xgrammar
 
         # Verify xGrammar environment
         assert optimized.env_vars["SGLANG_XGRAMMAR_ENABLED"] == "1"
@@ -466,7 +465,7 @@ class TestStructuredOutputOptimizations:
         assert optimized.schedule_policy == SchedulePolicy.LPM
         assert optimized.mem_fraction_static == 0.80
         assert optimized.chunked_prefill_size == 8192
-        assert optimized.disable_radix_cache == False
+        assert not optimized.disable_radix_cache
 
         # Verify RadixAttention environment
         assert optimized.env_vars["SGLANG_RADIX_ATTENTION"] == "1"
@@ -550,7 +549,7 @@ class TestIntegrationScenarios:
         assert config.schedule_policy == SchedulePolicy.LPM
 
         # Should have both MoE and agentic optimizations
-        assert config.enable_eplb == True  # MoE optimization
+        assert config.enable_eplb  # MoE optimization
         assert (
             config.env_vars.get("SGLANG_CACHE_AWARE_ROUTING") == "1"
         )  # Agentic optimization
@@ -564,8 +563,8 @@ class TestIntegrationScenarios:
 
         # Verify batch optimizations
         assert config.schedule_policy == SchedulePolicy.FCFS
-        assert config.disable_radix_cache == True
-        assert config.enable_torch_compile == True
+        assert config.disable_radix_cache
+        assert config.enable_torch_compile
         assert config.quantization == "fp8"
 
     def test_real_time_api_deployment(self):
@@ -578,7 +577,7 @@ class TestIntegrationScenarios:
         # Verify low latency optimizations
         assert config.workload_type == WorkloadType.LOW_LATENCY
         assert config.speculative_algorithm == SpeculativeAlgorithm.EAGLE
-        assert config.enable_spec_v2 == True
+        assert config.enable_spec_v2
         assert config.max_running_requests == 64
 
 

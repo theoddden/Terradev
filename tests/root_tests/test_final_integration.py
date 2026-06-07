@@ -7,11 +7,9 @@ of many auto-applied optimizations alongside cost, warm pool, semantic routing, 
 """
 
 import subprocess
-import json
 import time
 import sys
 from pathlib import Path
-from typing import Dict, List, Any
 
 
 class FinalIntegrationTest:
@@ -158,7 +156,6 @@ class FinalIntegrationTest:
 
         assert result.returncode == 0, "Optimization should succeed"
 
-        output = result.stdout
 
         # The code should be capable of detecting different optimization types
         # Even if the current test instance only triggers cost optimization
@@ -315,7 +312,7 @@ class FinalIntegrationTest:
         print(f"Success Rate: {passed_tests/total_tests:.1%}")
 
         # Final verdict
-        print(f"\n🎯 FINAL INTEGRATION VERDICT:")
+        print("\n🎯 FINAL INTEGRATION VERDICT:")
         print("=" * 30)
 
         if passed_tests == total_tests:
@@ -331,7 +328,7 @@ class FinalIntegrationTest:
         else:
             print("⚠️  INTEGRATION NEEDS WORK")
 
-        print(f"\n🚀 WHERE WE STAND:")
+        print("\n🚀 WHERE WE STAND:")
         print("=" * 20)
         print("✅ CUCo Integration: COMPLETE")
         print("✅ Auto-Apply System: WORKING")
@@ -339,7 +336,7 @@ class FinalIntegrationTest:
         print("✅ CLI Interface: SIMPLE")
         print("✅ Production Ready: YES")
 
-        print(f"\n💡 KEY ACHIEVEMENT:")
+        print("\n💡 KEY ACHIEVEMENT:")
         print("=" * 20)
         print("CUCo is now just ONE of many auto-applied optimizations")
         print("in the Terradev CLI - exactly as requested!")

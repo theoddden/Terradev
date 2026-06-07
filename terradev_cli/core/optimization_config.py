@@ -4,7 +4,7 @@ Terradev Optimization Configuration
 Central configuration for all optimization features including CUCo integration.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 from dataclasses import dataclass
 import json
 from pathlib import Path

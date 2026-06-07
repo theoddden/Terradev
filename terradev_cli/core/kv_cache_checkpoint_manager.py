@@ -22,7 +22,6 @@ Based on DistServe and vLLM team research (2025)
 
 import asyncio
 import aiohttp
-import json
 import pickle
 import gzip
 import logging
@@ -626,7 +625,6 @@ class KVCacheCheckpointManager:
                 self.logger.info("No checkpoint files to upload")
                 return True
 
-            upload_tasks = []
             for checkpoint_file in checkpoint_files:
                 data = checkpoint_file.read_bytes()
                 checkpoint_id = checkpoint_file.stem

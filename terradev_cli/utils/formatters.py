@@ -192,7 +192,7 @@ def format_cost_savings(savings_percent: float, savings_amount: float) -> str:
     if savings_percent > 0:
         return f"💰 Save {savings_percent:.1f}% (${savings_amount:.2f})"
     else:
-        return f"💸 No savings available"
+        return "💸 No savings available"
 
 
 def format_optimization_score(score: float) -> str:

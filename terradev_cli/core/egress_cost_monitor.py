@@ -9,9 +9,8 @@ CRITICAL FIXES v4.0.0:
 - Budget alert integration
 """
 
-import asyncio
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum

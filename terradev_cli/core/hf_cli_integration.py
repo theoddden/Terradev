@@ -8,7 +8,7 @@ import click
 import asyncio
 import json
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 from .hf_spaces import HFSpaceConfig, HFSpacesDeployer
@@ -65,7 +65,7 @@ def space(
         click.echo("💡 Try with a known model like 'meta-llama/Llama-3-8B-Instruct'")
         return
 
-    click.echo(f"✅ Model analyzed:")
+    click.echo("✅ Model analyzed:")
     click.echo(f"   📊 Parameters: {model_spec.parameters}")
     click.echo(f"   💾 Model size: {model_spec.model_size_gb}GB")
     click.echo(f"   🎯 Model type: {model_spec.model_type}")
@@ -80,9 +80,9 @@ def space(
         return
 
     # Use provided hardware or recommendation
-    selected_hardware = hardware or hardware_rec["recommended_hardware"]
+    hardware or hardware_rec["recommended_hardware"]
 
-    click.echo(f"✅ Hardware recommendation:")
+    click.echo("✅ Hardware recommendation:")
     click.echo(f"   🎯 Recommended: {hardware_rec['recommended_hardware']}")
     click.echo(
         f"   💰 Hourly cost: ${hardware_rec['cost_breakdown']['hourly_cost']:.2f}"
@@ -95,7 +95,7 @@ def space(
 
     # Show cost breakdown
     cost_breakdown = hardware_rec["cost_breakdown"]
-    click.echo(f"💰 Cost breakdown:")
+    click.echo("💰 Cost breakdown:")
     click.echo(f"   📈 Hourly: ${cost_breakdown['hourly_cost']:.2f}")
     click.echo(
         f"   📅 Daily (24/7): ${cost_breakdown['cost_breakdown']['daily_24_7']:.2f}"
@@ -110,7 +110,7 @@ def space(
 
     # Show alternatives if available
     if "alternative_options" in hardware_rec and hardware_rec["alternative_options"]:
-        click.echo(f"🔄 Alternative hardware options:")
+        click.echo("🔄 Alternative hardware options:")
         for alt in hardware_rec["alternative_options"][:3]:  # Show top 3
             status = "✅" if alt["suitable"] else "❌"
             click.echo(
@@ -146,7 +146,7 @@ def space(
     template_config["private"] = private
     template_config["sdk"] = sdk
 
-    click.echo(f"✅ Template generated:")
+    click.echo("✅ Template generated:")
     click.echo(f"   🎯 Template type: {template_config['template_type']}")
     click.echo(f"   🔧 Hardware: {template_config['hardware']}")
     click.echo(f"   🛠️ SDK: {template_config['sdk']}")
@@ -181,7 +181,7 @@ def space(
         result = await deployer.create_space(config)
 
         if result["status"] == "created":
-            click.echo(f"✅ Space created successfully!")
+            click.echo("✅ Space created successfully!")
             click.echo(f"🔗 Space URL: {result['space_url']}")
             click.echo(f"🎯 Hardware: {result['hardware']}")
             click.echo(f"📝 Model: {result['model_id']}")
@@ -221,14 +221,14 @@ def optimize(model_id: str, budget: Optional[float]):
 
     # Show model analysis
     model_analysis = recommendation["model_analysis"]
-    click.echo(f"\n📊 Model Analysis:")
+    click.echo("\n📊 Model Analysis:")
     click.echo(f"   🎯 Parameters: {model_analysis['parameters']}")
     click.echo(f"   💾 Model size: {model_analysis['model_size_gb']}GB")
     click.echo(f"   🎯 Type: {model_analysis['model_type']}")
     click.echo(f"   🧠 Min memory: {model_analysis['min_memory_gb']}GB")
 
     # Show recommendation
-    click.echo(f"\n🎯 Recommended Hardware:")
+    click.echo("\n🎯 Recommended Hardware:")
     click.echo(f"   🔧 Hardware: {recommendation['recommended_hardware']}")
     click.echo(
         f"   💰 Hourly cost: ${recommendation['cost_breakdown']['hourly_cost']:.2f}"
@@ -239,7 +239,7 @@ def optimize(model_id: str, budget: Optional[float]):
 
     # Show cost breakdown
     cost_breakdown = recommendation["cost_breakdown"]
-    click.echo(f"\n💰 Cost Breakdown:")
+    click.echo("\n💰 Cost Breakdown:")
     click.echo(f"   📈 Hourly: ${cost_breakdown['hourly_cost']:.2f}")
     click.echo(
         f"   📅 Daily (24/7): ${cost_breakdown['cost_breakdown']['daily_24_7']:.2f}"
@@ -254,7 +254,7 @@ def optimize(model_id: str, budget: Optional[float]):
 
     # Show alternatives
     if "alternative_options" in recommendation:
-        click.echo(f"\n🔄 Alternative Options:")
+        click.echo("\n🔄 Alternative Options:")
         for alt in recommendation["alternative_options"]:
             status = "✅" if alt["suitable"] else "❌"
             click.echo(
@@ -281,13 +281,13 @@ def compare(model_id: str):
 
     # Show model requirements
     requirements = comparison["model_requirements"]
-    click.echo(f"\n📊 Model Requirements:")
+    click.echo("\n📊 Model Requirements:")
     click.echo(f"   🎯 Parameters: {requirements['parameters']}")
     click.echo(f"   💾 Model size: {requirements['model_size_gb']}GB")
     click.echo(f"   🧠 Min memory: {requirements['min_memory_gb']}GB")
 
     # Show comparison table
-    click.echo(f"\n🔧 Hardware Comparison:")
+    click.echo("\n🔧 Hardware Comparison:")
     click.echo(
         f"{'Hardware':<15} {'Suitable':<10} {'Memory':<10} {'GPU':<10} {'Cost/hr':<10} {'Perf':<8} {'Util%':<8} {'Rec':<12}"
     )
@@ -324,7 +324,7 @@ def preview(model_id: str, template: str, space_name: Optional[str]):
         return
 
     # Show template configuration
-    click.echo(f"\n📋 Template Configuration:")
+    click.echo("\n📋 Template Configuration:")
     click.echo(f"   📝 Space name: {template_config['name']}")
     click.echo(f"   🎯 Model ID: {template_config['model_id']}")
     click.echo(f"   🔧 Hardware: {template_config['hardware']}")
@@ -333,7 +333,7 @@ def preview(model_id: str, template: str, space_name: Optional[str]):
 
     # Show model spec
     model_spec = template_config["model_spec"]
-    click.echo(f"\n📊 Model Specifications:")
+    click.echo("\n📊 Model Specifications:")
     click.echo(f"   🎯 Parameters: {model_spec['parameters']}")
     click.echo(f"   💾 Model size: {model_spec['model_size_gb']}GB")
     click.echo(f"   🎯 Type: {model_spec['model_type']}")
@@ -341,13 +341,13 @@ def preview(model_id: str, template: str, space_name: Optional[str]):
 
     # Show environment variables
     if template_config.get("env_vars"):
-        click.echo(f"\n🔧 Environment Variables:")
+        click.echo("\n🔧 Environment Variables:")
         for key, value in template_config["env_vars"].items():
             click.echo(f"   {key}: {value}")
 
     # Show cost breakdown
     cost_breakdown = template_config["cost_breakdown"]
-    click.echo(f"\n💰 Cost Breakdown:")
+    click.echo("\n💰 Cost Breakdown:")
     click.echo(f"   📈 Hourly: ${cost_breakdown['hourly_cost']:.2f}")
     click.echo(
         f"   📅 Daily (24/7): ${cost_breakdown['cost_breakdown']['daily_24_7']:.2f}"
@@ -362,7 +362,7 @@ def preview(model_id: str, template: str, space_name: Optional[str]):
 
     # Show alternatives
     if "alternative_hardware" in template_config:
-        click.echo(f"\n🔄 Alternative Hardware:")
+        click.echo("\n🔄 Alternative Hardware:")
         for alt in template_config["alternative_hardware"]:
             click.echo(
                 f"   {alt['name']}: ${alt['hourly_cost']:.2f}/hr, {alt['memory_gb']}GB RAM"
@@ -385,7 +385,6 @@ def configure():
     credentials_file = config_dir / "credentials.json"
 
     # Load existing credentials
-    import json
 
     credentials = {}
     if credentials_file.exists():
@@ -421,7 +420,6 @@ def list():
         click.echo("📝 No deployments found")
         return
 
-    import json
 
     with open(registry_file, "r") as f:
         deployments = json.load(f)
@@ -474,7 +472,6 @@ def _save_deployment(result: Dict[str, Any], template_config: Dict[str, Any]):
     registry_file = Path.home() / ".terradev" / "hf_deployments.json"
     registry_file.parent.mkdir(exist_ok=True)
 
-    import json
 
     # Load existing deployments
     deployments = []

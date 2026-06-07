@@ -6,12 +6,10 @@ Manages Kubernetes clusters, Karpenter, and GPU node provisioning
 
 import os
 import json
-import asyncio
 import aiohttp
 import subprocess
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from pathlib import Path
 
 
 @dataclass
@@ -216,7 +214,7 @@ class KubernetesService:
             )
 
             if result.returncode == 0:
-                apply_result = subprocess.run(
+                subprocess.run(
                     ["kubectl", "apply", "-f", "-"],
                     input=result.stdout,
                     text=True,

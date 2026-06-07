@@ -4,14 +4,11 @@ vLLM Service Integration for Terradev
 High-performance LLM inference server deployment and management
 """
 
-import os
-import json
-import asyncio
 import aiohttp
 import subprocess
 import statistics
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass
 from datetime import datetime
 
 
@@ -147,7 +144,7 @@ class VLLMConfig:
             return cls._create_reasoning_optimized(model_name, workload, **kwargs)
 
         # Calculate optimal max_num_batched_tokens
-        total_tokens_per_request = (
+        (
             workload.avg_prompt_length + workload.avg_response_length
         )
 
@@ -453,7 +450,7 @@ class VLLMService:
     ) -> Dict[str, Any]:
         """Install vLLM on remote instance"""
         try:
-            install_script = f"""
+            install_script = """
 #!/bin/bash
 # Install vLLM with GPU support
 pip install vllm

@@ -4,7 +4,6 @@ HuggingFace Provider - Inference Endpoints GPU cloud integration
 BYOAPI: Uses the end-client's HuggingFace API token
 """
 
-import asyncio
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime

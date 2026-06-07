@@ -4,9 +4,7 @@ DVC (Data Version Control) Service Integration for Terradev
 Manages DVC repositories, data versioning, and remote storage
 """
 
-import os
 import json
-import asyncio
 import subprocess
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
@@ -438,7 +436,7 @@ class DVCService:
         if commit_message:
             try:
                 # Stage the .dvc file and .gitignore changes
-                git_add = subprocess.run(
+                subprocess.run(
                     ["git", "add", f"{checkpoint_path}.dvc", ".gitignore"],
                     capture_output=True,
                     text=True,

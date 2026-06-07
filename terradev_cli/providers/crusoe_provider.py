@@ -5,7 +5,6 @@ BYOAPI: Uses the end-client's Crusoe API access key + secret key
 API: https://api.crusoecloud.com/v1alpha5
 """
 
-import asyncio
 import os
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -143,7 +142,6 @@ class CrusoeProvider(BaseProvider):
         """Query Crusoe /capacities endpoint for real-time availability."""
         await self._ensure_auth()
 
-        params: Dict[str, Any] = {}
         # Map our GPU type to Crusoe product_name prefix
         gpu_lower = gpu_type.lower().replace("-", ".")
         if not gpu_lower.endswith("x"):

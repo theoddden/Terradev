@@ -9,7 +9,7 @@ reasoning markers, and domain-specific complexity cues.
 
 import re
 import math
-from typing import Any, Dict, Set
+from typing import Any, Dict
 from .base_signal import BaseSignal, SignalResult, SignalType
 
 

@@ -11,11 +11,10 @@ CRITICAL FIXES v4.0.0:
 """
 
 import asyncio
-import json
 import logging
 import os
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from .base_provider import BaseProvider
 
@@ -302,7 +301,7 @@ class GCPProvider(BaseProvider):
             )
 
             loop = asyncio.get_running_loop()
-            op = await loop.run_in_executor(None, self.instances_client.insert, request)
+            await loop.run_in_executor(None, self.instances_client.insert, request)
 
             return {
                 "instance_id": instance_name,
@@ -459,7 +458,7 @@ class GCPProvider(BaseProvider):
         except FileNotFoundError:
             # gcloud CLI not installed — try direct SSH via instance IP
             try:
-                status = await self.get_instance_status(instance_id)
+                await self.get_instance_status(instance_id)
                 # GCP instances don't always expose public IP in our status dict,
                 # so fall back to gcloud describe
                 import subprocess
@@ -656,7 +655,6 @@ class GCPProvider(BaseProvider):
 
         try:
             from google.cloud import compute_v1
-            from google.protobuf import field_mask_pb2
 
             # Map GPU types to accelerator configurations
             accelerator_configs = {

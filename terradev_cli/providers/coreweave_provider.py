@@ -9,7 +9,6 @@ CRITICAL FIXES v4.0.0:
 - Public IP billing tracking
 """
 
-import asyncio
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
@@ -121,7 +120,7 @@ class CoreWeaveProvider(BaseProvider):
             )
 
             # Deploy via CoreWeave API
-            deployment = await self._make_request(
+            await self._make_request(
                 "POST",
                 f"{self.API_BASE}/v1/namespaces/{self.namespace}/deployments",
                 json=manifest,

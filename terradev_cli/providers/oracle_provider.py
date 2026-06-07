@@ -4,7 +4,6 @@ Oracle Cloud Infrastructure (OCI) Provider - GPU instance integration
 BYOAPI: Uses the end-client's OCI API key/tenancy credentials
 """
 
-import asyncio
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
@@ -237,7 +236,6 @@ class OracleProvider(BaseProvider):
         if not self.api_key:
             raise Exception("OCI credentials not configured")
         # OCI supports RunCommand via the Instance Agent
-        url = f"https://iaas.{self.region}.oraclecloud.com/20160918/instanceConsoleConnections"
         try:
             data = await self._make_request(
                 "POST",

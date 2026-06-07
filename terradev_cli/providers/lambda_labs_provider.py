@@ -9,7 +9,6 @@ CRITICAL FIXES v4.0.0:
 - Container image pinning strategy
 """
 
-import asyncio
 import os
 from typing import Dict, List, Any, Optional
 from datetime import datetime

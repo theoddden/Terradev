@@ -4,9 +4,7 @@ Terradev CLI Demo - Demonstration of parallel provisioning capabilities
 """
 
 import asyncio
-import json
 import time
-from datetime import datetime
 from typing import Dict, List, Any
 
 
@@ -284,7 +282,7 @@ async def main():
     # Analyze savings
     analysis = engine.analyze_savings(quotes)
     if analysis:
-        print(f"\n💰 COST ANALYSIS:")
+        print("\n💰 COST ANALYSIS:")
         print(f"   Best Price: ${analysis['best_price']:.4f}/hour")
         print(f"   Worst Price: ${analysis['worst_price']:.4f}/hour")
         print(f"   Average Price: ${analysis['avg_price']:.4f}/hour")
@@ -294,7 +292,7 @@ async def main():
             print(f"   Spot Savings: {analysis['spot_savings']:.1f}%")
 
     # Demo 2: Sequential vs Parallel comparison
-    print(f"\n🎯 DEMO 2: Sequential vs Parallel Performance")
+    print("\n🎯 DEMO 2: Sequential vs Parallel Performance")
     print("-" * 40)
 
     # Simulate sequential (slow) approach
@@ -307,7 +305,7 @@ async def main():
     print(f"   Total time: {sequential_time:.1f}s")
 
     # Simulate parallel (fast) approach
-    print(f"\n⚡ Parallel approach (Terradev):")
+    print("\n⚡ Parallel approach (Terradev):")
     parallel_start = time.time()
     tasks = [asyncio.sleep(2) for _ in engine.providers[:4]]
     await asyncio.gather(*tasks)
@@ -318,7 +316,7 @@ async def main():
     print(f"\n🚀 Speedup: {speedup:.1f}x faster")
 
     # Demo 3: Multi-GPU comparison
-    print(f"\n🎯 DEMO 3: Multi-GPU Type Comparison")
+    print("\n🎯 DEMO 3: Multi-GPU Type Comparison")
     print("-" * 40)
 
     gpu_comparison = {}
@@ -333,7 +331,7 @@ async def main():
         print(f"   {gpu_type}: ${price:.4f}/hour")
 
     # Demo 4: Regional optimization
-    print(f"\n🎯 DEMO 4: Regional Price Optimization")
+    print("\n🎯 DEMO 4: Regional Price Optimization")
     print("-" * 40)
 
     regional_analysis = {}
@@ -348,7 +346,7 @@ async def main():
         print(f"   {region}: ${price:.4f}/hour")
 
     # Summary
-    print(f"\n🎉 TERRADEV CLI DEMO COMPLETE")
+    print("\n🎉 TERRADEV CLI DEMO COMPLETE")
     print("=" * 60)
     print("✅ Parallel provisioning demonstrated")
     print("✅ Multi-cloud optimization shown")
@@ -356,7 +354,7 @@ async def main():
     print("✅ Performance improvement measured")
     print("✅ Regional optimization analyzed")
 
-    print(f"\n🚀 KEY BENEFITS:")
+    print("\n🚀 KEY BENEFITS:")
     print("   ⚡ 4-6x faster provisioning")
     print("   💰 20%+ cost savings")
     print("   🌐 8+ cloud providers")
@@ -364,7 +362,7 @@ async def main():
     print("   📊 Real-time analytics")
     print("   🐳 Container orchestration")
 
-    print(f"\n🎯 READY FOR PRODUCTION:")
+    print("\n🎯 READY FOR PRODUCTION:")
     print("   pip install terradev-cli")
     print("   terradev configure --provider aws")
     print("   terradev quote --gpu-type A100")

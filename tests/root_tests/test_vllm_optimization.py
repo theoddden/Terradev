@@ -4,7 +4,6 @@ Test script for vLLM optimization implementation
 """
 
 import sys
-import json
 
 sys.path.append(".")
 
@@ -29,8 +28,8 @@ def test_throughput_optimization():
     assert (
         config.gpu_memory_utilization == 0.95
     ), f"Expected 0.95, got {config.gpu_memory_utilization}"
-    assert config.enable_prefix_caching == True, "Prefix caching should be enabled"
-    assert config.enable_chunked_prefill == True, "Chunked prefill should be enabled"
+    assert config.enable_prefix_caching, "Prefix caching should be enabled"
+    assert config.enable_chunked_prefill, "Chunked prefill should be enabled"
 
     print("✅ Throughput optimization tests passed")
 
@@ -50,9 +49,9 @@ def test_latency_optimization():
         config.gpu_memory_utilization == 0.95
     ), f"Expected 0.95, got {config.gpu_memory_utilization}"
     assert (
-        config.enable_prefix_caching == True
+        config.enable_prefix_caching
     ), "Prefix caching should still be enabled"
-    assert config.enable_chunked_prefill == True, "Chunked prefill should be enabled"
+    assert config.enable_chunked_prefill, "Chunked prefill should be enabled"
 
     print("✅ Latency optimization tests passed")
 
@@ -83,9 +82,9 @@ def test_auto_optimization():
     assert (
         config.max_num_seqs >= 256
     ), f"High QPS should allow more sequences, got {config.max_num_seqs}"
-    assert config.enable_prefix_caching == True, "High QPS should enable prefix caching"
+    assert config.enable_prefix_caching, "High QPS should enable prefix caching"
     assert (
-        config.enable_chunked_prefill == True
+        config.enable_chunked_prefill
     ), "High QPS should enable chunked prefill"
     assert (
         config.cpu_cores >= 6

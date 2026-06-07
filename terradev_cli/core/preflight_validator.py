@@ -1307,7 +1307,7 @@ def _check_nccl_pair(ctx: Dict[str, Any]) -> List[CheckResult]:
         )
         return [
             CheckResult(
-                f"nccl_pair",
+                "nccl_pair",
                 status,
                 f"{pair_label}: busbw min={min_bw:.0f} avg={avg_bw:.0f} GB/s",
                 details={"pair": pair_label, "min_gbs": min_bw, "avg_gbs": avg_bw},
@@ -1317,7 +1317,7 @@ def _check_nccl_pair(ctx: Dict[str, Any]) -> List[CheckResult]:
 
     return [
         CheckResult(
-            f"nccl_pair",
+            "nccl_pair",
             CheckStatus.PASS,
             f"{pair_label}: NCCL completed (bandwidth not parsed)",
             node=pair_label,

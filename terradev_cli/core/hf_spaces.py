@@ -4,13 +4,8 @@ HuggingFace Spaces One-Click Deployment
 Q1 2026: +$5M revenue opportunity with 100k researcher reach
 """
 
-import asyncio
-import json
-import os
-from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 from dataclasses import dataclass
-from datetime import datetime
 
 
 @dataclass
@@ -131,7 +126,7 @@ class HFSpacesDeployer:
             f"{self.api_base}/spaces/{space_name}/env", headers=headers, json=env_vars
         ) as response:
             if response.status != 200:
-                print(f"Warning: Failed to add environment variables")
+                print("Warning: Failed to add environment variables")
 
     async def _upload_app_file(
         self, session, space_name: str, config: HFSpaceConfig, headers: Dict[str, str]

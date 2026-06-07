@@ -13,7 +13,7 @@ a neural classifier for higher accuracy.
 """
 
 import re
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List
 from .base_signal import BaseSignal, SignalResult, SignalType
 
 

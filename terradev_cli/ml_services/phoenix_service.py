@@ -18,7 +18,7 @@ import logging
 import asyncio
 import random
 import aiohttp
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -206,7 +206,7 @@ class PhoenixService:
         proj = project_name or self.config.project_name
         ep = self.config.collector_endpoint
         key_line = (
-            f'\nos.environ["PHOENIX_API_KEY"] = "<your-key>"'
+            '\nos.environ["PHOENIX_API_KEY"] = "<your-key>"'
             if self.config.api_key
             else ""
         )

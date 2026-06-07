@@ -10,11 +10,10 @@ Tests use mocked HTTP responses to verify that each provider:
   5. Requires credentials (BYOAPI)
 """
 
-import asyncio
 import os
 import sys
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -287,18 +286,6 @@ class TestOutputSchemaConsistency:
     @pytest.mark.asyncio
     async def test_runpod_quote_schema(self):
         provider = RunPodProvider(credentials={"api_key": "test"})
-        mock_response = {
-            "data": {
-                "gpuTypes": [
-                    {
-                        "id": "A100-80GB",
-                        "displayName": "NVIDIA A100-80GB",
-                        "communityPrice": 2.49,
-                        "memoryInGb": 80,
-                    }
-                ]
-            }
-        }
 
         with patch.object(
             provider, "_get_live_pricing", new_callable=AsyncMock

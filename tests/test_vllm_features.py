@@ -107,7 +107,7 @@ class TestVLLMConfigSleepMode:
         assert hasattr(config, "auto_sleep_idle_seconds")
 
         # Defaults
-        assert config.enable_sleep_mode == False  # Disabled by default
+        assert not config.enable_sleep_mode  # Disabled by default
         assert config.sleep_level == 1
         assert config.auto_sleep_idle_seconds == 300
 
@@ -120,7 +120,7 @@ class TestVLLMConfigSleepMode:
             auto_sleep_idle_seconds=300,
         )
 
-        assert config.enable_sleep_mode == True
+        assert config.enable_sleep_mode
         assert config.sleep_level == 1
         assert config.auto_sleep_idle_seconds == 300
 
@@ -155,7 +155,7 @@ class TestVLLMConfigMultiLoRA:
         assert hasattr(config, "lora_tuned_config_dir")
 
         # Defaults
-        assert config.enable_lora == False  # Disabled by default
+        assert not config.enable_lora  # Disabled by default
         assert config.lora_modules is None
         assert config.max_loras == 8
         assert config.max_lora_rank == 64
@@ -176,7 +176,7 @@ class TestVLLMConfigMultiLoRA:
             max_lora_rank=64,
         )
 
-        assert config.enable_lora == True
+        assert config.enable_lora
         assert len(config.lora_modules) == 2
         assert config.lora_modules[0].name == "adapter1"
         assert config.lora_modules[0].path == "/path/to/adapter1"
@@ -206,7 +206,7 @@ class TestVLLMConfigRouter:
         assert hasattr(config, "router_session_key")
 
         # Defaults
-        assert config.enable_router == False  # Disabled by default
+        assert not config.enable_router  # Disabled by default
         assert config.router_policy == "consistent_hash"
         assert config.router_port == 8080
         assert config.router_session_key == "x-session-id"
@@ -220,7 +220,7 @@ class TestVLLMConfigRouter:
             router_port=8080,
         )
 
-        assert config.enable_router == True
+        assert config.enable_router
         assert config.router_policy == "consistent_hash"
         assert config.router_port == 8080
 
@@ -305,8 +305,8 @@ class TestVLLMConfigOtherOptimizations:
         # Optimized defaults per memory
         assert config.max_num_batched_tokens == 16384  # Optimized: 2048 → 16384
         assert config.max_num_seqs == 1024  # Optimized: 256/1024 → 1024
-        assert config.enable_prefix_caching == True  # Optimized: OFF → ON
-        assert config.enable_chunked_prefill == True  # Optimized: OFF → ON
+        assert config.enable_prefix_caching  # Optimized: OFF → ON
+        assert config.enable_chunked_prefill  # Optimized: OFF → ON
         assert config.gpu_memory_utilization == 0.95  # Optimized: 0.90 → 0.95
         assert config.cpu_cores is None  # Auto-calculated
 
@@ -318,7 +318,7 @@ class TestVLLMConfigOtherOptimizations:
         assert hasattr(config, "enable_flashinfer")
 
         assert config.attention_backend == "FLASHINFER"
-        assert config.enable_flashinfer == True
+        assert config.enable_flashinfer
 
     def test_lmcache_integration(self):
         """LMCache integration is available but disabled by default"""
@@ -328,7 +328,7 @@ class TestVLLMConfigOtherOptimizations:
         assert hasattr(config, "lmcache_backend")
 
         assert (
-            config.enable_lmcache == False
+            not config.enable_lmcache
         )  # Disabled by default, can be enabled via config
         assert config.lmcache_backend == "redis"
 

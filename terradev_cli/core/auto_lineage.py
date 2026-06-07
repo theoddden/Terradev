@@ -4,14 +4,12 @@ Auto Lineage System - Automatic artifact tracking on every pipeline execution
 No manual tagging required - lineage is automatically captured
 """
 
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 import json
 import uuid
 from datetime import datetime
-from pathlib import Path
-import hashlib
 import logging
 
 from .event_system import (

@@ -20,14 +20,13 @@ Key integration points:
 """
 
 import asyncio
-import json
 import logging
 import os
 import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from pathlib import Path
 
 from .checkpoint_manager import CheckpointManager, CheckpointConfig
@@ -35,7 +34,6 @@ from .kv_cache_checkpoint_manager import (
     KVCacheCheckpointManager,
     KVCacheCheckpoint,
     CheckpointConfig as KVCheckpointConfig,
-    CheckpointState,
 )
 
 logger = logging.getLogger(__name__)
@@ -335,10 +333,10 @@ class InferenceSpotManager:
             # Import TerradevAPI for re-provisioning
             from terradev_cli.cli import TerradevAPI
 
-            api = TerradevAPI()
+            TerradevAPI()
 
             # Build provider list (current + fallbacks)
-            providers = [self.active_state.provider] + self.config.fallback_providers
+            [self.active_state.provider] + self.config.fallback_providers
 
             # Log re-provisioning intent
             logger.info(

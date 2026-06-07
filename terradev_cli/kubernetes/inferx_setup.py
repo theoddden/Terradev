@@ -5,9 +5,6 @@ Deploy InferX serverless inference platform on Kubernetes
 """
 
 import asyncio
-import json
-import subprocess
-import tempfile
 import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -48,7 +45,7 @@ class InferXK8sSetup:
     ) -> Dict[str, Any]:
         """Deploy InferX platform on Kubernetes"""
 
-        print(f"🚀 Deploying InferX platform on Kubernetes...")
+        print("🚀 Deploying InferX platform on Kubernetes...")
         print(f"📦 Namespace: {namespace}")
         print(f"🎮 GPU Nodes: {gpu_nodes}")
         print(f"🎮 GPU Type: {gpu_type}")
@@ -91,7 +88,7 @@ class InferXK8sSetup:
             endpoints = await self._get_service_endpoints(namespace)
             results["endpoints"] = endpoints
 
-            print(f"✅ InferX platform deployed successfully!")
+            print("✅ InferX platform deployed successfully!")
             print(f"🌐 Gateway: {endpoints.get('inferx-gateway', 'N/A')}")
             print(f"📊 Dashboard: {endpoints.get('inferx-dashboard', 'N/A')}")
 
@@ -241,7 +238,7 @@ class InferXK8sSetup:
 
     async def _wait_for_deployments(self, namespace: str, timeout: int = 300):
         """Wait for all deployments to be ready"""
-        print(f"⏳ Waiting for deployments to be ready...")
+        print("⏳ Waiting for deployments to be ready...")
 
         start_time = time.time()
         while time.time() - start_time < timeout:
@@ -257,7 +254,7 @@ class InferXK8sSetup:
                         break
 
                 if all_ready:
-                    print(f"✅ All deployments are ready")
+                    print("✅ All deployments are ready")
                     return
 
                 await asyncio.sleep(10)
@@ -266,7 +263,7 @@ class InferXK8sSetup:
                 print(f"⚠️  Error checking deployment status: {e}")
                 await asyncio.sleep(10)
 
-        raise Exception(f"Timeout waiting for deployments to be ready")
+        raise Exception("Timeout waiting for deployments to be ready")
 
     async def _get_service_endpoints(self, namespace: str) -> Dict[str, str]:
         """Get service endpoints"""
@@ -419,7 +416,7 @@ class InferXK8sSetup:
 
             if gpu_nodes:
                 # Scale GPU nodes (requires Karpenter or similar)
-                print(f"📝 GPU node scaling requires Karpenter or cluster autoscaler")
+                print("📝 GPU node scaling requires Karpenter or cluster autoscaler")
                 results["scaled"].append(f"GPU node scaling requested: {gpu_nodes}")
 
             return results
@@ -485,7 +482,7 @@ def deploy(
             )
         )
 
-        print(f"\n🎉 Deployment Summary:")
+        print("\n🎉 Deployment Summary:")
         print(f"📦 Namespace: {results['namespace']}")
         print(f"🌐 Endpoints: {len(results.get('endpoints', {}))}")
 
@@ -509,20 +506,20 @@ def status(namespace, kubeconfig):
     try:
         status = asyncio.run(setup.get_cluster_status(namespace))
 
-        print(f"📊 InferX Cluster Status")
-        print(f"=" * 40)
+        print("📊 InferX Cluster Status")
+        print("=" * 40)
         print(f"📦 Namespace: {status.get('namespace', 'Unknown')}")
         print(f"🎮 GPU Nodes: {status.get('gpu_nodes', 0)}")
         print(f"📦 Models Deployed: {status.get('models_deployed', 0)}")
         print()
 
-        print(f"🚀 Deployments:")
+        print("🚀 Deployments:")
         for name, info in status.get("deployments", {}).items():
             print(
                 f"   {name}: {info['ready_replicas']}/{info['desired_replicas']} ({info['status']})"
             )
 
-        print(f"🌐 Services:")
+        print("🌐 Services:")
         for name, info in status.get("services", {}).items():
             external_ip = f" ({info['external_ip']})" if info["external_ip"] else ""
             print(f"   {name}: {info['type']}{external_ip}")
@@ -548,7 +545,7 @@ def scale(namespace, replicas, gpu_nodes, kubeconfig):
             )
         )
 
-        print(f"📊 Scaling Results:")
+        print("📊 Scaling Results:")
         for item in results.get("scaled", []):
             print(f"   ✅ {item}")
 
@@ -573,7 +570,7 @@ def delete(namespace, kubeconfig):
     try:
         results = asyncio.run(setup.delete_platform(namespace))
 
-        print(f"📊 Deletion Results:")
+        print("📊 Deletion Results:")
         for item in results.get("deleted", []):
             print(f"   ✅ {item}")
 

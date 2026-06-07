@@ -11,7 +11,7 @@ import time
 import sys
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, Any
 import tempfile
 
 
@@ -607,7 +607,7 @@ class CLIUXFinalTest:
             print(f"✅ {feature}: {description}")
 
         print(
-            f"\n🌟 FINAL VERDICT: This CLI delivers an ABSOLUTELY AMAZING user experience!"
+            "\n🌟 FINAL VERDICT: This CLI delivers an ABSOLUTELY AMAZING user experience!"
         )
         print(
             "🎉 Users will be delighted by the beautiful design and powerful functionality!"

@@ -29,7 +29,6 @@ class AzureProvider(BaseProvider):
         try:
             from azure.identity import ClientSecretCredential
             from azure.mgmt.compute import ComputeManagementClient
-            from azure.mgmt.resource import ResourceManagementClient
             from azure.mgmt.quota import QuotaManagementClient
 
             cred = ClientSecretCredential(
@@ -134,8 +133,6 @@ class AzureProvider(BaseProvider):
                 OSDisk,
                 ImageReference,
                 OSProfile,
-                NetworkProfile,
-                NetworkInterfaceReference,
             )
 
             vm_params = VirtualMachine(
@@ -159,7 +156,7 @@ class AzureProvider(BaseProvider):
             )
 
             loop = asyncio.get_running_loop()
-            poller = await loop.run_in_executor(
+            await loop.run_in_executor(
                 None,
                 lambda: self.compute_client.virtual_machines.begin_create_or_update(
                     self.resource_group, vm_name, vm_params
@@ -429,7 +426,7 @@ class AzureProvider(BaseProvider):
                 return {
                     "available": False,
                     "reason": f"ML workspace quota exhausted (0/{ml_workspace_quotas['limit']})",
-                    "action_required": f"Request quota increase for ML workspace in Azure ML Studio",
+                    "action_required": "Request quota increase for ML workspace in Azure ML Studio",
                     "remaining": 0,
                     "subscription_quota": available_quota,
                     "ml_workspace_quota": 0,

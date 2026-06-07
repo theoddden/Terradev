@@ -4,9 +4,7 @@ InferX Provider Integration for Terradev CLI
 Serverless inference platform with <2s cold starts and 90% GPU utilization
 """
 
-import asyncio
 import aiohttp
-import json
 import logging
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
@@ -62,7 +60,7 @@ class InferXProvider(BaseProvider):
         """Get InferX serverless quotes"""
 
         try:
-            session = await self._get_session()
+            await self._get_session()
 
             # InferX pricing model (serverless, per-request)
             quotes = [

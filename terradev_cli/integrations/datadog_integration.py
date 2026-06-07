@@ -20,7 +20,6 @@ in ~/.terradev/credentials.json, never leave the machine.
 from typing import Dict, Any, Optional, List
 import json
 import time
-from datetime import datetime, timedelta
 
 
 # ── Credential prompts ─────────────────────────────────────────────────
@@ -233,7 +232,8 @@ def _build_series(metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
 def submit_metrics_sync(
     creds: Dict[str, str], metrics: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
-    import urllib.request, urllib.error
+    import urllib.request
+    import urllib.error
 
     url = f"{_base_url(creds)}/api/v2/series"
     payload = json.dumps(_build_series(metrics)).encode()
@@ -312,7 +312,8 @@ def send_event_sync(
     alert_type: str = "info",
     tags: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    import urllib.request, urllib.error
+    import urllib.request
+    import urllib.error
 
     url = f"{_base_url(creds)}/api/v1/events"
     payload = json.dumps(_build_event(title, text, alert_type, tags)).encode()
@@ -482,7 +483,8 @@ async def create_monitor(
 
 
 def _create_monitor_sync(creds: Dict[str, str], monitor: Dict) -> Dict[str, Any]:
-    import urllib.request, urllib.error
+    import urllib.request
+    import urllib.error
 
     url = f"{_base_url(creds)}/api/v1/monitor"
     try:
@@ -771,7 +773,8 @@ async def create_dashboard(
 
 
 def _create_dashboard_sync(creds: Dict[str, str], dashboard: Dict) -> Dict[str, Any]:
-    import urllib.request, urllib.error
+    import urllib.request
+    import urllib.error
 
     url = f"{_base_url(creds)}/api/v1/dashboard"
     try:

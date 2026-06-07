@@ -1,6 +1,10 @@
 """HuggingFace Spaces CLI commands for Terradev."""
 
-import os, json, asyncio, click, sys
+import os
+import json
+import asyncio
+import click
+import sys
 
 
 def _get_hf_token(TerradevAPI):
@@ -14,7 +18,8 @@ def _get_hf_token(TerradevAPI):
 
 
 def _hf_api(method, path, token, body=None):
-    import urllib.request, urllib.error
+    import urllib.request
+    import urllib.error
 
     url = f"https://huggingface.co/api{path}"
     data = json.dumps(body).encode() if body else None
@@ -129,7 +134,7 @@ def register_hf_spaces_commands(cli, TerradevAPI):
             click.confirm(f"Delete '{space_id}'?", abort=True)
         _hf_api(
             "DELETE",
-            f"/repos/delete",
+            "/repos/delete",
             _get_hf_token(TerradevAPI),
             body={"type": "space", "name": space_id},
         )

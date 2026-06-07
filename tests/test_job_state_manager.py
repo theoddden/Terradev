@@ -13,7 +13,6 @@ Covers:
 
 import os
 import sys
-import tempfile
 import pytest
 from datetime import datetime, timedelta
 

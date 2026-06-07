@@ -18,10 +18,9 @@ API notes (verified from NVIDIA docs + GitHub):
 import logging
 import asyncio
 import random
-import json
 import aiohttp
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +225,7 @@ class GuardrailsService:
             files[f"{cid}/config.yml"] += "      - check jailbreak\n"
         if self.config.enable_pii:
             files[f"{cid}/config.yml"] += "      - mask sensitive data\n"
-        files[f"{cid}/config.yml"] += f"  output:\n" f"    flows:\n"
+        files[f"{cid}/config.yml"] += "  output:\n" "    flows:\n"
         if self.config.enable_topical:
             files[f"{cid}/config.yml"] += "      - check topical\n"
         if self.config.enable_factcheck:
