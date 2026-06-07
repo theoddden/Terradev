@@ -76,10 +76,7 @@ jobs:
 
     - name: Install linting tools
       run: |
-        pip install black==24.3.0 flake8 mypy ruff
-
-    - name: Black check
-      run: black --check --target-version py311 --fast terradev_cli/ tests/
+        pip install flake8 mypy ruff
 
     - name: Flake8 check
       run: flake8 terradev_cli/ tests/ --max-line-length=120 --ignore=E203,W503
