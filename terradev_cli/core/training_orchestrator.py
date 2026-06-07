@@ -76,12 +76,14 @@ done
 # Config
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TrainingConfig:
     """Declarative training job — can come from YAML, dict, or CLI args."""
+
     name: str = "training-job"
     framework: str = "torchrun"  # torchrun | deepspeed | accelerate | megatron
-    backend: str = "native"      # native | ray  (native = zero deps, ray = optional)
+    backend: str = "native"  # native | ray  (native = zero deps, ray = optional)
     script: str = "train.py"
     script_args: List[str] = field(default_factory=list)
     nodes: List[str] = field(default_factory=list)  # empty = localhost
@@ -104,8 +106,8 @@ class TrainingConfig:
     total_steps: int = 0
     # Monitoring hooks (optional — empty means disabled)
     log_path: str = ""
-    wandb_project: str = ""      # optional W&B hook
-    prometheus_port: int = 0     # optional prometheus push gateway
+    wandb_project: str = ""  # optional W&B hook
+    prometheus_port: int = 0  # optional prometheus push gateway
     # Resume
     resume_from_checkpoint: str = ""
     # Elastic
@@ -141,6 +143,7 @@ class TrainingConfig:
 # ---------------------------------------------------------------------------
 # FlashOptim auto-detection (pure function — no side effects)
 # ---------------------------------------------------------------------------
+
 
 def _flashoptim_auto_config(
     config: TrainingConfig,
@@ -207,15 +210,30 @@ def _flashoptim_auto_config(
 
     # Detect training precision from script args
     args_str = " ".join(config.script_args).lower()
-    uses_reduced_precision = any(kw in args_str for kw in [
-        "bf16", "bfloat16", "fp16", "float16", "--bf16", "--fp16",
-        "mixed_precision", "--mixed-precision", "half",
-    ])
+    uses_reduced_precision = any(
+        kw in args_str
+        for kw in [
+            "bf16",
+            "bfloat16",
+            "fp16",
+            "float16",
+            "--bf16",
+            "--fp16",
+            "mixed_precision",
+            "--mixed-precision",
+            "half",
+        ]
+    )
 
     # Detect if user is already specifying an optimizer
-    user_has_optimizer = any(kw in args_str for kw in [
-        "--optimizer", "--optim ", "--optim=",
-    ])
+    user_has_optimizer = any(
+        kw in args_str
+        for kw in [
+            "--optimizer",
+            "--optim ",
+            "--optim=",
+        ]
+    )
 
     # Map config to FlashOptim class name
     optimizer_map = {
@@ -227,7 +245,11 @@ def _flashoptim_auto_config(
     }
     flash_class = optimizer_map.get(config.flashoptim_optimizer, "FlashAdamW")
 
-    master_bits = config.flashoptim_master_weight_bits if config.flashoptim_master_weight_bits != 0 else None
+    master_bits = (
+        config.flashoptim_master_weight_bits
+        if config.flashoptim_master_weight_bits != 0
+        else None
+    )
 
     # Rule 5: explicit on
     if config.flashoptim == "on":
@@ -260,8 +282,12 @@ def _flashoptim_auto_config(
         "FLASHOPTIM_ENABLED": "1",
         "FLASHOPTIM_OPTIMIZER": flash_class,
         "FLASHOPTIM_MASTER_WEIGHT_BITS": str(master_bits) if master_bits else "",
-        "FLASHOPTIM_COMPRESS_CHECKPOINTS": "1" if config.flashoptim_compress_checkpoints else "0",
-        "FLASHOPTIM_GRADIENT_RELEASE": "1" if config.flashoptim_gradient_release else "0",
+        "FLASHOPTIM_COMPRESS_CHECKPOINTS": (
+            "1" if config.flashoptim_compress_checkpoints else "0"
+        ),
+        "FLASHOPTIM_GRADIENT_RELEASE": (
+            "1" if config.flashoptim_gradient_release else "0"
+        ),
     }
 
     # Hint args that can be passed to training scripts that support --optim
@@ -277,6 +303,7 @@ def _flashoptim_auto_config(
 # ---------------------------------------------------------------------------
 # Reasoning-workload auto-detection (pure function — no side effects)
 # ---------------------------------------------------------------------------
+
 
 def _reasoning_auto_config(
     config: TrainingConfig,
@@ -312,7 +339,9 @@ def _reasoning_auto_config(
 
     # Rule 1: explicit non-reasoning
     if config.workload_type in ("default", "chat", "batch"):
-        result["reason"] = f"workload_type set to {config.workload_type} (not reasoning)"
+        result["reason"] = (
+            f"workload_type set to {config.workload_type} (not reasoning)"
+        )
         return result
 
     # Gather GPU info from topology
@@ -335,8 +364,16 @@ def _reasoning_auto_config(
     else:
         args_str = " ".join(config.script_args).lower()
         reasoning_keywords = [
-            "o3", "r1", "thinking", "reasoning", "deepseek-r1", "qwen-qwq",
-            "claude-thinking", "qwen-thinking", "chain-of-thought", "cot",
+            "o3",
+            "r1",
+            "thinking",
+            "reasoning",
+            "deepseek-r1",
+            "qwen-qwq",
+            "claude-thinking",
+            "qwen-thinking",
+            "chain-of-thought",
+            "cot",
         ]
         if any(kw in args_str for kw in reasoning_keywords):
             result["enabled"] = True
@@ -348,7 +385,9 @@ def _reasoning_auto_config(
     # Rule 4: require sufficient VRAM (reasoning needs large KV cache)
     if min_vram_mb < 40000 and config.workload_type != "reasoning":
         result["enabled"] = False
-        result["reason"] = f"skipped: smallest GPU has {min_vram_mb / 1000:.0f}GB VRAM (<40GB for reasoning)"
+        result["reason"] = (
+            f"skipped: smallest GPU has {min_vram_mb / 1000:.0f}GB VRAM (<40GB for reasoning)"
+        )
         return result
 
     # Build optimization payload
@@ -382,25 +421,39 @@ def _reasoning_auto_config(
 # SSH helper (shared)
 # ---------------------------------------------------------------------------
 
-def _run_on(host: Optional[str], cmd: str, user: str = "root",
-            key: Optional[str] = None, timeout: int = 60) -> Tuple[int, str, str]:
+
+def _run_on(
+    host: Optional[str],
+    cmd: str,
+    user: str = "root",
+    key: Optional[str] = None,
+    timeout: int = 60,
+) -> Tuple[int, str, str]:
     # SECURITY: Validate command to prevent shell injection
     import re
+
     # Allow alphanumeric, spaces, and basic shell-safe characters
     if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t"\']+$', cmd):
         return -1, "", "Unsafe command characters detected"
-    
+
     if host and host not in ("localhost", "127.0.0.1"):
         # Validate host and user
-        if not re.match(r'^[a-zA-Z0-9._-]+$', user):
+        if not re.match(r"^[a-zA-Z0-9._-]+$", user):
             return -1, "", "Invalid username format"
-        if not re.match(r'^[a-zA-Z0-9._-]+$', host):
+        if not re.match(r"^[a-zA-Z0-9._-]+$", host):
             return -1, "", "Invalid hostname format"
-        if key and not re.match(r'^[a-zA-Z0-9._/~-]+$', key):
+        if key and not re.match(r"^[a-zA-Z0-9._/~-]+$", key):
             return -1, "", "Invalid key path format"
-        
-        ssh = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
-               "-o", "ConnectTimeout=10", "-o", "BatchMode=yes"]
+
+        ssh = [
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ConnectTimeout=10",
+            "-o",
+            "BatchMode=yes",
+        ]
         if key:
             ssh.extend(["-i", key])
         ssh.extend([f"{user}@{host}", cmd])
@@ -411,7 +464,9 @@ def _run_on(host: Optional[str], cmd: str, user: str = "root",
             return -1, "", str(e)
     # SECURITY: shell=True is used but command is validated above
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True, timeout=timeout
+        )
         return r.returncode, r.stdout.strip(), r.stderr.strip()
     except Exception as e:
         return -1, "", str(e)
@@ -421,8 +476,10 @@ def _run_on(host: Optional[str], cmd: str, user: str = "root",
 # Launch command builders (pure functions — no side effects)
 # ---------------------------------------------------------------------------
 
-def _build_torchrun_cmd(config: TrainingConfig, n_nodes: int,
-                        master_addr: str) -> List[str]:
+
+def _build_torchrun_cmd(
+    config: TrainingConfig, n_nodes: int, master_addr: str
+) -> List[str]:
     parts = [
         "torchrun",
         f"--nnodes={n_nodes}",
@@ -431,18 +488,21 @@ def _build_torchrun_cmd(config: TrainingConfig, n_nodes: int,
         "--master_port=29500",
     ]
     if n_nodes > 1:
-        parts.extend([
-            "--rdzv_backend=c10d",
-            f"--rdzv_endpoint={master_addr}:{config.rdzv_port}",
-            f"--max_restarts={config.max_restarts}",
-        ])
+        parts.extend(
+            [
+                "--rdzv_backend=c10d",
+                f"--rdzv_endpoint={master_addr}:{config.rdzv_port}",
+                f"--max_restarts={config.max_restarts}",
+            ]
+        )
     parts.append(config.script)
     parts.extend(config.script_args)
     return parts
 
 
-def _build_deepspeed_cmd(config: TrainingConfig, n_nodes: int,
-                         master_addr: str, hostfile: str) -> List[str]:
+def _build_deepspeed_cmd(
+    config: TrainingConfig, n_nodes: int, master_addr: str, hostfile: str
+) -> List[str]:
     if n_nodes > 1:
         parts = [
             "deepspeed",
@@ -462,25 +522,29 @@ def _build_deepspeed_cmd(config: TrainingConfig, n_nodes: int,
     return parts
 
 
-def _build_accelerate_cmd(config: TrainingConfig, n_nodes: int,
-                          total_gpus: int, master_addr: str) -> List[str]:
+def _build_accelerate_cmd(
+    config: TrainingConfig, n_nodes: int, total_gpus: int, master_addr: str
+) -> List[str]:
     parts = [
-        "accelerate", "launch",
+        "accelerate",
+        "launch",
         f"--num_processes={total_gpus}",
         f"--num_machines={n_nodes}",
         f"--main_process_ip={master_addr}",
         "--main_process_port=29500",
     ]
     if config.tp_size > 1:
-        parts.extend(["--use_fsdp",
-                       f"--fsdp_sharding_strategy=HYBRID_SHARD_{config.tp_size}"])
+        parts.extend(
+            ["--use_fsdp", f"--fsdp_sharding_strategy=HYBRID_SHARD_{config.tp_size}"]
+        )
     parts.append(config.script)
     parts.extend(config.script_args)
     return parts
 
 
-def _build_megatron_cmd(config: TrainingConfig, n_nodes: int,
-                        master_addr: str) -> List[str]:
+def _build_megatron_cmd(
+    config: TrainingConfig, n_nodes: int, master_addr: str
+) -> List[str]:
     parts = [
         "torchrun",
         f"--nnodes={n_nodes}",
@@ -499,12 +563,14 @@ def _build_megatron_cmd(config: TrainingConfig, n_nodes: int,
 # DAG node functions
 # ---------------------------------------------------------------------------
 
+
 def _do_preflight(ctx: Dict[str, Any]) -> Dict[str, Any]:
     """Run preflight validation (imports inline so it's optional)."""
     config = ctx.get("config")
     if not isinstance(config, TrainingConfig):
         return {"passed": True, "skipped": True}
     from .preflight_validator import PreflightValidator
+
     validator = PreflightValidator(
         nodes=config.nodes or [None],
         ssh_user=config.ssh_user,
@@ -525,35 +591,53 @@ def _detect_topology(ctx: Dict[str, Any]) -> Dict[str, Any]:
         rc, stdout, _ = _run_on(
             node_list[0],
             "nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader,nounits",
-            config.ssh_user, config.ssh_key or None)
+            config.ssh_user,
+            config.ssh_key or None,
+        )
         gpus = []
         if rc == 0:
             for line in stdout.splitlines():
                 parts = [p.strip() for p in line.split(",")]
                 if len(parts) >= 3:
-                    gpus.append({"index": int(parts[0]), "name": parts[1],
-                                 "memory_mb": float(parts[2])})
+                    gpus.append(
+                        {
+                            "index": int(parts[0]),
+                            "name": parts[1],
+                            "memory_mb": float(parts[2]),
+                        }
+                    )
         node_key = node_list[0] or "localhost"
         return {"nodes": {node_key: {"gpus": gpus, "count": len(gpus)}}}
 
     # Multi-node: DAG-parallel topology detection
     topo_dag = DAGExecutor(max_workers=len(node_list), name="topo_detect")
     for i, node in enumerate(node_list):
+
         def make_fn(h):
             def fn(_ctx):
                 rc, stdout, _ = _run_on(
-                    h, "nvidia-smi --query-gpu=index,name,memory.total "
-                       "--format=csv,noheader,nounits",
-                    config.ssh_user, config.ssh_key or None)
+                    h,
+                    "nvidia-smi --query-gpu=index,name,memory.total "
+                    "--format=csv,noheader,nounits",
+                    config.ssh_user,
+                    config.ssh_key or None,
+                )
                 gpus = []
                 if rc == 0:
                     for line in stdout.splitlines():
                         parts = [p.strip() for p in line.split(",")]
                         if len(parts) >= 3:
-                            gpus.append({"index": int(parts[0]), "name": parts[1],
-                                         "memory_mb": float(parts[2])})
+                            gpus.append(
+                                {
+                                    "index": int(parts[0]),
+                                    "name": parts[1],
+                                    "memory_mb": float(parts[2]),
+                                }
+                            )
                 return {"node": h or "localhost", "gpus": gpus, "count": len(gpus)}
+
             return fn
+
         topo_dag.add_node(f"topo_{i}", make_fn(node))
 
     result = topo_dag.apply()
@@ -580,10 +664,12 @@ def _build_artifacts(ctx: Dict[str, Any]) -> Dict[str, Any]:
     hostfile_path = ""
     if n_nodes > 1:
         import tempfile
-        hostfile_path = tempfile.mktemp(prefix=".terradev_hostfile_", suffix=f"_{os.getpid()}")
+
+        hostfile_path = tempfile.mktemp(
+            prefix=".terradev_hostfile_", suffix=f"_{os.getpid()}"
+        )
         hostfile_content = "\n".join(
-            f"{node} slots={config.gpus_per_node}"
-            for node in config.nodes
+            f"{node} slots={config.gpus_per_node}" for node in config.nodes
         )
     else:
         hostfile_content = ""
@@ -656,15 +742,16 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
     # SECURITY: Validate cmd_parts to prevent shell injection
     # Only allow safe characters in command parts
     import re
+
     for part in cmd_parts:
-        if not re.match(r'^[a-zA-Z0-9_\-./:=@]+$', part):
+        if not re.match(r"^[a-zA-Z0-9_\-./:=@]+$", part):
             logger.error(f"Unsafe character in command part: {part}")
             return {"status": "failed", "error": "Unsafe command characters detected"}
-    
+
     cmd = " ".join(cmd_parts)
     if config.log_path:
         # Validate log path to prevent path injection
-        if not re.match(r'^[a-zA-Z0-9_\-./]+$', config.log_path):
+        if not re.match(r"^[a-zA-Z0-9_\-./]+$", config.log_path):
             logger.error(f"Unsafe log path: {config.log_path}")
             return {"status": "failed", "error": "Unsafe log path detected"}
         os.makedirs(os.path.dirname(config.log_path) or ".", exist_ok=True)
@@ -683,8 +770,11 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
     try:
         # SECURITY: shell=True is required for pipe redirection, but inputs are validated above
         process = subprocess.Popen(
-            cmd, shell=True, env=env,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            cmd,
+            shell=True,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             start_new_session=True,
         )
 
@@ -692,8 +782,13 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
         # Runs alongside training — polls cloud metadata and SIGUSR1s training PID if preempted
         try:
             import tempfile
-            sidecar_path = tempfile.mktemp(prefix=".terradev_spot_sidecar_", suffix=".sh")
-            sidecar_log = tempfile.mktemp(prefix=".terradev_spot_sidecar_", suffix=".log")
+
+            sidecar_path = tempfile.mktemp(
+                prefix=".terradev_spot_sidecar_", suffix=".sh"
+            )
+            sidecar_log = tempfile.mktemp(
+                prefix=".terradev_spot_sidecar_", suffix=".log"
+            )
             node_list = config.nodes or [None]
             for node in node_list:
                 _run_on(
@@ -701,7 +796,9 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
                     f"cat > {sidecar_path} << 'SIDECAR_EOF'\n{_SPOT_SIDECAR_SH}\nSIDECAR_EOF\n"
                     f"chmod +x {sidecar_path} && "
                     f"nohup {sidecar_path} {process.pid} > {sidecar_log} 2>&1 &",
-                    config.ssh_user, config.ssh_key or None, timeout=15,
+                    config.ssh_user,
+                    config.ssh_key or None,
+                    timeout=15,
                 )
             logger.info(f"Spot-preemption sidecar deployed to {len(node_list)} node(s)")
         except Exception as sidecar_err:
@@ -731,6 +828,7 @@ def _launch_ray(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         from ..ml_services.ray_service import RayService
+
         ray_svc = RayService()
         # Submit as Ray job
         result = ray_svc.submit_job(
@@ -756,6 +854,7 @@ def _launch_ray(ctx: Dict[str, Any]) -> Dict[str, Any]:
 # TrainingOrchestrator
 # ---------------------------------------------------------------------------
 
+
 class TrainingOrchestrator:
     """
     High-level training job orchestrator.
@@ -772,8 +871,9 @@ class TrainingOrchestrator:
     def __init__(self, state_manager: Optional[JobStateManager] = None):
         self.state_manager = state_manager or JobStateManager()
 
-    def launch(self, config: TrainingConfig,
-               skip_preflight: bool = False) -> Dict[str, Any]:
+    def launch(
+        self, config: TrainingConfig, skip_preflight: bool = False
+    ) -> Dict[str, Any]:
         """Launch a training job. Returns structured JSON."""
         job = self.state_manager.create_job(
             name=config.name,
@@ -811,16 +911,21 @@ class TrainingOrchestrator:
 
         if not result.success:
             self.state_manager.update_job_status(
-                job.id, JobStatus.FAILED,
-                error_message=json.dumps(result.errors, default=str))
+                job.id,
+                JobStatus.FAILED,
+                error_message=json.dumps(result.errors, default=str),
+            )
             return {"job_id": job.id, "status": "failed", "errors": result.errors}
 
         if preflight_out and not preflight_out.get("passed", True):
             self.state_manager.update_job_status(
-                job.id, JobStatus.FAILED,
-                error_message="Preflight failed")
-            return {"job_id": job.id, "status": "preflight_failed",
-                    "preflight": preflight_out}
+                job.id, JobStatus.FAILED, error_message="Preflight failed"
+            )
+            return {
+                "job_id": job.id,
+                "status": "preflight_failed",
+                "preflight": preflight_out,
+            }
 
         self.state_manager.update_job_status(job.id, JobStatus.RUNNING)
         return {
@@ -836,7 +941,9 @@ class TrainingOrchestrator:
             "flashoptim": launch_out.get("flashoptim", {}),
         }
 
-    def resume(self, job_id: str, checkpoint_id: Optional[str] = None) -> Dict[str, Any]:
+    def resume(
+        self, job_id: str, checkpoint_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Resume from checkpoint. Rebuilds config from job state."""
         job = self.state_manager.get_job(job_id)
         if not job:
@@ -855,8 +962,9 @@ class TrainingOrchestrator:
 
         if "--resume" not in " ".join(config.script_args):
             if config.checkpoint_dir:
-                config.script_args.extend([
-                    "--resume_from_checkpoint", config.checkpoint_dir])
+                config.script_args.extend(
+                    ["--resume_from_checkpoint", config.checkpoint_dir]
+                )
 
         result = self.launch(config, skip_preflight=False)
         if preempted:
@@ -870,24 +978,35 @@ class TrainingOrchestrator:
         if not job:
             return {"status": "failed", "error": f"Job not found: {job_id}"}
 
-        nodes = job.nodes if hasattr(job, "nodes") else job.config.get("nodes", ["localhost"])
+        nodes = (
+            job.nodes
+            if hasattr(job, "nodes")
+            else job.config.get("nodes", ["localhost"])
+        )
         if len(nodes) <= 1:
             # Single node — no DAG overhead
-            _run_on(nodes[0] if nodes[0] != "localhost" else None,
-                    "pkill -f 'torchrun|deepspeed|accelerate' 2>/dev/null",
-                    job.config.get("ssh_user", "root"),
-                    job.config.get("ssh_key"))
+            _run_on(
+                nodes[0] if nodes[0] != "localhost" else None,
+                "pkill -f 'torchrun|deepspeed|accelerate' 2>/dev/null",
+                job.config.get("ssh_user", "root"),
+                job.config.get("ssh_key"),
+            )
         else:
             dag = DAGExecutor(max_workers=len(nodes), name=f"stop_{job_id[:8]}")
             for i, node in enumerate(nodes):
+
                 def make_fn(h):
                     def fn(_ctx):
-                        _run_on(h if h != "localhost" else None,
-                                "pkill -f 'torchrun|deepspeed|accelerate' 2>/dev/null",
-                                job.config.get("ssh_user", "root"),
-                                job.config.get("ssh_key"))
+                        _run_on(
+                            h if h != "localhost" else None,
+                            "pkill -f 'torchrun|deepspeed|accelerate' 2>/dev/null",
+                            job.config.get("ssh_user", "root"),
+                            job.config.get("ssh_key"),
+                        )
                         return {"node": h, "stopped": True}
+
                     return fn
+
                 dag.add_node(f"stop_{i}", make_fn(node))
             dag.apply()
 

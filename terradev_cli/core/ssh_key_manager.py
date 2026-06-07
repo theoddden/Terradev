@@ -32,6 +32,7 @@ _KEYFILE_PATH = _TERRADEV_DIR / ".keyfile"
 # Fernet helpers (reuses the same keyfile as auth.py)
 # ---------------------------------------------------------------------------
 
+
 def _load_fernet() -> Fernet:
     """Load or create the shared Fernet key used by AuthManager."""
     _SSH_DIR.mkdir(parents=True, exist_ok=True)
@@ -48,6 +49,7 @@ def _load_fernet() -> Fernet:
 # ---------------------------------------------------------------------------
 # Key generation
 # ---------------------------------------------------------------------------
+
 
 def generate_provision_keypair(parallel_group_id: str) -> Tuple[str, str]:
     """Generate an Ed25519 keypair for a provision group.
@@ -67,10 +69,14 @@ def generate_provision_keypair(parallel_group_id: str) -> Tuple[str, str]:
     )
 
     # Serialize public key (OpenSSH format)
-    pub_ssh = priv_key.public_key().public_bytes(
-        encoding=serialization.Encoding.OpenSSH,
-        format=serialization.PublicFormat.OpenSSH,
-    ).decode()
+    pub_ssh = (
+        priv_key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.OpenSSH,
+            format=serialization.PublicFormat.OpenSSH,
+        )
+        .decode()
+    )
 
     # Encrypt private key with Fernet
     fernet = _load_fernet()
@@ -170,6 +176,7 @@ def get_provision_ssh_key_path(parallel_group_id: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 # Cleanup
 # ---------------------------------------------------------------------------
+
 
 def delete_provision_keys(parallel_group_id: str) -> bool:
     """Delete both keys for a provision group (e.g. after terminate)."""

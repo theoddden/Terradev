@@ -39,10 +39,15 @@ from terradev_cli.core.training_monitor import (
 class TestDataModels:
     def test_gpu_metric_fields(self):
         m = GPUMetric(
-            node="10.0.0.1", gpu_index=0, gpu_name="A100",
-            utilization_pct=95.0, memory_used_mb=40000,
-            memory_total_mb=81920, temperature_c=72,
-            power_w=300, power_limit_w=400,
+            node="10.0.0.1",
+            gpu_index=0,
+            gpu_name="A100",
+            utilization_pct=95.0,
+            memory_used_mb=40000,
+            memory_total_mb=81920,
+            temperature_c=72,
+            power_w=300,
+            power_limit_w=400,
         )
         assert m.node == "10.0.0.1"
         assert m.utilization_pct == 95.0
@@ -227,6 +232,7 @@ class TestTrainingMonitorIntegration:
         d = snap.to_dict()
         # Should be JSON-serializable
         import json
+
         json_str = json.dumps(d)
         assert isinstance(json_str, str)
         parsed = json.loads(json_str)

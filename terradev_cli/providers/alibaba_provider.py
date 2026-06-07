@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 # Rust authentication integration
 try:
     from terradev_authentication import PyAlibabaSigner, PyAlibabaCredentials
+
     USE_RUST_AUTH = True
     logger.info("Using Rust authentication for 10x faster signature generation")
 except ImportError:
@@ -115,11 +116,23 @@ class AlibabaProvider(BaseProvider):
     }
 
     REGIONS = [
-        "cn-beijing", "cn-shanghai", "cn-hangzhou", "cn-shenzhen",
-        "cn-guangzhou", "cn-chengdu", "cn-wulanchabu", "cn-zhangjiakou",
-        "cn-hongkong", "ap-southeast-1", "ap-southeast-3",
-        "ap-southeast-5", "ap-northeast-1", "ap-south-1",
-        "us-west-1", "us-east-1", "eu-central-1",
+        "cn-beijing",
+        "cn-shanghai",
+        "cn-hangzhou",
+        "cn-shenzhen",
+        "cn-guangzhou",
+        "cn-chengdu",
+        "cn-wulanchabu",
+        "cn-zhangjiakou",
+        "cn-hongkong",
+        "ap-southeast-1",
+        "ap-southeast-3",
+        "ap-southeast-5",
+        "ap-northeast-1",
+        "ap-south-1",
+        "us-west-1",
+        "us-east-1",
+        "eu-central-1",
     ]
 
     # ── Authentication ────────────────────────────────────────────────
@@ -137,7 +150,9 @@ class AlibabaProvider(BaseProvider):
     def _percent_encode(s: str) -> str:
         """RFC 3986 percent-encoding as required by Alibaba OpenAPI.
         Tildes (~) are NOT encoded; asterisks (*) and spaces are."""
-        return urllib.parse.quote(str(s), safe='~').replace('+', '%20').replace('*', '%2A')
+        return (
+            urllib.parse.quote(str(s), safe="~").replace("+", "%20").replace("*", "%2A")
+        )
 
     def _sign_url(self, params: Dict[str, str], region_id: Optional[str] = None) -> str:
         """Build a signed Alibaba OpenAPI URL with HMAC-SHA1 signature."""
@@ -159,19 +174,25 @@ class AlibabaProvider(BaseProvider):
             for k, v in sorted_params
         )
         # Step 2: string-to-sign = METHOD&%2F&<url-encoded canonicalized QS>
-        string_to_sign = f"GET&{self._percent_encode('/')}&{self._percent_encode(canon_qs)}"
+        string_to_sign = (
+            f"GET&{self._percent_encode('/')}&{self._percent_encode(canon_qs)}"
+        )
 
         # Step 3: HMAC-SHA1 with key = AccessKeySecret + "&"
         key = f"{self.access_key_secret}&"
         signature = base64.b64encode(
-            hmac.new(key.encode("utf-8"), string_to_sign.encode("utf-8"), hashlib.sha1).digest()
+            hmac.new(
+                key.encode("utf-8"), string_to_sign.encode("utf-8"), hashlib.sha1
+            ).digest()
         ).decode("utf-8")
 
         common["Signature"] = signature
         final_qs = urllib.parse.urlencode(common)
         return f"{self._build_api_base(region_id)}/?{final_qs}"
 
-    async def _ecs_request(self, params: Dict[str, str], region_id: Optional[str] = None) -> Dict[str, Any]:
+    async def _ecs_request(
+        self, params: Dict[str, str], region_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Make a signed ECS API request.
 
         Uses raw aiohttp session — NOT _make_request — because Alibaba
@@ -202,7 +223,7 @@ class AlibabaProvider(BaseProvider):
         # Return empty list if no valid credentials
         if not self.access_key_id or not self.access_key_secret:
             return []
-        
+
         if self.access_key_id and self.access_key_secret:
             try:
                 live = await self._get_live_availability(gpu_type, region)
@@ -222,10 +243,10 @@ class AlibabaProvider(BaseProvider):
             return []
 
         target_region = region or self.region_id
-        
+
         # CRITICAL: Check cross-border compliance
         compliance_check = await self._check_cross_border_compliance(target_region)
-        
+
         quotes = [
             {
                 "instance_type": info["instance_type"],
@@ -243,7 +264,9 @@ class AlibabaProvider(BaseProvider):
                 "data_residency_warning": compliance_check["warning"],
                 "international_billing": compliance_check["billing_issues"],
                 "multi_api_complexity": True,
-                "pai_integration_available": await self._check_pai_availability(target_region),
+                "pai_integration_available": await self._check_pai_availability(
+                    target_region
+                ),
             }
         ]
 
@@ -275,7 +298,9 @@ class AlibabaProvider(BaseProvider):
             zone_id = zone.get("ZoneId", "")
             resources = zone.get("AvailableResources", {}).get("AvailableResource", [])
             for res in resources:
-                for sr in res.get("SupportedResources", {}).get("SupportedResource", []):
+                for sr in res.get("SupportedResources", {}).get(
+                    "SupportedResource", []
+                ):
                     if sr.get("Status") == "Available":
                         quotes.append(
                             {
@@ -302,19 +327,26 @@ class AlibabaProvider(BaseProvider):
         """Provision Alibaba instance with compliance checks"""
         # CRITICAL: Check compliance before provisioning
         compliance_check = await self._check_cross_border_compliance(region)
-        if compliance_check["compliance_required"] and not compliance_check["compliance_confirmed"]:
-            raise Exception(f"Compliance required for {region}: {compliance_check['warning']}. Confirm compliance before proceeding.")
-        
+        if (
+            compliance_check["compliance_required"]
+            and not compliance_check["compliance_confirmed"]
+        ):
+            raise Exception(
+                f"Compliance required for {region}: {compliance_check['warning']}. Confirm compliance before proceeding."
+            )
+
         # CRITICAL: Validate resources before deployment
         validation = await self._validate_deployment_resources(instance_type, region)
         if not validation["valid"]:
             raise Exception(f"Resource validation failed: {validation['reason']}")
-        
+
         # CRITICAL: Check for international billing issues
         billing_check = await self._check_international_billing(region)
         if billing_check["issues"]:
-            logger.warning(f"International billing issues detected: {billing_check['issues']}")
-        
+            logger.warning(
+                f"International billing issues detected: {billing_check['issues']}"
+            )
+
         if not self.access_key_id or not self.access_key_secret:
             raise Exception("Alibaba Cloud credentials not configured")
 
@@ -344,7 +376,11 @@ class AlibabaProvider(BaseProvider):
         data = await self._ecs_request(params, region_id=region)
 
         instance_ids = data.get("InstanceIdSets", {}).get("InstanceIdSet", [])
-        iid = instance_ids[0] if instance_ids else f"alibaba-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        iid = (
+            instance_ids[0]
+            if instance_ids
+            else f"alibaba-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
 
         return {
             "instance_id": iid,
@@ -362,15 +398,21 @@ class AlibabaProvider(BaseProvider):
         if not self.access_key_id or not self.access_key_secret:
             raise Exception("Alibaba Cloud credentials not configured")
 
-        data = await self._ecs_request({
-            "Action": "DescribeInstances",
-            "RegionId": self.region_id,
-            "InstanceIds": f'["{instance_id}"]',
-        })
+        data = await self._ecs_request(
+            {
+                "Action": "DescribeInstances",
+                "RegionId": self.region_id,
+                "InstanceIds": f'["{instance_id}"]',
+            }
+        )
 
         instances = data.get("Instances", {}).get("Instance", [])
         if not instances:
-            return {"instance_id": instance_id, "status": "not_found", "provider": "alibaba"}
+            return {
+                "instance_id": instance_id,
+                "status": "not_found",
+                "provider": "alibaba",
+            }
 
         inst = instances[0]
         public_ips = inst.get("PublicIpAddress", {}).get("IpAddress", [])
@@ -386,41 +428,53 @@ class AlibabaProvider(BaseProvider):
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.access_key_id or not self.access_key_secret:
             raise Exception("Alibaba Cloud credentials not configured")
-        await self._ecs_request({
-            "Action": "StopInstance",
-            "InstanceId": instance_id,
-        })
+        await self._ecs_request(
+            {
+                "Action": "StopInstance",
+                "InstanceId": instance_id,
+            }
+        )
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
 
     async def start_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.access_key_id or not self.access_key_secret:
             raise Exception("Alibaba Cloud credentials not configured")
-        await self._ecs_request({
-            "Action": "StartInstance",
-            "InstanceId": instance_id,
-        })
+        await self._ecs_request(
+            {
+                "Action": "StartInstance",
+                "InstanceId": instance_id,
+            }
+        )
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
 
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.access_key_id or not self.access_key_secret:
             raise Exception("Alibaba Cloud credentials not configured")
-        await self._ecs_request({
-            "Action": "DeleteInstance",
-            "InstanceId": instance_id,
-            "Force": "true",
-        })
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        await self._ecs_request(
+            {
+                "Action": "DeleteInstance",
+                "InstanceId": instance_id,
+                "Force": "true",
+            }
+        )
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.access_key_id or not self.access_key_secret:
             return []
         try:
-            data = await self._ecs_request({
-                "Action": "DescribeInstances",
-                "RegionId": self.region_id,
-                "Tag.1.Key": "terradev",
-                "PageSize": "100",
-            })
+            data = await self._ecs_request(
+                {
+                    "Action": "DescribeInstances",
+                    "RegionId": self.region_id,
+                    "Tag.1.Key": "terradev",
+                    "PageSize": "100",
+                }
+            )
             instances = data.get("Instances", {}).get("Instance", [])
             return [
                 {
@@ -443,14 +497,16 @@ class AlibabaProvider(BaseProvider):
 
         # Alibaba Cloud Assist for remote command execution
         try:
-            data = await self._ecs_request({
-                "Action": "RunCommand",
-                "RegionId": self.region_id,
-                "Type": "RunShellScript",
-                "CommandContent": base64.b64encode(command.encode()).decode(),
-                "InstanceId.1": instance_id,
-                "Timeout": "600",
-            })
+            data = await self._ecs_request(
+                {
+                    "Action": "RunCommand",
+                    "RegionId": self.region_id,
+                    "Type": "RunShellScript",
+                    "CommandContent": base64.b64encode(command.encode()).decode(),
+                    "InstanceId.1": instance_id,
+                    "Timeout": "600",
+                }
+            )
             invoke_id = data.get("InvokeId", "unknown")
             if async_exec:
                 return {
@@ -463,11 +519,13 @@ class AlibabaProvider(BaseProvider):
                 }
             # Poll for result
             await asyncio.sleep(3)
-            result_data = await self._ecs_request({
-                "Action": "DescribeInvocationResults",
-                "RegionId": self.region_id,
-                "InvokeId": invoke_id,
-            })
+            result_data = await self._ecs_request(
+                {
+                    "Action": "DescribeInvocationResults",
+                    "RegionId": self.region_id,
+                    "InvokeId": invoke_id,
+                }
+            )
             results = (
                 result_data.get("Invocation", {})
                 .get("InvocationResults", {})
@@ -475,7 +533,9 @@ class AlibabaProvider(BaseProvider):
             )
             if results:
                 r = results[0]
-                output = base64.b64decode(r.get("Output", "")).decode("utf-8", errors="replace")
+                output = base64.b64decode(r.get("Output", "")).decode(
+                    "utf-8", errors="replace"
+                )
                 return {
                     "instance_id": instance_id,
                     "command": command,
@@ -498,14 +558,22 @@ class AlibabaProvider(BaseProvider):
                 if not public_ip:
                     raise Exception("No public IP available")
                 import subprocess
+
                 result = subprocess.run(
                     [
-                        "ssh", "-o", "StrictHostKeyChecking=accept-new",
-                        "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                        "-o", "ConnectTimeout=10",
-                        f"root@{public_ip}", command,
+                        "ssh",
+                        "-o",
+                        "StrictHostKeyChecking=accept-new",
+                        "-o",
+                        f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                        "-o",
+                        "ConnectTimeout=10",
+                        f"root@{public_ip}",
+                        command,
                     ],
-                    capture_output=True, text=True, timeout=300,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
                 )
                 return {
                     "instance_id": instance_id,
@@ -531,27 +599,45 @@ class AlibabaProvider(BaseProvider):
         data = await self._ecs_request({"Action": "DescribeRegions"})
         return data.get("Regions", {}).get("Region", [])
 
-    async def get_instance_types(self, family: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_instance_types(
+        self, family: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """List available GPU instance types."""
         params: Dict[str, str] = {"Action": "DescribeInstanceTypes"}
         if family:
             params["InstanceTypeFamily"] = family
         data = await self._ecs_request(params)
         return data.get("InstanceTypes", {}).get("InstanceType", [])
-    
+
     async def _check_cross_border_compliance(self, region: str) -> Dict[str, Any]:
         """CRITICAL: Check cross-border data transfer compliance requirements"""
         # Define data residency regions vs international regions
-        china_regions = ["cn-beijing", "cn-shanghai", "cn-hangzhou", "cn-shenzhen", 
-                       "cn-guangzhou", "cn-chengdu", "cn-wulanchabu", "cn-zhangjiakou"]
-        
-        international_regions = ["cn-hongkong", "ap-southeast-1", "ap-southeast-3", 
-                                "ap-southeast-5", "ap-northeast-1", "ap-south-1",
-                                "us-west-1", "us-east-1", "eu-central-1"]
-        
+        china_regions = [
+            "cn-beijing",
+            "cn-shanghai",
+            "cn-hangzhou",
+            "cn-shenzhen",
+            "cn-guangzhou",
+            "cn-chengdu",
+            "cn-wulanchabu",
+            "cn-zhangjiakou",
+        ]
+
+        international_regions = [
+            "cn-hongkong",
+            "ap-southeast-1",
+            "ap-southeast-3",
+            "ap-southeast-5",
+            "ap-northeast-1",
+            "ap-south-1",
+            "us-west-1",
+            "us-east-1",
+            "eu-central-1",
+        ]
+
         is_china_region = region.startswith("cn-") and region in china_regions
         is_international_region = region in international_regions
-        
+
         if is_china_region:
             return {
                 "compliance_required": True,
@@ -559,8 +645,16 @@ class AlibabaProvider(BaseProvider):
                 "compliance_confirmed": self.compliance_checked,
                 "warning": "China data residency - data must remain within China",
                 "billing_issues": "China mainland billing requires local payment methods",
-                "regulations": ["Cybersecurity Law", "Data Security Law", "Personal Information Protection Law"],
-                "action_required": "Confirm China data residency compliance" if not self.compliance_checked else None,
+                "regulations": [
+                    "Cybersecurity Law",
+                    "Data Security Law",
+                    "Personal Information Protection Law",
+                ],
+                "action_required": (
+                    "Confirm China data residency compliance"
+                    if not self.compliance_checked
+                    else None
+                ),
             }
         elif is_international_region:
             return {
@@ -570,7 +664,11 @@ class AlibabaProvider(BaseProvider):
                 "warning": "Cross-border data transfer - may require export approval",
                 "billing_issues": "International billing may require USD payment method",
                 "regulations": ["China Data Export Security Measures"],
-                "action_required": "Confirm cross-border data transfer compliance" if not self.compliance_checked else None,
+                "action_required": (
+                    "Confirm cross-border data transfer compliance"
+                    if not self.compliance_checked
+                    else None
+                ),
             }
         else:
             return {
@@ -582,19 +680,23 @@ class AlibabaProvider(BaseProvider):
                 "regulations": [],
                 "action_required": None,
             }
-    
-    async def _validate_deployment_resources(self, instance_type: str, region: str) -> Dict[str, Any]:
+
+    async def _validate_deployment_resources(
+        self, instance_type: str, region: str
+    ) -> Dict[str, Any]:
         """CRITICAL: Validate resources before deployment"""
         try:
             # Check instance type availability
-            availability = await self._check_instance_availability(instance_type, region)
+            availability = await self._check_instance_availability(
+                instance_type, region
+            )
             if not availability["available"]:
                 return {
                     "valid": False,
                     "reason": f"Instance type {instance_type} not available in {region}",
                     "alternative_regions": availability.get("alternative_regions", []),
                 }
-            
+
             # Check resource limits
             resource_check = await self._check_resource_limits(region)
             if not resource_check["within_limits"]:
@@ -603,20 +705,28 @@ class AlibabaProvider(BaseProvider):
                     "reason": f"Resource limits exceeded: {resource_check['exceeded_resources']}",
                     "action_required": "Request resource limit increase",
                 }
-            
+
             return {"valid": True}
-            
+
         except Exception as e:
             return {
                 "valid": False,
                 "reason": f"Resource validation failed: {str(e)}",
             }
-    
+
     async def _check_international_billing(self, region: str) -> Dict[str, Any]:
         """CRITICAL: Check for international billing issues"""
-        china_regions = ["cn-beijing", "cn-shanghai", "cn-hangzhou", "cn-shenzhen", 
-                       "cn-guangzhou", "cn-chengdu", "cn-wulanchabu", "cn-zhangjiakou"]
-        
+        china_regions = [
+            "cn-beijing",
+            "cn-shanghai",
+            "cn-hangzhou",
+            "cn-shenzhen",
+            "cn-guangzhou",
+            "cn-chengdu",
+            "cn-wulanchabu",
+            "cn-zhangjiakou",
+        ]
+
         if region in china_regions:
             return {
                 "issues": "China mainland requires Alipay/UnionPay payment methods",
@@ -627,7 +737,12 @@ class AlibabaProvider(BaseProvider):
         elif region == "cn-hongkong":
             return {
                 "issues": "Hong Kong supports international payment methods",
-                "payment_methods_accepted": ["Visa", "Mastercard", "Alipay", "UnionPay"],
+                "payment_methods_accepted": [
+                    "Visa",
+                    "Mastercard",
+                    "Alipay",
+                    "UnionPay",
+                ],
                 "currency": "HKD",
                 "international_cards": "Accepted",
             }
@@ -638,7 +753,7 @@ class AlibabaProvider(BaseProvider):
                 "currency": "USD",
                 "international_cards": "Accepted",
             }
-    
+
     async def _check_pai_availability(self, region: str) -> Dict[str, Any]:
         """Check PAI (Platform for AI) service availability"""
         pai_services = {
@@ -646,10 +761,10 @@ class AlibabaProvider(BaseProvider):
             "PAI-EAS": "Elastic Algorithm Service",
             "PAI-DSW": "Data Science Workshop",
         }
-        
+
         # PAI is primarily available in China regions
         china_regions = ["cn-beijing", "cn-shanghai", "cn-hangzhou", "cn-shenzhen"]
-        
+
         if region in china_regions:
             return {
                 "available": True,
@@ -661,7 +776,7 @@ class AlibabaProvider(BaseProvider):
                 },
                 "integration_benefits": [
                     "Managed training environments",
-                    "Auto-scaling capabilities", 
+                    "Auto-scaling capabilities",
                     "Built-in MLOps tools",
                 ],
             }
@@ -672,8 +787,10 @@ class AlibabaProvider(BaseProvider):
                 "reason": "PAI services primarily available in China regions",
                 "alternative": "Use ECS with custom ML stack",
             }
-    
-    async def _check_instance_availability(self, instance_type: str, region: str) -> Dict[str, Any]:
+
+    async def _check_instance_availability(
+        self, instance_type: str, region: str
+    ) -> Dict[str, Any]:
         """Check if instance type is available in the region"""
         try:
             data = await self._ecs_request(
@@ -686,9 +803,9 @@ class AlibabaProvider(BaseProvider):
                 },
                 region_id=region,
             )
-            
+
             zones = data.get("AvailableZones", {}).get("AvailableZone", [])
-            
+
             if zones:
                 return {
                     "available": True,
@@ -697,7 +814,12 @@ class AlibabaProvider(BaseProvider):
             else:
                 # Find alternative regions
                 alternative_regions = []
-                for alt_region in ["cn-beijing", "cn-shanghai", "cn-hangzhou", "cn-hongkong"]:
+                for alt_region in [
+                    "cn-beijing",
+                    "cn-shanghai",
+                    "cn-hangzhou",
+                    "cn-hongkong",
+                ]:
                     if alt_region != region:
                         try:
                             alt_data = await self._ecs_request(
@@ -714,18 +836,18 @@ class AlibabaProvider(BaseProvider):
                                 alternative_regions.append(alt_region)
                         except Exception:
                             continue
-                
+
                 return {
                     "available": False,
                     "alternative_regions": alternative_regions,
                 }
-                
+
         except Exception as e:
             return {
                 "available": False,
                 "reason": f"Availability check failed: {str(e)}",
             }
-    
+
     async def _check_resource_limits(self, region: str) -> Dict[str, Any]:
         """Check if user is within resource limits"""
         try:

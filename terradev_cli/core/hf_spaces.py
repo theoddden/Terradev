@@ -12,40 +12,46 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
 
+
 @dataclass
 class HFSpaceConfig:
     """HuggingFace Space configuration"""
+
     name: str
     model_id: str
-    hardware: str = "cpu-basic"  # cpu-basic, cpu-upgrade, t4-medium, a10g-large, a10g-large
+    hardware: str = (
+        "cpu-basic"  # cpu-basic, cpu-upgrade, t4-medium, a10g-large, a10g-large
+    )
     sdk: str = "gradio"  # gradio, streamlit, docker
     python_version: str = "3.10"
     secrets: Dict[str, str] = None
     env_vars: Dict[str, str] = None
     private: bool = False
 
+
 class HFSpacesDeployer:
     """One-click HuggingFace Spaces deployment"""
-    
+
     def __init__(self, hf_token: str):
         self.hf_token = hf_token
         self.api_base = "https://huggingface.co/api"
-        
+
         try:
             import aiohttp
+
             self.aiohttp = aiohttp
         except ImportError:
             print("❌ aiohttp required for HF Spaces deployment")
             print("   Install with: pip install aiohttp")
             self.aiohttp = None
-        
+
     async def create_space(self, config: HFSpaceConfig) -> Dict[str, Any]:
         """Create HuggingFace Space with one click"""
         if not self.aiohttp:
             return {"status": "error", "error": "aiohttp not available"}
-            
+
         headers = {"Authorization": f"Bearer {self.hf_token}"}
-        
+
         # Space configuration
         space_data = {
             "name": config.name,
@@ -54,86 +60,102 @@ class HFSpacesDeployer:
             "hardware": config.hardware,
             "private": config.private,
             "tags": ["terradev", "gpu", "ml"],
-            "description": f"Terradev deployment of {config.model_id}"
+            "description": f"Terradev deployment of {config.model_id}",
         }
-        
+
         try:
             async with self.aiohttp.ClientSession() as session:
                 # Create space
                 async with session.post(
-                    f"{self.api_base}/spaces/create",
-                    headers=headers,
-                    json=space_data
+                    f"{self.api_base}/spaces/create", headers=headers, json=space_data
                 ) as response:
                     if response.status == 200:
                         space_info = await response.json()
                         space_name = space_info.get("name", config.name)
-                        
+
                         # Add secrets if provided
                         if config.secrets:
-                            await self._add_secrets(session, space_name, config.secrets, headers)
-                        
+                            await self._add_secrets(
+                                session, space_name, config.secrets, headers
+                            )
+
                         # Add environment variables if provided
                         if config.env_vars:
-                            await self._add_env_vars(session, space_name, config.env_vars, headers)
-                        
+                            await self._add_env_vars(
+                                session, space_name, config.env_vars, headers
+                            )
+
                         # Generate and upload app.py
-                        await self._upload_app_file(session, space_name, config, headers)
-                        
+                        await self._upload_app_file(
+                            session, space_name, config, headers
+                        )
+
                         return {
                             "status": "created",
                             "space_name": space_name,
                             "space_url": f"https://huggingface.co/spaces/{space_name}",
                             "hardware": config.hardware,
-                            "model_id": config.model_id
+                            "model_id": config.model_id,
                         }
                     else:
                         error_text = await response.text()
                         return {
                             "status": "error",
-                            "error": f"Failed to create space: {response.status} - {error_text}"
+                            "error": f"Failed to create space: {response.status} - {error_text}",
                         }
         except Exception as e:
             return {"status": "error", "error": str(e)}
-    
-    async def _add_secrets(self, session, space_name: str, secrets: Dict[str, str], headers: Dict[str, str]):
+
+    async def _add_secrets(
+        self, session, space_name: str, secrets: Dict[str, str], headers: Dict[str, str]
+    ):
         """Add secrets to space"""
         for key, value in secrets.items():
             async with session.post(
                 f"{self.api_base}/spaces/{space_name}/secrets",
                 headers=headers,
-                json={"key": key, "value": value}
+                json={"key": key, "value": value},
             ) as response:
                 if response.status != 200:
                     print(f"Warning: Failed to add secret {key}")
-    
-    async def _add_env_vars(self, session, space_name: str, env_vars: Dict[str, str], headers: Dict[str, str]):
+
+    async def _add_env_vars(
+        self,
+        session,
+        space_name: str,
+        env_vars: Dict[str, str],
+        headers: Dict[str, str],
+    ):
         """Add environment variables to space"""
         async with session.post(
-            f"{self.api_base}/spaces/{space_name}/env",
-            headers=headers,
-            json=env_vars
+            f"{self.api_base}/spaces/{space_name}/env", headers=headers, json=env_vars
         ) as response:
             if response.status != 200:
                 print(f"Warning: Failed to add environment variables")
-    
-    async def _upload_app_file(self, session, space_name: str, config: HFSpaceConfig, headers: Dict[str, str]):
+
+    async def _upload_app_file(
+        self, session, space_name: str, config: HFSpaceConfig, headers: Dict[str, str]
+    ):
         """Generate and upload app.py file"""
         app_content = self._generate_app_content(config)
-        
+
         # Upload app.py
         files_data = self.aiohttp.FormData()
-        files_data.add_field('file', app_content, filename='app.py', content_type='text/plain')
-        
+        files_data.add_field(
+            "file", app_content, filename="app.py", content_type="text/plain"
+        )
+
         async with session.post(
             f"{self.api_base}/spaces/{space_name}/files/main/app.py",
             headers=headers,
-            data=files_data
+            data=files_data,
         ) as response:
             if response.status != 200:
                 error_text = await response.text()
-                raise Exception(f"Failed to upload app.py: {response.status} - {error_text}")
-    
+                raise Exception(
+                    f"Failed to upload app.py: {response.status} - {error_text}"
+                )
+
     def _generate_app_content(self, config: HFSpaceConfig) -> str:
         """Generate app.py content based on SDK"""
         if config.sdk == "gradio":
@@ -144,7 +166,7 @@ class HFSpacesDeployer:
             return self._generate_docker_app(config)
         else:
             return self._generate_gradio_app(config)  # default
-    
+
     def _generate_gradio_app(self, config: HFSpaceConfig) -> str:
         """Generate Gradio app.py"""
         return f'''import gradio as gr
@@ -210,10 +232,10 @@ iface = gr.Interface(
 if __name__ == "__main__":
     iface.launch()
 '''
-    
+
     def _generate_streamlit_app(self, config: HFSpaceConfig) -> str:
         """Generate Streamlit app.py"""
-        return f'''import streamlit as st
+        return f"""import streamlit as st
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import os
@@ -272,11 +294,11 @@ if st.button("Generate"):
             st.error(f"Generation error: {{e}}")
     else:
         st.warning("Please enter a prompt.")
-'''
-    
+"""
+
     def _generate_docker_app(self, config: HFSpaceConfig) -> str:
         """Generate Docker app.py"""
-        return f'''# Docker-based deployment for {config.model_id}
+        return f"""# Docker-based deployment for {config.model_id}
 # This is a placeholder for Docker-based Spaces
 
 import subprocess
@@ -293,11 +315,12 @@ def main():
     
 if __name__ == "__main__":
     main()
-'''
+"""
+
 
 class HFSpaceTemplates:
     """Pre-configured templates for common use cases"""
-    
+
     @staticmethod
     def get_llm_template(model_id: str, space_name: str) -> HFSpaceConfig:
         """Template for LLM deployment"""
@@ -308,13 +331,9 @@ class HFSpaceTemplates:
             sdk="gradio",
             python_version="3.10",
             private=False,
-            env_vars={
-                "MODEL_ID": model_id,
-                "MAX_LENGTH": "500",
-                "TEMPERATURE": "0.7"
-            }
+            env_vars={"MODEL_ID": model_id, "MAX_LENGTH": "500", "TEMPERATURE": "0.7"},
         )
-    
+
     @staticmethod
     def get_embedding_template(model_id: str, space_name: str) -> HFSpaceConfig:
         """Template for embedding model deployment"""
@@ -325,12 +344,9 @@ class HFSpaceTemplates:
             sdk="streamlit",
             python_version="3.10",
             private=False,
-            env_vars={
-                "MODEL_ID": model_id,
-                "BATCH_SIZE": "32"
-            }
+            env_vars={"MODEL_ID": model_id, "BATCH_SIZE": "32"},
         )
-    
+
     @staticmethod
     def get_image_model_template(model_id: str, space_name: str) -> HFSpaceConfig:
         """Template for image model deployment"""
@@ -341,8 +357,5 @@ class HFSpaceTemplates:
             sdk="gradio",
             python_version="3.10",
             private=False,
-            env_vars={
-                "MODEL_ID": model_id,
-                "IMAGE_SIZE": "512"
-            }
+            env_vars={"MODEL_ID": model_id, "IMAGE_SIZE": "512"},
         )

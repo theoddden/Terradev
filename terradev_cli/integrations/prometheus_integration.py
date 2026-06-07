@@ -31,9 +31,24 @@ OPTIONAL_CREDENTIALS = {
 def get_credential_prompts() -> List[Dict[str, str]]:
     """Return the list of credential prompts for interactive configure."""
     return [
-        {"key": "prometheus_pushgateway_url", "prompt": "Pushgateway URL (e.g. http://pushgateway:9091)", "required": True, "hide": False},
-        {"key": "prometheus_username", "prompt": "Pushgateway Username (optional)", "required": False, "hide": False},
-        {"key": "prometheus_password", "prompt": "Pushgateway Password (optional)", "required": False, "hide": True},
+        {
+            "key": "prometheus_pushgateway_url",
+            "prompt": "Pushgateway URL (e.g. http://pushgateway:9091)",
+            "required": True,
+            "hide": False,
+        },
+        {
+            "key": "prometheus_username",
+            "prompt": "Pushgateway Username (optional)",
+            "required": False,
+            "hide": False,
+        },
+        {
+            "key": "prometheus_password",
+            "prompt": "Pushgateway Password (optional)",
+            "required": False,
+            "hide": True,
+        },
     ]
 
 
@@ -110,17 +125,26 @@ def build_provision_metrics(
     """Build the full metric payload for a provision event."""
     parts = []
 
-    parts.append(build_metric_payload(
-        "terradev_provisions_total",
-        1,
-        {"provider": provider, "gpu_type": gpu_type, "region": region},
-    ))
+    parts.append(
+        build_metric_payload(
+            "terradev_provisions_total",
+            1,
+            {"provider": provider, "gpu_type": gpu_type, "region": region},
+        )
+    )
 
-    parts.append(build_metric_payload(
-        "terradev_gpu_cost_per_hour",
-        price_per_hour,
-        {"provider": provider, "gpu_type": gpu_type, "region": region, "instance_id": instance_id},
-    ))
+    parts.append(
+        build_metric_payload(
+            "terradev_gpu_cost_per_hour",
+            price_per_hour,
+            {
+                "provider": provider,
+                "gpu_type": gpu_type,
+                "region": region,
+                "instance_id": instance_id,
+            },
+        )
+    )
 
     return "\n".join(parts)
 
@@ -134,17 +158,21 @@ def build_terminate_metrics(
     """Build the full metric payload for a terminate event."""
     parts = []
 
-    parts.append(build_metric_payload(
-        "terradev_total_cost_usd",
-        total_cost,
-        {"provider": provider, "instance_id": instance_id},
-    ))
+    parts.append(
+        build_metric_payload(
+            "terradev_total_cost_usd",
+            total_cost,
+            {"provider": provider, "instance_id": instance_id},
+        )
+    )
 
-    parts.append(build_metric_payload(
-        "terradev_provision_duration_seconds",
-        duration_seconds,
-        {"instance_id": instance_id},
-    ))
+    parts.append(
+        build_metric_payload(
+            "terradev_provision_duration_seconds",
+            duration_seconds,
+            {"instance_id": instance_id},
+        )
+    )
 
     return "\n".join(parts)
 
@@ -221,9 +249,7 @@ def generate_scrape_config(job_name: str = "terradev") -> str:
     config = {
         "job_name": job_name,
         "honor_labels": True,
-        "static_configs": [
-            {"targets": ["pushgateway:9091"]}
-        ],
+        "static_configs": [{"targets": ["pushgateway:9091"]}],
     }
 
     lines = [
@@ -251,31 +277,56 @@ def generate_grafana_dashboard_json(
                 {
                     "title": "GPU Cost per Hour by Provider",
                     "type": "timeseries",
-                    "targets": [{"expr": "terradev_gpu_cost_per_hour", "legendFormat": "{{provider}} — {{gpu_type}}"}],
+                    "targets": [
+                        {
+                            "expr": "terradev_gpu_cost_per_hour",
+                            "legendFormat": "{{provider}} — {{gpu_type}}",
+                        }
+                    ],
                     "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
                 },
                 {
                     "title": "Total Provisions",
                     "type": "stat",
-                    "targets": [{"expr": "sum(terradev_provisions_total)", "legendFormat": "Total"}],
+                    "targets": [
+                        {
+                            "expr": "sum(terradev_provisions_total)",
+                            "legendFormat": "Total",
+                        }
+                    ],
                     "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
                 },
                 {
                     "title": "Active Instances by Provider",
                     "type": "bargauge",
-                    "targets": [{"expr": "terradev_active_instances", "legendFormat": "{{provider}}"}],
+                    "targets": [
+                        {
+                            "expr": "terradev_active_instances",
+                            "legendFormat": "{{provider}}",
+                        }
+                    ],
                     "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
                 },
                 {
                     "title": "Accumulated Cost per Instance",
                     "type": "table",
-                    "targets": [{"expr": "terradev_total_cost_usd", "legendFormat": "{{instance_id}}"}],
+                    "targets": [
+                        {
+                            "expr": "terradev_total_cost_usd",
+                            "legendFormat": "{{instance_id}}",
+                        }
+                    ],
                     "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
                 },
                 {
                     "title": "Quote Prices Over Time",
                     "type": "timeseries",
-                    "targets": [{"expr": "terradev_quote_price", "legendFormat": "{{provider}} — {{gpu_type}}"}],
+                    "targets": [
+                        {
+                            "expr": "terradev_quote_price",
+                            "legendFormat": "{{provider}} — {{gpu_type}}",
+                        }
+                    ],
                     "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
                 },
             ],

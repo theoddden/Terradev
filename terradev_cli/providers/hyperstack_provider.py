@@ -33,10 +33,34 @@ class HyperstackProvider(BaseProvider):
         self.ssh_key_name = credentials.get("ssh_key_name", "")
 
     GPU_PRICING = {
-        "H100": {"flavor": "n3-H100x1", "price": 3.35, "mem": 80, "vcpus": 26, "gpus": 1},
-        "H100-8x": {"flavor": "n3-H100x8", "price": 26.80, "mem": 80, "vcpus": 208, "gpus": 8},
-        "A100": {"flavor": "n2-A100x1", "price": 2.10, "mem": 80, "vcpus": 12, "gpus": 1},
-        "A100-8x": {"flavor": "n2-A100x8", "price": 16.80, "mem": 80, "vcpus": 96, "gpus": 8},
+        "H100": {
+            "flavor": "n3-H100x1",
+            "price": 3.35,
+            "mem": 80,
+            "vcpus": 26,
+            "gpus": 1,
+        },
+        "H100-8x": {
+            "flavor": "n3-H100x8",
+            "price": 26.80,
+            "mem": 80,
+            "vcpus": 208,
+            "gpus": 8,
+        },
+        "A100": {
+            "flavor": "n2-A100x1",
+            "price": 2.10,
+            "mem": 80,
+            "vcpus": 12,
+            "gpus": 1,
+        },
+        "A100-8x": {
+            "flavor": "n2-A100x8",
+            "price": 16.80,
+            "mem": 80,
+            "vcpus": 96,
+            "gpus": 8,
+        },
         "L40": {"flavor": "n2-L40x1", "price": 1.15, "mem": 48, "vcpus": 12, "gpus": 1},
     }
 
@@ -69,18 +93,20 @@ class HyperstackProvider(BaseProvider):
         if not info:
             return []
 
-        return [{
-            "instance_type": info["flavor"],
-            "gpu_type": gpu_type,
-            "price_per_hour": info["price"],
-            "region": region or "CANADA-1",
-            "available": True,
-            "provider": "hyperstack",
-            "vcpus": info["vcpus"],
-            "memory_gb": info["mem"],
-            "gpu_count": info["gpus"],
-            "spot": False,
-        }]
+        return [
+            {
+                "instance_type": info["flavor"],
+                "gpu_type": gpu_type,
+                "price_per_hour": info["price"],
+                "region": region or "CANADA-1",
+                "available": True,
+                "provider": "hyperstack",
+                "vcpus": info["vcpus"],
+                "memory_gb": info["mem"],
+                "gpu_count": info["gpus"],
+                "spot": False,
+            }
+        ]
 
     async def _get_live_flavors(self, gpu_type: str) -> List[Dict[str, Any]]:
         data = await self._make_request("GET", f"{self.API_BASE}/core/flavors")
@@ -88,18 +114,24 @@ class HyperstackProvider(BaseProvider):
         for flavor in data.get("flavors", []):
             name = flavor.get("name", "")
             if gpu_type.lower() in name.lower():
-                quotes.append({
-                    "instance_type": name,
-                    "gpu_type": gpu_type,
-                    "price_per_hour": flavor.get("price_per_hour", 0),
-                    "region": flavor.get("region_name", "CANADA-1"),
-                    "available": flavor.get("stock_available", True),
-                    "provider": "hyperstack",
-                    "vcpus": flavor.get("cpu", 0),
-                    "memory_gb": (flavor.get("ram", 0) or 0) // 1024 if flavor.get("ram", 0) > 100 else flavor.get("ram", 0),
-                    "gpu_count": flavor.get("gpu", 1),
-                    "spot": False,
-                })
+                quotes.append(
+                    {
+                        "instance_type": name,
+                        "gpu_type": gpu_type,
+                        "price_per_hour": flavor.get("price_per_hour", 0),
+                        "region": flavor.get("region_name", "CANADA-1"),
+                        "available": flavor.get("stock_available", True),
+                        "provider": "hyperstack",
+                        "vcpus": flavor.get("cpu", 0),
+                        "memory_gb": (
+                            (flavor.get("ram", 0) or 0) // 1024
+                            if flavor.get("ram", 0) > 100
+                            else flavor.get("ram", 0)
+                        ),
+                        "gpu_count": flavor.get("gpu", 1),
+                        "spot": False,
+                    }
+                )
         return sorted(quotes, key=lambda q: q["price_per_hour"])
 
     async def provision_instance(
@@ -108,9 +140,12 @@ class HyperstackProvider(BaseProvider):
         if not self.api_key:
             raise Exception("Hyperstack API key not configured")
 
-        instance_name = f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%H%M%S')}"
+        instance_name = (
+            f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%H%M%S')}"
+        )
         data = await self._make_request(
-            "POST", f"{self.API_BASE}/core/virtual-machines",
+            "POST",
+            f"{self.API_BASE}/core/virtual-machines",
             json={
                 "name": instance_name,
                 "environment_name": self.environment,
@@ -139,7 +174,8 @@ class HyperstackProvider(BaseProvider):
         if not self.api_key:
             raise Exception("Hyperstack API key not configured")
         data = await self._make_request(
-            "GET", f"{self.API_BASE}/core/virtual-machines/{instance_id}",
+            "GET",
+            f"{self.API_BASE}/core/virtual-machines/{instance_id}",
         )
         vm = data.get("virtual_machine", data)
         return {
@@ -153,7 +189,8 @@ class HyperstackProvider(BaseProvider):
         if not self.api_key:
             raise Exception("Hyperstack API key not configured")
         await self._make_request(
-            "GET", f"{self.API_BASE}/core/virtual-machines/{instance_id}/hibernate",
+            "GET",
+            f"{self.API_BASE}/core/virtual-machines/{instance_id}/hibernate",
         )
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
 
@@ -161,7 +198,8 @@ class HyperstackProvider(BaseProvider):
         if not self.api_key:
             raise Exception("Hyperstack API key not configured")
         await self._make_request(
-            "GET", f"{self.API_BASE}/core/virtual-machines/{instance_id}/restore",
+            "GET",
+            f"{self.API_BASE}/core/virtual-machines/{instance_id}/restore",
         )
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
 
@@ -169,24 +207,38 @@ class HyperstackProvider(BaseProvider):
         if not self.api_key:
             raise Exception("Hyperstack API key not configured")
         await self._make_request(
-            "DELETE", f"{self.API_BASE}/core/virtual-machines/{instance_id}",
+            "DELETE",
+            f"{self.API_BASE}/core/virtual-machines/{instance_id}",
         )
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key:
             return []
         try:
             data = await self._make_request(
-                "GET", f"{self.API_BASE}/core/virtual-machines",
+                "GET",
+                f"{self.API_BASE}/core/virtual-machines",
             )
             vms = data.get("virtual_machines", data.get("instances", []))
             return [
                 {
                     "instance_id": str(vm.get("id", "unknown")),
                     "status": vm.get("status", "unknown"),
-                    "instance_type": vm.get("flavor", {}).get("name", "unknown") if isinstance(vm.get("flavor"), dict) else vm.get("flavor_name", "unknown"),
-                    "region": vm.get("environment", {}).get("name", "unknown") if isinstance(vm.get("environment"), dict) else vm.get("environment_name", "unknown"),
+                    "instance_type": (
+                        vm.get("flavor", {}).get("name", "unknown")
+                        if isinstance(vm.get("flavor"), dict)
+                        else vm.get("flavor_name", "unknown")
+                    ),
+                    "region": (
+                        vm.get("environment", {}).get("name", "unknown")
+                        if isinstance(vm.get("environment"), dict)
+                        else vm.get("environment_name", "unknown")
+                    ),
                     "provider": "hyperstack",
                     "public_ip": vm.get("floating_ip", vm.get("floating_ip_address")),
                 }
@@ -212,14 +264,22 @@ class HyperstackProvider(BaseProvider):
                     "async": async_exec,
                 }
             import subprocess
+
             ssh_cmd = [
-                "ssh", "-o", "StrictHostKeyChecking=accept-new",
-                "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                "-o", "ConnectTimeout=10",
-                f"ubuntu@{public_ip}", command,
+                "ssh",
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                "-o",
+                "ConnectTimeout=10",
+                f"ubuntu@{public_ip}",
+                command,
             ]
             if async_exec:
-                proc = subprocess.Popen(ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                proc = subprocess.Popen(
+                    ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
                 return {
                     "instance_id": instance_id,
                     "command": command,
@@ -228,7 +288,9 @@ class HyperstackProvider(BaseProvider):
                     "output": f"Async SSH process started (PID: {proc.pid})",
                     "async": True,
                 }
-            result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                ssh_cmd, capture_output=True, text=True, timeout=300
+            )
             return {
                 "instance_id": instance_id,
                 "command": command,

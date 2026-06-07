@@ -45,23 +45,26 @@ class BasetenProvider(BaseProvider):
         if not info:
             return []
 
-        return [{
-            "instance_type": f"baseten-{info['model_id']}",
-            "gpu_type": gpu_type,
-            "price_per_hour": info["price"],
-            "region": region or "us-east",
-            "available": True,
-            "provider": "baseten",
-            "vcpus": info["vcpus"],
-            "memory_gb": info["mem"],
-            "gpu_count": 1,
-            "spot": False,
-        }]
+        return [
+            {
+                "instance_type": f"baseten-{info['model_id']}",
+                "gpu_type": gpu_type,
+                "price_per_hour": info["price"],
+                "region": region or "us-east",
+                "available": True,
+                "provider": "baseten",
+                "vcpus": info["vcpus"],
+                "memory_gb": info["mem"],
+                "gpu_count": 1,
+                "spot": False,
+            }
+        ]
 
     async def _get_live_pricing(self, gpu_type: str) -> List[Dict[str, Any]]:
         """Query Baseten API for available models/deployments"""
         data = await self._make_request(
-            "GET", f"{self.API_BASE}/models",
+            "GET",
+            f"{self.API_BASE}/models",
         )
         quotes = []
         for model in data.get("models", []):
@@ -70,18 +73,20 @@ class BasetenProvider(BaseProvider):
             gpu_name = gpu_info.get("type", "")
             if gpu_type.lower() in gpu_name.lower():
                 price = gpu_info.get("price_per_hour", 0)
-                quotes.append({
-                    "instance_type": f"baseten-{model.get('id', 'unknown')}",
-                    "gpu_type": gpu_type,
-                    "price_per_hour": price,
-                    "region": deployment.get("region", "us-east"),
-                    "available": deployment.get("status") == "ACTIVE",
-                    "provider": "baseten",
-                    "vcpus": gpu_info.get("vcpus", 0),
-                    "memory_gb": gpu_info.get("memory_gb", 0),
-                    "gpu_count": gpu_info.get("count", 1),
-                    "spot": False,
-                })
+                quotes.append(
+                    {
+                        "instance_type": f"baseten-{model.get('id', 'unknown')}",
+                        "gpu_type": gpu_type,
+                        "price_per_hour": price,
+                        "region": deployment.get("region", "us-east"),
+                        "available": deployment.get("status") == "ACTIVE",
+                        "provider": "baseten",
+                        "vcpus": gpu_info.get("vcpus", 0),
+                        "memory_gb": gpu_info.get("memory_gb", 0),
+                        "gpu_count": gpu_info.get("count", 1),
+                        "spot": False,
+                    }
+                )
         return sorted(quotes, key=lambda q: q["price_per_hour"])
 
     async def provision_instance(
@@ -96,7 +101,8 @@ class BasetenProvider(BaseProvider):
 
         # Deploy a model via Baseten API
         data = await self._make_request(
-            "POST", f"{self.API_BASE}/models",
+            "POST",
+            f"{self.API_BASE}/models",
             json={
                 "model_name": f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%H%M%S')}",
                 "gpu": gpu_info["model_id"],
@@ -104,7 +110,9 @@ class BasetenProvider(BaseProvider):
                 "max_replicas": 1,
             },
         )
-        model_id = data.get("model", {}).get("id", f"baseten-{datetime.now().strftime('%Y%m%d%H%M%S')}")
+        model_id = data.get("model", {}).get(
+            "id", f"baseten-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
         return {
             "instance_id": model_id,
             "instance_type": instance_type,
@@ -120,7 +128,12 @@ class BasetenProvider(BaseProvider):
         data = await self._make_request("GET", f"{self.API_BASE}/models/{instance_id}")
         model = data.get("model", {})
         deployment = model.get("primary_deployment", {})
-        status_map = {"ACTIVE": "running", "BUILDING": "provisioning", "FAILED": "failed", "SCALED_TO_ZERO": "stopped"}
+        status_map = {
+            "ACTIVE": "running",
+            "BUILDING": "provisioning",
+            "FAILED": "failed",
+            "SCALED_TO_ZERO": "stopped",
+        }
         return {
             "instance_id": instance_id,
             "status": status_map.get(deployment.get("status", ""), "unknown"),
@@ -132,7 +145,8 @@ class BasetenProvider(BaseProvider):
             raise Exception("Baseten API key not configured")
         # Scale to zero
         await self._make_request(
-            "PATCH", f"{self.API_BASE}/models/{instance_id}/deployments/production",
+            "PATCH",
+            f"{self.API_BASE}/models/{instance_id}/deployments/production",
             json={"min_replicas": 0, "max_replicas": 0},
         )
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
@@ -141,7 +155,8 @@ class BasetenProvider(BaseProvider):
         if not self.api_key:
             raise Exception("Baseten API key not configured")
         await self._make_request(
-            "PATCH", f"{self.API_BASE}/models/{instance_id}/deployments/production",
+            "PATCH",
+            f"{self.API_BASE}/models/{instance_id}/deployments/production",
             json={"min_replicas": 1, "max_replicas": 1},
         )
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
@@ -150,7 +165,11 @@ class BasetenProvider(BaseProvider):
         if not self.api_key:
             raise Exception("Baseten API key not configured")
         await self._make_request("DELETE", f"{self.API_BASE}/models/{instance_id}")
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key:
@@ -160,13 +179,17 @@ class BasetenProvider(BaseProvider):
             instances = []
             for model in data.get("models", []):
                 deployment = model.get("primary_deployment", {})
-                instances.append({
-                    "instance_id": model.get("id"),
-                    "status": deployment.get("status", "unknown").lower(),
-                    "instance_type": deployment.get("gpu", {}).get("type", "unknown"),
-                    "region": deployment.get("region", "unknown"),
-                    "provider": "baseten",
-                })
+                instances.append(
+                    {
+                        "instance_id": model.get("id"),
+                        "status": deployment.get("status", "unknown").lower(),
+                        "instance_type": deployment.get("gpu", {}).get(
+                            "type", "unknown"
+                        ),
+                        "region": deployment.get("region", "unknown"),
+                        "provider": "baseten",
+                    }
+                )
             return instances
         except Exception:
             return []
@@ -178,7 +201,8 @@ class BasetenProvider(BaseProvider):
             raise Exception("Baseten API key not configured")
         # Baseten supports running predictions — map command to prediction call
         data = await self._make_request(
-            "POST", f"{self.API_BASE}/models/{instance_id}/predict",
+            "POST",
+            f"{self.API_BASE}/models/{instance_id}/predict",
             json={"command": command},
         )
         return {

@@ -88,9 +88,14 @@ class QdrantService:
         return self.session
 
     async def _request(
-        self, method: str, path: str, *,
-        params: Optional[Dict] = None, json_body: Optional[Any] = None,
-        timeout: float = 30, retries: int = _MAX_RETRIES,
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Optional[Dict] = None,
+        json_body: Optional[Any] = None,
+        timeout: float = 30,
+        retries: int = _MAX_RETRIES,
     ) -> Any:
         session = self._ensure_session()
         url = f"{self.config.url}{path}"
@@ -98,13 +103,19 @@ class QdrantService:
         for attempt in range(retries):
             try:
                 async with session.request(
-                    method, url, params=params, json=json_body,
+                    method,
+                    url,
+                    params=params,
+                    json=json_body,
                     timeout=aiohttp.ClientTimeout(total=timeout),
                 ) as resp:
                     if resp.status in (200, 201):
                         return await resp.json()
                     if resp.status in _RETRYABLE_STATUSES and attempt < retries - 1:
-                        wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
+                        wait = min(
+                            _BACKOFF_BASE * (2**attempt) + random.uniform(0, 0.5),
+                            _BACKOFF_MAX,
+                        )
                         await asyncio.sleep(wait)
                         continue
                     error_text = await resp.text()
@@ -112,7 +123,10 @@ class QdrantService:
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 last_exc = e
                 if attempt < retries - 1:
-                    wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
+                    wait = min(
+                        _BACKOFF_BASE * (2**attempt) + random.uniform(0, 0.5),
+                        _BACKOFF_MAX,
+                    )
                     await asyncio.sleep(wait)
                     continue
                 raise
@@ -124,7 +138,11 @@ class QdrantService:
         try:
             data = await self._request("GET", "/collections")
             cols = data.get("result", {}).get("collections", [])
-            return {"status": "connected", "url": self.config.url, "collections": [c["name"] for c in cols]}
+            return {
+                "status": "connected",
+                "url": self.config.url,
+                "collections": [c["name"] for c in cols],
+            }
         except Exception as e:
             return {"status": "failed", "error": str(e)}
 
@@ -133,18 +151,34 @@ class QdrantService:
         return [c["name"] for c in data.get("result", {}).get("collections", [])]
 
     async def get_collection_info(self, name: Optional[str] = None) -> Dict[str, Any]:
-        return await self._request("GET", f"/collections/{name or self.config.default_collection}")
+        return await self._request(
+            "GET", f"/collections/{name or self.config.default_collection}"
+        )
 
-    async def create_collection(self, name: Optional[str] = None, *, vector_size: Optional[int] = None, distance: Optional[str] = None) -> Dict[str, Any]:
+    async def create_collection(
+        self,
+        name: Optional[str] = None,
+        *,
+        vector_size: Optional[int] = None,
+        distance: Optional[str] = None,
+    ) -> Dict[str, Any]:
         n = name or self.config.default_collection
         body: Dict[str, Any] = {
-            "vectors": {"size": vector_size or self.config.vector_size, "distance": distance or self.config.distance},
-            "hnsw_config": {"m": self.config.hnsw_m, "ef_construct": self.config.hnsw_ef_construct},
+            "vectors": {
+                "size": vector_size or self.config.vector_size,
+                "distance": distance or self.config.distance,
+            },
+            "hnsw_config": {
+                "m": self.config.hnsw_m,
+                "ef_construct": self.config.hnsw_ef_construct,
+            },
         }
         if self.config.on_disk:
             body["vectors"]["on_disk"] = True
         if self.config.quantization == "scalar":
-            body["quantization_config"] = {"scalar": {"type": "int8", "always_ram": True}}
+            body["quantization_config"] = {
+                "scalar": {"type": "int8", "always_ram": True}
+            }
         elif self.config.quantization == "binary":
             body["quantization_config"] = {"binary": {"always_ram": True}}
         return await self._request("PUT", f"/collections/{n}", json_body=body)
@@ -152,65 +186,117 @@ class QdrantService:
     async def delete_collection(self, name: str) -> Dict[str, Any]:
         return await self._request("DELETE", f"/collections/{name}")
 
-    async def upsert_points(self, points: List[Dict[str, Any]], *, name: Optional[str] = None) -> Dict[str, Any]:
-        return await self._request("PUT", f"/collections/{name or self.config.default_collection}/points", json_body={"points": points})
+    async def upsert_points(
+        self, points: List[Dict[str, Any]], *, name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        return await self._request(
+            "PUT",
+            f"/collections/{name or self.config.default_collection}/points",
+            json_body={"points": points},
+        )
 
-    async def search(self, vector: List[float], *, name: Optional[str] = None, limit: int = 10, score_threshold: Optional[float] = None, filter_conditions: Optional[Dict] = None, with_payload: bool = True) -> Dict[str, Any]:
-        body: Dict[str, Any] = {"vector": vector, "limit": limit, "with_payload": with_payload}
+    async def search(
+        self,
+        vector: List[float],
+        *,
+        name: Optional[str] = None,
+        limit: int = 10,
+        score_threshold: Optional[float] = None,
+        filter_conditions: Optional[Dict] = None,
+        with_payload: bool = True,
+    ) -> Dict[str, Any]:
+        body: Dict[str, Any] = {
+            "vector": vector,
+            "limit": limit,
+            "with_payload": with_payload,
+        }
         if score_threshold is not None:
             body["score_threshold"] = score_threshold
         if filter_conditions:
             body["filter"] = filter_conditions
-        return await self._request("POST", f"/collections/{name or self.config.default_collection}/points/search", json_body=body)
+        return await self._request(
+            "POST",
+            f"/collections/{name or self.config.default_collection}/points/search",
+            json_body=body,
+        )
 
     async def count_points(self, name: Optional[str] = None) -> int:
-        data = await self._request("POST", f"/collections/{name or self.config.default_collection}/points/count", json_body={"exact": True})
+        data = await self._request(
+            "POST",
+            f"/collections/{name or self.config.default_collection}/points/count",
+            json_body={"exact": True},
+        )
         return data.get("result", {}).get("count", 0)
 
-    async def configure_rag_collection(self, name: Optional[str] = None, *, embedding_model: Optional[str] = None) -> Dict[str, Any]:
+    async def configure_rag_collection(
+        self, name: Optional[str] = None, *, embedding_model: Optional[str] = None
+    ) -> Dict[str, Any]:
         n = name or self.config.default_collection
         model = embedding_model or self.config.embedding_model
         size = EMBEDDING_DIMENSIONS.get(model, self.config.vector_size)
-        result = await self.create_collection(name=n, vector_size=size, distance="Cosine")
-        return {"collection": n, "embedding_model": model, "vector_size": size, "result": result}
+        result = await self.create_collection(
+            name=n, vector_size=size, distance="Cosine"
+        )
+        return {
+            "collection": n,
+            "embedding_model": model,
+            "vector_size": size,
+            "result": result,
+        }
 
     # ── K8s deployment ───────────────────────────────────────────────
 
     def generate_k8s_deployment(self, namespace: str = "vector-db") -> str:
-        sc = f"\n          storageClassName: {self.config.storage_class}" if self.config.storage_class else ""
+        sc = (
+            f"\n          storageClassName: {self.config.storage_class}"
+            if self.config.storage_class
+            else ""
+        )
         p, gp = self.config.port, self.config.grpc_port
         return (
-            f'---\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: {namespace}\n'
-            f'---\napiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: qdrant\n  namespace: {namespace}\n'
-            f'spec:\n  serviceName: qdrant\n  replicas: {self.config.replicas}\n'
-            f'  selector:\n    matchLabels:\n      app: qdrant\n'
-            f'  template:\n    metadata:\n      labels:\n        app: qdrant\n'
-            f'    spec:\n      containers:\n        - name: qdrant\n          image: {self.config.image}\n'
-            f'          ports:\n            - containerPort: {p}\n              name: rest\n'
-            f'            - containerPort: {gp}\n              name: grpc\n'
+            f"---\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: {namespace}\n"
+            f"---\napiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: qdrant\n  namespace: {namespace}\n"
+            f"spec:\n  serviceName: qdrant\n  replicas: {self.config.replicas}\n"
+            f"  selector:\n    matchLabels:\n      app: qdrant\n"
+            f"  template:\n    metadata:\n      labels:\n        app: qdrant\n"
+            f"    spec:\n      containers:\n        - name: qdrant\n          image: {self.config.image}\n"
+            f"          ports:\n            - containerPort: {p}\n              name: rest\n"
+            f"            - containerPort: {gp}\n              name: grpc\n"
             f'          resources:\n            requests:\n              cpu: "500m"\n              memory: "2Gi"\n'
             f'            limits:\n              cpu: "4"\n              memory: "8Gi"\n'
-            f'          volumeMounts:\n            - name: qdrant-storage\n              mountPath: /qdrant/storage\n'
-            f'          readinessProbe:\n            httpGet:\n              path: /healthz\n              port: rest\n'
-            f'            initialDelaySeconds: 5\n            periodSeconds: 10\n'
-            f'  volumeClaimTemplates:\n    - metadata:\n        name: qdrant-storage\n'
+            f"          volumeMounts:\n            - name: qdrant-storage\n              mountPath: /qdrant/storage\n"
+            f"          readinessProbe:\n            httpGet:\n              path: /healthz\n              port: rest\n"
+            f"            initialDelaySeconds: 5\n            periodSeconds: 10\n"
+            f"  volumeClaimTemplates:\n    - metadata:\n        name: qdrant-storage\n"
             f'      spec:\n        accessModes: ["ReadWriteOnce"]{sc}\n'
-            f'        resources:\n          requests:\n            storage: {self.config.storage_size}\n'
-            f'---\napiVersion: v1\nkind: Service\nmetadata:\n  name: qdrant-svc\n  namespace: {namespace}\n'
-            f'spec:\n  selector:\n    app: qdrant\n  ports:\n'
-            f'    - port: {p}\n      targetPort: rest\n      name: rest\n'
-            f'    - port: {gp}\n      targetPort: grpc\n      name: grpc\n  type: ClusterIP\n'
+            f"        resources:\n          requests:\n            storage: {self.config.storage_size}\n"
+            f"---\napiVersion: v1\nkind: Service\nmetadata:\n  name: qdrant-svc\n  namespace: {namespace}\n"
+            f"spec:\n  selector:\n    app: qdrant\n  ports:\n"
+            f"    - port: {p}\n      targetPort: rest\n      name: rest\n"
+            f"    - port: {gp}\n      targetPort: grpc\n      name: grpc\n  type: ClusterIP\n"
         )
 
     def generate_helm_values(self) -> Dict[str, Any]:
         v: Dict[str, Any] = {
             "qdrant": {
-                "image": self.config.image, "replicas": self.config.replicas,
+                "image": self.config.image,
+                "replicas": self.config.replicas,
                 "ports": {"rest": self.config.port, "grpc": self.config.grpc_port},
                 "persistence": {"enabled": True, "size": self.config.storage_size},
-                "resources": {"requests": {"cpu": "500m", "memory": "2Gi"}, "limits": {"cpu": "4", "memory": "8Gi"}},
-                "hnsw": {"m": self.config.hnsw_m, "efConstruct": self.config.hnsw_ef_construct},
-                "defaultCollection": {"name": self.config.default_collection, "vectorSize": self.config.vector_size, "distance": self.config.distance, "embeddingModel": self.config.embedding_model},
+                "resources": {
+                    "requests": {"cpu": "500m", "memory": "2Gi"},
+                    "limits": {"cpu": "4", "memory": "8Gi"},
+                },
+                "hnsw": {
+                    "m": self.config.hnsw_m,
+                    "efConstruct": self.config.hnsw_ef_construct,
+                },
+                "defaultCollection": {
+                    "name": self.config.default_collection,
+                    "vectorSize": self.config.vector_size,
+                    "distance": self.config.distance,
+                    "embeddingModel": self.config.embedding_model,
+                },
             }
         }
         if self.config.storage_class:
@@ -220,7 +306,9 @@ class QdrantService:
         return v
 
 
-def create_qdrant_service_from_credentials(credentials: Dict[str, str]) -> QdrantService:
+def create_qdrant_service_from_credentials(
+    credentials: Dict[str, str]
+) -> QdrantService:
     em = credentials.get("embedding_model", "BAAI/bge-large-en-v1.5")
     config = QdrantConfig(
         url=credentials.get("url", "http://localhost:6333"),

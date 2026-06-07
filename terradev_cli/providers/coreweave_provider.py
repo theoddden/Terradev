@@ -43,23 +43,23 @@ class CoreWeaveProvider(BaseProvider):
         # BYOAPI REQUIREMENT: No quotes without API key
         if not self.api_key:
             return []
-        
+
         # CRITICAL: Check account permissions for new users
         if not self.account_checked:
             permissions_check = await self._check_account_permissions()
             if not permissions_check["full_access"]:
                 return []
             self.account_checked = True
-            
+
         info = self.GPU_PRICING.get(gpu_type)
         if not info:
             return []
 
         target_region = region or "us-east-04e"
-        
+
         # CRITICAL: Check for legacy node pool billing issues
         legacy_warning = await self._check_legacy_node_pool_billing()
-        
+
         quotes = [
             {
                 "instance_type": info["type"],
@@ -92,7 +92,7 @@ class CoreWeaveProvider(BaseProvider):
                 "public_ip_billing": "separate_charge",
             },
         ]
-        
+
         return quotes
 
     async def provision_instance(
@@ -100,24 +100,31 @@ class CoreWeaveProvider(BaseProvider):
     ) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("CoreWeave API key not configured")
-        
+
         # CRITICAL: Double-check permissions before provisioning
         if not self.account_checked:
             permissions_check = await self._check_account_permissions()
             if not permissions_check["full_access"]:
-                raise Exception(f"Account permissions insufficient: {permissions_check['reason']}. {permissions_check['action_required']}")
+                raise Exception(
+                    f"Account permissions insufficient: {permissions_check['reason']}. {permissions_check['action_required']}"
+                )
             self.account_checked = True
 
-        instance_name = f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        instance_name = (
+            f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
 
         try:
             # CRITICAL: CoreWeave is Kubernetes-only - use manifests, not VMs
-            manifest = await self._generate_kubernetes_manifest(instance_name, instance_type, gpu_type, region)
-            
+            manifest = await self._generate_kubernetes_manifest(
+                instance_name, instance_type, gpu_type, region
+            )
+
             # Deploy via CoreWeave API
             deployment = await self._make_request(
-                "POST", f"{self.API_BASE}/v1/namespaces/{self.namespace}/deployments",
-                json=manifest
+                "POST",
+                f"{self.API_BASE}/v1/namespaces/{self.namespace}/deployments",
+                json=manifest,
             )
 
             return {
@@ -144,10 +151,15 @@ class CoreWeaveProvider(BaseProvider):
             raise Exception("CoreWeave API key not configured")
         try:
             data = await self._make_request(
-                "GET", f"{self.API_BASE}/v1/namespaces/{self.namespace}/virtualservers/{instance_id}"
+                "GET",
+                f"{self.API_BASE}/v1/namespaces/{self.namespace}/virtualservers/{instance_id}",
             )
             status = data.get("status", {}).get("phase", "unknown")
-            return {"instance_id": instance_id, "status": status.lower(), "provider": "coreweave"}
+            return {
+                "instance_id": instance_id,
+                "status": status.lower(),
+                "provider": "coreweave",
+            }
         except Exception as e:
             raise Exception(f"CoreWeave status failed: {e}")
 
@@ -155,7 +167,8 @@ class CoreWeaveProvider(BaseProvider):
         if not self.api_key:
             raise Exception("CoreWeave API key not configured")
         await self._make_request(
-            "PATCH", f"{self.API_BASE}/v1/namespaces/{self.namespace}/virtualservers/{instance_id}",
+            "PATCH",
+            f"{self.API_BASE}/v1/namespaces/{self.namespace}/virtualservers/{instance_id}",
             json={"spec": {"running": False}},
         )
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
@@ -164,7 +177,8 @@ class CoreWeaveProvider(BaseProvider):
         if not self.api_key:
             raise Exception("CoreWeave API key not configured")
         await self._make_request(
-            "PATCH", f"{self.API_BASE}/v1/namespaces/{self.namespace}/virtualservers/{instance_id}",
+            "PATCH",
+            f"{self.API_BASE}/v1/namespaces/{self.namespace}/virtualservers/{instance_id}",
             json={"spec": {"running": True}},
         )
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
@@ -173,16 +187,22 @@ class CoreWeaveProvider(BaseProvider):
         if not self.api_key:
             raise Exception("CoreWeave API key not configured")
         await self._make_request(
-            "DELETE", f"{self.API_BASE}/v1/namespaces/{self.namespace}/virtualservers/{instance_id}"
+            "DELETE",
+            f"{self.API_BASE}/v1/namespaces/{self.namespace}/virtualservers/{instance_id}",
         )
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key:
             return []
         try:
             data = await self._make_request(
-                "GET", f"{self.API_BASE}/v1/namespaces/{self.namespace}/virtualservers?labelSelector=managed-by=terradev"
+                "GET",
+                f"{self.API_BASE}/v1/namespaces/{self.namespace}/virtualservers?labelSelector=managed-by=terradev",
             )
             return [
                 {
@@ -204,12 +224,22 @@ class CoreWeaveProvider(BaseProvider):
         try:
             # Try kubectl exec first (requires kubeconfig configured for CoreWeave)
             import subprocess
+
             kubectl_cmd = [
-                "kubectl", "--namespace", self.namespace,
-                "exec", instance_id, "--", "sh", "-c", command,
+                "kubectl",
+                "--namespace",
+                self.namespace,
+                "exec",
+                instance_id,
+                "--",
+                "sh",
+                "-c",
+                command,
             ]
             if async_exec:
-                proc = subprocess.Popen(kubectl_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                proc = subprocess.Popen(
+                    kubectl_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
                 return {
                     "instance_id": instance_id,
                     "command": command,
@@ -218,7 +248,9 @@ class CoreWeaveProvider(BaseProvider):
                     "output": f"Async kubectl exec started (PID: {proc.pid})",
                     "async": True,
                 }
-            result = subprocess.run(kubectl_cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                kubectl_cmd, capture_output=True, text=True, timeout=300
+            )
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -253,30 +285,32 @@ class CoreWeaveProvider(BaseProvider):
 
     def _get_auth_headers(self) -> Dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
-    
+
     async def _check_account_permissions(self) -> Dict[str, Any]:
         """CRITICAL: Check if account has full Kubernetes and Applications Catalog access
-        
+
         New organizations start with limited access. Must request permissions upgrade.
         """
         try:
             # Test basic API access
             await self._make_request("GET", f"{self.API_BASE}/v1/user")
-            
+
             # Test Kubernetes access
             try:
-                await self._make_request("GET", f"{self.API_BASE}/v1/namespaces/{self.namespace}/pods")
+                await self._make_request(
+                    "GET", f"{self.API_BASE}/v1/namespaces/{self.namespace}/pods"
+                )
                 k8s_access = True
             except Exception:
                 k8s_access = False
-            
+
             # Test Applications Catalog access
             try:
                 await self._make_request("GET", f"{self.API_BASE}/v1/applications")
                 catalog_access = True
             except Exception:
                 catalog_access = False
-            
+
             if not k8s_access or not catalog_access:
                 return {
                     "full_access": False,
@@ -285,31 +319,33 @@ class CoreWeaveProvider(BaseProvider):
                     "k8s_access": k8s_access,
                     "catalog_access": catalog_access,
                 }
-            
+
             return {"full_access": True}
-            
+
         except Exception as e:
             return {
                 "full_access": False,
                 "reason": f"Permission check failed: {str(e)}",
                 "action_required": "Verify API key and account status with CoreWeave support",
             }
-    
+
     async def _check_legacy_node_pool_billing(self) -> Optional[Dict[str, Any]]:
         """CRITICAL: Check for legacy node pool billing issues
-        
+
         Clusters created before July 7, 2025 have cpu-control-plane Node Pool
         that must be filtered out from billing queries.
         """
         try:
             # Check for legacy node pools
-            node_pools = await self._make_request("GET", f"{self.API_BASE}/v1/nodepools")
-            
+            node_pools = await self._make_request(
+                "GET", f"{self.API_BASE}/v1/nodepools"
+            )
+
             legacy_pools = []
             for pool in node_pools.get("items", []):
                 if pool.get("name", "").startswith("cpu-control-plane"):
                     legacy_pools.append(pool["name"])
-            
+
             if legacy_pools:
                 return {
                     "legacy_node_pools_detected": True,
@@ -318,12 +354,12 @@ class CoreWeaveProvider(BaseProvider):
                     "action_required": "Filter out cpu-control-plane node pools from billing queries",
                     "fix_available": True,
                 }
-            
+
             return None
-            
+
         except Exception:
             return None
-    
+
     async def _generate_kubernetes_manifest(
         self, instance_name: str, instance_type: str, gpu_type: str, region: str
     ) -> Dict[str, Any]:
@@ -374,7 +410,10 @@ class CoreWeaveProvider(BaseProvider):
                                 },
                                 "env": [
                                     {"name": "NVIDIA_VISIBLE_DEVICES", "value": "all"},
-                                    {"name": "NVIDIA_DRIVER_CAPABILITIES", "value": "compute,utility"},
+                                    {
+                                        "name": "NVIDIA_DRIVER_CAPABILITIES",
+                                        "value": "compute,utility",
+                                    },
                                 ],
                             }
                         ],

@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class InferenceSpotConfig:
     """Configuration for inference-on-spot"""
+
     enable_spot_checkpointing: bool = True
     checkpoint_dir: str = None  # Will use tempfile if not provided
     nvme_path: str = "/mnt/nvme"
@@ -60,6 +61,7 @@ class InferenceSpotConfig:
 @dataclass
 class InferenceSpotState:
     """State of inference-on-spot checkpoint"""
+
     checkpoint_id: str
     model_id: str
     endpoint_name: str
@@ -90,6 +92,7 @@ class InferenceSpotManager:
         # Use tempfile if checkpoint_dir not provided
         if config.checkpoint_dir is None:
             import tempfile
+
             self.checkpoint_dir = Path(tempfile.mkdtemp(prefix="terradev_inference_"))
         else:
             self.checkpoint_dir = Path(config.checkpoint_dir)
@@ -128,13 +131,16 @@ class InferenceSpotManager:
             region=os.environ.get("TERRADEV_REGION", "unknown"),
             instance_id=self._get_instance_id(),
             created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(hours=self.config.max_checkpoint_age_hours),
+            expires_at=datetime.utcnow()
+            + timedelta(hours=self.config.max_checkpoint_age_hours),
         )
 
         # Start background spot monitoring
         self._spot_monitor_task = asyncio.create_task(self._spot_monitor_loop())
 
-        logger.info(f"Started spot monitoring for endpoint {endpoint_name} on {self.active_state.instance_id}")
+        logger.info(
+            f"Started spot monitoring for endpoint {endpoint_name} on {self.active_state.instance_id}"
+        )
 
     async def _spot_monitor_loop(self):
         """Background loop to check for spot termination notices."""
@@ -150,7 +156,13 @@ class InferenceSpotManager:
         # AWS spot termination
         try:
             result = subprocess.run(
-                ["curl", "-sf", "-m", "2", "http://169.254.169.254/latest/meta-data/spot/termination-time"],
+                [
+                    "curl",
+                    "-sf",
+                    "-m",
+                    "2",
+                    "http://169.254.169.254/latest/meta-data/spot/termination-time",
+                ],
                 capture_output=True,
                 text=True,
             )
@@ -162,8 +174,15 @@ class InferenceSpotManager:
         # GCP preempted
         try:
             result = subprocess.run(
-                ["curl", "-sf", "-m", "2", "-H", "Metadata-Flavor: Google",
-                 "http://metadata.google.internal/computeMetadata/v1/instance/preempted"],
+                [
+                    "curl",
+                    "-sf",
+                    "-m",
+                    "2",
+                    "-H",
+                    "Metadata-Flavor: Google",
+                    "http://metadata.google.internal/computeMetadata/v1/instance/preempted",
+                ],
                 capture_output=True,
                 text=True,
             )
@@ -175,8 +194,15 @@ class InferenceSpotManager:
         # Azure scheduled events
         try:
             result = subprocess.run(
-                ["curl", "-sf", "-m", "2", "-H", "Metadata: true",
-                 "http://169.254.169.254/metadata/scheduledevents?api-version=2020-07-01"],
+                [
+                    "curl",
+                    "-sf",
+                    "-m",
+                    "2",
+                    "-H",
+                    "Metadata: true",
+                    "http://169.254.169.254/metadata/scheduledevents?api-version=2020-07-01",
+                ],
                 capture_output=True,
                 text=True,
             )
@@ -210,11 +236,15 @@ class InferenceSpotManager:
                 self.active_state.model_checkpoint_id = model_checkpoint
 
             # 4. Capture in-flight request queue
-            self.active_state.in_flight_requests = await self._capture_in_flight_requests()
+            self.active_state.in_flight_requests = (
+                await self._capture_in_flight_requests()
+            )
 
             # 5. Mark as saved
             self.active_state.state = "saved"
-            logger.info(f"Inference-on-spot checkpoint saved: {self.active_state.checkpoint_id}")
+            logger.info(
+                f"Inference-on-spot checkpoint saved: {self.active_state.checkpoint_id}"
+            )
 
             # 6. Trigger re-provisioning if enabled
             if self.config.auto_reprovision:
@@ -232,7 +262,9 @@ class InferenceSpotManager:
             import aiohttp
 
             async with aiohttp.ClientSession() as session:
-                async with session.post("http://localhost:8000/v1/sleep", timeout=30) as resp:
+                async with session.post(
+                    "http://localhost:8000/v1/sleep", timeout=30
+                ) as resp:
                     if resp.status == 200:
                         logger.info("vLLM sleep mode triggered successfully")
                     else:
@@ -370,7 +402,9 @@ class InferenceSpotManager:
             import aiohttp
 
             async with aiohttp.ClientSession() as session:
-                async with session.post("http://localhost:8000/v1/wake", timeout=30) as resp:
+                async with session.post(
+                    "http://localhost:8000/v1/wake", timeout=30
+                ) as resp:
                     if resp.status == 200:
                         logger.info("vLLM wake mode triggered successfully")
                     else:
@@ -381,7 +415,9 @@ class InferenceSpotManager:
     async def _restore_model_state(self, checkpoint_id: str):
         """Restore model/adapter state from checkpoint."""
         try:
-            await self.model_manager.restore_checkpoint(checkpoint_id, target_path="/mnt/nvme/adapters")
+            await self.model_manager.restore_checkpoint(
+                checkpoint_id, target_path="/mnt/nvme/adapters"
+            )
             logger.info(f"Model state restored: {checkpoint_id}")
         except Exception as e:
             logger.error(f"Failed to restore model state: {e}")
@@ -401,7 +437,13 @@ class InferenceSpotManager:
         """Get current instance ID from cloud metadata."""
         try:
             result = subprocess.run(
-                ["curl", "-sf", "-m", "2", "http://169.254.169.254/latest/meta-data/instance-id"],
+                [
+                    "curl",
+                    "-sf",
+                    "-m",
+                    "2",
+                    "http://169.254.169.254/latest/meta-data/instance-id",
+                ],
                 capture_output=True,
                 text=True,
             )

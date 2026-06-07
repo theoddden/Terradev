@@ -25,28 +25,31 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
+
 class TelemetryClient:
     """No-op telemetry client for open source compatibility"""
-    
+
     def __init__(self):
         logger.debug("TelemetryClient initialized (no-op for open source)")
-    
+
     def log_action(self, action: str, details: Dict[str, Any] = None):
         """No-op log action for open source compatibility"""
         pass
-    
-    def check_license(self, action: str = 'provision') -> Dict[str, Any]:
+
+    def check_license(self, action: str = "provision") -> Dict[str, Any]:
         """No-op license check - always allowed for open source"""
         return {
-            'allowed': True,
-            'tier': 'open-source',
-            'limit': float('inf'),
-            'usage': 0,
-            'reason': 'Open source - no restrictions'
+            "allowed": True,
+            "tier": "open-source",
+            "limit": float("inf"),
+            "usage": 0,
+            "reason": "Open source - no restrictions",
         }
+
 
 # Global telemetry instance
 _telemetry = None
+
 
 def get_mandatory_telemetry() -> TelemetryClient:
     """Get global telemetry instance (no-op for open source)"""
@@ -54,6 +57,7 @@ def get_mandatory_telemetry() -> TelemetryClient:
     if _telemetry is None:
         _telemetry = TelemetryClient()
     return _telemetry
+
 
 # Alias for backward compatibility
 MandatoryTelemetryClient = TelemetryClient

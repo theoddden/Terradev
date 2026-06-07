@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 import aiohttp
+
 try:
     from asyncio_throttle import Throttler
 except ImportError:
@@ -80,10 +81,10 @@ class RateLimiter:
             self.global_throttler = Throttler(
                 rate_limit=50, period=60
             )  # 50 requests per minute globally
-        
+
         # Adaptive global semaphore for enterprise loads
         self._global_semaphore = asyncio.Semaphore(100)  # Base limit
-        
+
         # Background task for adaptive scaling
         self._scaling_task: Optional[asyncio.Task] = None
 
@@ -182,7 +183,10 @@ class RateLimiter:
 
     async def acquire(self, provider: str) -> bool:
         """Acquire rate limit permit for a provider"""
-        if provider not in self.provider_throttlers and provider not in self.provider_limits:
+        if (
+            provider not in self.provider_throttlers
+            and provider not in self.provider_limits
+        ):
             logger.warning(f"No rate limit configured for provider: {provider}")
             return True
 

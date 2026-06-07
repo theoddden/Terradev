@@ -20,6 +20,7 @@ def _conn() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     if is_new:
         import os
+
         os.chmod(DB_PATH, 0o600)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -28,7 +29,8 @@ def _conn() -> sqlite3.Connection:
 
 
 def _ensure_schema(conn: sqlite3.Connection):
-    conn.executescript("""
+    conn.executescript(
+        """
         CREATE TABLE IF NOT EXISTS quotes (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             ts          TEXT    NOT NULL DEFAULT (datetime('now')),
@@ -59,14 +61,16 @@ def _ensure_schema(conn: sqlite3.Connection):
 
         -- Migration: add ssh_key_path if missing (existing DBs)
         -- SQLite ignores ALTER TABLE errors for duplicate columns via pragma
-    """)
+    """
+    )
     # Safe migration for existing DBs
     try:
         conn.execute("ALTER TABLE provisions ADD COLUMN ssh_key_path TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass  # Column already exists
 
-    conn.executescript("""
+    conn.executescript(
+        """
         CREATE TABLE IF NOT EXISTS egress (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             ts           TEXT    NOT NULL DEFAULT (datetime('now')),
@@ -95,11 +99,13 @@ def _ensure_schema(conn: sqlite3.Connection):
             total       REAL    NOT NULL DEFAULT 0.0,
             providers   TEXT    NOT NULL DEFAULT '{}'
         );
-    """)
+    """
+    )
     conn.commit()
 
 
 # ── Quote tracking ────────────────────────────────────────────────────
+
 
 def record_quotes(quotes: List[Dict[str, Any]], selected_idx: Optional[int] = None):
     """Record every quote returned by a quote command."""
@@ -123,6 +129,7 @@ def record_quotes(quotes: List[Dict[str, Any]], selected_idx: Optional[int] = No
 
 # ── Provision tracking ────────────────────────────────────────────────
 
+
 def record_provision(
     instance_id: str,
     provider: str,
@@ -138,7 +145,15 @@ def record_provision(
         "INSERT INTO provisions "
         "(instance_id, provider, gpu_type, region, price_hr, spot, parallel_group, status) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, 'active')",
-        (instance_id, provider, gpu_type, region, price_hr, 1 if spot else 0, parallel_group),
+        (
+            instance_id,
+            provider,
+            gpu_type,
+            region,
+            price_hr,
+            1 if spot else 0,
+            parallel_group,
+        ),
     )
     conn.commit()
     row_id = cur.lastrowid
@@ -168,16 +183,29 @@ def end_provision(instance_id: str):
 
 # ── Egress tracking ──────────────────────────────────────────────────
 
+
 def record_egress(
-    src_provider: str, src_region: str,
-    dst_provider: str, dst_region: str,
-    bytes_moved: int, cost: float, optimized: bool = False,
+    src_provider: str,
+    src_region: str,
+    dst_provider: str,
+    dst_region: str,
+    bytes_moved: int,
+    cost: float,
+    optimized: bool = False,
 ):
     conn = _conn()
     conn.execute(
         "INSERT INTO egress (src_provider, src_region, dst_provider, dst_region, bytes_moved, cost, optimized) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (src_provider, src_region, dst_provider, dst_region, bytes_moved, cost, 1 if optimized else 0),
+        (
+            src_provider,
+            src_region,
+            dst_provider,
+            dst_region,
+            bytes_moved,
+            cost,
+            1 if optimized else 0,
+        ),
     )
     conn.commit()
     conn.close()
@@ -185,8 +213,15 @@ def record_egress(
 
 # ── Staging tracking ─────────────────────────────────────────────────
 
-def record_staging(dataset: str, original_size: int, compressed_size: int,
-                   compression: str, chunks: int, regions: List[str]):
+
+def record_staging(
+    dataset: str,
+    original_size: int,
+    compressed_size: int,
+    compression: str,
+    chunks: int,
+    regions: List[str],
+):
     """Record a staging event for each target region."""
     conn = _conn()
     for region in regions:
@@ -200,9 +235,12 @@ def record_staging(dataset: str, original_size: int, compressed_size: int,
 
 # ── Daily spend helper ───────────────────────────────────────────────
 
+
 def _update_daily_spend(conn: sqlite3.Connection, price_hr: float, provider: str):
     today = datetime.utcnow().strftime("%Y-%m-%d")
-    row = conn.execute("SELECT total, providers FROM daily_spend WHERE date = ?", (today,)).fetchone()
+    row = conn.execute(
+        "SELECT total, providers FROM daily_spend WHERE date = ?", (today,)
+    ).fetchone()
     if row:
         providers = json.loads(row["providers"])
         providers[provider] = providers.get(provider, 0) + price_hr
@@ -220,13 +258,15 @@ def _update_daily_spend(conn: sqlite3.Connection, price_hr: float, provider: str
 
 # ── Analytics queries ────────────────────────────────────────────────
 
+
 def get_spend_summary(days: int = 30) -> Dict[str, Any]:
     """Get spend summary for the last N days."""
     conn = _conn()
     cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
 
     total = conn.execute(
-        "SELECT COALESCE(SUM(total_cost), 0) as s FROM provisions WHERE ts >= ?", (cutoff,)
+        "SELECT COALESCE(SUM(total_cost), 0) as s FROM provisions WHERE ts >= ?",
+        (cutoff,),
     ).fetchone()["s"]
 
     by_provider = {}
@@ -268,7 +308,10 @@ def get_daily_spend(days: int = 7) -> List[Dict[str, Any]]:
         (cutoff,),
     ).fetchall()
     conn.close()
-    return [{"date": r["date"], "cost": r["cost"], "providers": json.loads(r["providers"])} for r in rows]
+    return [
+        {"date": r["date"], "cost": r["cost"], "providers": json.loads(r["providers"])}
+        for r in rows
+    ]
 
 
 def get_parallel_group_summary(group_id: str) -> List[Dict[str, Any]]:

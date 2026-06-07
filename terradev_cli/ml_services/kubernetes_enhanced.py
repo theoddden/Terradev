@@ -18,19 +18,19 @@ from .kubernetes_service import KubernetesConfig  # single canonical definition
 
 class EnhancedKubernetesService:
     """Enhanced Kubernetes service with deep monitoring integration"""
-    
+
     def __init__(self, config: Optional[KubernetesConfig] = None):
         self.config = config or KubernetesConfig()
         self.session: Optional[aiohttp.ClientSession] = None
-        
+
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
-    
+
     async def install_monitoring_stack(
         self,
         cluster_name: str = "",
@@ -42,27 +42,37 @@ class EnhancedKubernetesService:
         if not self.config.monitoring_enabled and not cluster_name:
             return {
                 "status": "failed",
-                "error": "Monitoring not enabled in configuration"
+                "error": "Monitoring not enabled in configuration",
             }
-        
+
         try:
             env = os.environ.copy()
             if self.config.kubeconfig_path:
                 env["KUBECONFIG"] = self.config.kubeconfig_path
-            
+
             # Create monitoring namespace
-            namespace_cmd = ["kubectl", "create", "namespace", "monitoring", "--dry-run=client", "-o", "yaml"]
-            result = subprocess.run(namespace_cmd, capture_output=True, text=True, timeout=10, env=env)
-            
+            namespace_cmd = [
+                "kubectl",
+                "create",
+                "namespace",
+                "monitoring",
+                "--dry-run=client",
+                "-o",
+                "yaml",
+            ]
+            result = subprocess.run(
+                namespace_cmd, capture_output=True, text=True, timeout=10, env=env
+            )
+
             if result.returncode == 0:
                 apply_result = subprocess.run(
                     ["kubectl", "apply", "-f", "-"],
                     input=result.stdout,
                     text=True,
                     timeout=10,
-                    env=env
+                    env=env,
                 )
-            
+
             # Install Prometheus with Karpenter metrics
             prometheus_values = f"""
 global:
@@ -94,25 +104,36 @@ alerting:
     - static_configs:
       - "/etc/prometheus/alertmanager.yml"
 """
-            
+
             # Write Prometheus values
             import tempfile
-            prometheus_file = tempfile.mktemp(prefix="prometheus-karpenter_", suffix=".yaml")
-            with open(prometheus_file, 'w') as f:
+
+            prometheus_file = tempfile.mktemp(
+                prefix="prometheus-karpenter_", suffix=".yaml"
+            )
+            with open(prometheus_file, "w") as f:
                 f.write(prometheus_values)
-            
+
             prometheus_cmd = [
-                "helm", "install", "prometheus", "prometheus-community/prometheus",
-                "--namespace", namespace, "--create-namespace",
-                "--values", prometheus_file,
-                "--wait"
+                "helm",
+                "install",
+                "prometheus",
+                "prometheus-community/prometheus",
+                "--namespace",
+                namespace,
+                "--create-namespace",
+                "--values",
+                prometheus_file,
+                "--wait",
             ]
-            
-            result = subprocess.run(prometheus_cmd, capture_output=True, text=True, timeout=300, env=env)
-            
+
+            result = subprocess.run(
+                prometheus_cmd, capture_output=True, text=True, timeout=300, env=env
+            )
+
             if result.returncode != 0:
                 raise Exception(f"Prometheus installation failed: {result.stderr}")
-            
+
             # Install Grafana with Karpenter dashboards
             grafana_values = f"""
 adminPassword: {grafana_password or 'prom-operator'}
@@ -154,41 +175,46 @@ dashboardProviders:
         options:
           path: /var/lib/grafana/dashboards
 """
-            
+
             # Write Grafana values
             import tempfile
+
             grafana_file = tempfile.mktemp(prefix="grafana-karpenter_", suffix=".yaml")
-            with open(grafana_file, 'w') as f:
+            with open(grafana_file, "w") as f:
                 f.write(grafana_values)
-            
+
             grafana_cmd = [
-                "helm", "install", "grafana", "grafana/grafana",
-                "--namespace", namespace,
-                "--values", grafana_file,
-                "--wait"
+                "helm",
+                "install",
+                "grafana",
+                "grafana/grafana",
+                "--namespace",
+                namespace,
+                "--values",
+                grafana_file,
+                "--wait",
             ]
-            
-            result = subprocess.run(grafana_cmd, capture_output=True, text=True, timeout=300, env=env)
-            
+
+            result = subprocess.run(
+                grafana_cmd, capture_output=True, text=True, timeout=300, env=env
+            )
+
             if result.returncode != 0:
                 raise Exception(f"Grafana installation failed: {result.stderr}")
-            
+
             # Import Karpenter dashboards
             await self._import_karpenter_dashboards()
-            
+
             return {
                 "status": "installed",
                 "prometheus": "http://prometheus.monitoring.svc.cluster.local:9090",
                 "grafana": "http://grafana.monitoring.svc.cluster.local:80",
-                "dashboards": "Karpenter dashboards imported"
+                "dashboards": "Karpenter dashboards imported",
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def _import_karpenter_dashboards(self) -> Dict[str, Any]:
         """Import Karpenter-specific dashboards into Grafana"""
         try:
@@ -206,15 +232,12 @@ dashboardProviders:
                             "targets": [
                                 {
                                     "expr": "rate(karpenter_created_nodes_total[5m])",
-                                    "legendFormat": "{{instance}} nodes/min"
+                                    "legendFormat": "{{instance}} nodes/min",
                                 }
                             ],
                             "fieldConfig": {
-                                "defaults": {
-                                    "unit": "nodes/min",
-                                    "min": 0
-                                }
-                            }
+                                "defaults": {"unit": "nodes/min", "min": 0}
+                            },
                         },
                         {
                             "title": "Node Deprovisioning Rate",
@@ -222,105 +245,94 @@ dashboardProviders:
                             "targets": [
                                 {
                                     "expr": "rate(karpenter_deleted_nodes_total[5m])",
-                                    "legendFormat": "{{instance}} nodes/min"
+                                    "legendFormat": "{{instance}} nodes/min",
                                 }
-                            ]
+                            ],
                         },
                         {
                             "title": "Active Nodes",
                             "type": "stat",
                             "targets": [
                                 {
-                                    "expr": "sum(kubernetes_node_info_condition{{condition=~\"Ready\"}})",
-                                    "legendFormat": "{{instance}} nodes"
+                                    "expr": 'sum(kubernetes_node_info_condition{{condition=~"Ready"}})',
+                                    "legendFormat": "{{instance}} nodes",
                                 }
-                            ]
+                            ],
                         },
                         {
                             "title": "Pending Pods",
                             "type": "stat",
                             "targets": [
                                 {
-                                    "expr": "sum(kubernetes_pod_status_phase{{phase=\"Pending\"}})",
-                                    "legendFormat": "{{instance}} pods"
+                                    "expr": 'sum(kubernetes_pod_status_phase{{phase="Pending"}})',
+                                    "legendFormat": "{{instance}} pods",
                                 }
-                            ]
+                            ],
                         },
                         {
                             "title": "GPU Nodes",
                             "type": "stat",
                             "targets": [
                                 {
-                                    "expr": "sum(kubernetes_node_info{{label_node_kubernetes_io_instance_type=~\"p5|p4|p3|g5|g4\"}})",
-                                    "legendFormat": "{{instance}} GPU nodes"
+                                    "expr": 'sum(kubernetes_node_info{{label_node_kubernetes_io_instance_type=~"p5|p4|p3|g5|g4"}})',
+                                    "legendFormat": "{{instance}} GPU nodes",
                                 }
-                            ]
-                        }
+                            ],
+                        },
                     ],
                     "templating": {
                         "list": [
                             "all_variables",
-                            [
-                                "datasource",
-                                "prometheus",
-                                "karpenter"
-                            ],
-                            [
-                                "dashboard",
-                                "karpenter"
-                            ]
+                            ["datasource", "prometheus", "karpenter"],
+                            ["dashboard", "karpenter"],
                         ]
-                    }
+                    },
                 }
             }
-            
+
             # Import dashboard via Grafana API
-            grafana_url = "http://admin:prom-operator@grafana.monitoring.svc.cluster.local:80/api"
-            
+            grafana_url = (
+                "http://admin:prom-operator@grafana.monitoring.svc.cluster.local:80/api"
+            )
+
             if not self.session:
                 self.session = aiohttp.ClientSession()
-            
-            async with self.session.post(f"{grafana_url}/api/dashboards/db", json=dashboard_config) as response:
-                if response.status == 200:
-                    return {
 
-                        "status": "imported",
-                        "dashboard_id": "karpenter-overview"
-                    }
+            async with self.session.post(
+                f"{grafana_url}/api/dashboards/db", json=dashboard_config
+            ) as response:
+                if response.status == 200:
+                    return {"status": "imported", "dashboard_id": "karpenter-overview"}
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to import dashboard: {response.status} - {error_text}")
-            
+                    raise Exception(
+                        f"Failed to import dashboard: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def get_monitoring_status(self) -> Dict[str, Any]:
         """Get comprehensive monitoring status"""
         try:
             env = os.environ.copy()
             if self.config.kubeconfig_path:
                 env["KUBECONFIG"] = self.config.kubeconfig_path
-            
+
             status = {
                 "kubernetes": await self._get_cluster_status(),
                 "monitoring": {
                     "prometheus": await self._check_prometheus_health(env),
-                    "grafana": await self._check_grafana_health(env)
+                    "grafana": await self._check_grafana_health(env),
                 },
-                "karpenter": await self._get_karpenter_status(env)
+                "karpenter": await self._get_karpenter_status(env),
             }
-            
+
             return status
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def _get_cluster_status(self) -> Dict[str, Any]:
         """Get detailed cluster status"""
         try:
@@ -329,58 +341,72 @@ dashboardProviders:
                 capture_output=True,
                 text=True,
                 timeout=15,
-                env=os.environ.copy()
+                env=os.environ.copy(),
             )
-            
+
             if result.returncode == 0:
                 nodes_data = json.loads(result.stdout)
-                
+
                 status = {
                     "total_nodes": len(nodes_data.get("items", [])),
-                    "ready_nodes": len([n for n in nodes_data.get("items", []) 
-                                    if n.get("status", {}).get("conditions", [{}])[-1].get("type") == "Ready"]),
-                    "gpu_nodes": len([n for n in nodes_data.get("items", [])
-                                   if "nvidia.com/gpu" in n.get("status", {}).get("capacity", {})]),
-                    "node_pools": self._get_node_pools_summary(nodes_data)
+                    "ready_nodes": len(
+                        [
+                            n
+                            for n in nodes_data.get("items", [])
+                            if n.get("status", {})
+                            .get("conditions", [{}])[-1]
+                            .get("type")
+                            == "Ready"
+                        ]
+                    ),
+                    "gpu_nodes": len(
+                        [
+                            n
+                            for n in nodes_data.get("items", [])
+                            if "nvidia.com/gpu"
+                            in n.get("status", {}).get("capacity", {})
+                        ]
+                    ),
+                    "node_pools": self._get_node_pools_summary(nodes_data),
                 }
-                
+
                 return status
             else:
                 raise Exception(f"Failed to get cluster status: {result.stderr}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to get cluster status: {e}")
-    
+
     def _get_node_pools_summary(self, nodes_data: Dict) -> Dict[str, Any]:
         """Get node pools summary"""
         pools = {}
-        
+
         for node in nodes_data.get("items", []):
             labels = node.get("metadata", {}).get("labels", {})
             pool_name = labels.get("karpenter.sh/nodepool", "default")
-            
+
             if pool_name not in pools:
-                pools[pool_name] = {
-                    "count": 0,
-                    "instance_types": set(),
-                    "gpu_count": 0
-                }
-            
+                pools[pool_name] = {"count": 0, "instance_types": set(), "gpu_count": 0}
+
             pools[pool_name]["count"] += 1
-            
+
             instance_type = labels.get("node.kubernetes.io/instance-type", "unknown")
             pools[pool_name]["instance_types"].add(instance_type)
-            
-            gpu_capacity = node.get("status", {}).get("capacity", {}).get("nvidia.com/gpu", "0")
+
+            gpu_capacity = (
+                node.get("status", {}).get("capacity", {}).get("nvidia.com/gpu", "0")
+            )
             if gpu_capacity and gpu_capacity != "0":
                 pools[pool_name]["gpu_count"] += int(gpu_capacity)
-        
+
         # Convert sets to lists for JSON serialization
         for pool_name in pools:
-            pools[pool_name]["instance_types"] = list(pools[pool_name]["instance_types"])
-        
+            pools[pool_name]["instance_types"] = list(
+                pools[pool_name]["instance_types"]
+            )
+
         return pools
-    
+
     async def _check_prometheus_health(self, env: Dict[str, str]) -> Dict[str, Any]:
         """Check Prometheus health"""
         try:
@@ -389,20 +415,20 @@ dashboardProviders:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                env=env
+                env=env,
             )
-            
+
             if result.returncode == 0:
-                lines = result.stdout.strip().split('\n')
+                lines = result.stdout.strip().split("\n")
                 for line in lines:
-                    if 'prometheus' in line and 'Running' in line:
+                    if "prometheus" in line and "Running" in line:
                         return {"status": "healthy", "details": line.strip()}
-            
+
             return {"status": "unhealthy", "error": "Prometheus not running"}
-            
+
         except Exception as e:
             return {"status": "failed", "error": str(e)}
-    
+
     async def _check_grafana_health(self, env: Dict[str, str]) -> Dict[str, Any]:
         """Check Grafana health"""
         try:
@@ -411,20 +437,20 @@ dashboardProviders:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                env=env
+                env=env,
             )
-            
+
             if result.returncode == 0:
-                lines = result.stdout.strip().split('\n')
+                lines = result.stdout.strip().split("\n")
                 for line in lines:
-                    if 'grafana' in line and 'Running' in line:
+                    if "grafana" in line and "Running" in line:
                         return {"status": "healthy", "details": line.strip()}
-            
+
             return {"status": "unhealthy", "error": "Grafana not running"}
-            
+
         except Exception as e:
             return {"status": "failed", "error": str(e)}
-    
+
     async def _get_karpenter_status(self, env: Dict[str, str]) -> Dict[str, Any]:
         """Check Karpenter status"""
         try:
@@ -433,53 +459,62 @@ dashboardProviders:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                env=env
+                env=env,
             )
-            
+
             if result.returncode == 0:
-                lines = result.stdout.strip().split('\n')
+                lines = result.stdout.strip().split("\n")
                 for line in lines:
-                    if 'karpenter' in line and 'Running' in line:
+                    if "karpenter" in line and "Running" in line:
                         return {"status": "healthy", "details": line.strip()}
-            
+
             return {"status": "unhealthy", "error": "Karpenter not running"}
-            
+
         except Exception as e:
             return {"status": "failed", "error": str(e)}
-    
+
     async def get_metrics_summary(self) -> Dict[str, Any]:
         """Get comprehensive metrics summary"""
         try:
             if not self.config.monitoring_enabled:
                 return {"status": "disabled", "error": "Monitoring not enabled"}
-            
+
             env = os.environ.copy()
             if self.config.kubeconfig_path:
                 env["KUBECONFIG"] = self.config.kubeconfig_path
-            
+
             # Get cluster metrics
             cluster_status = await self._get_cluster_status()
-            
+
             # Get resource usage
             resources = await self.get_cluster_resources()
-            
+
             # Get Karpenter metrics if available
             karpenter_metrics = {}
             if self.config.karpenter_enabled:
                 try:
                     # Try to get Karpenter metrics from Prometheus
-                    prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090"
-                    
+                    prometheus_url = (
+                        "http://prometheus.monitoring.svc.cluster.local:9090"
+                    )
+
                     if not self.session:
                         self.session = aiohttp.ClientSession()
-                    
-                    async with self.session.get(f"{prometheus_url}/api/v1/query?query=karpenter_created_nodes_total") as response:
+
+                    async with self.session.get(
+                        f"{prometheus_url}/api/v1/query?query=karpenter_created_nodes_total"
+                    ) as response:
                         if response.status == 200:
                             data = await response.json()
-                            karpenter_metrics["created_nodes"] = data.get("data", {}).get("result", [{}])[0].get("value", [{}])[0].get("value", 0)
+                            karpenter_metrics["created_nodes"] = (
+                                data.get("data", {})
+                                .get("result", [{}])[0]
+                                .get("value", [{}])[0]
+                                .get("value", 0)
+                            )
                 except Exception:
                     pass
-            
+
             return {
                 "cluster": cluster_status,
                 "resources": resources,
@@ -487,16 +522,13 @@ dashboardProviders:
                 "monitoring": {
                     "prometheus": await self._check_prometheus_health(env),
                     "grafana": await self._check_grafana_health(env),
-                    "karpenter": await self._get_karpenter_status(env)
-                }
+                    "karpenter": await self._get_karpenter_status(env),
+                },
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     # ── Methods called by MCP v5.0.0 K8s Enhanced tools ─────────────────
 
     async def install_gpu_operator(
@@ -513,31 +545,58 @@ dashboardProviders:
 
             # Add NVIDIA Helm repo
             subprocess.run(
-                ["helm", "repo", "add", "nvidia",
-                 "https://helm.ngc.nvidia.com/nvidia", "--force-update"],
-                capture_output=True, text=True, timeout=60, env=env,
+                [
+                    "helm",
+                    "repo",
+                    "add",
+                    "nvidia",
+                    "https://helm.ngc.nvidia.com/nvidia",
+                    "--force-update",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=env,
             )
             subprocess.run(
                 ["helm", "repo", "update"],
-                capture_output=True, text=True, timeout=60, env=env,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=env,
             )
 
             helm_cmd = [
-                "helm", "upgrade", "--install", "gpu-operator",
+                "helm",
+                "upgrade",
+                "--install",
+                "gpu-operator",
                 "nvidia/gpu-operator",
-                "--namespace", namespace, "--create-namespace",
-                "--set", "driver.enabled=true",
-                "--set", "toolkit.enabled=true",
-                "--set", "devicePlugin.enabled=true",
-                "--set", "dcgmExporter.enabled=true",
-                "--set", "gfd.enabled=true",
-                "--wait", "--timeout=10m",
+                "--namespace",
+                namespace,
+                "--create-namespace",
+                "--set",
+                "driver.enabled=true",
+                "--set",
+                "toolkit.enabled=true",
+                "--set",
+                "devicePlugin.enabled=true",
+                "--set",
+                "dcgmExporter.enabled=true",
+                "--set",
+                "gfd.enabled=true",
+                "--wait",
+                "--timeout=10m",
             ]
             if driver_version:
                 helm_cmd.extend(["--set", f"driver.version={driver_version}"])
 
             result = subprocess.run(
-                helm_cmd, capture_output=True, text=True, timeout=600, env=env,
+                helm_cmd,
+                capture_output=True,
+                text=True,
+                timeout=600,
+                env=env,
             )
 
             if result.returncode != 0:
@@ -548,7 +607,13 @@ dashboardProviders:
                 "cluster": cluster_name or self.config.cluster_name or "current",
                 "namespace": namespace,
                 "driver_version": driver_version or "auto-detect",
-                "components": ["driver", "toolkit", "device-plugin", "dcgm-exporter", "gfd"],
+                "components": [
+                    "driver",
+                    "toolkit",
+                    "device-plugin",
+                    "dcgm-exporter",
+                    "gfd",
+                ],
             }
         except FileNotFoundError:
             return {"status": "failed", "error": "helm not found — install Helm first"}
@@ -567,16 +632,20 @@ dashboardProviders:
             if self.config.kubeconfig_path:
                 env["KUBECONFIG"] = self.config.kubeconfig_path
 
-            config_yaml = json.dumps({
-                "version": "v1",
-                "flags": {"migStrategy": strategy},
-                "sharing": {
-                    "timeSlicing": {
-                        "renameByDefault": False,
-                        "resources": [{"name": "nvidia.com/gpu", "replicas": replicas}],
-                    }
-                },
-            })
+            config_yaml = json.dumps(
+                {
+                    "version": "v1",
+                    "flags": {"migStrategy": strategy},
+                    "sharing": {
+                        "timeSlicing": {
+                            "renameByDefault": False,
+                            "resources": [
+                                {"name": "nvidia.com/gpu", "replicas": replicas}
+                            ],
+                        }
+                    },
+                }
+            )
 
             # Apply as ConfigMap
             cm_manifest = (
@@ -589,7 +658,11 @@ dashboardProviders:
 
             result = subprocess.run(
                 ["kubectl", "apply", "-f", "-"],
-                input=cm_manifest, text=True, capture_output=True, timeout=30, env=env,
+                input=cm_manifest,
+                text=True,
+                capture_output=True,
+                timeout=30,
+                env=env,
             )
             if result.returncode != 0:
                 raise Exception(f"ConfigMap apply failed: {result.stderr}")
@@ -617,27 +690,41 @@ dashboardProviders:
 
             # MIG profiles: 1g.10gb, 2g.20gb, 3g.40gb, 4g.40gb, 7g.80gb (A100)
             valid_profiles = [
-                "all-1g.10gb", "all-2g.20gb", "all-3g.40gb",
-                "all-4g.40gb", "all-7g.80gb", "all-1g.20gb",
-                "all-1g.10gb,2g.20gb", "mixed",
+                "all-1g.10gb",
+                "all-2g.20gb",
+                "all-3g.40gb",
+                "all-4g.40gb",
+                "all-7g.80gb",
+                "all-1g.20gb",
+                "all-1g.10gb,2g.20gb",
+                "mixed",
             ]
 
             # Label nodes with MIG config
             label_cmd = [
-                "kubectl", "label", "nodes", "--all",
+                "kubectl",
+                "label",
+                "nodes",
+                "--all",
                 f"nvidia.com/mig.config={mig_profile}",
                 "--overwrite",
             ]
             if gpu_indices:
                 label_cmd = [
-                    "kubectl", "label", "nodes",
+                    "kubectl",
+                    "label",
+                    "nodes",
                     f"--selector=nvidia.com/gpu.count>={max(gpu_indices) + 1}",
                     f"nvidia.com/mig.config={mig_profile}",
                     "--overwrite",
                 ]
 
             result = subprocess.run(
-                label_cmd, capture_output=True, text=True, timeout=30, env=env,
+                label_cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env,
             )
             if result.returncode != 0:
                 raise Exception(f"MIG label failed: {result.stderr}")
@@ -687,25 +774,43 @@ dashboardProviders:
 
             result = subprocess.run(
                 ["kubectl", "apply", "-f", "-"],
-                input=cm_manifest, text=True, capture_output=True, timeout=30, env=env,
+                input=cm_manifest,
+                text=True,
+                capture_output=True,
+                timeout=30,
+                env=env,
             )
             if result.returncode != 0:
                 raise Exception(f"Time-slicing ConfigMap apply failed: {result.stderr}")
 
             # Patch ClusterPolicy to use this ConfigMap
             patch_cmd = [
-                "kubectl", "patch", "clusterpolicy/cluster-policy",
-                "-n", "gpu-operator", "--type=merge",
-                "-p", json.dumps({
-                    "spec": {
-                        "devicePlugin": {
-                            "config": {"name": "time-slicing-config", "default": "config.json"}
+                "kubectl",
+                "patch",
+                "clusterpolicy/cluster-policy",
+                "-n",
+                "gpu-operator",
+                "--type=merge",
+                "-p",
+                json.dumps(
+                    {
+                        "spec": {
+                            "devicePlugin": {
+                                "config": {
+                                    "name": "time-slicing-config",
+                                    "default": "config.json",
+                                }
+                            }
                         }
                     }
-                }),
+                ),
             ]
             patch_result = subprocess.run(
-                patch_cmd, capture_output=True, text=True, timeout=30, env=env,
+                patch_cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env,
             )
 
             return {
@@ -725,58 +830,65 @@ dashboardProviders:
             env = os.environ.copy()
             if self.config.kubeconfig_path:
                 env["KUBECONFIG"] = self.config.kubeconfig_path
-            
+
             # Get nodes with resource info
             result = subprocess.run(
                 ["kubectl", "top", "nodes", "--no-headers"],
                 capture_output=True,
                 text=True,
                 timeout=15,
-                env=env
+                env=env,
             )
-            
-            resources = {
-                "total_cpu": 0,
-                "total_memory": 0,
-                "total_gpu": 0,
-                "nodes": []
-            }
-            
+
+            resources = {"total_cpu": 0, "total_memory": 0, "total_gpu": 0, "nodes": []}
+
             if result.returncode == 0:
-                for line in result.stdout.strip().split('\n'):
+                for line in result.stdout.strip().split("\n"):
                     if line.strip():
                         parts = line.split()
                         if len(parts) >= 3:
                             node_name = parts[0]
-                            cpu_cores = parts[1].replace('m', '')
-                            memory = parts[2].replace('Mi', '')
-                            
+                            cpu_cores = parts[1].replace("m", "")
+                            memory = parts[2].replace("Mi", "")
+
                             try:
-                                cpu_int = int(cpu_cores) / 1000 if 'm' in parts[1] else int(cpu_cores)
+                                cpu_int = (
+                                    int(cpu_cores) / 1000
+                                    if "m" in parts[1]
+                                    else int(cpu_cores)
+                                )
                                 mem_gb = int(memory) / 1024
-                                
-                                resources["nodes"].append({
-                                    "name": node_name,
-                                    "cpu_cores": cpu_int,
-                                    "memory_gb": mem_gb
-                                })
-                                
+
+                                resources["nodes"].append(
+                                    {
+                                        "name": node_name,
+                                        "cpu_cores": cpu_int,
+                                        "memory_gb": mem_gb,
+                                    }
+                                )
+
                                 resources["total_cpu"] += cpu_int
                                 resources["total_memory"] += mem_gb
                             except ValueError:
                                 continue
-            
+
             # Get GPU resources
             gpu_result = subprocess.run(
-                ["kubectl", "get", "nodes", "-o", "jsonpath='{range .items[*]}{{.metadata.name}}{{\" \"}}{{.status.capacity.nvidia.com/gpu}}{{\"\\n\"}}{end}'"],
+                [
+                    "kubectl",
+                    "get",
+                    "nodes",
+                    "-o",
+                    'jsonpath=\'{range .items[*]}{{.metadata.name}}{{" "}}{{.status.capacity.nvidia.com/gpu}}{{"\\n"}}{end}\'',
+                ],
                 capture_output=True,
                 text=True,
                 timeout=15,
-                env=env
+                env=env,
             )
-            
+
             if gpu_result.returncode == 0:
-                for line in gpu_result.stdout.strip().split('\n'):
+                for line in gpu_result.stdout.strip().split("\n"):
                     if line.strip():
                         parts = line.split()
                         if len(parts) >= 2:
@@ -785,12 +897,12 @@ dashboardProviders:
                                 resources["total_gpu"] += gpu_count
                             except ValueError:
                                 continue
-            
+
             return resources
-            
+
         except Exception as e:
             raise Exception(f"Failed to get cluster resources: {e}")
-    
+
     def get_enhanced_config(self) -> Dict[str, str]:
         """Get enhanced Kubernetes configuration for environment variables"""
         config: Dict[str, str] = {}
@@ -802,21 +914,23 @@ dashboardProviders:
             config["KUBERNETES_NAMESPACE"] = self.config.namespace
         if self.config.aws_region:
             config["AWS_DEFAULT_REGION"] = self.config.aws_region
-        
+
         # Add monitoring configuration
         if self.config.monitoring_enabled:
             config["KARPENTER_MONITORING_ENABLED"] = "true"
-        
+
         if self.config.prometheus_enabled:
             config["PROMETHEUS_ENABLED"] = "true"
-            config["PROMETHEUS_URL"] = "http://prometheus.monitoring.svc.cluster.local:9090"
-        
+            config["PROMETHEUS_URL"] = (
+                "http://prometheus.monitoring.svc.cluster.local:9090"
+            )
+
         if self.config.grafana_enabled:
             config["GRAFANA_ENABLED"] = "true"
             config["GRAFANA_URL"] = "http://grafana.monitoring.svc.cluster.local:80"
             config["GRAFANA_USERNAME"] = "admin"
             config["GRAFANA_PASSWORD"] = "prom-operator"
-        
+
         return config
 
     # ---------------------------------------------------------------------------
@@ -832,7 +946,7 @@ dashboardProviders:
         if not self.config.dra_enabled:
             return {
                 "status": "skipped",
-                "message": "DRA not enabled in configuration, using device plugin fallback"
+                "message": "DRA not enabled in configuration, using device plugin fallback",
             }
 
         try:
@@ -869,21 +983,20 @@ suitableNodeCount: 1
             return {
                 "status": "installed",
                 "driver": self.config.dra_driver_name,
-                "message": "DRA ResourceClass installed successfully"
+                "message": "DRA ResourceClass installed successfully",
             }
 
         except Exception as e:
-            logger.warning(f"DRA installation failed, falling back to device plugin: {e}")
+            logger.warning(
+                f"DRA installation failed, falling back to device plugin: {e}"
+            )
             # Fall back to device plugin
             return await self.install_device_plugin()
 
     async def install_device_plugin(self) -> Dict[str, Any]:
         """Install NVIDIA device plugin (fallback for pre-DRA K8s)."""
         if not self.config.device_plugin_enabled:
-            return {
-                "status": "skipped",
-                "message": "Device plugin not enabled"
-            }
+            return {"status": "skipped", "message": "Device plugin not enabled"}
 
         try:
             env = os.environ.copy()
@@ -893,8 +1006,12 @@ suitableNodeCount: 1
             # Install NVIDIA device plugin via Helm
             result = subprocess.run(
                 [
-                    "helm", "repo", "add", "nvidia", "https://nvidia.github.io/gpu-operator",
-                    "--force-update"
+                    "helm",
+                    "repo",
+                    "add",
+                    "nvidia",
+                    "https://nvidia.github.io/gpu-operator",
+                    "--force-update",
                 ],
                 capture_output=True,
                 text=True,
@@ -907,8 +1024,13 @@ suitableNodeCount: 1
 
             result = subprocess.run(
                 [
-                    "helm", "install", "nvidia-device-plugin", "nvidia/gpu-device-plugin",
-                    "--namespace", "kube-system", "--create-namespace"
+                    "helm",
+                    "install",
+                    "nvidia-device-plugin",
+                    "nvidia/gpu-device-plugin",
+                    "--namespace",
+                    "kube-system",
+                    "--create-namespace",
                 ],
                 capture_output=True,
                 text=True,
@@ -921,14 +1043,11 @@ suitableNodeCount: 1
 
             return {
                 "status": "installed",
-                "message": "NVIDIA device plugin installed (DRA fallback)"
+                "message": "NVIDIA device plugin installed (DRA fallback)",
             }
 
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
+            return {"status": "failed", "error": str(e)}
 
     async def configure_dra_mig(self) -> Dict[str, Any]:
         """Configure MIG (Multi-Instance GPU) via DRA."""
@@ -960,34 +1079,33 @@ suitableNodeCount: 1
             if result.returncode != 0:
                 raise Exception(f"Failed to configure MIG: {result.stderr}")
 
-            return {
-                "status": "configured",
-                "message": "MIG configured via DRA"
-            }
+            return {"status": "configured", "message": "MIG configured via DRA"}
 
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
+            return {"status": "failed", "error": str(e)}
 
 
-def create_enhanced_kubernetes_service_from_credentials(credentials: Dict[str, str]) -> EnhancedKubernetesService:
+def create_enhanced_kubernetes_service_from_credentials(
+    credentials: Dict[str, str]
+) -> EnhancedKubernetesService:
     """Create enhanced KubernetesService from credential dictionary"""
     config = KubernetesConfig(
         kubeconfig_path=credentials.get("kubeconfig_path"),
         cluster_name=credentials.get("cluster_name"),
         namespace=credentials.get("namespace", "default"),
-        karpenter_enabled=credentials.get("karpenter_enabled", "false").lower() == "true",
+        karpenter_enabled=credentials.get("karpenter_enabled", "false").lower()
+        == "true",
         karpenter_version=credentials.get("karpenter_version", "v1.10.0"),
         aws_region=credentials.get("aws_region", "us-east-1"),
         aws_account_id=credentials.get("aws_account_id"),
-        monitoring_enabled=credentials.get("monitoring_enabled", "false").lower() == "true",
-        prometheus_enabled=credentials.get("prometheus_enabled", "false").lower() == "true",
+        monitoring_enabled=credentials.get("monitoring_enabled", "false").lower()
+        == "true",
+        prometheus_enabled=credentials.get("prometheus_enabled", "false").lower()
+        == "true",
         grafana_enabled=credentials.get("grafana_enabled", "false").lower() == "true",
-        dashboard_port=int(credentials.get("dashboard_port", 3000))
+        dashboard_port=int(credentials.get("dashboard_port", 3000)),
     )
-    
+
     return EnhancedKubernetesService(config)
 
 

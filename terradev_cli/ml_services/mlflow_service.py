@@ -38,6 +38,7 @@ _RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
 @dataclass
 class MLflowConfig:
     """MLflow configuration"""
+
     tracking_uri: str
     username: Optional[str] = None
     password: Optional[str] = None
@@ -47,15 +48,15 @@ class MLflowConfig:
 
 class MLflowService:
     """MLflow integration service for experiment tracking and model registry"""
-    
+
     def __init__(self, config: MLflowConfig):
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
-        
+
     async def __aenter__(self):
         self._ensure_session()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
@@ -68,7 +69,9 @@ class MLflowService:
         if self.session is None or self.session.closed:
             kwargs: Dict[str, Any] = {}
             if self.config.username and self.config.password:
-                kwargs["auth"] = aiohttp.BasicAuth(self.config.username, self.config.password)
+                kwargs["auth"] = aiohttp.BasicAuth(
+                    self.config.username, self.config.password
+                )
             self.session = aiohttp.ClientSession(**kwargs)
         return self.session
 
@@ -90,7 +93,8 @@ class MLflowService:
         for attempt in range(retries):
             try:
                 async with session.request(
-                    method, url,
+                    method,
+                    url,
                     params=params,
                     json=json_body,
                     timeout=aiohttp.ClientTimeout(total=timeout),
@@ -98,10 +102,18 @@ class MLflowService:
                     if resp.status == 200:
                         return await resp.json()
                     if resp.status in _RETRYABLE_STATUSES and attempt < retries - 1:
-                        wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
+                        wait = min(
+                            _BACKOFF_BASE * (2**attempt) + random.uniform(0, 0.5),
+                            _BACKOFF_MAX,
+                        )
                         logger.warning(
                             "MLflow %s %s → %d, retrying in %.1fs (attempt %d/%d)",
-                            method.upper(), path, resp.status, wait, attempt + 1, retries,
+                            method.upper(),
+                            path,
+                            resp.status,
+                            wait,
+                            attempt + 1,
+                            retries,
                         )
                         await asyncio.sleep(wait)
                         continue
@@ -110,10 +122,16 @@ class MLflowService:
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 last_exc = e
                 if attempt < retries - 1:
-                    wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
+                    wait = min(
+                        _BACKOFF_BASE * (2**attempt) + random.uniform(0, 0.5),
+                        _BACKOFF_MAX,
+                    )
                     logger.warning(
                         "MLflow %s %s network error: %s, retrying in %.1fs",
-                        method.upper(), path, e, wait,
+                        method.upper(),
+                        path,
+                        e,
+                        wait,
                     )
                     await asyncio.sleep(wait)
                     continue
@@ -125,101 +143,149 @@ class MLflowService:
     async def test_connection(self) -> Dict[str, Any]:
         """Test MLflow connection and get server info"""
         try:
-            data = await self._request("GET", "/api/2.0/mlflow/experiments/list", timeout=10)
+            data = await self._request(
+                "GET", "/api/2.0/mlflow/experiments/list", timeout=10
+            )
             return {
                 "status": "connected",
                 "tracking_uri": self.config.tracking_uri,
                 "experiments_count": len(data.get("experiments", [])),
-                "registry_uri": self.config.registry_uri
+                "registry_uri": self.config.registry_uri,
             }
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def list_experiments(self) -> List[Dict[str, Any]]:
         """List all experiments"""
         data = await self._request("GET", "/api/2.0/mlflow/experiments/list")
         return data.get("experiments", [])
-    
-    async def create_experiment(self, name: str, artifact_location: Optional[str] = None) -> Dict[str, Any]:
+
+    async def create_experiment(
+        self, name: str, artifact_location: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Create a new experiment"""
         payload: Dict[str, Any] = {"name": name}
         if artifact_location:
             payload["artifact_location"] = artifact_location
-        return await self._request("POST", "/api/2.0/mlflow/experiments/create", json_body=payload)
-    
+        return await self._request(
+            "POST", "/api/2.0/mlflow/experiments/create", json_body=payload
+        )
+
     async def get_experiment(self, experiment_id: str) -> Dict[str, Any]:
         """Get experiment details"""
-        return await self._request("GET", "/api/2.0/mlflow/experiments/get", params={"experiment_id": experiment_id})
-    
-    async def list_runs(self, experiment_ids: Optional[List[str]] = None, max_results: int = 1000) -> List[Dict[str, Any]]:
+        return await self._request(
+            "GET",
+            "/api/2.0/mlflow/experiments/get",
+            params={"experiment_id": experiment_id},
+        )
+
+    async def list_runs(
+        self, experiment_ids: Optional[List[str]] = None, max_results: int = 1000
+    ) -> List[Dict[str, Any]]:
         """List runs in experiments"""
         payload: Dict[str, Any] = {"max_results": max_results}
         if experiment_ids:
-            eid_list = ', '.join(f'"{eid}"' for eid in experiment_ids)
+            eid_list = ", ".join(f'"{eid}"' for eid in experiment_ids)
             payload["filter"] = f"experiment_id IN ({eid_list})"
-        data = await self._request("POST", "/api/2.0/mlflow/runs/search", json_body=payload)
+        data = await self._request(
+            "POST", "/api/2.0/mlflow/runs/search", json_body=payload
+        )
         return data.get("runs", [])
-    
+
     async def get_run(self, run_id: str) -> Dict[str, Any]:
         """Get run details"""
-        return await self._request("GET", "/api/2.0/mlflow/runs/get", params={"run_id": run_id})
-    
-    async def log_run(self, run_id: str, metrics: Dict[str, float], params: Dict[str, Any], tags: Dict[str, str]) -> Dict[str, Any]:
+        return await self._request(
+            "GET", "/api/2.0/mlflow/runs/get", params={"run_id": run_id}
+        )
+
+    async def log_run(
+        self,
+        run_id: str,
+        metrics: Dict[str, float],
+        params: Dict[str, Any],
+        tags: Dict[str, str],
+    ) -> Dict[str, Any]:
         """Log metrics, parameters, and tags to a run"""
         # Log metrics
         if metrics:
-            await self._request("POST", "/api/2.0/mlflow/runs/log-metrics", json_body={
-                "run_id": run_id,
-                "metrics": [{"key": k, "value": v, "timestamp": int(datetime.now().timestamp() * 1000)} for k, v in metrics.items()],
-            })
+            await self._request(
+                "POST",
+                "/api/2.0/mlflow/runs/log-metrics",
+                json_body={
+                    "run_id": run_id,
+                    "metrics": [
+                        {
+                            "key": k,
+                            "value": v,
+                            "timestamp": int(datetime.now().timestamp() * 1000),
+                        }
+                        for k, v in metrics.items()
+                    ],
+                },
+            )
         # Log parameters
         if params:
-            await self._request("POST", "/api/2.0/mlflow/runs/log-parameters", json_body={
-                "run_id": run_id,
-                "parameters": [{"key": k, "value": str(v)} for k, v in params.items()],
-            })
+            await self._request(
+                "POST",
+                "/api/2.0/mlflow/runs/log-parameters",
+                json_body={
+                    "run_id": run_id,
+                    "parameters": [
+                        {"key": k, "value": str(v)} for k, v in params.items()
+                    ],
+                },
+            )
         # Log tags
         if tags:
-            await self._request("POST", "/api/2.0/mlflow/runs/set-tags", json_body={
-                "run_id": run_id,
-                "tags": tags,
-            })
+            await self._request(
+                "POST",
+                "/api/2.0/mlflow/runs/set-tags",
+                json_body={
+                    "run_id": run_id,
+                    "tags": tags,
+                },
+            )
         return {"status": "logged", "run_id": run_id}
-    
+
     async def list_registered_models(self) -> List[Dict[str, Any]]:
         """List registered models"""
         data = await self._request("GET", "/api/2.0/mlflow/registered-models/list")
         return data.get("registered_models", [])
-    
-    async def create_model_version(self, name: str, source: str, run_id: Optional[str] = None, description: str = "") -> Dict[str, Any]:
+
+    async def create_model_version(
+        self,
+        name: str,
+        source: str,
+        run_id: Optional[str] = None,
+        description: str = "",
+    ) -> Dict[str, Any]:
         """Create a new model version"""
-        return await self._request("POST", "/api/2.0/mlflow/model-versions/create", json_body={
-            "name": name,
-            "source": source,
-            "run_id": run_id,
-            "description": description,
-        })
-    
+        return await self._request(
+            "POST",
+            "/api/2.0/mlflow/model-versions/create",
+            json_body={
+                "name": name,
+                "source": source,
+                "run_id": run_id,
+                "description": description,
+            },
+        )
+
     def get_tracking_config(self) -> Dict[str, str]:
         """Get environment variables for MLflow tracking"""
-        config = {
-            "MLFLOW_TRACKING_URI": self.config.tracking_uri
-        }
-        
+        config = {"MLFLOW_TRACKING_URI": self.config.tracking_uri}
+
         if self.config.username:
             config["MLFLOW_TRACKING_USERNAME"] = self.config.username
-            
+
         if self.config.password:
             config["MLFLOW_TRACKING_PASSWORD"] = self.config.password
-            
+
         if self.config.registry_uri:
             config["MLFLOW_REGISTRY_URI"] = self.config.registry_uri
-            
+
         return config
-    
+
     # ── Terradev-specific: auto-logging & provenance ────────────────
 
     async def log_terradev_run(
@@ -256,16 +322,20 @@ class MLflowService:
             exp_id = result.get("experiment_id")
 
         # Create run
-        run_result = await self._request("POST", "/api/2.0/mlflow/runs/create", json_body={
-            "experiment_id": exp_id,
-            "start_time": int(datetime.now().timestamp() * 1000),
-            "tags": [
-                {"key": "mlflow.source.name", "value": "terradev"},
-                {"key": "terradev.provider", "value": provider},
-                {"key": "terradev.gpu_type", "value": gpu_type},
-                {"key": "terradev.managed", "value": "true"},
-            ],
-        })
+        run_result = await self._request(
+            "POST",
+            "/api/2.0/mlflow/runs/create",
+            json_body={
+                "experiment_id": exp_id,
+                "start_time": int(datetime.now().timestamp() * 1000),
+                "tags": [
+                    {"key": "mlflow.source.name", "value": "terradev"},
+                    {"key": "terradev.provider", "value": provider},
+                    {"key": "terradev.gpu_type", "value": gpu_type},
+                    {"key": "terradev.managed", "value": "true"},
+                ],
+            },
+        )
         run_id = run_result.get("run", {}).get("info", {}).get("run_id")
         if not run_id:
             raise Exception(f"Failed to create MLflow run: {run_result}")
@@ -347,13 +417,17 @@ class MLflowService:
         models = await self.list_registered_models()
         model_exists = any(m.get("name") == model_name for m in models)
         if not model_exists:
-            await self._request("POST", "/api/2.0/mlflow/registered-models/create", json_body={
-                "name": model_name,
-                "description": f"Terradev-managed model: {full_desc}",
-                "tags": [
-                    {"key": "terradev.managed", "value": "true"},
-                ],
-            })
+            await self._request(
+                "POST",
+                "/api/2.0/mlflow/registered-models/create",
+                json_body={
+                    "name": model_name,
+                    "description": f"Terradev-managed model: {full_desc}",
+                    "tags": [
+                        {"key": "terradev.managed", "value": "true"},
+                    ],
+                },
+            )
 
         # Create model version
         version_result = await self.create_model_version(
@@ -377,12 +451,16 @@ class MLflowService:
                 tag_pairs.append(("terradev.provider", provider))
             for key, value in tag_pairs:
                 try:
-                    await self._request("POST", "/api/2.0/mlflow/model-versions/set-tag", json_body={
-                        "name": model_name,
-                        "version": version,
-                        "key": key,
-                        "value": value,
-                    })
+                    await self._request(
+                        "POST",
+                        "/api/2.0/mlflow/model-versions/set-tag",
+                        json_body={
+                            "name": model_name,
+                            "version": version,
+                            "key": key,
+                            "value": value,
+                        },
+                    )
                 except Exception as e:
                     logger.warning("Failed to set model version tag %s: %s", key, e)
 
@@ -427,54 +505,67 @@ class MLflowService:
 
     # ── Existing export method ───────────────────────────────────────
 
-    async def export_experiment_data(self, experiment_id: str, format: str = "json") -> str:
+    async def export_experiment_data(
+        self, experiment_id: str, format: str = "json"
+    ) -> str:
         """Export experiment data"""
         try:
             runs = await self.list_runs([experiment_id])
-            
+
             if format.lower() == "json":
                 return json.dumps(runs, indent=2)
             elif format.lower() == "csv":
                 import csv
                 import io
-                
+
                 if not runs:
                     return ""
-                
+
                 output = io.StringIO()
-                fieldnames = ["run_id", "experiment_id", "status", "start_time", "end_time", "artifact_uri"]
+                fieldnames = [
+                    "run_id",
+                    "experiment_id",
+                    "status",
+                    "start_time",
+                    "end_time",
+                    "artifact_uri",
+                ]
                 writer = csv.DictWriter(output, fieldnames=fieldnames)
                 writer.writeheader()
-                
+
                 for run in runs:
                     info = run.get("info", {})
-                    writer.writerow({
-                        "run_id": info.get("run_id", ""),
-                        "experiment_id": info.get("experiment_id", ""),
-                        "status": info.get("status", ""),
-                        "start_time": info.get("start_time", ""),
-                        "end_time": info.get("end_time", ""),
-                        "artifact_uri": info.get("artifact_uri", "")
-                    })
-                
+                    writer.writerow(
+                        {
+                            "run_id": info.get("run_id", ""),
+                            "experiment_id": info.get("experiment_id", ""),
+                            "status": info.get("status", ""),
+                            "start_time": info.get("start_time", ""),
+                            "end_time": info.get("end_time", ""),
+                            "artifact_uri": info.get("artifact_uri", ""),
+                        }
+                    )
+
                 return output.getvalue()
             else:
                 raise ValueError(f"Unsupported format: {format}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to export experiment data: {e}")
 
 
-def create_mlflow_service_from_credentials(credentials: Dict[str, str]) -> MLflowService:
+def create_mlflow_service_from_credentials(
+    credentials: Dict[str, str]
+) -> MLflowService:
     """Create MLflowService from credential dictionary"""
     config = MLflowConfig(
         tracking_uri=credentials["tracking_uri"],
         username=credentials.get("username"),
         password=credentials.get("password"),
         experiment_name=credentials.get("experiment_name"),
-        registry_uri=credentials.get("registry_uri")
+        registry_uri=credentials.get("registry_uri"),
     )
-    
+
     return MLflowService(config)
 
 

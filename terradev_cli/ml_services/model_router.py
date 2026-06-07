@@ -57,15 +57,25 @@ class StepType(str, Enum):
 _STRONG_ONLY_STEPS = frozenset({StepType.ERROR_RECOVERY, StepType.REASONING})
 
 # Step types that can safely use the weak model
-_WEAK_ELIGIBLE_STEPS = frozenset({
-    StepType.TOOL_SELECTION, StepType.SUMMARIZATION, StepType.GENERAL,
-})
+_WEAK_ELIGIBLE_STEPS = frozenset(
+    {
+        StepType.TOOL_SELECTION,
+        StepType.SUMMARIZATION,
+        StepType.GENERAL,
+    }
+)
 
 # Heuristic patterns for classifying step type from message content
 _STEP_PATTERNS: List[Tuple[str, StepType]] = [
-    (r"(?i)(error|exception|traceback|failed|retry|fix|debug)", StepType.ERROR_RECOVERY),
+    (
+        r"(?i)(error|exception|traceback|failed|retry|fix|debug)",
+        StepType.ERROR_RECOVERY,
+    ),
     (r"(?i)(think|reason|plan|analyze|consider|evaluate|decide)", StepType.REASONING),
-    (r"(?i)(```|def |class |import |function |const |let |var )", StepType.CODE_GENERATION),
+    (
+        r"(?i)(```|def |class |import |function |const |let |var )",
+        StepType.CODE_GENERATION,
+    ),
     (r"(?i)(summarize|summary|recap|overview|brief)", StepType.SUMMARIZATION),
     (r"(?i)(call|invoke|execute|run|use tool|function_call)", StepType.TOOL_SELECTION),
 ]
@@ -74,6 +84,7 @@ _STEP_PATTERNS: List[Tuple[str, StepType]] = [
 @dataclass
 class ModelEndpoint:
     """A model endpoint that the router can target."""
+
     name: str
     url: str  # OpenAI-compatible base URL
     model_id: str  # Model name to use in API calls
@@ -86,11 +97,14 @@ class ModelEndpoint:
 @dataclass
 class RouterConfig:
     """Configuration for the model router."""
+
     # Model endpoints
     strong_endpoint: Optional[ModelEndpoint] = None
     weak_endpoint: Optional[ModelEndpoint] = None
     # Routing strategy
-    strategy: str = "step_type"  # "step_type", "threshold", "cascade", "strong_only", "weak_only"
+    strategy: str = (
+        "step_type"  # "step_type", "threshold", "cascade", "strong_only", "weak_only"
+    )
     # For threshold strategy: probability threshold above which to use strong model
     # Lower = more strong model usage = higher quality, higher cost
     cost_threshold: float = 0.5
@@ -134,7 +148,10 @@ class StepClassifier:
         for msg in reversed(messages):
             if msg.get("role") == "tool":
                 content = str(msg.get("content", ""))
-                if any(kw in content.lower() for kw in ("error", "exception", "traceback", "failed")):
+                if any(
+                    kw in content.lower()
+                    for kw in ("error", "exception", "traceback", "failed")
+                ):
                     return StepType.ERROR_RECOVERY
                 break
 
@@ -186,7 +203,9 @@ class ModelRouter:
         Returns (endpoint, step_type, reason).
         """
         step_type = self.classifier.classify(
-            messages, tool_call_expected=tool_call_expected, is_retry=is_retry,
+            messages,
+            tool_call_expected=tool_call_expected,
+            is_retry=is_retry,
         )
 
         # Force override
@@ -229,16 +248,24 @@ class ModelRouter:
     def _route_by_step_type(self, step_type: StepType) -> Tuple[ModelEndpoint, str]:
         """Route based on classified step type."""
         if step_type in _STRONG_ONLY_STEPS:
-            return self._get_endpoint(ModelTier.STRONG), f"step_{step_type.value}_requires_strong"
+            return (
+                self._get_endpoint(ModelTier.STRONG),
+                f"step_{step_type.value}_requires_strong",
+            )
         if step_type in _WEAK_ELIGIBLE_STEPS:
-            return self._get_endpoint(ModelTier.WEAK), f"step_{step_type.value}_weak_eligible"
+            return (
+                self._get_endpoint(ModelTier.WEAK),
+                f"step_{step_type.value}_weak_eligible",
+            )
         # Code generation: use strong for safety
         if step_type == StepType.CODE_GENERATION:
             return self._get_endpoint(ModelTier.STRONG), "step_code_gen_strong"
         return self._get_endpoint(ModelTier.STRONG), "step_default_strong"
 
     def _route_by_threshold(
-        self, messages: List[Dict[str, Any]], step_type: StepType,
+        self,
+        messages: List[Dict[str, Any]],
+        step_type: StepType,
     ) -> Tuple[ModelEndpoint, str]:
         """Route based on a complexity heuristic vs cost_threshold.
 
@@ -247,7 +274,10 @@ class ModelRouter:
         """
         # Always use strong for error recovery
         if step_type in _STRONG_ONLY_STEPS:
-            return self._get_endpoint(ModelTier.STRONG), f"threshold_forced_{step_type.value}"
+            return (
+                self._get_endpoint(ModelTier.STRONG),
+                f"threshold_forced_{step_type.value}",
+            )
 
         # Heuristic complexity score [0, 1]
         total_chars = sum(len(str(m.get("content", ""))) for m in messages)
@@ -261,25 +291,43 @@ class ModelRouter:
         complexity = 0.4 * length_score + 0.3 * tool_score + 0.3 * turn_score
 
         if complexity >= self.config.cost_threshold:
-            return self._get_endpoint(ModelTier.STRONG), f"threshold_{complexity:.2f}_above_{self.config.cost_threshold}"
-        return self._get_endpoint(ModelTier.WEAK), f"threshold_{complexity:.2f}_below_{self.config.cost_threshold}"
+            return (
+                self._get_endpoint(ModelTier.STRONG),
+                f"threshold_{complexity:.2f}_above_{self.config.cost_threshold}",
+            )
+        return (
+            self._get_endpoint(ModelTier.WEAK),
+            f"threshold_{complexity:.2f}_below_{self.config.cost_threshold}",
+        )
 
     def _get_endpoint(self, tier: ModelTier) -> ModelEndpoint:
         """Get endpoint for tier, falling back if not configured."""
         if tier == ModelTier.STRONG:
-            return self.config.strong_endpoint or self.config.weak_endpoint or _DEFAULT_ENDPOINT
-        return self.config.weak_endpoint or self.config.strong_endpoint or _DEFAULT_ENDPOINT
+            return (
+                self.config.strong_endpoint
+                or self.config.weak_endpoint
+                or _DEFAULT_ENDPOINT
+            )
+        return (
+            self.config.weak_endpoint
+            or self.config.strong_endpoint
+            or _DEFAULT_ENDPOINT
+        )
 
-    def _log_decision(self, step_type: StepType, endpoint: ModelEndpoint, reason: str) -> None:
+    def _log_decision(
+        self, step_type: StepType, endpoint: ModelEndpoint, reason: str
+    ) -> None:
         if not self.config.track_routing_decisions:
             return
-        self._decision_log.append({
-            "ts": time.time(),
-            "step_type": step_type.value,
-            "model": endpoint.model_id,
-            "tier": endpoint.tier.value,
-            "reason": reason,
-        })
+        self._decision_log.append(
+            {
+                "ts": time.time(),
+                "step_type": step_type.value,
+                "model": endpoint.model_id,
+                "tier": endpoint.tier.value,
+                "reason": reason,
+            }
+        )
         # Keep bounded
         if len(self._decision_log) > 10000:
             self._decision_log = self._decision_log[-5000:]
@@ -305,10 +353,14 @@ class ModelRouter:
         }
 
     async def _request(
-        self, method: str, url: str, *,
+        self,
+        method: str,
+        url: str,
+        *,
         headers: Optional[Dict[str, str]] = None,
         json_body: Optional[Any] = None,
-        timeout: float = 60, retries: int = _MAX_RETRIES,
+        timeout: float = 60,
+        retries: int = _MAX_RETRIES,
     ) -> Any:
         """HTTP request with retry for proxied inference calls."""
         session = self._ensure_session()
@@ -316,13 +368,19 @@ class ModelRouter:
         for attempt in range(retries):
             try:
                 async with session.request(
-                    method, url, headers=headers, json=json_body,
+                    method,
+                    url,
+                    headers=headers,
+                    json=json_body,
                     timeout=aiohttp.ClientTimeout(total=timeout),
                 ) as resp:
                     if resp.status == 200:
                         return await resp.json()
                     if resp.status in _RETRYABLE_STATUSES and attempt < retries - 1:
-                        wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
+                        wait = min(
+                            _BACKOFF_BASE * (2**attempt) + random.uniform(0, 0.5),
+                            _BACKOFF_MAX,
+                        )
                         await asyncio.sleep(wait)
                         continue
                     error_text = await resp.text()
@@ -330,7 +388,10 @@ class ModelRouter:
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 last_exc = e
                 if attempt < retries - 1:
-                    wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
+                    wait = min(
+                        _BACKOFF_BASE * (2**attempt) + random.uniform(0, 0.5),
+                        _BACKOFF_MAX,
+                    )
                     await asyncio.sleep(wait)
                     continue
                 raise
@@ -352,25 +413,34 @@ class ModelRouter:
         response fails to parse tool calls when they were expected.
         """
         endpoint, step_type, reason = self.route(
-            messages, tool_call_expected=tool_call_expected,
-            is_retry=is_retry, force_tier=force_tier,
+            messages,
+            tool_call_expected=tool_call_expected,
+            is_retry=is_retry,
+            force_tier=force_tier,
         )
 
         result = await self._call_endpoint(endpoint, messages, tools, extra_params)
 
         # Cascade escalation: if tool call expected but none parsed
-        if (self.config.cascade_enabled
-                and self.config.cascade_parse_retry
-                and tool_call_expected
-                and endpoint.tier == ModelTier.WEAK):
+        if (
+            self.config.cascade_enabled
+            and self.config.cascade_parse_retry
+            and tool_call_expected
+            and endpoint.tier == ModelTier.WEAK
+        ):
             choices = result.get("choices", [])
             if choices:
                 msg = choices[0].get("message", {})
                 from .agentic_serving import parse_tool_calls
+
                 if not parse_tool_calls(msg):
-                    logger.info("Cascade: weak model failed to produce tool call, escalating to strong")
+                    logger.info(
+                        "Cascade: weak model failed to produce tool call, escalating to strong"
+                    )
                     endpoint, esc_reason = self.escalate(step_type)
-                    result = await self._call_endpoint(endpoint, messages, tools, extra_params)
+                    result = await self._call_endpoint(
+                        endpoint, messages, tools, extra_params
+                    )
                     result["_terradev_escalated"] = True
                     result["_terradev_escalation_reason"] = esc_reason
 
@@ -427,25 +497,30 @@ def generate_llmd_routing_config(config: RouterConfig) -> Dict[str, Any]:
         "kind": "ConfigMap",
         "metadata": {"name": "llm-d-epp-config", "namespace": "inference"},
         "data": {
-            "plugins-v2.yaml": json.dumps({
-                "plugins": [{
-                    "name": "cache-aware-router",
-                    "type": "external_processor",
-                    "config": {
-                        "discovery": {
-                            "label_selector": "llm-d.ai/inferenceServing=true",
-                        },
-                        "cache": {
-                            "type": "in-memory-lru",
-                            "max_size": 10000,
-                        },
-                        "routing": {
-                            "algorithm": "prefix-aware",
-                            "session_affinity": True,
-                        },
-                    },
-                }],
-            }, indent=2),
+            "plugins-v2.yaml": json.dumps(
+                {
+                    "plugins": [
+                        {
+                            "name": "cache-aware-router",
+                            "type": "external_processor",
+                            "config": {
+                                "discovery": {
+                                    "label_selector": "llm-d.ai/inferenceServing=true",
+                                },
+                                "cache": {
+                                    "type": "in-memory-lru",
+                                    "max_size": 10000,
+                                },
+                                "routing": {
+                                    "algorithm": "prefix-aware",
+                                    "session_affinity": True,
+                                },
+                            },
+                        }
+                    ],
+                },
+                indent=2,
+            ),
         },
     }
 
@@ -501,8 +576,10 @@ def create_router_from_credentials(credentials: Dict[str, str]) -> ModelRouter:
         strategy=credentials.get("strategy", "step_type"),
         cost_threshold=float(credentials.get("cost_threshold", "0.5")),
         cascade_enabled=credentials.get("cascade_enabled", "false").lower() == "true",
-        cascade_parse_retry=credentials.get("cascade_parse_retry", "true").lower() == "true",
-        kv_cache_routing_enabled=credentials.get("kv_cache_routing", "false").lower() == "true",
+        cascade_parse_retry=credentials.get("cascade_parse_retry", "true").lower()
+        == "true",
+        kv_cache_routing_enabled=credentials.get("kv_cache_routing", "false").lower()
+        == "true",
         llmd_epp_url=credentials.get("llmd_epp_url"),
     )
     return ModelRouter(config)

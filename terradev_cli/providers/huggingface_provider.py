@@ -28,8 +28,18 @@ class HuggingFaceProvider(BaseProvider):
 
     # HuggingFace Inference Endpoints GPU instance types and pricing
     GPU_PRICING = {
-        "A100": {"instance_type": "gpu-xlarge-a100", "price": 4.50, "mem": 80, "vcpus": 8},
-        "A10G": {"instance_type": "gpu-medium-a10g", "price": 1.30, "mem": 24, "vcpus": 4},
+        "A100": {
+            "instance_type": "gpu-xlarge-a100",
+            "price": 4.50,
+            "mem": 80,
+            "vcpus": 8,
+        },
+        "A10G": {
+            "instance_type": "gpu-medium-a10g",
+            "price": 1.30,
+            "mem": 24,
+            "vcpus": 4,
+        },
         "T4": {"instance_type": "gpu-small-t4", "price": 0.60, "mem": 16, "vcpus": 4},
     }
 
@@ -44,7 +54,8 @@ class HuggingFaceProvider(BaseProvider):
         if self.api_key and self.namespace:
             try:
                 data = await self._make_request(
-                    "GET", f"{self.API_BASE}/endpoint/{self.namespace}",
+                    "GET",
+                    f"{self.API_BASE}/endpoint/{self.namespace}",
                 )
                 # If we have live endpoints, extract pricing info
                 if isinstance(data, list) and data:
@@ -52,18 +63,20 @@ class HuggingFaceProvider(BaseProvider):
             except Exception:
                 pass
 
-        return [{
-            "instance_type": info["instance_type"],
-            "gpu_type": gpu_type,
-            "price_per_hour": info["price"],
-            "region": region or "us-east-1",
-            "available": True,
-            "provider": "huggingface",
-            "vcpus": info["vcpus"],
-            "memory_gb": info["mem"],
-            "gpu_count": 1,
-            "spot": False,
-        }]
+        return [
+            {
+                "instance_type": info["instance_type"],
+                "gpu_type": gpu_type,
+                "price_per_hour": info["price"],
+                "region": region or "us-east-1",
+                "available": True,
+                "provider": "huggingface",
+                "vcpus": info["vcpus"],
+                "memory_gb": info["mem"],
+                "gpu_count": 1,
+                "spot": False,
+            }
+        ]
 
     async def provision_instance(
         self, instance_type: str, region: str, gpu_type: str
@@ -71,14 +84,19 @@ class HuggingFaceProvider(BaseProvider):
         if not self.api_key:
             raise Exception("HuggingFace API token not configured")
         if not self.namespace:
-            raise Exception("HuggingFace namespace not configured (set 'namespace' in credentials)")
+            raise Exception(
+                "HuggingFace namespace not configured (set 'namespace' in credentials)"
+            )
 
-        endpoint_name = f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        endpoint_name = (
+            f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
 
         # Real HuggingFace Inference Endpoints API call
         try:
             data = await self._make_request(
-                "POST", f"{self.API_BASE}/endpoint/{self.namespace}",
+                "POST",
+                f"{self.API_BASE}/endpoint/{self.namespace}",
                 json={
                     "name": endpoint_name,
                     "type": "protected",
@@ -113,12 +131,15 @@ class HuggingFaceProvider(BaseProvider):
             raise Exception("HuggingFace credentials not configured")
         try:
             data = await self._make_request(
-                "GET", f"{self.API_BASE}/endpoint/{self.namespace}/{instance_id}",
+                "GET",
+                f"{self.API_BASE}/endpoint/{self.namespace}/{instance_id}",
             )
             hf_status = data.get("status", {}).get("state", "unknown")
             status_map = {
-                "pending": "provisioning", "initializing": "provisioning",
-                "running": "running", "failed": "error",
+                "pending": "provisioning",
+                "initializing": "provisioning",
+                "running": "running",
+                "failed": "error",
                 "scaledToZero": "stopped",
             }
             return {
@@ -135,7 +156,8 @@ class HuggingFaceProvider(BaseProvider):
             raise Exception("HuggingFace credentials not configured")
         # HF Inference Endpoints: scale to zero to "stop"
         await self._make_request(
-            "PUT", f"{self.API_BASE}/endpoint/{self.namespace}/{instance_id}",
+            "PUT",
+            f"{self.API_BASE}/endpoint/{self.namespace}/{instance_id}",
             json={"compute": {"scaling": {"minReplica": 0, "maxReplica": 0}}},
         )
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
@@ -144,7 +166,8 @@ class HuggingFaceProvider(BaseProvider):
         if not self.api_key or not self.namespace:
             raise Exception("HuggingFace credentials not configured")
         await self._make_request(
-            "PUT", f"{self.API_BASE}/endpoint/{self.namespace}/{instance_id}",
+            "PUT",
+            f"{self.API_BASE}/endpoint/{self.namespace}/{instance_id}",
             json={"compute": {"scaling": {"minReplica": 1, "maxReplica": 1}}},
         )
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
@@ -153,16 +176,22 @@ class HuggingFaceProvider(BaseProvider):
         if not self.api_key or not self.namespace:
             raise Exception("HuggingFace credentials not configured")
         await self._make_request(
-            "DELETE", f"{self.API_BASE}/endpoint/{self.namespace}/{instance_id}",
+            "DELETE",
+            f"{self.API_BASE}/endpoint/{self.namespace}/{instance_id}",
         )
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key or not self.namespace:
             return []
         try:
             data = await self._make_request(
-                "GET", f"{self.API_BASE}/endpoint/{self.namespace}",
+                "GET",
+                f"{self.API_BASE}/endpoint/{self.namespace}",
             )
             endpoints = data if isinstance(data, list) else []
             return [
@@ -198,7 +227,8 @@ class HuggingFaceProvider(BaseProvider):
                 }
             # Send inference request with the command as input text
             data = await self._make_request(
-                "POST", endpoint_url,
+                "POST",
+                endpoint_url,
                 json={"inputs": command},
             )
             return {
@@ -225,9 +255,11 @@ class HuggingFaceProvider(BaseProvider):
             raise Exception("HuggingFace API token not configured")
         try:
             import time
+
             t0 = time.monotonic()
             data = await self._make_request(
-                "POST", f"{self.INFERENCE_API}/models/{model_id}",
+                "POST",
+                f"{self.INFERENCE_API}/models/{model_id}",
                 json=inputs,
             )
             elapsed = time.monotonic() - t0

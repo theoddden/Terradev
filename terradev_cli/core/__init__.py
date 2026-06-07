@@ -4,7 +4,7 @@
 # No user intervention required - everything runs passively in the background
 
 from .semantic_router import NUMAEndpointScorer
-from .warm_pool_manager import WarmPoolManager  
+from .warm_pool_manager import WarmPoolManager
 from .cuda_graph_integrator import CUDAGraphIntegrator, get_cuda_graph_integrator
 
 # Default instances for easy access
@@ -28,6 +28,7 @@ def get_default_warm_pool() -> WarmPoolManager:
     global _default_warm_pool
     if _default_warm_pool is None:
         from .warm_pool_manager import WarmPoolConfig
+
         config = WarmPoolConfig()
         _default_warm_pool = WarmPoolManager(config)
     return _default_warm_pool
@@ -38,8 +39,7 @@ def get_default_cuda_graph_integrator() -> CUDAGraphIntegrator:
     global _default_integrator
     if _default_integrator is None:
         _default_integrator = get_cuda_graph_integrator(
-            get_default_numa_scorer(),
-            get_default_warm_pool()
+            get_default_numa_scorer(), get_default_warm_pool()
         )
     return _default_integrator
 

@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class SignalType(Enum):
     """Signal categories for semantic routing signal extraction"""
+
     KEYWORD = "keyword"
     MODALITY = "modality"
     COMPLEXITY = "complexity"
@@ -36,11 +37,12 @@ class SignalType(Enum):
 @dataclass
 class SignalResult:
     """Result of a single signal extraction"""
+
     signal_type: SignalType
     name: str
-    value: Any                          # bool, str, float, dict — depends on signal
-    confidence: float = 1.0             # 0.0–1.0
-    latency_ms: float = 0.0            # extraction wall-clock time
+    value: Any  # bool, str, float, dict — depends on signal
+    confidence: float = 1.0  # 0.0–1.0
+    latency_ms: float = 0.0  # extraction wall-clock time
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def as_bool(self) -> bool:

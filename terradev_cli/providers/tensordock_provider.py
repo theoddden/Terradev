@@ -28,9 +28,24 @@ class TensorDockProvider(BaseProvider):
         "A100": {"v0Name": "a100-pcie-80gb", "price": 1.50, "mem": 80, "vcpus": 10},
         "H100": {"v0Name": "h100-sxm5-80gb", "price": 2.49, "mem": 80, "vcpus": 16},
         "V100": {"v0Name": "v100-pcie-16gb", "price": 0.39, "mem": 16, "vcpus": 6},
-        "RTX4090": {"v0Name": "geforcertx4090-pcie-24gb", "price": 0.49, "mem": 24, "vcpus": 8},
-        "RTX3090": {"v0Name": "geforcertx3090-pcie-24gb", "price": 0.20, "mem": 24, "vcpus": 6},
-        "RTX3080": {"v0Name": "geforcertx3080-pcie-10gb", "price": 0.10, "mem": 10, "vcpus": 4},
+        "RTX4090": {
+            "v0Name": "geforcertx4090-pcie-24gb",
+            "price": 0.49,
+            "mem": 24,
+            "vcpus": 8,
+        },
+        "RTX3090": {
+            "v0Name": "geforcertx3090-pcie-24gb",
+            "price": 0.20,
+            "mem": 24,
+            "vcpus": 6,
+        },
+        "RTX3080": {
+            "v0Name": "geforcertx3080-pcie-10gb",
+            "price": 0.10,
+            "mem": 10,
+            "vcpus": 4,
+        },
         "T4": {"v0Name": "t4-pcie-16gb", "price": 0.10, "mem": 16, "vcpus": 4},
         "L40S": {"v0Name": "l40s-pcie-48gb", "price": 1.14, "mem": 48, "vcpus": 10},
     }
@@ -41,7 +56,7 @@ class TensorDockProvider(BaseProvider):
         # CRITICAL FIX: Don't return quotes without API credentials (BYOAPI requirement)
         if not self.api_key:
             return []
-            
+
         # Try live API first
         try:
             live = await self._get_live_availability(gpu_type)
@@ -54,18 +69,20 @@ class TensorDockProvider(BaseProvider):
         if not info:
             return []
 
-        return [{
-            "instance_type": info["v0Name"],
-            "gpu_type": gpu_type,
-            "price_per_hour": info["price"],
-            "region": region or "us-east",
-            "available": True,
-            "provider": "tensordock",
-            "vcpus": info["vcpus"],
-            "memory_gb": info["mem"],
-            "gpu_count": 1,
-            "spot": False,
-        }]
+        return [
+            {
+                "instance_type": info["v0Name"],
+                "gpu_type": gpu_type,
+                "price_per_hour": info["price"],
+                "region": region or "us-east",
+                "available": True,
+                "provider": "tensordock",
+                "vcpus": info["vcpus"],
+                "memory_gb": info["mem"],
+                "gpu_count": 1,
+                "spot": False,
+            }
+        ]
 
     async def _get_live_availability(self, gpu_type: str) -> List[Dict[str, Any]]:
         # TensorDock v2 API: GET /api/v2/locations
@@ -80,24 +97,29 @@ class TensorDockProvider(BaseProvider):
             for gpu_info in loc.get("gpus", []):
                 v0name = gpu_info.get("v0Name", "")
                 display = gpu_info.get("displayName", v0name)
-                if gpu_type.lower() in display.lower() or gpu_type.lower() in v0name.lower():
+                if (
+                    gpu_type.lower() in display.lower()
+                    or gpu_type.lower() in v0name.lower()
+                ):
                     price = gpu_info.get("price_per_hr", 0)
                     max_count = gpu_info.get("max_count", 0)
                     res = gpu_info.get("resources", {})
-                    quotes.append({
-                        "instance_type": v0name,
-                        "gpu_type": gpu_type,
-                        "price_per_hour": price,
-                        "region": region_label,
-                        "available": max_count > 0,
-                        "provider": "tensordock",
-                        "vcpus": res.get("max_vcpus", 8),
-                        "memory_gb": res.get("max_ram_gb", 0),
-                        "gpu_count": 1,
-                        "spot": False,
-                        "_location_id": loc_id,
-                        "_v0name": v0name,
-                    })
+                    quotes.append(
+                        {
+                            "instance_type": v0name,
+                            "gpu_type": gpu_type,
+                            "price_per_hour": price,
+                            "region": region_label,
+                            "available": max_count > 0,
+                            "provider": "tensordock",
+                            "vcpus": res.get("max_vcpus", 8),
+                            "memory_gb": res.get("max_ram_gb", 0),
+                            "gpu_count": 1,
+                            "spot": False,
+                            "_location_id": loc_id,
+                            "_v0name": v0name,
+                        }
+                    )
         return sorted(quotes, key=lambda q: q["price_per_hour"])
 
     async def provision_instance(
@@ -145,9 +167,7 @@ class TensorDockProvider(BaseProvider):
                         "vcpu_count": info.get("vcpus", 8),
                         "ram_gb": 32,
                         "storage_gb": 200,
-                        "gpus": {
-                            v0name: {"count": 1}
-                        },
+                        "gpus": {v0name: {"count": 1}},
                     },
                     "location_id": location_id,
                     "useDedicatedIp": True,
@@ -157,12 +177,15 @@ class TensorDockProvider(BaseProvider):
         }
 
         resp = await self._make_request(
-            "POST", f"{self.API_BASE}/instances",
+            "POST",
+            f"{self.API_BASE}/instances",
             json=body,
         )
         inst = resp.get("data", resp)
         return {
-            "instance_id": inst.get("id", f"td-{datetime.now().strftime('%Y%m%d%H%M%S')}"),
+            "instance_id": inst.get(
+                "id", f"td-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            ),
             "instance_type": v0name,
             "region": region,
             "gpu_type": gpu_type,
@@ -174,7 +197,8 @@ class TensorDockProvider(BaseProvider):
         if not self.api_key:
             raise Exception("TensorDock credentials not configured")
         data = await self._make_request(
-            "GET", f"{self.API_BASE}/instances/{instance_id}",
+            "GET",
+            f"{self.API_BASE}/instances/{instance_id}",
         )
         # v2 response: top-level keys (type, id, name, status, ipAddress, ...)
         inst = data if "status" in data else data.get("data", data)
@@ -190,7 +214,8 @@ class TensorDockProvider(BaseProvider):
         if not self.api_key:
             raise Exception("TensorDock credentials not configured")
         await self._make_request(
-            "POST", f"{self.API_BASE}/instances/{instance_id}/stop",
+            "POST",
+            f"{self.API_BASE}/instances/{instance_id}/stop",
         )
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
 
@@ -198,7 +223,8 @@ class TensorDockProvider(BaseProvider):
         if not self.api_key:
             raise Exception("TensorDock credentials not configured")
         await self._make_request(
-            "POST", f"{self.API_BASE}/instances/{instance_id}/start",
+            "POST",
+            f"{self.API_BASE}/instances/{instance_id}/start",
         )
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
 
@@ -206,23 +232,31 @@ class TensorDockProvider(BaseProvider):
         if not self.api_key:
             raise Exception("TensorDock credentials not configured")
         await self._make_request(
-            "DELETE", f"{self.API_BASE}/instances/{instance_id}",
+            "DELETE",
+            f"{self.API_BASE}/instances/{instance_id}",
         )
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key:
             return []
         try:
             data = await self._make_request(
-                "GET", f"{self.API_BASE}/instances",
+                "GET",
+                f"{self.API_BASE}/instances",
             )
             # v2 response: {"data": {"instances": [{"type", "id", "attributes": {...}}]}}
             instances = data.get("data", {}).get("instances", [])
             return [
                 {
                     "instance_id": str(vm.get("id")),
-                    "status": vm.get("attributes", {}).get("status", vm.get("status", "unknown")),
+                    "status": vm.get("attributes", {}).get(
+                        "status", vm.get("status", "unknown")
+                    ),
                     "instance_type": vm.get("attributes", {}).get("name", "unknown"),
                     "region": vm.get("attributes", {}).get("region", "unknown"),
                     "provider": "tensordock",
@@ -251,14 +285,22 @@ class TensorDockProvider(BaseProvider):
                     "async": async_exec,
                 }
             import subprocess
+
             ssh_cmd = [
-                "ssh", "-o", "StrictHostKeyChecking=accept-new",
-                "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                "-o", "ConnectTimeout=10",
-                f"user@{public_ip}", command,
+                "ssh",
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                "-o",
+                "ConnectTimeout=10",
+                f"user@{public_ip}",
+                command,
             ]
             if async_exec:
-                proc = subprocess.Popen(ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                proc = subprocess.Popen(
+                    ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
                 return {
                     "instance_id": instance_id,
                     "command": command,
@@ -267,7 +309,9 @@ class TensorDockProvider(BaseProvider):
                     "output": f"Async SSH process started (PID: {proc.pid})",
                     "async": True,
                 }
-            result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                ssh_cmd, capture_output=True, text=True, timeout=300
+            )
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -288,5 +332,8 @@ class TensorDockProvider(BaseProvider):
     def _get_auth_headers(self) -> Dict[str, str]:
         # TensorDock v2 API requires Bearer token auth on all endpoints
         if self.api_key:
-            return {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+            return {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
         return {}

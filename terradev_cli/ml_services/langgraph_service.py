@@ -17,6 +17,7 @@ import base64
 @dataclass
 class LangGraphConfig:
     """LangGraph configuration"""
+
     api_key: str
     langsmith_api_key: Optional[str] = None
     langsmith_endpoint: Optional[str] = None
@@ -32,45 +33,53 @@ class LangGraphConfig:
 
 class LangGraphService:
     """LangGraph integration service for workflow orchestration"""
-    
+
     def __init__(self, config: LangGraphConfig):
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
-        self.langsmith_api_base = config.langsmith_endpoint or "https://api.smith.langchain.com"
-        
+        self.langsmith_api_base = (
+            config.langsmith_endpoint or "https://api.smith.langchain.com"
+        )
+
     async def __aenter__(self):
         headers = {"Authorization": f"Bearer {self.config.api_key}"}
         self.session = aiohttp.ClientSession(headers=headers)
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
-    
+
     async def test_connection(self) -> Dict[str, Any]:
         """Test LangGraph and LangSmith connection"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             # Test LangSmith connection
             if self.config.langsmith_api_key:
-                langsmith_headers = {"Authorization": f"Bearer {self.config.langsmith_api_key}"}
+                langsmith_headers = {
+                    "Authorization": f"Bearer {self.config.langsmith_api_key}"
+                }
                 langsmith_session = langsmith_session
-                
+
                 url = f"{self.langsmith_api_base}/v1/organizations"
-                async with langsmith_session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                async with langsmith_session.get(
+                    url, timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
                     if response.status == 200:
                         langsmith_data = await response.json()
                         langsmith_status = "connected"
                     else:
                         langsmith_status = "failed"
-                        langsmith_data = {"error": f"LangSmith API request failed: {response.status}"}
+                        langsmith_data = {
+                            "error": f"LangSmith API request failed: {response.status}"
+                        }
             else:
                 langsmith_status = "not_configured"
                 langsmith_data = {"message": "LangSmith API key not provided"}
-            
+
             return {
                 "status": langsmith_status,
                 "langsmith": langsmith_data,
@@ -79,25 +88,24 @@ class LangGraphService:
                 "tracing_enabled": self.config.tracing_enabled,
                 "evaluation_enabled": self.config.evaluation_enabled,
                 "deployment_enabled": self.config.deployment_enabled,
-                "observability_enabled": self.config.observability_enabled
+                "observability_enabled": self.config.observability_enabled,
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def create_workflow(self, workflow_config: Dict[str, Any]) -> Dict[str, Any]:
         """Create a LangGraph workflow with monitoring"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             # This would integrate with LangGraph's workflow APIs
-            workflow_id = f"terradev-langgraph-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            
+            workflow_id = (
+                f"terradev-langgraph-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            )
+
             # Create workflow with monitoring configuration
             enhanced_config = {
                 **workflow_config,
@@ -106,34 +114,35 @@ class LangGraphService:
                     "tracing": self.config.tracing_enabled,
                     "evaluation": self.config.evaluation_enabled,
                     "deployment": self.config.deployment_enabled,
-                    "observability": self.config.observability_enabled
+                    "observability": self.config.observability_enabled,
                 },
                 "langsmith": {
                     "project": self.config.project_name or "terradev",
-                    "workspace_id": self.config.workspace_id
-                }
+                    "workspace_id": self.config.workspace_id,
+                },
             }
-            
+
             return {
                 "status": "created",
                 "workflow_id": workflow_id,
                 "config": enhanced_config,
                 "name": workflow_config.get("name", "Terradev LangGraph Workflow"),
-                "description": workflow_config.get("description", "LangGraph workflow created via Terradev CLI")
+                "description": workflow_config.get(
+                    "description", "LangGraph workflow created via Terradev CLI"
+                ),
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
-    async def create_orchestrator_worker_workflow(self, workflow_config: Dict[str, Any]) -> Dict[str, Any]:
+            return {"status": "failed", "error": str(e)}
+
+    async def create_orchestrator_worker_workflow(
+        self, workflow_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create an orchestrator-worker pattern workflow"""
         try:
             # Define the workflow state
             from langgraph.graph import StateGraph, START, END
-            
+
             # Enhanced state with monitoring
             class WorkflowState:
                 topic: str
@@ -147,64 +156,78 @@ class LangGraphService:
                 langsmith_run_id: Optional[str]
                 start_time: datetime
                 end_time: Optional[datetime]
-            
+
             # Enhanced orchestrator with monitoring
             def enhanced_orchestrator(state: WorkflowState):
                 """Enhanced orchestrator with monitoring"""
                 try:
                     # Generate plan
                     from langchain.chains import LLMChain
-                    llm = LLM(llm='openai/gpt-4', temperature=0.7)
-                    
-                    plan_result = llm.invoke([
-                        SystemMessage(content="Generate a plan for the report."),
-                        HumanMessage(content=f"Here is the report topic: {state['topic']}"),
-                    ])
-                    
-                    sections = plan_result.content.split('\n')
-                    return {"sections": [{"name": section.strip(), "description": section.strip()} for section in sections if section.strip()]}
-                    
+
+                    llm = LLM(llm="openai/gpt-4", temperature=0.7)
+
+                    plan_result = llm.invoke(
+                        [
+                            SystemMessage(content="Generate a plan for the report."),
+                            HumanMessage(
+                                content=f"Here is the report topic: {state['topic']}"
+                            ),
+                        ]
+                    )
+
+                    sections = plan_result.content.split("\n")
+                    return {
+                        "sections": [
+                            {"name": section.strip(), "description": section.strip()}
+                            for section in sections
+                            if section.strip()
+                        ]
+                    }
+
                 except Exception as e:
                     return {"error": str(e)}
-            
+
             # Enhanced worker with monitoring
             def enhanced_worker(state: WorkflowState):
                 """Enhanced worker with monitoring"""
                 try:
                     from langchain.chains import LLMChain
-                    llm = LLM(llm='openai/gpt-4', temperature=0.7)
-                    
-                    section = state['current_section']
+
+                    llm = LLM(llm="openai/gpt-4", temperature=0.7)
+
+                    section = state["current_section"]
                     if section:
-                        msg = llm.invoke(f"Write a report section following the provided name and description. Include no preamble for each section. Use markdown formatting.")
+                        msg = llm.invoke(
+                            f"Write a report section following the provided name and description. Include no preamble for each section. Use markdown formatting."
+                        )
                     else:
                         msg = llm.invoke(f"Write a section about {state['topic']}")
-                    
+
                     return {
                         "completed_sections": [section.content],
                         "current_section": None,
-                        "metrics": {"section_length": len(section.content)}
+                        "metrics": {"section_length": len(section.content)},
                     }
-                    
+
                 except Exception as e:
                     return {"error": str(e)}
-            
+
             # Enhanced synthesizer with monitoring
             def enhanced_synthesizer(state: WorkflowState):
                 """Enhanced synthesizer with monitoring"""
                 try:
                     completed_sections = state.get("completed_sections", [])
                     completed_report = "\n\n---\n\n".join(completed_sections)
-                    
+
                     return {
                         "final_report": completed_report,
                         "total_sections": len(completed_sections),
-                        "metrics": {"report_length": len(completed_report)}
+                        "metrics": {"report_length": len(completed_report)},
                     }
-                    
+
                 except Exception as e:
                     return {"error": str(e)}
-            
+
             # Conditional edge function for routing
             def route_section(state: WorkflowState):
                 """Route to next section or end"""
@@ -215,49 +238,57 @@ class LangGraphService:
                         return "worker"
                 else:
                     return "synthesizer"
-            
+
             # Build workflow
             builder = StateGraph(WorkflowState)
             builder.add_node("orchestrator", enhanced_orchestrator)
             builder.add_node("worker", enhanced_worker)
             builder.add_node("synthesizer", enhanced_synthesizer)
-            
+
             # Add edges
             builder.add_edge(START, "orchestrator")
             builder.add_conditional_edges("orchestrator", "worker", ["worker"])
             builder.add_edge("worker", "synthesizer")
             builder.add_edge("synthesizer", END)
-            
+
             # Compile workflow
             workflow = builder.compile()
-            
+
             return {
                 "status": "created",
                 "workflow_id": workflow_id,
                 "config": enhanced_config,
                 "graph": workflow.get_graph().dict(),
-                "name": workflow_config.get("name", "Terradev Orchestrator-Worker Workflow"),
-                "description": workflow_config.get("description", "Orchestrator-worker workflow created via Terradev CLI")
+                "name": workflow_config.get(
+                    "name", "Terradev Orchestrator-Worker Workflow"
+                ),
+                "description": workflow_config.get(
+                    "description",
+                    "Orchestrator-worker workflow created via Terradev CLI",
+                ),
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
-    async def create_evaluation_workflow(self, evaluation_config: Dict[str, Any]) -> Dict[str, Any]:
+            return {"status": "failed", "error": str(e)}
+
+    async def create_evaluation_workflow(
+        self, evaluation_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create an evaluator-optimizer workflow"""
         try:
             # Define the workflow state
             from langgraph.graph import StateGraph, START, END
             from pydantic import BaseModel, Field
             from typing import Literal
-            
+
             class Feedback(BaseModel):
-                grade: Literal["funny", "not funny"] = Field(description="Decide if the joke is funny or not.")
-                feedback: str = Field(description="If the joke is not funny, provide feedback on how to improve it.")
-            
+                grade: Literal["funny", "not funny"] = Field(
+                    description="Decide if the joke is funny or not."
+                )
+                feedback: str = Field(
+                    description="If the joke is not funny, provide feedback on how to improve it."
+                )
+
             # Enhanced state with monitoring
             class EvaluationState:
                 joke: str
@@ -269,49 +300,51 @@ class LangGraphService:
                 langsmith_run_id: Optional[str]
                 start_time: datetime
                 end_time: Optional[datetime]
-            
+
             # Enhanced generator with monitoring
             def enhanced_generator(state: EvaluationState):
                 """Enhanced generator with monitoring"""
                 try:
                     from langchain.chains import LLMChain
-                    llm = LLM(llm='openai/gpt-4', temperature=0.7)
-                    
+
+                    llm = LLM(llm="openai/gpt-4", temperature=0.7)
+
                     if state.get("feedback"):
                         msg = llm.invoke(
                             f"Write a joke about {state['topic']} but take into account the feedback: {state['feedback']}"
                         )
                     else:
                         msg = llm.invoke(f"Write a joke about {state['topic']}")
-                    
+
                     return {
                         "joke": msg.content,
                         "iteration": state.get("iteration", 0) + 1,
-                        "metrics": {"joke_length": len(msg.content)}
+                        "metrics": {"joke_length": len(msg.content)},
                     }
-                    
+
                 except Exception as e:
                     return {"error": str(e)}
-            
+
             # Enhanced evaluator with monitoring
             def enhanced_evaluator(state: EvaluationState):
                 """Enhanced evaluator with monitoring"""
                 try:
                     from langchain.evaluation import load_evaluator
+
                     evaluator = load_evaluator()
-                    
+
                     grade = evaluator.invoke(f"Grade the joke {state['joke']}")
-                    
+
                     return {
                         "funny_or_not": grade.grade,
                         "feedback": grade.feedback,
                         "iteration": state.get("iteration", 0),
-                        "metrics": {"evaluation_time": datetime.now().isoformat()}
+                        "metrics": {"evaluation_time": datetime.now().isoformat()},
                     }
-                    
+
                 except Exception as e:
                     return {"error": str(e)}
-            
+
             # Conditional edge function for routing
             def route_evaluation(state: EvaluationState):
                 """Route based on evaluation feedback"""
@@ -319,35 +352,38 @@ class LangGraphService:
                     return "END"
                 elif state["funny_or_not"] == "not funny":
                     return "generator"
-            
+
             # Build workflow
             builder = StateGraph(EvaluationState)
             builder.add_node("generator", enhanced_generator)
             builder.add_node("evaluator", enhanced_evaluator)
             builder.add_edge("generator", "evaluator")
-            builder.add_conditional_edges("evaluator", route_evaluation, {
-                "Accepted": "END",
-                "Rejected + Feedback": "generator"
-            })
-            
+            builder.add_conditional_edges(
+                "evaluator",
+                route_evaluation,
+                {"Accepted": "END", "Rejected + Feedback": "generator"},
+            )
+
             # Compile workflow
             workflow = builder.compile()
-            
+
             return {
                 "status": "created",
                 "workflow_id": f"terradev-evaluation-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
                 "config": evaluation_config,
                 "graph": workflow.get_graph().dict(),
-                "name": evaluation_config.get("name", "Terradev Evaluator-Optimizer Workflow"),
-                "description": evaluation_config.get("description", "Evaluator-optimizer workflow created via Terradev CLI")
+                "name": evaluation_config.get(
+                    "name", "Terradev Evaluator-Optimizer Workflow"
+                ),
+                "description": evaluation_config.get(
+                    "description",
+                    "Evaluator-optimizer workflow created via Terradev CLI",
+                ),
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def get_workflow_status(self, workflow_id: str) -> Dict[str, Any]:
         """Get workflow status and metrics"""
         try:
@@ -357,42 +393,34 @@ class LangGraphService:
                 "status": "running",
                 "workflow_id": workflow_id,
                 "status": "active",
-                "metrics": {
-                    "nodes": 4,
-                    "edges": 3,
-                    "runs": 12,
-                    "success_rate": 0.95
-                },
+                "metrics": {"nodes": 4, "edges": 3, "runs": 12, "success_rate": 0.95},
                 "monitoring": {
                     "tracing": self.config.tracing_enabled,
                     "evaluation": self.config.evaluation_enabled,
                     "deployment": self.config.deployment_enabled,
-                    "observability": self.config.observability_enabled
-                }
+                    "observability": self.config.observability_enabled,
+                },
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     def get_langgraph_config(self) -> Dict[str, str]:
         """Get LangGraph configuration for environment variables"""
         config = self.get_langchain_config()
-        
+
         # Add LangGraph-specific configuration
         if self.config.dashboard_enabled:
             config["LANGGRAPH_DASHBOARD_ENABLED"] = "true"
-        
+
         if self.config.deployment_enabled:
             config["LANGGRAPH_DEPLOYMENT_ENABLED"] = "true"
-        
+
         if self.config.observability_enabled:
             config["LANGGRAPH_OBSERVABILITY_ENABLED"] = "true"
-        
+
         return config
-    
+
     def generate_integration_script(self) -> str:
         """Generate LangGraph integration script"""
         script_lines = [
@@ -453,13 +481,15 @@ class LangGraphService:
             "    print('Workflow deployed! Access at: https://smith.langchain.com/deployments')",
             "",
             "# Access dashboard",
-            "print('LangSmith Dashboard: https://smith.langchain.com/' + os.environ.get('LANGSMITH_WORKSPACE_ID', 'default') + '/' + os.environ.get('LANGSMITH_PROJECT', 'terradev'))"
+            "print('LangSmith Dashboard: https://smith.langchain.com/' + os.environ.get('LANGSMITH_WORKSPACE_ID', 'default') + '/' + os.environ.get('LANGSMITH_PROJECT', 'terradev'))",
         ]
-        
+
         return "\n".join(script_lines)
 
 
-def create_langgraph_service_from_credentials(credentials: Dict[str, str]) -> LangGraphService:
+def create_langgraph_service_from_credentials(
+    credentials: Dict[str, str]
+) -> LangGraphService:
     """Create LangGraphService from credential dictionary"""
     config = LangGraphConfig(
         api_key=credentials["api_key"],
@@ -468,13 +498,17 @@ def create_langgraph_service_from_credentials(credentials: Dict[str, str]) -> La
         workspace_id=credentials.get("workspace_id"),
         project_name=credentials.get("project_name"),
         environment=credentials.get("environment", "development"),
-        dashboard_enabled=credentials.get("dashboard_enabled", "false").lower() == "true",
+        dashboard_enabled=credentials.get("dashboard_enabled", "false").lower()
+        == "true",
         tracing_enabled=credentials.get("tracing_enabled", "false").lower() == "true",
-        evaluation_enabled=credentials.get("evaluation_enabled", "false").lower() == "true",
-        deployment_enabled=credentials.get("deployment_enabled", "false").lower() == "true",
-        observability_enabled=credentials.get("observability_enabled", "false").lower() == "true"
+        evaluation_enabled=credentials.get("evaluation_enabled", "false").lower()
+        == "true",
+        deployment_enabled=credentials.get("deployment_enabled", "false").lower()
+        == "true",
+        observability_enabled=credentials.get("observability_enabled", "false").lower()
+        == "true",
     )
-    
+
     return LangGraphService(config)
 
 

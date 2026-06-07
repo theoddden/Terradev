@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class GPUMetric:
     node: str
@@ -62,6 +63,7 @@ class TrainingMetrics:
 @dataclass
 class StragglerInfo:
     """Detected straggler nodes — GPUs with significantly lower utilization."""
+
     detected: bool = False
     slow_nodes: List[str] = field(default_factory=list)
     util_spread_pct: float = 0.0  # max - min util across nodes
@@ -71,6 +73,7 @@ class StragglerInfo:
 @dataclass
 class MonitorSnapshot:
     """Complete monitoring snapshot — structured JSON for MCP."""
+
     timestamp: datetime = field(default_factory=datetime.now)
     job_id: str = ""
     gpus: List[GPUMetric] = field(default_factory=list)
@@ -122,25 +125,39 @@ class MonitorSnapshot:
 # SSH helper
 # ---------------------------------------------------------------------------
 
-def _run_on(host: Optional[str], cmd: str, user: str = "root",
-            key: Optional[str] = None, timeout: int = 15) -> Tuple[int, str, str]:
+
+def _run_on(
+    host: Optional[str],
+    cmd: str,
+    user: str = "root",
+    key: Optional[str] = None,
+    timeout: int = 15,
+) -> Tuple[int, str, str]:
     # SECURITY: Validate command to prevent shell injection
     import re
+
     # Allow alphanumeric, spaces, and basic shell-safe characters
     if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t"\']+$', cmd):
         return -1, "", "Unsafe command characters detected"
-    
+
     if host and host not in ("localhost", "127.0.0.1"):
         # Validate host and user
-        if not re.match(r'^[a-zA-Z0-9._-]+$', user):
+        if not re.match(r"^[a-zA-Z0-9._-]+$", user):
             return -1, "", "Invalid username format"
-        if not re.match(r'^[a-zA-Z0-9._-]+$', host):
+        if not re.match(r"^[a-zA-Z0-9._-]+$", host):
             return -1, "", "Invalid hostname format"
-        if key and not re.match(r'^[a-zA-Z0-9._/~-]+$', key):
+        if key and not re.match(r"^[a-zA-Z0-9._/~-]+$", key):
             return -1, "", "Invalid key path format"
-        
-        ssh = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
-               "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
+
+        ssh = [
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ConnectTimeout=5",
+            "-o",
+            "BatchMode=yes",
+        ]
         if key:
             ssh.extend(["-i", key])
         ssh.extend([f"{user}@{host}", cmd])
@@ -151,7 +168,9 @@ def _run_on(host: Optional[str], cmd: str, user: str = "root",
             return -1, "", str(e)
     # SECURITY: shell=True is used but command is validated above
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True, timeout=timeout
+        )
         return r.returncode, r.stdout.strip(), r.stderr.strip()
     except Exception as e:
         return -1, "", str(e)
@@ -168,6 +187,7 @@ def _safe_float(s: str, default: float = 0.0) -> float:
 # GPU metric collection — nvidia-smi default, Prometheus hook
 # ---------------------------------------------------------------------------
 
+
 def _collect_gpu_nvidia_smi(ctx: Dict[str, Any]) -> List[GPUMetric]:
     """Default: nvidia-smi query (zero deps)."""
     host = ctx.get("host")
@@ -175,10 +195,12 @@ def _collect_gpu_nvidia_smi(ctx: Dict[str, Any]) -> List[GPUMetric]:
     key = ctx.get("ssh_key")
     node = host or "localhost"
 
-    query = ("nvidia-smi --query-gpu=index,name,utilization.gpu,"
-             "memory.used,memory.total,temperature.gpu,"
-             "power.draw,power.limit "
-             "--format=csv,noheader,nounits")
+    query = (
+        "nvidia-smi --query-gpu=index,name,utilization.gpu,"
+        "memory.used,memory.total,temperature.gpu,"
+        "power.draw,power.limit "
+        "--format=csv,noheader,nounits"
+    )
     rc, stdout, _ = _run_on(host, query, user, key)
     if rc != 0:
         return []
@@ -188,15 +210,19 @@ def _collect_gpu_nvidia_smi(ctx: Dict[str, Any]) -> List[GPUMetric]:
         parts = [p.strip() for p in line.split(",")]
         if len(parts) < 8:
             continue
-        metrics.append(GPUMetric(
-            node=node, gpu_index=int(parts[0]), gpu_name=parts[1],
-            utilization_pct=_safe_float(parts[2]),
-            memory_used_mb=_safe_float(parts[3]),
-            memory_total_mb=_safe_float(parts[4]),
-            temperature_c=_safe_float(parts[5]),
-            power_w=_safe_float(parts[6]),
-            power_limit_w=_safe_float(parts[7]),
-        ))
+        metrics.append(
+            GPUMetric(
+                node=node,
+                gpu_index=int(parts[0]),
+                gpu_name=parts[1],
+                utilization_pct=_safe_float(parts[2]),
+                memory_used_mb=_safe_float(parts[3]),
+                memory_total_mb=_safe_float(parts[4]),
+                temperature_c=_safe_float(parts[5]),
+                power_w=_safe_float(parts[6]),
+                power_limit_w=_safe_float(parts[7]),
+            )
+        )
     return metrics
 
 
@@ -204,6 +230,7 @@ def _collect_gpu_prometheus(endpoint: str, node: str) -> List[GPUMetric]:
     """Optional: scrape Prometheus/DCGM-exporter endpoint."""
     try:
         import urllib.request
+
         url = f"{endpoint}/api/v1/query?query=DCGM_FI_DEV_GPU_UTIL"
         with urllib.request.urlopen(url, timeout=5) as resp:
             data = json.loads(resp.read())
@@ -211,11 +238,19 @@ def _collect_gpu_prometheus(endpoint: str, node: str) -> List[GPUMetric]:
         for result in data.get("data", {}).get("result", []):
             gpu_idx = int(result.get("metric", {}).get("gpu", "0"))
             util = float(result["value"][1])
-            metrics.append(GPUMetric(
-                node=node, gpu_index=gpu_idx, gpu_name="",
-                utilization_pct=util, memory_used_mb=0, memory_total_mb=0,
-                temperature_c=0, power_w=0, power_limit_w=0,
-            ))
+            metrics.append(
+                GPUMetric(
+                    node=node,
+                    gpu_index=gpu_idx,
+                    gpu_name="",
+                    utilization_pct=util,
+                    memory_used_mb=0,
+                    memory_total_mb=0,
+                    temperature_c=0,
+                    power_w=0,
+                    power_limit_w=0,
+                )
+            )
         return metrics
     except Exception as e:
         logger.debug(f"Prometheus scrape failed ({e}), falling back to nvidia-smi")
@@ -233,19 +268,28 @@ _LOG_PATTERNS = {
         re.compile(r"\b(\d+)/\d+ \["),
     ],
     "loss": [
-        re.compile(r"(?:loss|train_loss|training_loss)[\s:=]+([\d.]+(?:e[+-]?\d+)?)", re.I),
+        re.compile(
+            r"(?:loss|train_loss|training_loss)[\s:=]+([\d.]+(?:e[+-]?\d+)?)", re.I
+        ),
     ],
     "grad_norm": [
-        re.compile(r"(?:grad_norm|gradient_norm|grad\.norm)[\s:=]+([\d.]+(?:e[+-]?\d+)?)", re.I),
+        re.compile(
+            r"(?:grad_norm|gradient_norm|grad\.norm)[\s:=]+([\d.]+(?:e[+-]?\d+)?)", re.I
+        ),
     ],
     "learning_rate": [
         re.compile(r"(?:lr|learning_rate)[\s:=]+([\d.]+(?:e[+-]?\d+)?)", re.I),
     ],
     "step_time_ms": [
-        re.compile(r"(?:step_time|elapsed|time/step|iter_time)[\s:=]+([\d.]+)\s*(?:ms|s)?", re.I),
+        re.compile(
+            r"(?:step_time|elapsed|time/step|iter_time)[\s:=]+([\d.]+)\s*(?:ms|s)?",
+            re.I,
+        ),
     ],
     "tokens_per_sec": [
-        re.compile(r"(?:tokens/sec|tps|tokens_per_second|throughput)[\s:=]+([\d.]+)", re.I),
+        re.compile(
+            r"(?:tokens/sec|tps|tokens_per_second|throughput)[\s:=]+([\d.]+)", re.I
+        ),
     ],
     "samples_per_sec": [
         re.compile(r"(?:samples/sec|sps|samples_per_second)[\s:=]+([\d.]+)", re.I),
@@ -294,6 +338,7 @@ def _parse_training_log(ctx: Dict[str, Any]) -> Optional[TrainingMetrics]:
 # Cost computation
 # ---------------------------------------------------------------------------
 
+
 def _compute_cost(ctx: Dict[str, Any]) -> Dict[str, Any]:
     """Compute GPU-hours and cost. Uses state_manager if available, else estimates."""
     state_manager = ctx.get("state_manager")
@@ -322,7 +367,10 @@ def _compute_cost(ctx: Dict[str, Any]) -> Dict[str, Any]:
 # Straggler detection
 # ---------------------------------------------------------------------------
 
-def _detect_stragglers(gpus: List[GPUMetric], threshold_pct: float = 30.0) -> StragglerInfo:
+
+def _detect_stragglers(
+    gpus: List[GPUMetric], threshold_pct: float = 30.0
+) -> StragglerInfo:
     """Detect nodes with significantly lower GPU utilization."""
     if not gpus:
         return StragglerInfo()
@@ -356,6 +404,7 @@ def _detect_stragglers(gpus: List[GPUMetric], threshold_pct: float = 30.0) -> St
 # Aggregation
 # ---------------------------------------------------------------------------
 
+
 def _aggregate(ctx: Dict[str, Any]) -> MonitorSnapshot:
     """Aggregate all Wave 0 outputs into a snapshot."""
     deps = ctx.get("__deps__", {})
@@ -377,9 +426,17 @@ def _aggregate(ctx: Dict[str, Any]) -> MonitorSnapshot:
         elif key == "cost" and isinstance(val, dict):
             cost_info = val
 
-    avg_util = (sum(g.utilization_pct for g in all_gpus) / len(all_gpus)) if all_gpus else 0
-    avg_mem = (sum(g.memory_used_mb / max(g.memory_total_mb, 1) * 100
-                   for g in all_gpus) / len(all_gpus)) if all_gpus else 0
+    avg_util = (
+        (sum(g.utilization_pct for g in all_gpus) / len(all_gpus)) if all_gpus else 0
+    )
+    avg_mem = (
+        (
+            sum(g.memory_used_mb / max(g.memory_total_mb, 1) * 100 for g in all_gpus)
+            / len(all_gpus)
+        )
+        if all_gpus
+        else 0
+    )
     total_power = sum(g.power_w for g in all_gpus)
     straggler = _detect_stragglers(all_gpus)
 
@@ -404,6 +461,7 @@ def _aggregate(ctx: Dict[str, Any]) -> MonitorSnapshot:
 # TrainingMonitor
 # ---------------------------------------------------------------------------
 
+
 class TrainingMonitor:
     """
     Unified training monitor.
@@ -420,15 +478,19 @@ class TrainingMonitor:
         print(json.dumps(snap.to_dict(), indent=2))
     """
 
-    def __init__(self, nodes: Optional[List[str]] = None,
-                 ssh_user: str = "root", ssh_key: Optional[str] = None,
-                 state_manager=None,
-                 log_path: str = "",
-                 cost_per_gpu_hour: float = 0.0,
-                 # Optional hooks
-                 prometheus_endpoint: str = "",
-                 wandb_run=None,
-                 on_snapshot: Optional[Callable] = None):
+    def __init__(
+        self,
+        nodes: Optional[List[str]] = None,
+        ssh_user: str = "root",
+        ssh_key: Optional[str] = None,
+        state_manager=None,
+        log_path: str = "",
+        cost_per_gpu_hour: float = 0.0,
+        # Optional hooks
+        prometheus_endpoint: str = "",
+        wandb_run=None,
+        on_snapshot: Optional[Callable] = None,
+    ):
         self.nodes = nodes or [None]
         self.ssh_user = ssh_user
         self.ssh_key = ssh_key
@@ -442,10 +504,7 @@ class TrainingMonitor:
 
     def snapshot(self, job_id: str = "") -> MonitorSnapshot:
         """Collect a single monitoring snapshot (DAG-parallel across nodes)."""
-        dag = DAGExecutor(
-            max_workers=max(len(self.nodes) + 2, 4),
-            name="monitor"
-        )
+        dag = DAGExecutor(max_workers=max(len(self.nodes) + 2, 4), name="monitor")
 
         # Wave 0: GPU metrics per node (parallel)
         wave0 = []
@@ -459,30 +518,52 @@ class TrainingMonitor:
                         result = _collect_gpu_prometheus(ep, h or "localhost")
                         if result:
                             return result
-                        return _collect_gpu_nvidia_smi({
-                            "host": h, "ssh_user": self.ssh_user,
-                            "ssh_key": self.ssh_key})
+                        return _collect_gpu_nvidia_smi(
+                            {
+                                "host": h,
+                                "ssh_user": self.ssh_user,
+                                "ssh_key": self.ssh_key,
+                            }
+                        )
+
                     return fn
+
                 dag.add_node(name, make_prom_fn(node, self.prometheus_endpoint))
             else:
+
                 def make_smi_fn(h):
                     def fn(_ctx):
-                        return _collect_gpu_nvidia_smi({
-                            "host": h, "ssh_user": self.ssh_user,
-                            "ssh_key": self.ssh_key})
+                        return _collect_gpu_nvidia_smi(
+                            {
+                                "host": h,
+                                "ssh_user": self.ssh_user,
+                                "ssh_key": self.ssh_key,
+                            }
+                        )
+
                     return fn
+
                 dag.add_node(name, make_smi_fn(node))
 
         # Training log parse
-        dag.add_node("training_log", lambda _ctx: _parse_training_log({
-            "log_path": self.log_path}))
+        dag.add_node(
+            "training_log",
+            lambda _ctx: _parse_training_log({"log_path": self.log_path}),
+        )
         wave0.append("training_log")
 
         # Cost
-        dag.add_node("cost", lambda _ctx: _compute_cost({
-            "state_manager": self.state_manager, "job_id": job_id,
-            "gpu_count": len(self.nodes) * 8,  # estimate, refined in aggregate
-            "cost_per_gpu_hour": self.cost_per_gpu_hour}))
+        dag.add_node(
+            "cost",
+            lambda _ctx: _compute_cost(
+                {
+                    "state_manager": self.state_manager,
+                    "job_id": job_id,
+                    "gpu_count": len(self.nodes) * 8,  # estimate, refined in aggregate
+                    "cost_per_gpu_hour": self.cost_per_gpu_hour,
+                }
+            ),
+        )
         wave0.append("cost")
 
         # Wave 1: Aggregate
@@ -506,15 +587,17 @@ class TrainingMonitor:
         # W&B hook (optional — only if wandb_run is set)
         if self.wandb_run and snap.training:
             try:
-                self.wandb_run.log({
-                    "gpu_util": snap.avg_gpu_util,
-                    "gpu_memory_pct": snap.avg_gpu_memory_pct,
-                    "power_w": snap.total_gpu_power_w,
-                    "loss": snap.training.loss,
-                    "step": snap.training.step,
-                    "tokens_per_sec": snap.training.tokens_per_sec,
-                    "cost_usd": snap.cost_usd,
-                })
+                self.wandb_run.log(
+                    {
+                        "gpu_util": snap.avg_gpu_util,
+                        "gpu_memory_pct": snap.avg_gpu_memory_pct,
+                        "power_w": snap.total_gpu_power_w,
+                        "loss": snap.training.loss,
+                        "step": snap.training.step,
+                        "tokens_per_sec": snap.training.tokens_per_sec,
+                        "cost_usd": snap.cost_usd,
+                    }
+                )
             except Exception as e:
                 logger.debug(f"W&B log failed: {e}")
 
@@ -527,8 +610,9 @@ class TrainingMonitor:
 
         return snap
 
-    def continuous(self, job_id: str, interval_s: float = 10.0,
-                   max_snapshots: int = 0) -> List[MonitorSnapshot]:
+    def continuous(
+        self, job_id: str, interval_s: float = 10.0, max_snapshots: int = 0
+    ) -> List[MonitorSnapshot]:
         """Continuous monitoring loop. Returns all collected snapshots."""
         count = 0
         while True:

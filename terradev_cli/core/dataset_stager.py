@@ -55,6 +55,7 @@ def _pick_compression(auto: bool, size_bytes: int) -> str:
     # Try zstd first (best ratio + speed for ML data)
     try:
         import zstandard  # noqa: F401
+
         return "zstd"
     except ImportError:
         pass
@@ -67,6 +68,7 @@ def compress_file(src: str, dst: str, algo: str) -> Tuple[int, int]:
     original = os.path.getsize(src)
     if algo == "zstd":
         import zstandard as zstd
+
         cctx = zstd.ZstdCompressor(level=3, threads=-1)
         with open(src, "rb") as fin, open(dst, "wb") as fout:
             cctx.copy_stream(fin, fout)
@@ -131,7 +133,11 @@ class StagingPlan:
         self.chunk_size = chunk_size
 
     def to_dict(self) -> Dict[str, Any]:
-        ratio = (1 - self.estimated_compressed / max(self.size_bytes, 1)) * 100 if self.size_bytes else 0
+        ratio = (
+            (1 - self.estimated_compressed / max(self.size_bytes, 1)) * 100
+            if self.size_bytes
+            else 0
+        )
         return {
             "dataset": self.dataset,
             "regions": self.regions,
@@ -162,7 +168,11 @@ class DatasetStager:
     ) -> StagingPlan:
         """Build a staging plan without executing it."""
         size = _detect_size(dataset)
-        algo = _pick_compression(compression == "auto", size) if compression == "auto" else compression
+        algo = (
+            _pick_compression(compression == "auto", size)
+            if compression == "auto"
+            else compression
+        )
 
         # Estimate compression ratio
         if algo == "zstd":
@@ -205,6 +215,7 @@ class DatasetStager:
 
         try:
             from .egress_optimizer import optimize_staging_route
+
             # Build target list from region strings
             # Attempt to parse "provider:region" format, fallback to generic
             targets = []
@@ -215,8 +226,10 @@ class DatasetStager:
                 else:
                     targets.append({"provider": "unknown", "region": r})
 
-            size_gb = plan.size_bytes / (1024 ** 3)
-            egress = optimize_staging_route(data_provider, data_region, targets, size_gb)
+            size_gb = plan.size_bytes / (1024**3)
+            egress = optimize_staging_route(
+                data_provider, data_region, targets, size_gb
+            )
             plan_dict["egress"] = egress
         except Exception as e:
             logger.debug("Egress optimization unavailable: %s", e)
@@ -251,14 +264,20 @@ class DatasetStager:
 
         # Step 1: Resolve dataset to a local path
         local_path = self._resolve_dataset(dataset)
-        original_size = os.path.getsize(local_path) if os.path.isfile(local_path) else _detect_size(local_path)
+        original_size = (
+            os.path.getsize(local_path)
+            if os.path.isfile(local_path)
+            else _detect_size(local_path)
+        )
 
         if progress_callback:
             progress_callback("compress", f"Compressing with {plan.compression}...")
 
         # Step 2: Compress
         if plan.compression != "none" and os.path.isfile(local_path):
-            compressed_path = str(self._staging_dir / f"{Path(local_path).stem}.{plan.compression}")
+            compressed_path = str(
+                self._staging_dir / f"{Path(local_path).stem}.{plan.compression}"
+            )
             orig, comp = compress_file(local_path, compressed_path, plan.compression)
         else:
             compressed_path = local_path
@@ -316,6 +335,7 @@ class DatasetStager:
         egress_info = {}
         try:
             from .egress_optimizer import optimize_staging_route
+
             targets = []
             for r in regions:
                 if ":" in r:
@@ -323,7 +343,7 @@ class DatasetStager:
                     targets.append({"provider": prov, "region": reg})
                 else:
                     targets.append({"provider": "unknown", "region": r})
-            size_gb_actual = comp / (1024 ** 3)
+            size_gb_actual = comp / (1024**3)
             egress_info = optimize_staging_route(
                 data_provider, data_region, targets, size_gb_actual
             )
@@ -345,15 +365,22 @@ class DatasetStager:
             "egress": egress_info,
         }
 
-    async def _upload_chunk(self, chunk_path: str, region: str, dataset_name: str) -> None:
+    async def _upload_chunk(
+        self, chunk_path: str, region: str, dataset_name: str
+    ) -> None:
         """Upload a single chunk to a target region via the appropriate cloud SDK."""
         filename = Path(chunk_path).name
         remote_key = f"terradev-staging/{Path(dataset_name).stem}/{filename}"
 
         # AWS regions → S3
-        if region.startswith("us-") or region.startswith("eu-") or region.startswith("ap-"):
+        if (
+            region.startswith("us-")
+            or region.startswith("eu-")
+            or region.startswith("ap-")
+        ):
             try:
                 import boto3
+
                 s3 = boto3.client("s3", region_name=region)
                 bucket = f"terradev-staging-{region}"
                 # Ensure bucket exists (best-effort)
@@ -362,16 +389,18 @@ class DatasetStager:
                 except Exception:
                     create_cfg = {}
                     if region != "us-east-1":
-                        create_cfg = {"CreateBucketConfiguration": {"LocationConstraint": region}}
+                        create_cfg = {
+                            "CreateBucketConfiguration": {"LocationConstraint": region}
+                        }
                     s3.create_bucket(Bucket=bucket, **create_cfg)
                     # Block all public access on auto-created staging buckets
                     s3.put_public_access_block(
                         Bucket=bucket,
                         PublicAccessBlockConfiguration={
-                            'BlockPublicAcls': True,
-                            'IgnorePublicAcls': True,
-                            'BlockPublicPolicy': True,
-                            'RestrictPublicBuckets': True,
+                            "BlockPublicAcls": True,
+                            "IgnorePublicAcls": True,
+                            "BlockPublicPolicy": True,
+                            "RestrictPublicBuckets": True,
                         },
                     )
                 s3.upload_file(chunk_path, bucket, remote_key)
@@ -380,9 +409,14 @@ class DatasetStager:
                 pass  # boto3 not installed, try next method
 
         # GCP regions → GCS
-        if region.startswith("us-central") or region.startswith("europe-") or region.startswith("asia-"):
+        if (
+            region.startswith("us-central")
+            or region.startswith("europe-")
+            or region.startswith("asia-")
+        ):
             try:
                 from google.cloud import storage as gcs
+
                 client = gcs.Client()
                 bucket_name = f"terradev-staging-{region.replace('/', '-')}"
                 try:
@@ -396,9 +430,15 @@ class DatasetStager:
                 pass  # google-cloud-storage not installed
 
         # Azure regions → Blob Storage
-        if region.startswith("east") or region.startswith("west") or region.startswith("north") or region.startswith("south"):
+        if (
+            region.startswith("east")
+            or region.startswith("west")
+            or region.startswith("north")
+            or region.startswith("south")
+        ):
             try:
                 from azure.storage.blob import BlobServiceClient
+
                 conn_str = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
                 if conn_str:
                     blob_service = BlobServiceClient.from_connection_string(conn_str)
@@ -407,7 +447,9 @@ class DatasetStager:
                         blob_service.create_container(container_name)
                     except Exception:
                         pass
-                    blob_client = blob_service.get_blob_client(container=container_name, blob=remote_key)
+                    blob_client = blob_service.get_blob_client(
+                        container=container_name, blob=remote_key
+                    )
                     with open(chunk_path, "rb") as data:
                         blob_client.upload_blob(data, overwrite=True)
                     return
@@ -418,12 +460,20 @@ class DatasetStager:
         staging_host = os.environ.get("TERRADEV_STAGING_HOST")
         if staging_host:
             import subprocess
+
             dest = f"{staging_host}:/data/terradev-staging/{region}/{remote_key}"
             subprocess.run(
-                ["scp", "-o", "StrictHostKeyChecking=accept-new",
-                 "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                 chunk_path, dest],
-                check=True, timeout=600,
+                [
+                    "scp",
+                    "-o",
+                    "StrictHostKeyChecking=accept-new",
+                    "-o",
+                    f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                    chunk_path,
+                    dest,
+                ],
+                check=True,
+                timeout=600,
             )
             return
 
@@ -431,6 +481,7 @@ class DatasetStager:
         local_dest = self._staging_dir / region / remote_key
         local_dest.parent.mkdir(parents=True, exist_ok=True)
         import shutil as _shutil
+
         _shutil.copy2(chunk_path, str(local_dest))
 
     def _resolve_dataset(self, dataset: str) -> str:
@@ -465,6 +516,7 @@ class DatasetStager:
         """Download from S3 (requires boto3)."""
         try:
             import boto3
+
             parts = uri.replace("s3://", "").split("/", 1)
             bucket, key = parts[0], parts[1] if len(parts) > 1 else ""
             local = str(self._staging_dir / Path(key).name)
@@ -480,6 +532,7 @@ class DatasetStager:
         """Download from GCS (requires google-cloud-storage)."""
         try:
             from google.cloud import storage
+
             parts = uri.replace("gs://", "").split("/", 1)
             bucket_name, blob_name = parts[0], parts[1] if len(parts) > 1 else ""
             local = str(self._staging_dir / Path(blob_name).name)
@@ -497,6 +550,7 @@ class DatasetStager:
         """Download from HTTP URL."""
         try:
             import urllib.request
+
             filename = url.split("/")[-1].split("?")[0] or "download"
             local = str(self._staging_dir / filename)
             urllib.request.urlretrieve(url, local)
@@ -510,12 +564,20 @@ class DatasetStager:
         """Download from HuggingFace Hub."""
         try:
             from huggingface_hub import snapshot_download
+
             local = str(self._staging_dir / dataset_name.replace("/", "_"))
             # SECURITY: Pin to main branch to prevent supply-chain attacks from uncommitted changes
             # Consider using a specific commit hash for production deployments
-            snapshot_download(repo_id=dataset_name, local_dir=local, repo_type="dataset", revision="main")
+            snapshot_download(
+                repo_id=dataset_name,
+                local_dir=local,
+                repo_type="dataset",
+                revision="main",
+            )
             return local
         except Exception:
-            placeholder = self._staging_dir / f"{dataset_name.replace('/', '_')}.placeholder"
+            placeholder = (
+                self._staging_dir / f"{dataset_name.replace('/', '_')}.placeholder"
+            )
             placeholder.write_text(f"# HuggingFace dataset pending: {dataset_name}\n")
             return str(placeholder)

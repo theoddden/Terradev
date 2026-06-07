@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Rust telemetry integration
 try:
     from terradev_telemetry import PyTelemetryPipeline
+
     USE_RUST_TELEMETRY = True
     logger.info("Using Rust telemetry for 10x metrics throughput")
 except ImportError:
@@ -26,16 +27,16 @@ except ImportError:
 
 class RustTelemetryBackend:
     """Rust telemetry backend with HDR histograms"""
-    
+
     def __init__(self):
         if not USE_RUST_TELEMETRY:
             raise ImportError("Rust telemetry not available")
         self.pipeline = PyTelemetryPipeline()
-    
+
     def record(self, name: str, value: float, tags: List[Tuple[str, str]]):
         """Record a metric value"""
         self.pipeline.record_value(name, value, tags)
-    
+
     def get_histogram(self, name: str) -> Optional[Dict[str, float]]:
         """Get histogram snapshot for a metric"""
         hist = self.pipeline.get_histogram(name)

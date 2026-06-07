@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Rust egress optimizer integration
 try:
     from terradev_egress_optimizer import PyEgressGraph, PyRegion, PyEgressEdge
+
     USE_RUST_EGRESS = True
     logger.info("Using Rust egress optimizer for 25x faster route calculation")
 except ImportError:
@@ -150,7 +151,7 @@ _STATIC_EGRESS_RATES: Dict[str, Dict[str, float]] = {
         "same_region": 0.00,
         "same_continent": 0.00,
         "cross_continent": 0.00,
-        "internet": 0.00,    # included bandwidth is generous
+        "internet": 0.00,  # included bandwidth is generous
     },
     # ── Inference platforms ───────────────────────────────────────────
     "baseten": {
@@ -172,7 +173,8 @@ EGRESS_RATES = _STATIC_EGRESS_RATES
 
 # ── Zero-egress providers (used for multi-hop relay selection) ───────
 _ZERO_EGRESS_PROVIDERS = frozenset(
-    p for p, rates in _STATIC_EGRESS_RATES.items()
+    p
+    for p, rates in _STATIC_EGRESS_RATES.items()
     if all(v == 0.0 for v in rates.values())
 )
 
@@ -182,43 +184,100 @@ _ZERO_EGRESS_PROVIDERS = frozenset(
 
 REGION_CONTINENT: Dict[str, str] = {
     # AWS
-    "us-east-1": "na", "us-east-2": "na", "us-west-1": "na", "us-west-2": "na",
+    "us-east-1": "na",
+    "us-east-2": "na",
+    "us-west-1": "na",
+    "us-west-2": "na",
     "ca-central-1": "na",
-    "eu-west-1": "eu", "eu-west-2": "eu", "eu-west-3": "eu",
-    "eu-central-1": "eu", "eu-north-1": "eu", "eu-south-1": "eu",
-    "ap-southeast-1": "ap", "ap-southeast-2": "ap",
-    "ap-northeast-1": "ap", "ap-northeast-2": "ap", "ap-south-1": "ap",
-    "sa-east-1": "sa", "me-south-1": "me", "af-south-1": "af",
+    "eu-west-1": "eu",
+    "eu-west-2": "eu",
+    "eu-west-3": "eu",
+    "eu-central-1": "eu",
+    "eu-north-1": "eu",
+    "eu-south-1": "eu",
+    "ap-southeast-1": "ap",
+    "ap-southeast-2": "ap",
+    "ap-northeast-1": "ap",
+    "ap-northeast-2": "ap",
+    "ap-south-1": "ap",
+    "sa-east-1": "sa",
+    "me-south-1": "me",
+    "af-south-1": "af",
     # GCP
-    "us-central1": "na", "us-east4": "na", "us-west1": "na", "us-west4": "na",
-    "europe-west1": "eu", "europe-west2": "eu", "europe-west3": "eu",
-    "europe-west4": "eu", "europe-north1": "eu",
-    "asia-east1": "ap", "asia-east2": "ap", "asia-southeast1": "ap",
-    "asia-northeast1": "ap", "asia-south1": "ap",
+    "us-central1": "na",
+    "us-east4": "na",
+    "us-west1": "na",
+    "us-west4": "na",
+    "europe-west1": "eu",
+    "europe-west2": "eu",
+    "europe-west3": "eu",
+    "europe-west4": "eu",
+    "europe-north1": "eu",
+    "asia-east1": "ap",
+    "asia-east2": "ap",
+    "asia-southeast1": "ap",
+    "asia-northeast1": "ap",
+    "asia-south1": "ap",
     # Azure
-    "eastus": "na", "eastus2": "na", "westus": "na", "westus2": "na",
-    "westus3": "na", "centralus": "na", "southcentralus": "na",
-    "northeurope": "eu", "westeurope": "eu", "uksouth": "eu", "ukwest": "eu",
-    "francecentral": "eu", "germanywestcentral": "eu", "swedencentral": "eu",
-    "southeastasia": "ap", "eastasia": "ap", "japaneast": "ap",
-    "australiaeast": "ap", "centralindia": "ap",
+    "eastus": "na",
+    "eastus2": "na",
+    "westus": "na",
+    "westus2": "na",
+    "westus3": "na",
+    "centralus": "na",
+    "southcentralus": "na",
+    "northeurope": "eu",
+    "westeurope": "eu",
+    "uksouth": "eu",
+    "ukwest": "eu",
+    "francecentral": "eu",
+    "germanywestcentral": "eu",
+    "swedencentral": "eu",
+    "southeastasia": "ap",
+    "eastasia": "ap",
+    "japaneast": "ap",
+    "australiaeast": "ap",
+    "centralindia": "ap",
     # Oracle
-    "us-ashburn-1": "na", "us-phoenix-1": "na", "us-chicago-1": "na",
-    "uk-london-1": "eu", "eu-frankfurt-1": "eu", "eu-amsterdam-1": "eu",
-    "ap-tokyo-1": "ap", "ap-mumbai-1": "ap", "ap-sydney-1": "ap",
+    "us-ashburn-1": "na",
+    "us-phoenix-1": "na",
+    "us-chicago-1": "na",
+    "uk-london-1": "eu",
+    "eu-frankfurt-1": "eu",
+    "eu-amsterdam-1": "eu",
+    "ap-tokyo-1": "ap",
+    "ap-mumbai-1": "ap",
+    "ap-sydney-1": "ap",
     # Alibaba
-    "cn-hangzhou": "ap", "cn-shanghai": "ap", "cn-beijing": "ap",
-    "cn-shenzhen": "ap", "cn-hongkong": "ap",
-    "us-west-1-alibaba": "na", "eu-central-1-alibaba": "eu",
+    "cn-hangzhou": "ap",
+    "cn-shanghai": "ap",
+    "cn-beijing": "ap",
+    "cn-shenzhen": "ap",
+    "cn-hongkong": "ap",
+    "us-west-1-alibaba": "na",
+    "eu-central-1-alibaba": "eu",
     # OVHcloud
-    "gra": "eu", "sbg": "eu", "bhs": "na", "de1": "eu", "uk1": "eu",
-    "waw": "eu", "sgp": "ap",
+    "gra": "eu",
+    "sbg": "eu",
+    "bhs": "na",
+    "de1": "eu",
+    "uk1": "eu",
+    "waw": "eu",
+    "sgp": "ap",
     # Hetzner
-    "fsn1": "eu", "nbg1": "eu", "hel1": "eu", "ash": "na", "hil": "na",
+    "fsn1": "eu",
+    "nbg1": "eu",
+    "hel1": "eu",
+    "ash": "na",
+    "hil": "na",
     # GPU cloud regions (generic, from smaller providers)
-    "us-east": "na", "us-west": "na", "us-central": "na",
-    "eu-west": "eu", "eu-central": "eu",
-    "ap-east": "ap", "ap-south": "ap",
+    "us-east": "na",
+    "us-west": "na",
+    "us-central": "na",
+    "eu-west": "eu",
+    "eu-central": "eu",
+    "ap-east": "ap",
+    "ap-south": "ap",
 }
 
 
@@ -226,13 +285,15 @@ REGION_CONTINENT: Dict[str, str] = {
 # Live pricing cache (SQLite)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def _db_conn() -> sqlite3.Connection:
     """Open/create the cost_tracking DB with the egress_cache table."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
-    conn.executescript("""
+    conn.executescript(
+        """
         CREATE TABLE IF NOT EXISTS egress_rate_cache (
             provider        TEXT    NOT NULL,
             dest_class      TEXT    NOT NULL,
@@ -241,7 +302,8 @@ def _db_conn() -> sqlite3.Connection:
             updated_at      TEXT    NOT NULL DEFAULT (datetime('now')),
             PRIMARY KEY (provider, dest_class)
         );
-    """)
+    """
+    )
     return conn
 
 
@@ -283,14 +345,17 @@ def refresh_egress_cache(force: bool = False) -> Dict[str, int]:
             stats["errors"] += 1
 
         for dest_class, rate in rates.items():
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO egress_rate_cache (provider, dest_class, rate_per_gb, source, updated_at)
                 VALUES (?, ?, ?, ?, datetime('now'))
                 ON CONFLICT(provider, dest_class) DO UPDATE SET
                     rate_per_gb = excluded.rate_per_gb,
                     source      = excluded.source,
                     updated_at  = excluded.updated_at
-            """, (provider, dest_class, rate, source))
+            """,
+                (provider, dest_class, rate, source),
+            )
         stats["updated"] += 1
 
     conn.commit()
@@ -315,18 +380,23 @@ def _fetch_live_rates(provider: str) -> Optional[Dict[str, float]]:
     if provider == "aws":
         try:
             import urllib.request
+
             url = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDataTransfer/current/index.json"
             with urllib.request.urlopen(url, timeout=10) as resp:
                 data = json.loads(resp.read())
             # Extract per-GB internet egress from the US Standard tier
             for sku, product in data.get("products", {}).items():
                 attrs = product.get("attributes", {})
-                if (attrs.get("transferType") == "AWS Outbound"
-                        and attrs.get("fromLocation") == "US East (N. Virginia)"):
+                if (
+                    attrs.get("transferType") == "AWS Outbound"
+                    and attrs.get("fromLocation") == "US East (N. Virginia)"
+                ):
                     terms = data.get("terms", {}).get("OnDemand", {}).get(sku, {})
                     for _, dim in terms.items():
                         for _, price_dim in dim.get("priceDimensions", {}).items():
-                            usd = float(price_dim.get("pricePerUnit", {}).get("USD", "0"))
+                            usd = float(
+                                price_dim.get("pricePerUnit", {}).get("USD", "0")
+                            )
                             if usd > 0:
                                 return {
                                     "same_region": 0.00,
@@ -342,9 +412,12 @@ def _fetch_live_rates(provider: str) -> Optional[Dict[str, float]]:
     if provider == "gcp":
         try:
             import urllib.request
+
             # GCP doesn't have a simple unauthenticated egress endpoint,
             # but their pricing page JSON is publicly accessible
-            url = "https://cloudpricingcalculator.appspot.com/static/data/pricelist.json"
+            url = (
+                "https://cloudpricingcalculator.appspot.com/static/data/pricelist.json"
+            )
             with urllib.request.urlopen(url, timeout=10) as resp:
                 data = json.loads(resp.read())
             egress_key = "CP-COMPUTEENGINE-INTERNET-EGRESS-NA-NA"
@@ -381,13 +454,16 @@ def get_cached_rate(provider: str, dest_class: str) -> float:
     except Exception:
         pass
     # Fallback to static
-    rates = _STATIC_EGRESS_RATES.get(provider.lower(), _STATIC_EGRESS_RATES.get("aws", {}))
+    rates = _STATIC_EGRESS_RATES.get(
+        provider.lower(), _STATIC_EGRESS_RATES.get("aws", {})
+    )
     return rates.get(dest_class, rates.get("internet", 0.09))
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # Core routing logic
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def _continent(region: str) -> str:
     """Best-effort continent lookup."""
@@ -396,9 +472,19 @@ def _continent(region: str) -> str:
         return REGION_CONTINENT[r]
     if r.startswith("us") or r.startswith("na") or r.startswith("ca-"):
         return "na"
-    if r.startswith("eu") or r.startswith("north") or r.startswith("west") or r.startswith("uk"):
+    if (
+        r.startswith("eu")
+        or r.startswith("north")
+        or r.startswith("west")
+        or r.startswith("uk")
+    ):
         return "eu"
-    if r.startswith("ap") or r.startswith("asia") or r.startswith("south") or r.startswith("cn-"):
+    if (
+        r.startswith("ap")
+        or r.startswith("asia")
+        or r.startswith("south")
+        or r.startswith("cn-")
+    ):
         return "ap"
     if r.startswith("sa") or r.startswith("brazil"):
         return "sa"
@@ -407,11 +493,15 @@ def _continent(region: str) -> str:
     return "unknown"
 
 
-def _dest_class(src_provider: str, src_region: str, dst_provider: str, dst_region: str) -> str:
+def _dest_class(
+    src_provider: str, src_region: str, dst_provider: str, dst_region: str
+) -> str:
     """Classify the transfer destination for pricing lookup."""
     if src_provider == dst_provider and src_region == dst_region:
         return "same_region"
-    if src_provider == dst_provider and _continent(src_region) == _continent(dst_region):
+    if src_provider == dst_provider and _continent(src_region) == _continent(
+        dst_region
+    ):
         return "same_continent"
     if _continent(src_region) == _continent(dst_region):
         return "same_continent"
@@ -428,7 +518,9 @@ def estimate_egress_cost(
     size_gb: float,
 ) -> float:
     """Estimate egress cost in USD for a direct transfer."""
-    dest = _dest_class(src_provider.lower(), src_region, dst_provider.lower(), dst_region)
+    dest = _dest_class(
+        src_provider.lower(), src_region, dst_provider.lower(), dst_region
+    )
     rate = get_cached_rate(src_provider.lower(), dest)
     return round(rate * size_gb, 4)
 
@@ -450,13 +542,15 @@ def find_cheapest_route(
         cost = estimate_egress_cost(
             src_provider, src_region, dst["provider"], dst["region"], size_gb
         )
-        results.append({
-            "provider": dst["provider"],
-            "region": dst["region"],
-            "egress_cost": cost,
-            "size_gb": size_gb,
-            "rate_per_gb": round(cost / max(size_gb, 0.001), 4),
-        })
+        results.append(
+            {
+                "provider": dst["provider"],
+                "region": dst["region"],
+                "egress_cost": cost,
+                "size_gb": size_gb,
+                "rate_per_gb": round(cost / max(size_gb, 0.001), 4),
+            }
+        )
     results.sort(key=lambda x: x["egress_cost"])
     return results
 
@@ -464,6 +558,7 @@ def find_cheapest_route(
 # ═══════════════════════════════════════════════════════════════════════
 # Multi-hop Dijkstra route optimizer
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def _build_provider_graph(size_gb: float) -> Dict[str, Dict[str, float]]:
     """
@@ -557,7 +652,9 @@ def find_cheapest_multihop(
 
         for neighbor, edge_cost in graph.get(node, {}).items():
             new_cost = cost + edge_cost
-            if new_cost < best_cost and (neighbor not in visited or visited[neighbor] > new_cost):
+            if new_cost < best_cost and (
+                neighbor not in visited or visited[neighbor] > new_cost
+            ):
                 heapq.heappush(pq, (new_cost, neighbor, path + [neighbor]))
 
     # Build leg details
@@ -581,6 +678,7 @@ def find_cheapest_multihop(
 # ═══════════════════════════════════════════════════════════════════════
 # Transfer plan (upgraded with multi-hop)
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def optimize_transfer_plan(
     data_location: Dict[str, str],
@@ -606,7 +704,9 @@ def optimize_transfer_plan(
         dst_prov = target["provider"].lower()
         dst_reg = target["region"]
 
-        direct_cost = estimate_egress_cost(src_prov, src_reg, dst_prov, dst_reg, size_gb)
+        direct_cost = estimate_egress_cost(
+            src_prov, src_reg, dst_prov, dst_reg, size_gb
+        )
         multihop = find_cheapest_multihop(src_prov, dst_prov, size_gb)
 
         route_entry = {
@@ -685,6 +785,7 @@ def optimize_transfer_plan(
 # ═══════════════════════════════════════════════════════════════════════
 # Dataset stager integration
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def optimize_staging_route(
     data_provider: str,

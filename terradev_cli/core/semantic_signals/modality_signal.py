@@ -21,13 +21,22 @@ class Modality:
 
 
 # Heuristic patterns
-_CODE_BLOCK_RE = re.compile(r'```[\s\S]*?```')
-_INLINE_CODE_RE = re.compile(r'`[^`]+`')
-_FUNCTION_DEF_RE = re.compile(r'\b(?:def|function|fn|func|class|struct|impl|module)\s+\w+')
-_IMPORT_RE = re.compile(r'\b(?:import|from|require|include|using)\s+\w+')
-_IMAGE_URL_RE = re.compile(r'https?://\S+\.(?:png|jpg|jpeg|gif|webp|svg|bmp|tiff)', re.I)
-_DIFFUSION_RE = re.compile(r'\b(?:generate|create|draw|paint|render|make)\s+(?:an?\s+)?(?:image|picture|photo|illustration|art)', re.I)
-_EMBEDDING_RE = re.compile(r'\b(?:embed|embedding|vectorize|encode|similarity|cosine)\b', re.I)
+_CODE_BLOCK_RE = re.compile(r"```[\s\S]*?```")
+_INLINE_CODE_RE = re.compile(r"`[^`]+`")
+_FUNCTION_DEF_RE = re.compile(
+    r"\b(?:def|function|fn|func|class|struct|impl|module)\s+\w+"
+)
+_IMPORT_RE = re.compile(r"\b(?:import|from|require|include|using)\s+\w+")
+_IMAGE_URL_RE = re.compile(
+    r"https?://\S+\.(?:png|jpg|jpeg|gif|webp|svg|bmp|tiff)", re.I
+)
+_DIFFUSION_RE = re.compile(
+    r"\b(?:generate|create|draw|paint|render|make)\s+(?:an?\s+)?(?:image|picture|photo|illustration|art)",
+    re.I,
+)
+_EMBEDDING_RE = re.compile(
+    r"\b(?:embed|embedding|vectorize|encode|similarity|cosine)\b", re.I
+)
 
 
 class ModalitySignal(BaseSignal):
@@ -40,7 +49,9 @@ class ModalitySignal(BaseSignal):
     """
 
     def __init__(self, enabled: bool = True):
-        super().__init__(name="modality", signal_type=SignalType.MODALITY, enabled=enabled)
+        super().__init__(
+            name="modality", signal_type=SignalType.MODALITY, enabled=enabled
+        )
 
     def extract(self, query: Dict[str, Any]) -> SignalResult:
         content = self._get_content(query)
@@ -64,12 +75,14 @@ class ModalitySignal(BaseSignal):
             scores[Modality.DIFFUSION] = 0.9
 
         # Code: code blocks, function defs, imports
-        code_signals = sum([
-            bool(_CODE_BLOCK_RE.search(content)) * 3,
-            bool(_FUNCTION_DEF_RE.search(content)) * 2,
-            bool(_IMPORT_RE.search(content)) * 2,
-            len(_INLINE_CODE_RE.findall(content)),
-        ])
+        code_signals = sum(
+            [
+                bool(_CODE_BLOCK_RE.search(content)) * 3,
+                bool(_FUNCTION_DEF_RE.search(content)) * 2,
+                bool(_IMPORT_RE.search(content)) * 2,
+                len(_INLINE_CODE_RE.findall(content)),
+            ]
+        )
         if code_signals >= 2:
             detected.append(Modality.CODE)
             scores[Modality.CODE] = min(1.0, code_signals / 5.0)
@@ -94,13 +107,20 @@ class ModalitySignal(BaseSignal):
         # If model was explicitly requested, respect it as a hint
         model_hint = query.get("model", "")
         if model_hint:
-            if any(k in model_hint.lower() for k in ("vision", "4o", "gemini-pro-vision")):
+            if any(
+                k in model_hint.lower() for k in ("vision", "4o", "gemini-pro-vision")
+            ):
                 primary = Modality.VISION if Modality.VISION in detected else primary
-            elif any(k in model_hint.lower() for k in ("code", "deepseek-coder", "codellama")):
+            elif any(
+                k in model_hint.lower() for k in ("code", "deepseek-coder", "codellama")
+            ):
                 primary = Modality.CODE
             elif any(k in model_hint.lower() for k in ("embed", "e5", "bge")):
                 primary = Modality.EMBEDDING
-            elif any(k in model_hint.lower() for k in ("dall-e", "sdxl", "flux", "midjourney")):
+            elif any(
+                k in model_hint.lower()
+                for k in ("dall-e", "sdxl", "flux", "midjourney")
+            ):
                 primary = Modality.DIFFUSION
 
         return SignalResult(

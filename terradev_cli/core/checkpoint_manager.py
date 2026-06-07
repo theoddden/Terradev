@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 # Rust snapshot manager integration
 try:
     from terradev_snapshot_manager import PySnapshotManager, PyModelState
+
     USE_RUST_SNAPSHOT = True
     logger.info("Using Rust snapshot manager for 5-10x faster checkpoint saves")
 except ImportError:
@@ -45,6 +46,7 @@ except ImportError:
 # Rust artifact verification integration
 try:
     from terradev_artifact_verification import PyArtifactVerifier
+
     USE_RUST_VERIFICATION = True
     logger.info("Using Rust artifact verification for integrity checks")
 except ImportError:
@@ -56,9 +58,11 @@ except ImportError:
 # Storage backend protocol (local default, S3/GCS optional)
 # ---------------------------------------------------------------------------
 
+
 @runtime_checkable
 class StorageBackend(Protocol):
     """Protocol for checkpoint storage. Implement for custom backends."""
+
     def put(self, local_path: str, remote_path: str) -> bool: ...
     def get(self, remote_path: str, local_path: str) -> bool: ...
     def exists(self, remote_path: str) -> bool: ...
@@ -68,6 +72,7 @@ class StorageBackend(Protocol):
 
 class LocalStorage:
     """Default: local filesystem (zero deps)."""
+
     def put(self, src: str, dest: str) -> bool:
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         shutil.copy2(src, dest)
@@ -98,9 +103,11 @@ class LocalStorage:
 
 class S3Storage:
     """Optional S3 backend — only instantiated if boto3 is available."""
+
     def __init__(self, bucket: str, prefix: str = "checkpoints"):
         try:
             import boto3
+
             self._s3 = boto3.client("s3")
         except ImportError:
             raise ImportError("S3 backend requires boto3: pip install boto3")
@@ -139,6 +146,7 @@ class S3Storage:
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ShardInfo:
     rank: int
@@ -153,6 +161,7 @@ class ShardInfo:
 @dataclass
 class CheckpointManifest:
     """Commit marker — checkpoint valid iff manifest exists and is complete."""
+
     checkpoint_id: str
     job_id: str
     step: int
@@ -187,6 +196,7 @@ class CheckpointManifest:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _compute_sha256(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -200,25 +210,38 @@ def _topology_hash(topology: Dict[str, Any]) -> str:
     return hashlib.sha256(canon.encode()).hexdigest()[:16]
 
 
-def _run_on(host: Optional[str], cmd: str, user: str = "root",
-            key: Optional[str] = None, timeout: int = 120) -> Tuple[int, str, str]:
+def _run_on(
+    host: Optional[str],
+    cmd: str,
+    user: str = "root",
+    key: Optional[str] = None,
+    timeout: int = 120,
+) -> Tuple[int, str, str]:
     # SECURITY: Validate command to prevent shell injection
     import re
+
     # Allow alphanumeric, spaces, and basic shell-safe characters
     if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t"\']+$', cmd):
         return -1, "", "Unsafe command characters detected"
-    
+
     if host and host not in ("localhost", "127.0.0.1"):
         # Validate host and user
-        if not re.match(r'^[a-zA-Z0-9._-]+$', user):
+        if not re.match(r"^[a-zA-Z0-9._-]+$", user):
             return -1, "", "Invalid username format"
-        if not re.match(r'^[a-zA-Z0-9._-]+$', host):
+        if not re.match(r"^[a-zA-Z0-9._-]+$", host):
             return -1, "", "Invalid hostname format"
-        if key and not re.match(r'^[a-zA-Z0-9._/~-]+$', key):
+        if key and not re.match(r"^[a-zA-Z0-9._/~-]+$", key):
             return -1, "", "Invalid key path format"
-        
-        ssh = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
-               "-o", "ConnectTimeout=10", "-o", "BatchMode=yes"]
+
+        ssh = [
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ConnectTimeout=10",
+            "-o",
+            "BatchMode=yes",
+        ]
         if key:
             ssh.extend(["-i", key])
         ssh.extend([f"{user}@{host}", cmd])
@@ -229,7 +252,9 @@ def _run_on(host: Optional[str], cmd: str, user: str = "root",
             return -1, "", str(e)
     # SECURITY: shell=True is used but command is validated above
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True, timeout=timeout
+        )
         return r.returncode, r.stdout.strip(), r.stderr.strip()
     except Exception as e:
         return -1, "", str(e)
@@ -238,6 +263,7 @@ def _run_on(host: Optional[str], cmd: str, user: str = "root",
 # ---------------------------------------------------------------------------
 # DAG node functions
 # ---------------------------------------------------------------------------
+
 
 def _write_shard(ctx: Dict[str, Any]) -> ShardInfo:
     """Write a single shard (parallel per rank)."""
@@ -279,8 +305,11 @@ def _write_shard(ctx: Dict[str, Any]) -> ShardInfo:
             r = subprocess.run(scp, capture_output=True, text=True, timeout=600)
             if r.returncode == 0:
                 rc, stdout, _ = _run_on(
-                    node, f"stat -c %s {dest_path} && sha256sum {dest_path} | cut -d' ' -f1",
-                    user, key)
+                    node,
+                    f"stat -c %s {dest_path} && sha256sum {dest_path} | cut -d' ' -f1",
+                    user,
+                    key,
+                )
                 if rc == 0:
                     lines = stdout.splitlines()
                     shard.size_bytes = int(lines[0]) if lines else 0
@@ -299,13 +328,17 @@ def _write_shard(ctx: Dict[str, Any]) -> ShardInfo:
 def _assemble_manifest(ctx: Dict[str, Any]) -> CheckpointManifest:
     """Assemble manifest from shard writes (Wave 1)."""
     deps = ctx.get("__deps__", {})
-    shards: List[ShardInfo] = [v for k, v in deps.items()
-                                if k.startswith("shard_") and isinstance(v, ShardInfo)]
+    shards: List[ShardInfo] = [
+        v
+        for k, v in deps.items()
+        if k.startswith("shard_") and isinstance(v, ShardInfo)
+    ]
 
     failed = [s for s in shards if s.status == "failed"]
     if failed:
         raise RuntimeError(
-            f"{len(failed)}/{len(shards)} shards failed (ranks: {[s.rank for s in failed]})")
+            f"{len(failed)}/{len(shards)} shards failed (ranks: {[s.rank for s in failed]})"
+        )
 
     ckpt_id = ctx.get("checkpoint_id", f"ckpt-{uuid.uuid4().hex[:8]}")
     return CheckpointManifest(
@@ -314,10 +347,17 @@ def _assemble_manifest(ctx: Dict[str, Any]) -> CheckpointManifest:
         step=ctx.get("step", 0),
         timestamp=datetime.now().isoformat(),
         topology_hash=_topology_hash(ctx.get("topology", {})),
-        shards=[{"rank": s.rank, "node": s.node, "path": s.path,
-                 "size_bytes": s.size_bytes, "sha256": s.sha256,
-                 "write_ms": s.write_ms}
-                for s in sorted(shards, key=lambda x: x.rank)],
+        shards=[
+            {
+                "rank": s.rank,
+                "node": s.node,
+                "path": s.path,
+                "size_bytes": s.size_bytes,
+                "sha256": s.sha256,
+                "write_ms": s.write_ms,
+            }
+            for s in sorted(shards, key=lambda x: x.rank)
+        ],
         total_size_bytes=sum(s.size_bytes for s in shards),
         shard_count=len(shards),
         framework=ctx.get("framework", ""),
@@ -341,14 +381,17 @@ def _commit_manifest(ctx: Dict[str, Any]) -> str:
         json.dump(manifest.to_dict(), f, indent=2)
 
     os.rename(temp, final)
-    logger.info(f"Committed: {manifest.checkpoint_id} step={manifest.step} "
-                f"shards={manifest.shard_count} size={manifest.total_size_bytes}")
+    logger.info(
+        f"Committed: {manifest.checkpoint_id} step={manifest.step} "
+        f"shards={manifest.shard_count} size={manifest.total_size_bytes}"
+    )
     return final
 
 
 # ---------------------------------------------------------------------------
 # CheckpointManager
 # ---------------------------------------------------------------------------
+
 
 class CheckpointManager:
     """
@@ -368,11 +411,15 @@ class CheckpointManager:
         manifest = mgr.restore("job-1")  # latest
     """
 
-    def __init__(self, base_dir: str = "",
-                 state_manager=None,
-                 storage: Optional[StorageBackend] = None,
-                 ssh_user: str = "root", ssh_key: Optional[str] = None,
-                 retention: int = 3):
+    def __init__(
+        self,
+        base_dir: str = "",
+        state_manager=None,
+        storage: Optional[StorageBackend] = None,
+        ssh_user: str = "root",
+        ssh_key: Optional[str] = None,
+        retention: int = 3,
+    ):
         self.base_dir = base_dir or str(Path.home() / ".terradev" / "checkpoints")
         self.state_manager = state_manager
         self.storage = storage or LocalStorage()
@@ -381,12 +428,16 @@ class CheckpointManager:
         self.retention = retention
         Path(self.base_dir).mkdir(parents=True, exist_ok=True)
 
-    def save(self, job_id: str, step: int,
-             shard_paths: Dict[int, str],
-             nodes: Optional[Dict[int, str]] = None,
-             topology: Optional[Dict[str, Any]] = None,
-             framework: str = "pytorch",
-             metadata: Optional[Dict[str, Any]] = None) -> CheckpointManifest:
+    def save(
+        self,
+        job_id: str,
+        step: int,
+        shard_paths: Dict[int, str],
+        nodes: Optional[Dict[int, str]] = None,
+        topology: Optional[Dict[str, Any]] = None,
+        framework: str = "pytorch",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> CheckpointManifest:
         """Save checkpoint with DAG-parallel shard writes."""
         nodes = nodes or {}
         ckpt_id = f"ckpt-{uuid.uuid4().hex[:8]}"
@@ -408,22 +459,39 @@ class CheckpointManager:
 
             def make_fn(r, sp, nh):
                 def fn(_ctx):
-                    return _write_shard({
-                        "rank": r, "node": nh, "src_path": sp,
-                        "dest_dir": dest_dir, "ssh_user": self.ssh_user,
-                        "ssh_key": self.ssh_key})
+                    return _write_shard(
+                        {
+                            "rank": r,
+                            "node": nh,
+                            "src_path": sp,
+                            "dest_dir": dest_dir,
+                            "ssh_user": self.ssh_user,
+                            "ssh_key": self.ssh_key,
+                        }
+                    )
+
                 return fn
+
             dag.add_node(name, make_fn(rank, src, nodes.get(rank, "localhost")))
 
-        dag.add_node("manifest_assemble", _assemble_manifest,
-                     depends_on=set(shard_names))
-        dag.add_node("manifest_commit", _commit_manifest,
-                     depends_on={"manifest_assemble"})
+        dag.add_node(
+            "manifest_assemble", _assemble_manifest, depends_on=set(shard_names)
+        )
+        dag.add_node(
+            "manifest_commit", _commit_manifest, depends_on={"manifest_assemble"}
+        )
 
-        result = dag.apply(initial_context={
-            "job_id": job_id, "step": step, "dest_dir": dest_dir,
-            "topology": topology or {}, "framework": framework,
-            "checkpoint_id": ckpt_id, "metadata": metadata or {}})
+        result = dag.apply(
+            initial_context={
+                "job_id": job_id,
+                "step": step,
+                "dest_dir": dest_dir,
+                "topology": topology or {},
+                "framework": framework,
+                "checkpoint_id": ckpt_id,
+                "metadata": metadata or {},
+            }
+        )
 
         if not result.success:
             if self.state_manager:
@@ -445,7 +513,8 @@ class CheckpointManager:
                     if os.path.exists(shard["path"]):
                         self.storage.put(
                             shard["path"],
-                            f"{job_id}/step_{step:08d}/{os.path.basename(shard['path'])}")
+                            f"{job_id}/step_{step:08d}/{os.path.basename(shard['path'])}",
+                        )
                 logger.info(f"Uploaded checkpoint to remote storage")
 
         # State DB updates
@@ -459,9 +528,13 @@ class CheckpointManager:
 
         return manifest
 
-    def restore(self, job_id: str, step: Optional[int] = None,
-                checkpoint_id: Optional[str] = None,
-                topology: Optional[Dict] = None) -> CheckpointManifest:
+    def restore(
+        self,
+        job_id: str,
+        step: Optional[int] = None,
+        checkpoint_id: Optional[str] = None,
+        topology: Optional[Dict] = None,
+    ) -> CheckpointManifest:
         """Restore checkpoint with parallel shard verification."""
         manifest_path = self._find_manifest(job_id, step, checkpoint_id)
 
@@ -474,13 +547,17 @@ class CheckpointManager:
             if current != manifest.topology_hash:
                 raise RuntimeError(
                     f"Topology mismatch: saved={manifest.topology_hash} "
-                    f"current={current}")
+                    f"current={current}"
+                )
 
         # Parallel shard verification
         if manifest.shards:
-            dag = DAGExecutor(max_workers=min(len(manifest.shards), 8),
-                              name=f"ckpt_verify_{manifest.step}")
+            dag = DAGExecutor(
+                max_workers=min(len(manifest.shards), 8),
+                name=f"ckpt_verify_{manifest.step}",
+            )
             for shard in manifest.shards:
+
                 def make_verify(s):
                     def fn(_ctx):
                         path = s["path"]
@@ -491,10 +568,11 @@ class CheckpointManager:
                             raise FileNotFoundError(f"Shard missing: {path}")
                         actual = _compute_sha256(path)
                         if actual != expected:
-                            raise RuntimeError(
-                                f"Rank {s['rank']} checksum mismatch")
+                            raise RuntimeError(f"Rank {s['rank']} checksum mismatch")
                         return {"rank": s["rank"], "verified": True}
+
                     return fn
+
                 dag.add_node(f"v_{shard['rank']}", make_verify(shard))
 
             vr = dag.apply()
@@ -508,7 +586,9 @@ class CheckpointManager:
         """List checkpoints for a job."""
         if self.state_manager:
             try:
-                return [c.to_dict() for c in self.state_manager.list_checkpoints(job_id)]
+                return [
+                    c.to_dict() for c in self.state_manager.list_checkpoints(job_id)
+                ]
             except Exception:
                 pass
 
@@ -522,8 +602,7 @@ class CheckpointManager:
                         results.append(json.load(f))
         return results
 
-    def promote(self, job_id: str, checkpoint_id: str,
-                dest_path: str = "") -> str:
+    def promote(self, job_id: str, checkpoint_id: str, dest_path: str = "") -> str:
         """Promote checkpoint (copy to model output path)."""
         if self.state_manager:
             try:
@@ -533,8 +612,9 @@ class CheckpointManager:
 
         if dest_path:
             ckpts = self.list(job_id)
-            ckpt = next((c for c in ckpts
-                         if c.get("checkpoint_id") == checkpoint_id), None)
+            ckpt = next(
+                (c for c in ckpts if c.get("checkpoint_id") == checkpoint_id), None
+            )
             if ckpt and ckpt.get("shards"):
                 src_dir = os.path.dirname(ckpt["shards"][0]["path"])
                 if src_dir and os.path.isdir(src_dir):
@@ -561,8 +641,9 @@ class CheckpointManager:
                         pass
                 return
 
-    def _find_manifest(self, job_id: str, step: Optional[int],
-                       checkpoint_id: Optional[str]) -> str:
+    def _find_manifest(
+        self, job_id: str, step: Optional[int], checkpoint_id: Optional[str]
+    ) -> str:
         """Locate manifest file."""
         if checkpoint_id and self.state_manager:
             try:
@@ -576,8 +657,9 @@ class CheckpointManager:
                 pass
 
         if step is not None:
-            mp = os.path.join(self.base_dir, job_id,
-                              f"step_{step:08d}", "manifest.json")
+            mp = os.path.join(
+                self.base_dir, job_id, f"step_{step:08d}", "manifest.json"
+            )
             if os.path.exists(mp):
                 return mp
 
@@ -600,4 +682,5 @@ class CheckpointManager:
                     return str(mp)
 
         raise FileNotFoundError(
-            f"No checkpoint: job={job_id} step={step} id={checkpoint_id}")
+            f"No checkpoint: job={job_id} step={step} id={checkpoint_id}"
+        )

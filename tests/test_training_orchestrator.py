@@ -54,14 +54,16 @@ class TestTrainingConfig:
         assert c.max_restarts == 3
 
     def test_from_dict(self):
-        c = TrainingConfig.from_dict({
-            "name": "my-job",
-            "framework": "deepspeed",
-            "script": "train.py",
-            "nodes": ["10.0.0.1", "10.0.0.2"],
-            "gpus_per_node": 4,
-            "tp_size": 2,
-        })
+        c = TrainingConfig.from_dict(
+            {
+                "name": "my-job",
+                "framework": "deepspeed",
+                "script": "train.py",
+                "nodes": ["10.0.0.1", "10.0.0.2"],
+                "gpus_per_node": 4,
+                "tp_size": 2,
+            }
+        )
         assert c.name == "my-job"
         assert c.framework == "deepspeed"
         assert len(c.nodes) == 2
@@ -69,10 +71,12 @@ class TestTrainingConfig:
         assert c.tp_size == 2
 
     def test_from_dict_ignores_unknown_keys(self):
-        c = TrainingConfig.from_dict({
-            "script": "train.py",
-            "unknown_key": "ignored",
-        })
+        c = TrainingConfig.from_dict(
+            {
+                "script": "train.py",
+                "unknown_key": "ignored",
+            }
+        )
         assert c.script == "train.py"
         assert not hasattr(c, "unknown_key")
 
@@ -137,8 +141,9 @@ class TestCommandBuilders:
             script="train.py",
             gpus_per_node=4,
         )
-        cmd = _build_deepspeed_cmd(config, n_nodes=1,
-                                   master_addr="localhost", hostfile="")
+        cmd = _build_deepspeed_cmd(
+            config, n_nodes=1, master_addr="localhost", hostfile=""
+        )
         assert cmd[0] == "deepspeed"
         assert "train.py" in cmd
 
@@ -147,9 +152,9 @@ class TestCommandBuilders:
             script="train.py",
             gpus_per_node=8,
         )
-        cmd = _build_deepspeed_cmd(config, n_nodes=2,
-                                   master_addr="10.0.0.1",
-                                   hostfile="/tmp/hostfile")
+        cmd = _build_deepspeed_cmd(
+            config, n_nodes=2, master_addr="10.0.0.1", hostfile="/tmp/hostfile"
+        )
         assert "--hostfile=/tmp/hostfile" in cmd
         assert "--num_nodes=2" in cmd
         assert "--master_addr=10.0.0.1" in cmd
@@ -275,9 +280,7 @@ class TestOrchestratorStatus:
 class TestRunOn:
     @patch("subprocess.run")
     def test_localhost_runs_shell(self, mock_run):
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="OK", stderr=""
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="OK", stderr="")
         rc, out, err = _run_on(None, "echo hello")
         assert rc == 0
         assert out == "OK"
@@ -285,9 +288,7 @@ class TestRunOn:
 
     @patch("subprocess.run")
     def test_remote_runs_ssh(self, mock_run):
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="remote-ok", stderr=""
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="remote-ok", stderr="")
         rc, out, err = _run_on("10.0.0.1", "nvidia-smi", user="ubuntu")
         assert rc == 0
         call_args = mock_run.call_args[0][0]

@@ -119,7 +119,9 @@ def format_trace_summary(spans: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-async def view_trace(phoenix_service, trace_id: str, project: Optional[str] = None) -> str:
+async def view_trace(
+    phoenix_service, trace_id: str, project: Optional[str] = None
+) -> str:
     """Fetch and render a trace from Phoenix."""
     data = await phoenix_service.get_trace(trace_id, project_identifier=project)
     spans = data.get("data", [])
@@ -127,14 +129,17 @@ async def view_trace(phoenix_service, trace_id: str, project: Optional[str] = No
 
 
 async def view_recent_spans(
-    phoenix_service, *,
+    phoenix_service,
+    *,
     project: Optional[str] = None,
     limit: int = 20,
     filter_condition: Optional[str] = None,
 ) -> str:
     """Fetch and render recent spans."""
     data = await phoenix_service.list_spans(
-        project, limit=limit, filter_condition=filter_condition,
+        project,
+        limit=limit,
+        filter_condition=filter_condition,
     )
     spans = data.get("data", [])
     if not spans:

@@ -204,10 +204,12 @@ class TestExecution:
 
     def test_parallel_independent_nodes(self):
         """6 independent nodes should run in parallel."""
+
         def slow_node(n):
             def fn(ctx):
                 time.sleep(0.05)
                 return n
+
             return fn
 
         dag = DAGExecutor(max_workers=6, name="test")
@@ -275,6 +277,7 @@ class TestIntrospection:
 class TestBuildSignalDag:
     def test_signal_dag_all_independent(self):
         from terradev_cli.core.semantic_signals.orchestrator import SignalOrchestrator
+
         orch = SignalOrchestrator(parallel=False)
         dag = build_signal_dag(orch)
         plan = dag.plan()
@@ -285,9 +288,12 @@ class TestBuildSignalDag:
 
     def test_signal_dag_executes(self):
         from terradev_cli.core.semantic_signals.orchestrator import SignalOrchestrator
+
         orch = SignalOrchestrator(parallel=False)
         dag = build_signal_dag(orch)
-        result = dag.apply(initial_context={"__query__": {"content": "Write Python code"}})
+        result = dag.apply(
+            initial_context={"__query__": {"content": "Write Python code"}}
+        )
         assert result.success
         assert "keyword" in result.outputs
         assert "modality" in result.outputs
@@ -295,6 +301,7 @@ class TestBuildSignalDag:
 
     def test_signal_dag_disabled_signal_excluded(self):
         from terradev_cli.core.semantic_signals.orchestrator import SignalOrchestrator
+
         orch = SignalOrchestrator(config={"safety_enabled": False}, parallel=False)
         dag = build_signal_dag(orch)
         plan = dag.plan()

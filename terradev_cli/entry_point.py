@@ -21,10 +21,12 @@ Simple entry point for open source version - no telemetry enforcement
 
 import sys
 
+
 def main():
     """Main entry point"""
     try:
         from .cli import cli
+
         cli()
     except KeyboardInterrupt:
         print("\n👋 Goodbye!", file=sys.stderr)
@@ -33,5 +35,6 @@ def main():
         print(f"❌ CLI Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

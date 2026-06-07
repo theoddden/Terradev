@@ -11,9 +11,11 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from pathlib import Path
 
+
 @dataclass
 class ModelSpec:
     """Model specifications for hardware optimization"""
+
     model_id: str
     model_size_gb: float
     parameters: str
@@ -24,9 +26,11 @@ class ModelSpec:
     streaming_capable: bool = True
     quantization_support: bool = True
 
+
 @dataclass
 class HardwareTier:
     """Hardware tier specifications"""
+
     name: str
     memory_gb: float
     gpu_type: str
@@ -34,13 +38,14 @@ class HardwareTier:
     performance_score: float
     available_regions: List[str]
 
+
 class SmartTemplateGenerator:
     """Generates intelligent templates based on model analysis"""
-    
+
     def __init__(self):
         self.model_specs = self._load_model_specs()
         self.hardware_tiers = self._load_hardware_tiers()
-        
+
     def _load_model_specs(self) -> Dict[str, ModelSpec]:
         """Load model specifications database"""
         return {
@@ -54,7 +59,7 @@ class SmartTemplateGenerator:
                 recommended_hardware="a10g-large",
                 hourly_cost=0.60,
                 streaming_capable=True,
-                quantization_support=True
+                quantization_support=True,
             ),
             "meta-llama/Llama-3-70B-Instruct": ModelSpec(
                 model_id="meta-llama/Llama-3-70B-Instruct",
@@ -65,7 +70,7 @@ class SmartTemplateGenerator:
                 recommended_hardware="a100-80gb",
                 hourly_cost=4.06,
                 streaming_capable=True,
-                quantization_support=True
+                quantization_support=True,
             ),
             "meta-llama/Llama-2-7b-hf": ModelSpec(
                 model_id="meta-llama/Llama-2-7b-hf",
@@ -76,7 +81,7 @@ class SmartTemplateGenerator:
                 recommended_hardware="a10g-large",
                 hourly_cost=0.60,
                 streaming_capable=True,
-                quantization_support=True
+                quantization_support=True,
             ),
             "meta-llama/Llama-2-70b-hf": ModelSpec(
                 model_id="meta-llama/Llama-2-70b-hf",
@@ -87,9 +92,8 @@ class SmartTemplateGenerator:
                 recommended_hardware="a100-80gb",
                 hourly_cost=4.06,
                 streaming_capable=True,
-                quantization_support=True
+                quantization_support=True,
             ),
-            
             # Mistral Models
             "mistralai/Mistral-7B-Instruct-v0.2": ModelSpec(
                 model_id="mistralai/Mistral-7B-Instruct-v0.2",
@@ -100,7 +104,7 @@ class SmartTemplateGenerator:
                 recommended_hardware="a10g-large",
                 hourly_cost=0.60,
                 streaming_capable=True,
-                quantization_support=True
+                quantization_support=True,
             ),
             "mistralai/Mixtral-8x7B-Instruct-v0.1": ModelSpec(
                 model_id="mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -111,9 +115,8 @@ class SmartTemplateGenerator:
                 recommended_hardware="a100-40gb",
                 hourly_cost=2.50,
                 streaming_capable=True,
-                quantization_support=True
+                quantization_support=True,
             ),
-            
             # Embedding Models
             "sentence-transformers/all-MiniLM-L6-v2": ModelSpec(
                 model_id="sentence-transformers/all-MiniLM-L6-v2",
@@ -124,7 +127,7 @@ class SmartTemplateGenerator:
                 recommended_hardware="cpu-upgrade",
                 hourly_cost=0.15,
                 streaming_capable=False,
-                quantization_support=False
+                quantization_support=False,
             ),
             "sentence-transformers/all-mpnet-base-v2": ModelSpec(
                 model_id="sentence-transformers/all-mpnet-base-v2",
@@ -135,9 +138,8 @@ class SmartTemplateGenerator:
                 recommended_hardware="cpu-upgrade",
                 hourly_cost=0.15,
                 streaming_capable=False,
-                quantization_support=False
+                quantization_support=False,
             ),
-            
             # Image Models
             "runwayml/stable-diffusion-v1-5": ModelSpec(
                 model_id="runwayml/stable-diffusion-v1-5",
@@ -148,7 +150,7 @@ class SmartTemplateGenerator:
                 recommended_hardware="t4-medium",
                 hourly_cost=0.35,
                 streaming_capable=False,
-                quantization_support=False
+                quantization_support=False,
             ),
             "stabilityai/stable-diffusion-xl-base-1.0": ModelSpec(
                 model_id="stabilityai/stable-diffusion-xl-base-1.0",
@@ -159,9 +161,8 @@ class SmartTemplateGenerator:
                 recommended_hardware="a10g-large",
                 hourly_cost=0.60,
                 streaming_capable=False,
-                quantization_support=False
+                quantization_support=False,
             ),
-            
             # Code Models
             "codellama/CodeLlama-7b-hf": ModelSpec(
                 model_id="codellama/CodeLlama-7b-hf",
@@ -172,7 +173,7 @@ class SmartTemplateGenerator:
                 recommended_hardware="a10g-large",
                 hourly_cost=0.60,
                 streaming_capable=True,
-                quantization_support=True
+                quantization_support=True,
             ),
             "microsoft/CodeGPT-small-py": ModelSpec(
                 model_id="microsoft/CodeGPT-small-py",
@@ -183,10 +184,10 @@ class SmartTemplateGenerator:
                 recommended_hardware="cpu-upgrade",
                 hourly_cost=0.15,
                 streaming_capable=True,
-                quantization_support=True
-            )
+                quantization_support=True,
+            ),
         }
-    
+
     def _load_hardware_tiers(self) -> Dict[str, HardwareTier]:
         """Load hardware tier specifications"""
         return {
@@ -196,7 +197,7 @@ class SmartTemplateGenerator:
                 gpu_type="CPU",
                 hourly_cost=0.05,
                 performance_score=1.0,
-                available_regions=["us-east-1", "eu-west-1"]
+                available_regions=["us-east-1", "eu-west-1"],
             ),
             "cpu-upgrade": HardwareTier(
                 name="cpu-upgrade",
@@ -204,7 +205,7 @@ class SmartTemplateGenerator:
                 gpu_type="CPU",
                 hourly_cost=0.15,
                 performance_score=2.0,
-                available_regions=["us-east-1", "eu-west-1"]
+                available_regions=["us-east-1", "eu-west-1"],
             ),
             "t4-medium": HardwareTier(
                 name="t4-medium",
@@ -212,7 +213,7 @@ class SmartTemplateGenerator:
                 gpu_type="T4",
                 hourly_cost=0.35,
                 performance_score=5.0,
-                available_regions=["us-east-1", "eu-west-1"]
+                available_regions=["us-east-1", "eu-west-1"],
             ),
             "a10g-large": HardwareTier(
                 name="a10g-large",
@@ -220,7 +221,7 @@ class SmartTemplateGenerator:
                 gpu_type="A10G",
                 hourly_cost=0.60,
                 performance_score=8.0,
-                available_regions=["us-east-1", "eu-west-1"]
+                available_regions=["us-east-1", "eu-west-1"],
             ),
             "a10g-xlarge": HardwareTier(
                 name="a10g-xlarge",
@@ -228,7 +229,7 @@ class SmartTemplateGenerator:
                 gpu_type="A10G",
                 hourly_cost=1.20,
                 performance_score=16.0,
-                available_regions=["us-east-1", "eu-west-1"]
+                available_regions=["us-east-1", "eu-west-1"],
             ),
             "a100-40gb": HardwareTier(
                 name="a100-40gb",
@@ -236,7 +237,7 @@ class SmartTemplateGenerator:
                 gpu_type="A100",
                 hourly_cost=2.50,
                 performance_score=20.0,
-                available_regions=["us-east-1"]
+                available_regions=["us-east-1"],
             ),
             "a100-80gb": HardwareTier(
                 name="a100-80gb",
@@ -244,25 +245,28 @@ class SmartTemplateGenerator:
                 gpu_type="A100",
                 hourly_cost=4.06,
                 performance_score=40.0,
-                available_regions=["us-east-1"]
-            )
+                available_regions=["us-east-1"],
+            ),
         }
-    
+
     def analyze_model(self, model_id: str) -> Optional[ModelSpec]:
         """Analyze model and return specifications"""
         # Direct lookup
         if model_id in self.model_specs:
             return self.model_specs[model_id]
-        
+
         # Pattern-based estimation
         return self._estimate_model_specs(model_id)
-    
+
     def _estimate_model_specs(self, model_id: str) -> Optional[ModelSpec]:
         """Estimate model specs from model ID patterns"""
         model_id_lower = model_id.lower()
-        
+
         # LLM patterns
-        if any(keyword in model_id_lower for keyword in ["llama", "mistral", "mixtral", "codellama"]):
+        if any(
+            keyword in model_id_lower
+            for keyword in ["llama", "mistral", "mixtral", "codellama"]
+        ):
             if "70b" in model_id_lower or "8x7b" in model_id_lower:
                 return ModelSpec(
                     model_id=model_id,
@@ -273,7 +277,7 @@ class SmartTemplateGenerator:
                     recommended_hardware="a100-80gb",
                     hourly_cost=4.06,
                     streaming_capable=True,
-                    quantization_support=True
+                    quantization_support=True,
                 )
             elif "34b" in model_id_lower:
                 return ModelSpec(
@@ -285,9 +289,13 @@ class SmartTemplateGenerator:
                     recommended_hardware="a100-40gb",
                     hourly_cost=2.50,
                     streaming_capable=True,
-                    quantization_support=True
+                    quantization_support=True,
                 )
-            elif "13b" in model_id_lower or "8b" in model_id_lower or "7b" in model_id_lower:
+            elif (
+                "13b" in model_id_lower
+                or "8b" in model_id_lower
+                or "7b" in model_id_lower
+            ):
                 return ModelSpec(
                     model_id=model_id,
                     model_size_gb=16.0,
@@ -297,9 +305,9 @@ class SmartTemplateGenerator:
                     recommended_hardware="a10g-large",
                     hourly_cost=0.60,
                     streaming_capable=True,
-                    quantization_support=True
+                    quantization_support=True,
                 )
-        
+
         # Embedding patterns
         elif "embedding" in model_id_lower or "sentence-transformers" in model_id_lower:
             return ModelSpec(
@@ -311,11 +319,14 @@ class SmartTemplateGenerator:
                 recommended_hardware="cpu-upgrade",
                 hourly_cost=0.15,
                 streaming_capable=False,
-                quantization_support=False
+                quantization_support=False,
             )
-        
+
         # Image patterns
-        elif any(keyword in model_id_lower for keyword in ["stable-diffusion", "sd", "midjourney"]):
+        elif any(
+            keyword in model_id_lower
+            for keyword in ["stable-diffusion", "sd", "midjourney"]
+        ):
             if "xl" in model_id_lower or "sdxl" in model_id_lower:
                 return ModelSpec(
                     model_id=model_id,
@@ -326,7 +337,7 @@ class SmartTemplateGenerator:
                     recommended_hardware="a10g-large",
                     hourly_cost=0.60,
                     streaming_capable=False,
-                    quantization_support=False
+                    quantization_support=False,
                 )
             else:
                 return ModelSpec(
@@ -338,32 +349,36 @@ class SmartTemplateGenerator:
                     recommended_hardware="t4-medium",
                     hourly_cost=0.35,
                     streaming_capable=False,
-                    quantization_support=False
+                    quantization_support=False,
                 )
-        
+
         return None
-    
-    def optimize_hardware(self, model_spec: ModelSpec, budget_constraint: Optional[float] = None) -> List[HardwareTier]:
+
+    def optimize_hardware(
+        self, model_spec: ModelSpec, budget_constraint: Optional[float] = None
+    ) -> List[HardwareTier]:
         """Optimize hardware selection for model"""
         suitable_tiers = []
-        
+
         for tier_name, tier in self.hardware_tiers.items():
             # Check memory requirements
             if tier.memory_gb >= model_spec.min_memory_gb:
                 # Check budget constraint
                 if budget_constraint is None or tier.hourly_cost <= budget_constraint:
                     suitable_tiers.append(tier)
-        
+
         # Sort by performance (best first)
         suitable_tiers.sort(key=lambda x: x.performance_score, reverse=True)
-        
+
         return suitable_tiers
-    
-    def generate_cost_breakdown(self, model_spec: ModelSpec, hardware_tier: HardwareTier) -> Dict[str, Any]:
+
+    def generate_cost_breakdown(
+        self, model_spec: ModelSpec, hardware_tier: HardwareTier
+    ) -> Dict[str, Any]:
         """Generate cost breakdown for deployment"""
         monthly_cost_24_7 = hardware_tier.hourly_cost * 24 * 30
         monthly_cost_8h = hardware_tier.hourly_cost * 8 * 30  # 8 hours/day
-        
+
         return {
             "model_id": model_spec.model_id,
             "model_size_gb": model_spec.model_size_gb,
@@ -376,35 +391,40 @@ class SmartTemplateGenerator:
                 "daily_24_7": hardware_tier.hourly_cost * 24,
                 "daily_8h": hardware_tier.hourly_cost * 8,
                 "monthly_24_7": monthly_cost_24_7,
-                "monthly_8h": monthly_cost_8h
+                "monthly_8h": monthly_cost_8h,
             },
-            "memory_utilization": (model_spec.min_memory_gb / hardware_tier.memory_gb) * 100,
+            "memory_utilization": (model_spec.min_memory_gb / hardware_tier.memory_gb)
+            * 100,
             "performance_score": hardware_tier.performance_score,
             "streaming_supported": model_spec.streaming_capable,
-            "quantization_supported": model_spec.quantization_support
+            "quantization_supported": model_spec.quantization_support,
         }
-    
-    def generate_smart_template(self, model_id: str, template_type: str = "auto", space_name: str = None) -> Dict[str, Any]:
+
+    def generate_smart_template(
+        self, model_id: str, template_type: str = "auto", space_name: str = None
+    ) -> Dict[str, Any]:
         """Generate smart template based on model analysis"""
         model_spec = self.analyze_model(model_id)
         if not model_spec:
             return {"error": f"Unable to analyze model: {model_id}"}
-        
+
         # Optimize hardware
         suitable_hardware = self.optimize_hardware(model_spec)
         if not suitable_hardware:
             return {"error": f"No suitable hardware found for model: {model_id}"}
-        
+
         best_hardware = suitable_hardware[0]
-        
+
         # Generate space name if not provided
         if not space_name:
-            space_name = f"terradev-{model_spec.model_type}-{model_spec.parameters.lower()}"
-        
+            space_name = (
+                f"terradev-{model_spec.model_type}-{model_spec.parameters.lower()}"
+            )
+
         # Generate template based on model type
         if template_type == "auto":
             template_type = model_spec.model_type
-        
+
         template_config = {
             "name": space_name,
             "model_id": model_id,
@@ -412,45 +432,41 @@ class SmartTemplateGenerator:
                 "parameters": model_spec.parameters,
                 "model_size_gb": model_spec.model_size_gb,
                 "model_type": model_spec.model_type,
-                "min_memory_gb": model_spec.min_memory_gb
+                "min_memory_gb": model_spec.min_memory_gb,
             },
             "hardware": best_hardware.name,
             "sdk": "gradio" if model_spec.streaming_capable else "streamlit",
             "python_version": "3.10",
             "private": False,
-            "template_type": template_type
+            "template_type": template_type,
         }
-        
+
         # Add model-specific environment variables
         env_vars = {
             "MODEL_ID": model_id,
             "MODEL_TYPE": model_spec.model_type,
-            "HARDWARE": best_hardware.name
+            "HARDWARE": best_hardware.name,
         }
-        
+
         if model_spec.model_type == "llm":
-            env_vars.update({
-                "MAX_LENGTH": "500",
-                "TEMPERATURE": "0.7",
-                "STREAMING": "true" if model_spec.streaming_capable else "false"
-            })
+            env_vars.update(
+                {
+                    "MAX_LENGTH": "500",
+                    "TEMPERATURE": "0.7",
+                    "STREAMING": "true" if model_spec.streaming_capable else "false",
+                }
+            )
         elif model_spec.model_type == "embedding":
-            env_vars.update({
-                "BATCH_SIZE": "32",
-                "MAX_SEQ_LENGTH": "512"
-            })
+            env_vars.update({"BATCH_SIZE": "32", "MAX_SEQ_LENGTH": "512"})
         elif model_spec.model_type == "image":
-            env_vars.update({
-                "IMAGE_SIZE": "512",
-                "NUM_INFERENCE_STEPS": "20"
-            })
-        
+            env_vars.update({"IMAGE_SIZE": "512", "NUM_INFERENCE_STEPS": "20"})
+
         template_config["env_vars"] = env_vars
-        
+
         # Generate cost breakdown
         cost_breakdown = self.generate_cost_breakdown(model_spec, best_hardware)
         template_config["cost_breakdown"] = cost_breakdown
-        
+
         # Add alternative hardware options
         if len(suitable_hardware) > 1:
             template_config["alternative_hardware"] = [
@@ -458,19 +474,19 @@ class SmartTemplateGenerator:
                     "name": tier.name,
                     "hourly_cost": tier.hourly_cost,
                     "memory_gb": tier.memory_gb,
-                    "performance_score": tier.performance_score
+                    "performance_score": tier.performance_score,
                 }
                 for tier in suitable_hardware[1:4]  # Top 3 alternatives
             ]
-        
+
         return template_config
-    
+
     def generate_chat_template(self, model_id: str, space_name: str) -> str:
         """Generate optimized chat template with streaming"""
         model_spec = self.analyze_model(model_id)
         if not model_spec or model_spec.model_type != "llm":
             return "# Error: This model is not suitable for chat applications"
-        
+
         return f'''import gradio as gr
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
@@ -705,10 +721,10 @@ if __name__ == "__main__":
     demo.queue()
     demo.launch()
 '''
-    
+
     def generate_embedding_template(self, model_id: str, space_name: str) -> str:
         """Generate optimized embedding template"""
-        return f'''import streamlit as st
+        return f"""import streamlit as st
 import torch
 from transformers import AutoModel, AutoTokenizer
 import numpy as np
@@ -908,40 +924,48 @@ with col2:
 # Footer
 st.markdown("---")
 st.markdown("🚀 **Powered by Terradev** | Multi-Cloud GPU Arbitrage Platform")
-'''
+"""
+
 
 class HardwareOptimizer:
     """Hardware tier optimization engine"""
-    
+
     def __init__(self):
         self.template_generator = SmartTemplateGenerator()
-    
-    def get_hardware_recommendation(self, model_id: str, budget_constraint: Optional[float] = None) -> Dict[str, Any]:
+
+    def get_hardware_recommendation(
+        self, model_id: str, budget_constraint: Optional[float] = None
+    ) -> Dict[str, Any]:
         """Get hardware recommendation with cost breakdown"""
         model_spec = self.template_generator.analyze_model(model_id)
         if not model_spec:
             return {"error": f"Unable to analyze model: {model_id}"}
-        
-        suitable_hardware = self.template_generator.optimize_hardware(model_spec, budget_constraint)
-        
+
+        suitable_hardware = self.template_generator.optimize_hardware(
+            model_spec, budget_constraint
+        )
+
         if not suitable_hardware:
             return {"error": f"No suitable hardware found for model: {model_id}"}
-        
+
         best_hardware = suitable_hardware[0]
-        cost_breakdown = self.template_generator.generate_cost_breakdown(model_spec, best_hardware)
-        
+        cost_breakdown = self.template_generator.generate_cost_breakdown(
+            model_spec, best_hardware
+        )
+
         recommendation = {
             "model_id": model_id,
             "model_analysis": {
                 "parameters": model_spec.parameters,
                 "model_size_gb": model_spec.model_size_gb,
                 "model_type": model_spec.model_type,
-                "min_memory_gb": model_spec.min_memory_gb
+                "min_memory_gb": model_spec.min_memory_gb,
             },
             "recommended_hardware": best_hardware.name,
             "recommendation_reason": f"Model requires {model_spec.min_memory_gb}GB memory, {best_hardware.name} provides {best_hardware.memory_gb}GB",
             "cost_breakdown": cost_breakdown,
-            "memory_utilization": (model_spec.min_memory_gb / best_hardware.memory_gb) * 100,
+            "memory_utilization": (model_spec.min_memory_gb / best_hardware.memory_gb)
+            * 100,
             "performance_score": best_hardware.performance_score,
             "alternative_options": [
                 {
@@ -950,47 +974,59 @@ class HardwareOptimizer:
                     "memory_gb": tier.memory_gb,
                     "monthly_cost_24_7": tier.hourly_cost * 24 * 30,
                     "monthly_cost_8h": tier.hourly_cost * 8 * 30,
-                    "suitable": tier.memory_gb >= model_spec.min_memory_gb
+                    "suitable": tier.memory_gb >= model_spec.min_memory_gb,
                 }
                 for tier in suitable_hardware[1:5]  # Top 4 alternatives
-            ]
+            ],
         }
-        
+
         return recommendation
-    
+
     def compare_hardware_options(self, model_id: str) -> Dict[str, Any]:
         """Compare all hardware options for a model"""
         model_spec = self.template_generator.analyze_model(model_id)
         if not model_spec:
             return {"error": f"Unable to analyze model: {model_id}"}
-        
+
         all_hardware = []
         for tier_name, tier in self.template_generator.hardware_tiers.items():
             suitable = tier.memory_gb >= model_spec.min_memory_gb
-            cost_breakdown = self.template_generator.generate_cost_breakdown(model_spec, tier)
-            
-            all_hardware.append({
-                "hardware": tier.name,
-                "suitable": suitable,
-                "memory_gb": tier.memory_gb,
-                "gpu_type": tier.gpu_type,
-                "hourly_cost": tier.hourly_cost,
-                "performance_score": tier.performance_score,
-                "memory_utilization": (model_spec.min_memory_gb / tier.memory_gb) * 100 if suitable else None,
-                "monthly_cost_24_7": tier.hourly_cost * 24 * 30,
-                "monthly_cost_8h": tier.hourly_cost * 8 * 30,
-                "recommendation": "✅ Recommended" if suitable and tier.name == model_spec.recommended_hardware else ("✅ Suitable" if suitable else "❌ Insufficient memory")
-            })
-        
+            cost_breakdown = self.template_generator.generate_cost_breakdown(
+                model_spec, tier
+            )
+
+            all_hardware.append(
+                {
+                    "hardware": tier.name,
+                    "suitable": suitable,
+                    "memory_gb": tier.memory_gb,
+                    "gpu_type": tier.gpu_type,
+                    "hourly_cost": tier.hourly_cost,
+                    "performance_score": tier.performance_score,
+                    "memory_utilization": (
+                        (model_spec.min_memory_gb / tier.memory_gb) * 100
+                        if suitable
+                        else None
+                    ),
+                    "monthly_cost_24_7": tier.hourly_cost * 24 * 30,
+                    "monthly_cost_8h": tier.hourly_cost * 8 * 30,
+                    "recommendation": (
+                        "✅ Recommended"
+                        if suitable and tier.name == model_spec.recommended_hardware
+                        else ("✅ Suitable" if suitable else "❌ Insufficient memory")
+                    ),
+                }
+            )
+
         # Sort by performance score (best first)
         all_hardware.sort(key=lambda x: x["performance_score"], reverse=True)
-        
+
         return {
             "model_id": model_id,
             "model_requirements": {
                 "parameters": model_spec.parameters,
                 "min_memory_gb": model_spec.min_memory_gb,
-                "model_size_gb": model_spec.model_size_gb
+                "model_size_gb": model_spec.model_size_gb,
             },
-            "hardware_comparison": all_hardware
+            "hardware_comparison": all_hardware,
         }

@@ -95,12 +95,15 @@ class ProviderConformanceTest:
 
         # Assert headers is not None and is dict-like
         assert headers is not None, "_get_auth_headers() returned None"
-        assert isinstance(headers, dict), f"_get_auth_headers() returned {type(headers)}, expected dict"
+        assert isinstance(
+            headers, dict
+        ), f"_get_auth_headers() returned {type(headers)}, expected dict"
 
         # Assert all header values are str or bytes
         for key, value in headers.items():
-            assert isinstance(value, (str, bytes)), \
-                f"Header '{key}' has value of type {type(value)}, expected str or bytes"
+            assert isinstance(
+                value, (str, bytes)
+            ), f"Header '{key}' has value of type {type(value)}, expected str or bytes"
 
     @pytest.mark.asyncio
     async def test_quotes_returns_iterable(self, provider):
@@ -111,20 +114,28 @@ class ProviderConformanceTest:
         # In a real implementation, we'd use vcrpy/responses fixtures here
         try:
             quotes = await provider.get_instance_quotes(gpu_type="A100")
-            
+
             # Assert quotes is iterable
-            assert hasattr(quotes, '__iter__'), "get_instance_quotes() did not return iterable"
-            
+            assert hasattr(
+                quotes, "__iter__"
+            ), "get_instance_quotes() did not return iterable"
+
             # Convert to list to check non-empty
             quotes_list = list(quotes)
-            
+
             # If we got quotes, verify structure
             if quotes_list:
                 quote = quotes_list[0]
                 # Verify quote has expected attributes (price, gpu_type, region, etc.)
-                assert hasattr(quote, 'price') or 'price' in quote, "Quote missing 'price' attribute/key"
-                assert hasattr(quote, 'gpu_type') or 'gpu_type' in quote, "Quote missing 'gpu_type' attribute/key"
-                assert hasattr(quote, 'region') or 'region' in quote, "Quote missing 'region' attribute/key"
+                assert (
+                    hasattr(quote, "price") or "price" in quote
+                ), "Quote missing 'price' attribute/key"
+                assert (
+                    hasattr(quote, "gpu_type") or "gpu_type" in quote
+                ), "Quote missing 'gpu_type' attribute/key"
+                assert (
+                    hasattr(quote, "region") or "region" in quote
+                ), "Quote missing 'region' attribute/key"
         except Exception as e:
             # If provider needs real API, skip with informative message
             pytest.skip(f"Provider requires real API call or mock fixtures: {e}")
@@ -144,7 +155,7 @@ class ProviderConformanceTest:
         mock_session.get = AsyncMock(return_value=mock_response)
         mock_session.close = AsyncMock()
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             # Provider should handle 429 gracefully
             # In a real implementation, we'd verify backoff behavior
             try:
@@ -152,8 +163,9 @@ class ProviderConformanceTest:
                 # If we get here, provider handled 429
             except Exception as e:
                 # Provider should have attempted retry or raised specific error
-                assert "rate limit" in str(e).lower() or "429" in str(e), \
-                    f"Provider did not handle 429 gracefully: {e}"
+                assert "rate limit" in str(e).lower() or "429" in str(
+                    e
+                ), f"Provider did not handle 429 gracefully: {e}"
 
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="Requires provider-specific mocking setup")
@@ -170,7 +182,7 @@ class ProviderConformanceTest:
         mock_session.get = AsyncMock(return_value=mock_response)
         mock_session.close = AsyncMock()
 
-        with patch('aiohttp.ClientSession', return_value=mock_session):
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             try:
                 quotes = await provider.get_instance_quotes(gpu_type="A100")
                 # If we get here without error, test fails
@@ -178,14 +190,17 @@ class ProviderConformanceTest:
             except Exception as e:
                 # Verify error is auth-related
                 error_msg = str(e).lower()
-                assert "auth" in error_msg or "unauthorized" in error_msg or "401" in error_msg, \
-                    f"Provider did not raise auth-specific error on 401: {e}"
+                assert (
+                    "auth" in error_msg
+                    or "unauthorized" in error_msg
+                    or "401" in error_msg
+                ), f"Provider did not raise auth-specific error on 401: {e}"
 
 
 # Generate test classes for each provider
 for provider_class in ALL_PROVIDERS:
     class_name = f"Test{provider_class.__name__}"
-    
+
     # Create test class dynamically
     test_class = type(
         class_name,
@@ -200,9 +215,9 @@ for provider_class in ALL_PROVIDERS:
                     "secret_key": "test_secret_key_67890",
                 }
             ),
-        }
+        },
     )
-    
+
     # Add to module namespace
     globals()[class_name] = test_class
 
@@ -212,16 +227,23 @@ for provider_class in ALL_PROVIDERS:
 @pytest.mark.asyncio
 async def test_all_providers_registered():
     """Verify all providers are registered and importable"""
-    assert len(ALL_PROVIDERS) >= 20, f"Expected at least 20 providers, got {len(ALL_PROVIDERS)}"
-    
+    assert (
+        len(ALL_PROVIDERS) >= 20
+    ), f"Expected at least 20 providers, got {len(ALL_PROVIDERS)}"
+
     # Verify each provider has required methods
-    mock_creds = {"api_key": "test_api_key_12345", "secret_key": "test_secret_key_67890"}
+    mock_creds = {
+        "api_key": "test_api_key_12345",
+        "secret_key": "test_secret_key_67890",
+    }
     for provider_class in ALL_PROVIDERS:
         provider_instance = provider_class(mock_creds)
-        assert hasattr(provider_instance, 'get_instance_quotes'), \
-            f"{provider_class.__name__} missing get_instance_quotes method"
-        assert hasattr(provider_instance, '_get_auth_headers'), \
-            f"{provider_class.__name__} missing _get_auth_headers method"
+        assert hasattr(
+            provider_instance, "get_instance_quotes"
+        ), f"{provider_class.__name__} missing get_instance_quotes method"
+        assert hasattr(
+            provider_instance, "_get_auth_headers"
+        ), f"{provider_class.__name__} missing _get_auth_headers method"
 
 
 if __name__ == "__main__":

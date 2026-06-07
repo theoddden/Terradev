@@ -18,32 +18,41 @@ from datetime import datetime
 # Rust helm generator integration
 try:
     from terradev_helm_generator import HelmGenerator
+
     USE_RUST_HELM = True
 except ImportError:
     USE_RUST_HELM = False
 
 # GPU product labels used by the NVIDIA GPU Operator / device plugin.
 GPU_NODE_LABELS: Dict[str, str] = {
-    'A100': 'NVIDIA-A100-SXM4-80GB',
-    'A100-40G': 'NVIDIA-A100-SXM4-40GB',
-    'A100-80G': 'NVIDIA-A100-SXM4-80GB',
-    'H100': 'NVIDIA-H100-80GB-HBM3',
-    'H100_SXM': 'NVIDIA-H100-80GB-HBM3',
-    'H200': 'NVIDIA-H200-141GB-HBM3e',
-    'V100': 'Tesla-V100-SXM2-16GB',
-    'L4': 'NVIDIA-L4',
-    'L40S': 'NVIDIA-L40S',
-    'RTX 3090': 'NVIDIA-GeForce-RTX-3090',
-    'RTX 4090': 'NVIDIA-GeForce-RTX-4090',
-    'T4': 'Tesla-T4',
+    "A100": "NVIDIA-A100-SXM4-80GB",
+    "A100-40G": "NVIDIA-A100-SXM4-40GB",
+    "A100-80G": "NVIDIA-A100-SXM4-80GB",
+    "H100": "NVIDIA-H100-80GB-HBM3",
+    "H100_SXM": "NVIDIA-H100-80GB-HBM3",
+    "H200": "NVIDIA-H200-141GB-HBM3e",
+    "V100": "Tesla-V100-SXM2-16GB",
+    "L4": "NVIDIA-L4",
+    "L40S": "NVIDIA-L40S",
+    "RTX 3090": "NVIDIA-GeForce-RTX-3090",
+    "RTX 4090": "NVIDIA-GeForce-RTX-4090",
+    "T4": "Tesla-T4",
 }
 
 # GPU VRAM in GB — both variants where applicable
 GPU_MEMORY_GB: Dict[str, int] = {
-    'A100': 80, 'A100-40G': 40, 'A100-80G': 80,
-    'H100': 80, 'H100_SXM': 80, 'H200': 141,
-    'V100': 16, 'L4': 24, 'L40S': 48,
-    'RTX 3090': 24, 'RTX 4090': 24, 'T4': 16,
+    "A100": 80,
+    "A100-40G": 40,
+    "A100-80G": 80,
+    "H100": 80,
+    "H100_SXM": 80,
+    "H200": 141,
+    "V100": 16,
+    "L4": 24,
+    "L40S": 48,
+    "RTX 3090": 24,
+    "RTX 4090": 24,
+    "T4": 16,
 }
 
 
@@ -63,25 +72,32 @@ class HelmChartGenerator:
     """Generate production-grade Helm charts from Terradev workloads"""
 
     WORKLOAD_TYPES = [
-        'training', 'inference', 'cost-optimized', 'high-performance',
-        'moe-inference', 'rag', 'vllm-optimized',
+        "training",
+        "inference",
+        "cost-optimized",
+        "high-performance",
+        "moe-inference",
+        "rag",
+        "vllm-optimized",
     ]
-    STACK_COMPONENTS = ['qdrant', 'phoenix', 'guardrails']
+    STACK_COMPONENTS = ["qdrant", "phoenix", "guardrails"]
 
     def __init__(self):
         self.chart_templates = {
-            'training': self._get_training_template(),
-            'inference': self._get_inference_template(),
-            'cost-optimized': self._get_cost_optimized_template(),
-            'high-performance': self._get_high_performance_template(),
-            'moe-inference': self._get_moe_inference_template(),
-            'rag': self._get_rag_template(),
-            'vllm-optimized': self._get_vllm_optimized_template(),
+            "training": self._get_training_template(),
+            "inference": self._get_inference_template(),
+            "cost-optimized": self._get_cost_optimized_template(),
+            "high-performance": self._get_high_performance_template(),
+            "moe-inference": self._get_moe_inference_template(),
+            "rag": self._get_rag_template(),
+            "vllm-optimized": self._get_vllm_optimized_template(),
         }
 
     def generate_chart(self, workload_config: Dict[str, Any], output_dir: str) -> str:
         """Generate complete Helm chart from Terradev workload"""
-        chart_name = workload_config.get('name', f"terradev-{workload_config['workload_type']}")
+        chart_name = workload_config.get(
+            "name", f"terradev-{workload_config['workload_type']}"
+        )
         chart_path = Path(output_dir) / chart_name
 
         chart_path.mkdir(parents=True, exist_ok=True)
@@ -102,67 +118,145 @@ class HelmChartGenerator:
 
         return str(chart_path)
 
-    def _generate_chart_config(self, workload: Dict[str, Any], chart_name: str) -> HelmChartConfig:
+    def _generate_chart_config(
+        self, workload: Dict[str, Any], chart_name: str
+    ) -> HelmChartConfig:
         """Generate Chart.yaml configuration"""
         deps: List[Dict[str, Any]] = []
-        for stack in workload.get('stack', []):
-            if stack == 'qdrant':
-                deps.append({'name': 'qdrant', 'version': '0.9.x',
-                             'repository': 'https://qdrant.github.io/qdrant-helm',
-                             'condition': 'qdrant.enabled'})
+        for stack in workload.get("stack", []):
+            if stack == "qdrant":
+                deps.append(
+                    {
+                        "name": "qdrant",
+                        "version": "0.9.x",
+                        "repository": "https://qdrant.github.io/qdrant-helm",
+                        "condition": "qdrant.enabled",
+                    }
+                )
         return HelmChartConfig(
-            name=chart_name, version="1.0.0",
+            name=chart_name,
+            version="1.0.0",
             description=f"Terradev {workload['workload_type'].title()} workload for {workload.get('gpu_type', 'GPU')}",
-            app_version="1.0.0", kube_version=">=1.24.0-0",
-            maintainers=[{"name": "Terradev", "email": "support@terradev.dev", "url": "https://terradev.dev"}],
-            keywords=["gpu", "machine-learning", "kubernetes", workload['workload_type'], workload.get('gpu_type', 'gpu')],
+            app_version="1.0.0",
+            kube_version=">=1.24.0-0",
+            maintainers=[
+                {
+                    "name": "Terradev",
+                    "email": "support@terradev.dev",
+                    "url": "https://terradev.dev",
+                }
+            ],
+            keywords=[
+                "gpu",
+                "machine-learning",
+                "kubernetes",
+                workload["workload_type"],
+                workload.get("gpu_type", "gpu"),
+            ],
             dependencies=deps,
         )
 
     def _generate_values(self, workload: Dict[str, Any]) -> Dict[str, Any]:
         """Generate values.yaml"""
-        wtype = workload['workload_type']
-        base_values = self.chart_templates.get(wtype, self.chart_templates['inference'])
+        wtype = workload["workload_type"]
+        base_values = self.chart_templates.get(wtype, self.chart_templates["inference"])
 
         values = {
             **base_values,
-            'image': {'repository': workload['image'], 'tag': workload.get('tag', 'latest'), 'pullPolicy': 'IfNotPresent'},
-            'gpu': {
-                'type': workload['gpu_type'], 'count': workload.get('gpu_count', 1),
-                'memory': workload.get('memory_gb', 16), 'storage': workload.get('storage_gb', 100),
-                'nodeLabel': GPU_NODE_LABELS.get(workload['gpu_type'], workload['gpu_type']),
+            "image": {
+                "repository": workload["image"],
+                "tag": workload.get("tag", "latest"),
+                "pullPolicy": "IfNotPresent",
             },
-            'resources': self._calculate_resources(workload),
-            'budget': {'maxHourlyRate': workload.get('budget'), 'enforce': workload.get('budget') is not None},
-            'terradev': {'provider': workload.get('provider', 'auto'), 'region': workload.get('region', 'us-east-1'), 'spot': workload.get('spot', True)},
-            'securityContext': {'runAsNonRoot': True, 'runAsUser': 1000, 'runAsGroup': 1000, 'fsGroup': 1000, 'capabilities': {'drop': ['ALL']}},
-            'podSecurityContext': {'fsGroup': 1000, 'seccompProfile': {'type': 'RuntimeDefault'}},
-            'serviceAccount': {'create': True, 'name': '', 'annotations': {}},
-            'metrics': {'enabled': True, 'serviceMonitor': {'enabled': True, 'interval': '15s', 'path': '/metrics'}},
+            "gpu": {
+                "type": workload["gpu_type"],
+                "count": workload.get("gpu_count", 1),
+                "memory": workload.get("memory_gb", 16),
+                "storage": workload.get("storage_gb", 100),
+                "nodeLabel": GPU_NODE_LABELS.get(
+                    workload["gpu_type"], workload["gpu_type"]
+                ),
+            },
+            "resources": self._calculate_resources(workload),
+            "budget": {
+                "maxHourlyRate": workload.get("budget"),
+                "enforce": workload.get("budget") is not None,
+            },
+            "terradev": {
+                "provider": workload.get("provider", "auto"),
+                "region": workload.get("region", "us-east-1"),
+                "spot": workload.get("spot", True),
+            },
+            "securityContext": {
+                "runAsNonRoot": True,
+                "runAsUser": 1000,
+                "runAsGroup": 1000,
+                "fsGroup": 1000,
+                "capabilities": {"drop": ["ALL"]},
+            },
+            "podSecurityContext": {
+                "fsGroup": 1000,
+                "seccompProfile": {"type": "RuntimeDefault"},
+            },
+            "serviceAccount": {"create": True, "name": "", "annotations": {}},
+            "metrics": {
+                "enabled": True,
+                "serviceMonitor": {
+                    "enabled": True,
+                    "interval": "15s",
+                    "path": "/metrics",
+                },
+            },
         }
 
         # Health probes, autoscaling, PDB for non-job workloads
-        if wtype not in ('training', 'cost-optimized'):
-            values['probes'] = {
-                'startup': {'enabled': True, 'path': '/health', 'initialDelaySeconds': 30, 'periodSeconds': 10, 'failureThreshold': 30},
-                'liveness': {'enabled': True, 'path': '/health', 'periodSeconds': 15, 'failureThreshold': 3},
-                'readiness': {'enabled': True, 'path': '/health', 'periodSeconds': 5, 'failureThreshold': 2},
+        if wtype not in ("training", "cost-optimized"):
+            values["probes"] = {
+                "startup": {
+                    "enabled": True,
+                    "path": "/health",
+                    "initialDelaySeconds": 30,
+                    "periodSeconds": 10,
+                    "failureThreshold": 30,
+                },
+                "liveness": {
+                    "enabled": True,
+                    "path": "/health",
+                    "periodSeconds": 15,
+                    "failureThreshold": 3,
+                },
+                "readiness": {
+                    "enabled": True,
+                    "path": "/health",
+                    "periodSeconds": 5,
+                    "failureThreshold": 2,
+                },
             }
-            values['autoscaling'] = {'enabled': False, 'minReplicas': 1, 'maxReplicas': 4, 'targetGPUUtilization': 80, 'targetCPUUtilizationPercentage': 80}
-            values['podDisruptionBudget'] = {'enabled': True, 'minAvailable': 1}
+            values["autoscaling"] = {
+                "enabled": False,
+                "minReplicas": 1,
+                "maxReplicas": 4,
+                "targetGPUUtilization": 80,
+                "targetCPUUtilizationPercentage": 80,
+            }
+            values["podDisruptionBudget"] = {"enabled": True, "minAvailable": 1}
 
-        if workload.get('environment_vars'):
-            values['env'] = workload['environment_vars']
+        if workload.get("environment_vars"):
+            values["env"] = workload["environment_vars"]
 
         # Ports for all non-job workloads — default 8000 if none specified
-        ports = workload.get('ports', [])
-        if wtype not in ('training', 'cost-optimized'):
+        ports = workload.get("ports", [])
+        if wtype not in ("training", "cost-optimized"):
             if not ports:
                 ports = [8000]
-            values['service'] = {'type': 'LoadBalancer', 'ports': [{'port': p, 'targetPort': p} for p in ports], 'annotations': {}}
+            values["service"] = {
+                "type": "LoadBalancer",
+                "ports": [{"port": p, "targetPort": p} for p in ports],
+                "annotations": {},
+            }
 
         # Stack integrations (qdrant, phoenix, guardrails)
-        for stack in workload.get('stack', []):
+        for stack in workload.get("stack", []):
             stack_values = self._get_stack_values(stack, workload)
             if stack_values:
                 values.update(stack_values)
@@ -171,81 +265,117 @@ class HelmChartGenerator:
 
     def _calculate_resources(self, workload: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate resource requirements"""
-        gpu_count = workload.get('gpu_count', 1)
-        memory_gb = workload.get('memory_gb', 16)
+        gpu_count = workload.get("gpu_count", 1)
+        memory_gb = workload.get("memory_gb", 16)
 
         # Estimate CPU based on GPU count (rule of thumb: 4-8 CPU cores per GPU)
         cpu_cores = gpu_count * 6
 
         # GPU VRAM + system memory overhead
-        gpu_memory = GPU_MEMORY_GB.get(workload['gpu_type'], 16) * gpu_count
+        gpu_memory = GPU_MEMORY_GB.get(workload["gpu_type"], 16) * gpu_count
         total_memory = max(memory_gb, gpu_memory + 8)  # Add 8GB for system
 
         return {
-            'requests': {
-                'cpu': str(cpu_cores),
-                'memory': f"{total_memory}Gi",
-                'nvidia.com/gpu': str(gpu_count),
+            "requests": {
+                "cpu": str(cpu_cores),
+                "memory": f"{total_memory}Gi",
+                "nvidia.com/gpu": str(gpu_count),
             },
-            'limits': {
-                'cpu': str(cpu_cores * 2),
-                'memory': f"{total_memory * 2}Gi",
-                'nvidia.com/gpu': str(gpu_count),
+            "limits": {
+                "cpu": str(cpu_cores * 2),
+                "memory": f"{total_memory * 2}Gi",
+                "nvidia.com/gpu": str(gpu_count),
             },
         }
 
     # ── Stack integrations ─────────────────────────────────────────────
 
-    def _get_stack_values(self, stack: str, workload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _get_stack_values(
+        self, stack: str, workload: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Get Helm values for a stack component by importing its service."""
-        if stack == 'qdrant':
+        if stack == "qdrant":
             try:
                 from ml_services.qdrant_service import QdrantService, QdrantConfig
+
                 return QdrantService(QdrantConfig()).generate_helm_values()
             except ImportError:
-                return {'qdrant': {'enabled': True, 'image': 'qdrant/qdrant:latest', 'replicas': 1,
-                                   'ports': {'rest': 6333, 'grpc': 6334}, 'persistence': {'enabled': True, 'size': '100Gi'},
-                                   'resources': {'requests': {'cpu': '500m', 'memory': '2Gi'}, 'limits': {'cpu': '4', 'memory': '8Gi'}}}}
-        elif stack == 'phoenix':
+                return {
+                    "qdrant": {
+                        "enabled": True,
+                        "image": "qdrant/qdrant:latest",
+                        "replicas": 1,
+                        "ports": {"rest": 6333, "grpc": 6334},
+                        "persistence": {"enabled": True, "size": "100Gi"},
+                        "resources": {
+                            "requests": {"cpu": "500m", "memory": "2Gi"},
+                            "limits": {"cpu": "4", "memory": "8Gi"},
+                        },
+                    }
+                }
+        elif stack == "phoenix":
             try:
                 from ml_services.phoenix_service import PhoenixService, PhoenixConfig
+
                 return PhoenixService(PhoenixConfig()).generate_helm_values()
             except ImportError:
-                return {'phoenix': {'enabled': True, 'image': 'arizephoenix/phoenix:latest', 'port': 6006,
-                                    'persistence': {'enabled': True, 'size': '50Gi'},
-                                    'resources': {'requests': {'cpu': '500m', 'memory': '1Gi'}, 'limits': {'cpu': '2', 'memory': '4Gi'}}}}
-        elif stack == 'guardrails':
+                return {
+                    "phoenix": {
+                        "enabled": True,
+                        "image": "arizephoenix/phoenix:latest",
+                        "port": 6006,
+                        "persistence": {"enabled": True, "size": "50Gi"},
+                        "resources": {
+                            "requests": {"cpu": "500m", "memory": "1Gi"},
+                            "limits": {"cpu": "2", "memory": "4Gi"},
+                        },
+                    }
+                }
+        elif stack == "guardrails":
             try:
-                from ml_services.guardrails_service import GuardrailsService, GuardrailsConfig
+                from ml_services.guardrails_service import (
+                    GuardrailsService,
+                    GuardrailsConfig,
+                )
+
                 return GuardrailsService(GuardrailsConfig()).generate_helm_values()
             except ImportError:
-                return {'guardrails': {'enabled': True, 'image': 'nvcr.io/nvidia/nemo-guardrails:latest', 'port': 8090,
-                                       'deploymentMode': 'standalone',
-                                       'resources': {'requests': {'cpu': '500m', 'memory': '1Gi'}, 'limits': {'cpu': '2', 'memory': '4Gi'}}}}
+                return {
+                    "guardrails": {
+                        "enabled": True,
+                        "image": "nvcr.io/nvidia/nemo-guardrails:latest",
+                        "port": 8090,
+                        "deploymentMode": "standalone",
+                        "resources": {
+                            "requests": {"cpu": "500m", "memory": "1Gi"},
+                            "limits": {"cpu": "2", "memory": "4Gi"},
+                        },
+                    }
+                }
         return None
-    
+
     # ── template generation ────────────────────────────────────────────
 
     def _generate_templates(self, workload: Dict[str, Any]) -> Dict[str, str]:
         """Generate Kubernetes templates"""
         templates = {}
-        wtype = workload['workload_type']
+        wtype = workload["workload_type"]
 
-        if wtype in ('training', 'cost-optimized'):
-            templates['job.yaml'] = self._generate_job_template(workload)
+        if wtype in ("training", "cost-optimized"):
+            templates["job.yaml"] = self._generate_job_template(workload)
         else:
-            templates['deployment.yaml'] = self._generate_deployment_template(workload)
-            templates['service.yaml'] = self._generate_service_template(workload)
+            templates["deployment.yaml"] = self._generate_deployment_template(workload)
+            templates["service.yaml"] = self._generate_service_template(workload)
 
-        templates['configmap.yaml'] = self._generate_configmap_template(workload)
+        templates["configmap.yaml"] = self._generate_configmap_template(workload)
 
-        if workload.get('storage_gb', 0) > 0:
-            templates['pvc.yaml'] = self._generate_pvc_template(workload)
+        if workload.get("storage_gb", 0) > 0:
+            templates["pvc.yaml"] = self._generate_pvc_template(workload)
 
-        templates['serviceaccount.yaml'] = self._generate_serviceaccount_template()
-        if wtype not in ('training', 'cost-optimized'):
-            templates['hpa.yaml'] = self._generate_hpa_template()
-            templates['pdb.yaml'] = self._generate_pdb_template()
+        templates["serviceaccount.yaml"] = self._generate_serviceaccount_template()
+        if wtype not in ("training", "cost-optimized"):
+            templates["hpa.yaml"] = self._generate_hpa_template()
+            templates["pdb.yaml"] = self._generate_pdb_template()
 
         return templates
 
@@ -541,71 +671,85 @@ spec:
     matchLabels:
       {{- include "terradev.selectorLabels" . | nindent 6 }}
 {{- end }}"""
-    
+
     # ── workload type templates ────────────────────────────────────────
 
     def _get_training_template(self) -> Dict[str, Any]:
         """Get training workload template"""
         return {
-            'workloadType': 'Job',
-            'restartPolicy': 'Never',
-            'backoffLimit': 3,
-            'ttlSecondsAfterFinished': 300,
-            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
-            'tolerations': [
-                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+            "workloadType": "Job",
+            "restartPolicy": "Never",
+            "backoffLimit": 3,
+            "ttlSecondsAfterFinished": 300,
+            "nodeSelector": {"nvidia.com/gpu.product": "{{ .Values.gpu.nodeLabel }}"},
+            "tolerations": [
+                {"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"},
             ],
         }
 
     def _get_inference_template(self) -> Dict[str, Any]:
         """Get inference workload template"""
         return {
-            'workloadType': 'Deployment',
-            'replicaCount': 1,
-            'strategy': {'type': 'Recreate'},
-            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
-            'tolerations': [
-                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+            "workloadType": "Deployment",
+            "replicaCount": 1,
+            "strategy": {"type": "Recreate"},
+            "nodeSelector": {"nvidia.com/gpu.product": "{{ .Values.gpu.nodeLabel }}"},
+            "tolerations": [
+                {"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"},
             ],
         }
 
     def _get_cost_optimized_template(self) -> Dict[str, Any]:
         """Get cost-optimized workload template"""
         return {
-            'workloadType': 'Job',
-            'restartPolicy': 'Never',
-            'backoffLimit': 2,
-            'ttlSecondsAfterFinished': 60,
-            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
-            'tolerations': [
-                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
-                {'key': 'spot', 'operator': 'Exists', 'effect': 'NoSchedule'},
+            "workloadType": "Job",
+            "restartPolicy": "Never",
+            "backoffLimit": 2,
+            "ttlSecondsAfterFinished": 60,
+            "nodeSelector": {"nvidia.com/gpu.product": "{{ .Values.gpu.nodeLabel }}"},
+            "tolerations": [
+                {"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"},
+                {"key": "spot", "operator": "Exists", "effect": "NoSchedule"},
             ],
         }
 
     def _get_high_performance_template(self) -> Dict[str, Any]:
         """Get high-performance workload template"""
         return {
-            'workloadType': 'Deployment',
-            'replicaCount': 1,
-            'strategy': {'type': 'Recreate'},
-            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
-            'tolerations': [
-                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
-                {'key': 'dedicated', 'operator': 'Equal', 'value': 'gpu-inference', 'effect': 'NoSchedule'},
+            "workloadType": "Deployment",
+            "replicaCount": 1,
+            "strategy": {"type": "Recreate"},
+            "nodeSelector": {"nvidia.com/gpu.product": "{{ .Values.gpu.nodeLabel }}"},
+            "tolerations": [
+                {"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"},
+                {
+                    "key": "dedicated",
+                    "operator": "Equal",
+                    "value": "gpu-inference",
+                    "effect": "NoSchedule",
+                },
             ],
-            'affinity': {
-                'podAntiAffinity': {
-                    'preferredDuringSchedulingIgnoredDuringExecution': [{
-                        'weight': 100,
-                        'podAffinityTerm': {
-                            'labelSelector': {'matchExpressions': [
-                                {'key': 'app.kubernetes.io/name', 'operator': 'In',
-                                 'values': ['{{ include "terradev.name" . }}']}
-                            ]},
-                            'topologyKey': 'kubernetes.io/hostname',
-                        },
-                    }]
+            "affinity": {
+                "podAntiAffinity": {
+                    "preferredDuringSchedulingIgnoredDuringExecution": [
+                        {
+                            "weight": 100,
+                            "podAffinityTerm": {
+                                "labelSelector": {
+                                    "matchExpressions": [
+                                        {
+                                            "key": "app.kubernetes.io/name",
+                                            "operator": "In",
+                                            "values": [
+                                                '{{ include "terradev.name" . }}'
+                                            ],
+                                        }
+                                    ]
+                                },
+                                "topologyKey": "kubernetes.io/hostname",
+                            },
+                        }
+                    ]
                 }
             },
         }
@@ -615,101 +759,161 @@ spec:
     def _get_moe_inference_template(self) -> Dict[str, Any]:
         """Get MoE inference workload template — mirrors clusters/moe-template"""
         return {
-            'workloadType': 'Deployment',
-            'replicaCount': 1,
-            'strategy': {'type': 'Recreate'},
-            'serving': {
-                'backend': 'vllm', 'port': 8000, 'host': '0.0.0.0',
-                'expertParallel': {
-                    'enabled': True, 'dataParallelSize': 8,
-                    'enableEplb': True, 'enableDbo': True,
-                    'all2allBackend': 'deepep_low_latency',
+            "workloadType": "Deployment",
+            "replicaCount": 1,
+            "strategy": {"type": "Recreate"},
+            "serving": {
+                "backend": "vllm",
+                "port": 8000,
+                "host": "0.0.0.0",
+                "expertParallel": {
+                    "enabled": True,
+                    "dataParallelSize": 8,
+                    "enableEplb": True,
+                    "enableDbo": True,
+                    "all2allBackend": "deepep_low_latency",
                 },
-                'vllm': {
-                    'tensorParallelSize': 8, 'gpuMemoryUtilization': 0.95,
-                    'maxModelLen': 32768, 'dtype': 'auto', 'trustRemoteCode': True,
-                    'maxNumBatchedTokens': 16384, 'maxNumSeqs': 1024,
-                    'enablePrefixCaching': True, 'enableChunkedPrefill': True,
+                "vllm": {
+                    "tensorParallelSize": 8,
+                    "gpuMemoryUtilization": 0.95,
+                    "maxModelLen": 32768,
+                    "dtype": "auto",
+                    "trustRemoteCode": True,
+                    "maxNumBatchedTokens": 16384,
+                    "maxNumSeqs": 1024,
+                    "enablePrefixCaching": True,
+                    "enableChunkedPrefill": True,
                 },
-                'flashinfer': {'enabled': True, 'backend': 'FLASHINFER'},
-                'sleepMode': {'enabled': True, 'level': 1},
-                'kvOffloading': {'enabled': True, 'connector': 'offloading'},
-                'speculative': {'enabled': True, 'method': 'mtp', 'numTokens': 1},
-                'lmcache': {
-                    'enabled': True, 'backend': 'redis',
-                    'redisUrl': 'redis://lmcache-redis:6379',
-                    'chunkSize': 256, 'pipelined': True,
+                "flashinfer": {"enabled": True, "backend": "FLASHINFER"},
+                "sleepMode": {"enabled": True, "level": 1},
+                "kvOffloading": {"enabled": True, "connector": "offloading"},
+                "speculative": {"enabled": True, "method": "mtp", "numTokens": 1},
+                "lmcache": {
+                    "enabled": True,
+                    "backend": "redis",
+                    "redisUrl": "redis://lmcache-redis:6379",
+                    "chunkSize": 256,
+                    "pipelined": True,
                 },
-                'lora': {'enabled': False, 'maxLoras': 8, 'maxLoraRank': 64},
-                'router': {'enabled': False, 'replicas': 2, 'port': 8080, 'policy': 'consistent_hash'},
+                "lora": {"enabled": False, "maxLoras": 8, "maxLoraRank": 64},
+                "router": {
+                    "enabled": False,
+                    "replicas": 2,
+                    "port": 8080,
+                    "policy": "consistent_hash",
+                },
             },
-            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
-            'tolerations': [
-                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
-                {'key': 'dedicated', 'operator': 'Equal', 'value': 'gpu-inference', 'effect': 'NoSchedule'},
+            "nodeSelector": {"nvidia.com/gpu.product": "{{ .Values.gpu.nodeLabel }}"},
+            "tolerations": [
+                {"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"},
+                {
+                    "key": "dedicated",
+                    "operator": "Equal",
+                    "value": "gpu-inference",
+                    "effect": "NoSchedule",
+                },
             ],
-            'persistence': {
-                'modelCache': {'enabled': True, 'size': '500Gi', 'storageClass': 'nvme-ssd', 'mountPath': '/models'},
-                'sharedMemory': {'enabled': True, 'size': '32Gi', 'mountPath': '/dev/shm'},
+            "persistence": {
+                "modelCache": {
+                    "enabled": True,
+                    "size": "500Gi",
+                    "storageClass": "nvme-ssd",
+                    "mountPath": "/models",
+                },
+                "sharedMemory": {
+                    "enabled": True,
+                    "size": "32Gi",
+                    "mountPath": "/dev/shm",
+                },
             },
-            'env': {
-                'CUDA_VISIBLE_DEVICES': '0,1,2,3,4,5,6,7',
-                'NCCL_P2P_DISABLE': '0', 'NCCL_IB_DISABLE': '0', 'NCCL_SOCKET_IFNAME': 'eth0',
-                'VLLM_ATTENTION_BACKEND': 'FLASHINFER', 'VLLM_USE_DEEP_GEMM': '1',
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0,1,2,3,4,5,6,7",
+                "NCCL_P2P_DISABLE": "0",
+                "NCCL_IB_DISABLE": "0",
+                "NCCL_SOCKET_IFNAME": "eth0",
+                "VLLM_ATTENTION_BACKEND": "FLASHINFER",
+                "VLLM_USE_DEEP_GEMM": "1",
             },
         }
 
     def _get_rag_template(self) -> Dict[str, Any]:
         """Get RAG infrastructure workload template — mirrors clusters/rag-template"""
         return {
-            'workloadType': 'Deployment',
-            'replicaCount': 1,
-            'strategy': {'type': 'Recreate'},
-            'serving': {
-                'backend': 'vllm', 'port': 8000,
-                'vllm': {'tensorParallelSize': 1, 'gpuMemoryUtilization': 0.9, 'maxModelLen': 32768},
-                'flashInfer': {'enabled': True},
-                'sleepMode': {'enabled': True},
-                'kvOffloading': {'enabled': True, 'connector': 'offloading'},
-                'speculative': {'enabled': True, 'method': 'mtp', 'numTokens': 5},
-                'lmcache': {'enabled': True, 'backend': 'redis', 'remoteUrl': 'redis://redis-svc:6379'},
+            "workloadType": "Deployment",
+            "replicaCount": 1,
+            "strategy": {"type": "Recreate"},
+            "serving": {
+                "backend": "vllm",
+                "port": 8000,
+                "vllm": {
+                    "tensorParallelSize": 1,
+                    "gpuMemoryUtilization": 0.9,
+                    "maxModelLen": 32768,
+                },
+                "flashInfer": {"enabled": True},
+                "sleepMode": {"enabled": True},
+                "kvOffloading": {"enabled": True, "connector": "offloading"},
+                "speculative": {"enabled": True, "method": "mtp", "numTokens": 5},
+                "lmcache": {
+                    "enabled": True,
+                    "backend": "redis",
+                    "remoteUrl": "redis://redis-svc:6379",
+                },
             },
-            'embedding': {
-                'model': 'BAAI/bge-large-en-v1.5', 'replicas': 1, 'port': 8001, 'backend': 'fastembed',
-                'resources': {'requests': {'cpu': '2', 'memory': '4Gi'}, 'limits': {'cpu': '4', 'memory': '8Gi'}},
+            "embedding": {
+                "model": "BAAI/bge-large-en-v1.5",
+                "replicas": 1,
+                "port": 8001,
+                "backend": "fastembed",
+                "resources": {
+                    "requests": {"cpu": "2", "memory": "4Gi"},
+                    "limits": {"cpu": "4", "memory": "8Gi"},
+                },
             },
-            'redis': {'enabled': True, 'image': 'redis:7-alpine', 'port': 6379, 'persistence': {'enabled': True, 'size': '10Gi'}},
-            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
-            'tolerations': [
-                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+            "redis": {
+                "enabled": True,
+                "image": "redis:7-alpine",
+                "port": 6379,
+                "persistence": {"enabled": True, "size": "10Gi"},
+            },
+            "nodeSelector": {"nvidia.com/gpu.product": "{{ .Values.gpu.nodeLabel }}"},
+            "tolerations": [
+                {"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"},
             ],
         }
 
     def _get_vllm_optimized_template(self) -> Dict[str, Any]:
         """Get vLLM-optimized inference template with all 6 critical knobs"""
         return {
-            'workloadType': 'Deployment',
-            'replicaCount': 1,
-            'strategy': {'type': 'Recreate'},
-            'serving': {
-                'backend': 'vllm', 'port': 8000,
-                'vllm': {
-                    'tensorParallelSize': 1, 'gpuMemoryUtilization': 0.92,
-                    'maxModelLen': 8192, 'dtype': 'auto', 'trustRemoteCode': True,
-                    'maxNumBatchedTokens': 8192, 'maxNumSeqs': 256,
-                    'enablePrefixCaching': True, 'enableChunkedPrefill': True,
+            "workloadType": "Deployment",
+            "replicaCount": 1,
+            "strategy": {"type": "Recreate"},
+            "serving": {
+                "backend": "vllm",
+                "port": 8000,
+                "vllm": {
+                    "tensorParallelSize": 1,
+                    "gpuMemoryUtilization": 0.92,
+                    "maxModelLen": 8192,
+                    "dtype": "auto",
+                    "trustRemoteCode": True,
+                    "maxNumBatchedTokens": 8192,
+                    "maxNumSeqs": 256,
+                    "enablePrefixCaching": True,
+                    "enableChunkedPrefill": True,
                 },
-                'flashinfer': {'enabled': True, 'backend': 'FLASHINFER'},
-                'sleepMode': {'enabled': True, 'level': 1},
-                'kvOffloading': {'enabled': True, 'connector': 'offloading'},
-                'speculative': {'enabled': False},
+                "flashinfer": {"enabled": True, "backend": "FLASHINFER"},
+                "sleepMode": {"enabled": True, "level": 1},
+                "kvOffloading": {"enabled": True, "connector": "offloading"},
+                "speculative": {"enabled": False},
             },
-            'nodeSelector': {'nvidia.com/gpu.product': '{{ .Values.gpu.nodeLabel }}'},
-            'tolerations': [
-                {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+            "nodeSelector": {"nvidia.com/gpu.product": "{{ .Values.gpu.nodeLabel }}"},
+            "tolerations": [
+                {"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"},
             ],
-            'env': {
-                'VLLM_ATTENTION_BACKEND': 'FLASHINFER', 'VLLM_USE_DEEP_GEMM': '1',
+            "env": {
+                "VLLM_ATTENTION_BACKEND": "FLASHINFER",
+                "VLLM_USE_DEEP_GEMM": "1",
             },
         }
 
@@ -718,42 +922,42 @@ spec:
     def _write_chart_yaml(self, chart_path: Path, config: HelmChartConfig):
         """Write Chart.yaml"""
         chart_data = {
-            'apiVersion': 'v2',
-            'name': config.name,
-            'description': config.description,
-            'type': 'application',
-            'version': config.version,
-            'appVersion': config.app_version,
-            'kubeVersion': config.kube_version,
-            'maintainers': config.maintainers,
-            'keywords': config.keywords,
+            "apiVersion": "v2",
+            "name": config.name,
+            "description": config.description,
+            "type": "application",
+            "version": config.version,
+            "appVersion": config.app_version,
+            "kubeVersion": config.kube_version,
+            "maintainers": config.maintainers,
+            "keywords": config.keywords,
         }
         if config.dependencies:
-            chart_data['dependencies'] = config.dependencies
+            chart_data["dependencies"] = config.dependencies
 
-        with open(chart_path / 'Chart.yaml', 'w') as f:
+        with open(chart_path / "Chart.yaml", "w") as f:
             yaml.dump(chart_data, f, default_flow_style=False)
 
     def _write_values_yaml(self, chart_path: Path, values: Dict[str, Any]):
         """Write values.yaml"""
-        with open(chart_path / 'values.yaml', 'w') as f:
+        with open(chart_path / "values.yaml", "w") as f:
             yaml.dump(values, f, default_flow_style=False)
 
     def _write_templates(self, chart_path: Path, templates: Dict[str, str]):
         """Write template files"""
         for filename, content in templates.items():
-            with open(chart_path / 'templates' / filename, 'w') as f:
+            with open(chart_path / "templates" / filename, "w") as f:
                 f.write(content)
         self._write_helper_templates(chart_path)
 
     def _write_helper_templates(self, chart_path: Path):
         """Write helper templates"""
         helpers = {
-            '_helpers.tpl': self._get_helpers_tpl(),
-            'NOTES.txt': self._get_notes_txt(),
+            "_helpers.tpl": self._get_helpers_tpl(),
+            "NOTES.txt": self._get_notes_txt(),
         }
         for filename, content in helpers.items():
-            with open(chart_path / 'templates' / filename, 'w') as f:
+            with open(chart_path / "templates" / filename, "w") as f:
                 f.write(content)
 
     @staticmethod
@@ -847,19 +1051,23 @@ Service:
 {{- end }}
 {{- end }}
 """
-    
+
     def _write_readme(self, chart_path: Path, readme: str):
         """Write README.md"""
-        with open(chart_path / 'README.md', 'w') as f:
+        with open(chart_path / "README.md", "w") as f:
             f.write(readme)
 
     def _generate_readme(self, workload: Dict[str, Any], chart_name: str) -> str:
         """Generate README content"""
-        gpu_label = GPU_NODE_LABELS.get(workload['gpu_type'], workload['gpu_type'])
-        stacks = workload.get('stack', [])
+        gpu_label = GPU_NODE_LABELS.get(workload["gpu_type"], workload["gpu_type"])
+        stacks = workload.get("stack", [])
         stack_section = ""
         if stacks:
-            stack_section = "\n### Stack Integrations\n\n" + "\n".join(f"- `{s}`" for s in stacks) + "\n"
+            stack_section = (
+                "\n### Stack Integrations\n\n"
+                + "\n".join(f"- `{s}`" for s in stacks)
+                + "\n"
+            )
 
         return f"""# {chart_name}
 

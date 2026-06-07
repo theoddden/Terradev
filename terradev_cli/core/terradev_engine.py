@@ -101,6 +101,7 @@ class TerradevEngine:
         # Use real existing modules instead of non-existent ones
         try:
             from .dataset_stager import DatasetStager
+
             self.dataset_stager = DatasetStager()
         except Exception:
             self.dataset_stager = None
@@ -492,6 +493,7 @@ class TerradevEngine:
         """Get cost analytics"""
         try:
             from .cost_tracker import get_spend_summary
+
             return get_spend_summary(days)
         except Exception as e:
             logger.error(f"Analytics failed: {e}")
@@ -501,15 +503,18 @@ class TerradevEngine:
         """Run cost optimization recommendations"""
         try:
             from .cost_tracker import get_spend_summary
+
             summary = get_spend_summary(30)
             recommendations = []
             for provider, data in summary.get("by_provider", {}).items():
                 if data.get("cost", 0) > 100:
-                    recommendations.append({
-                        "provider": provider,
-                        "recommendation": f"Consider spot instances for {provider} — current spend ${data['cost']:.2f}",
-                        "potential_savings": round(data["cost"] * 0.4, 2),
-                    })
+                    recommendations.append(
+                        {
+                            "provider": provider,
+                            "recommendation": f"Consider spot instances for {provider} — current spend ${data['cost']:.2f}",
+                            "potential_savings": round(data["cost"] * 0.4, 2),
+                        }
+                    )
             return recommendations
         except Exception as e:
             logger.error(f"Optimization failed: {e}")

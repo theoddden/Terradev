@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from terradev_cli.providers.gcp_provider import GCPProvider
 
+
 def run_async(coro):
     """Helper to run async functions in sync context"""
     loop = asyncio.new_event_loop()
@@ -43,15 +44,19 @@ def run_async(coro):
     finally:
         loop.close()
 
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from terradev_cli.ml_services.kubernetes_enhanced import EnhancedKubernetesService, KubernetesConfig
+from terradev_cli.ml_services.kubernetes_enhanced import (
+    EnhancedKubernetesService,
+    KubernetesConfig,
+)
 from terradev_cli.ml_services.kubernetes_service import KubernetesService
 
 
 class TestKubernetesEnhancedCriticalFixes:
     """Test critical bug fixes in kubernetes_enhanced.py"""
-    
+
     def test_init_defaults_config(self):
         """Bug #2: __init__ should default config to KubernetesConfig()"""
         # MCP calls EnhancedKubernetesService() without args
@@ -59,47 +64,48 @@ class TestKubernetesEnhancedCriticalFixes:
         assert service.config is not None
         assert isinstance(service.config, KubernetesConfig)
         assert service.config.namespace == "default"
-    
+
     def test_missing_methods_exist(self):
         """Bug #1: 4 missing methods that MCP handlers call"""
         service = EnhancedKubernetesService()
-        
+
         # Check that all 4 methods exist
-        assert hasattr(service, 'install_gpu_operator')
-        assert hasattr(service, 'configure_device_plugin')
-        assert hasattr(service, 'configure_mig')
-        assert hasattr(service, 'configure_time_slicing')
-        
+        assert hasattr(service, "install_gpu_operator")
+        assert hasattr(service, "configure_device_plugin")
+        assert hasattr(service, "configure_mig")
+        assert hasattr(service, "configure_time_slicing")
+
         # Check they are callable
         assert callable(service.install_gpu_operator)
         assert callable(service.configure_device_plugin)
         assert callable(service.configure_mig)
         assert callable(service.configure_time_slicing)
-    
+
     def test_get_enhanced_config_no_super_call(self):
         """Bug #3: get_enhanced_config() should not call super().get_kubernetes_config()"""
         service = EnhancedKubernetesService()
-        
+
         # The method should exist and be callable
-        assert hasattr(service, 'get_enhanced_config')
+        assert hasattr(service, "get_enhanced_config")
         assert callable(service.get_enhanced_config)
-        
+
         # Call it to ensure it doesn't crash
         config = service.get_enhanced_config()
         assert config is not None
-    
+
     def test_install_monitoring_stack_accepts_kwargs(self):
         """Bug #13: install_monitoring_stack signature should accept MCP kwargs"""
         service = EnhancedKubernetesService()
-        
+
         # Should accept additional kwargs without error
         # (we won't actually run it since it requires kubectl, just check signature)
         import inspect
+
         sig = inspect.signature(service.install_monitoring_stack)
-        
+
         # Should have at least the base parameters
         params = list(sig.parameters.keys())
-        assert 'cluster_name' in params or len(params) > 0
+        assert "cluster_name" in params or len(params) > 0
 
     def test_total_tool_count(self):
         """Total new tools in v5.0.0 should be 55"""
@@ -118,7 +124,7 @@ class TestKubernetesEnhancedCriticalFixes:
 
 class TestKubernetesServiceCPUParsingFix:
     """Test CPU parsing fix for millicores"""
-    
+
     @pytest.mark.skip(reason="CPU parsing implementation differs from test expectation")
     def test_cpu_parsing_with_millicores(self):
         """CPU parsing should handle millicores correctly"""
@@ -131,14 +137,14 @@ class TestKubernetesServiceCPUParsingFix:
 
 class TestKubernetesAPIVersions:
     """Test Karpenter API version fixes"""
-    
+
     def test_karpenter_nodepool_api_version(self):
         """Bug #7: Karpenter NodePool API should be karpenter.sh/v1 not v1beta1"""
         # This would be tested in actual YAML generation
         # For now, we verify the service exists and can generate configs
         service = KubernetesService(KubernetesConfig())
         assert service is not None
-    
+
     def test_ec2nodeclass_api_version(self):
         """Bug #8: EC2NodeClass API should be karpenter.k8s.aws/v1 not v1beta1"""
         # This would be tested in actual YAML generation
@@ -148,21 +154,21 @@ class TestKubernetesAPIVersions:
 
 class TestKubernetesEnhancedPrometheusFix:
     """Test Prometheus relabel config fix"""
-    
+
     def test_prometheus_relabel_uses_plural(self):
         """Bug #6: Prometheus relabel_configs should use source_labels (plural)"""
         service = EnhancedKubernetesService()
-        
+
         # Check that install_monitoring_stack generates correct prometheus config
         # The fix changed source_label to source_labels (plural)
         # We can verify this by checking the method exists and is callable
-        assert hasattr(service, 'install_monitoring_stack')
+        assert hasattr(service, "install_monitoring_stack")
         assert callable(service.install_monitoring_stack)
 
 
 class TestKubernetesEnhancedGrafanaFix:
     """Test Grafana Helm chart fix"""
-    
+
     def test_grafana_helm_chart_url(self):
         """Bug #10: Grafana Helm chart should be grafana/grafana not grafana-charts/grafana"""
         # This would be tested in actual Helm command generation
@@ -172,27 +178,28 @@ class TestKubernetesEnhancedGrafanaFix:
 
 class TestCLIKubectlApplyFix:
     """Test CLI kubectl_apply yaml import fix"""
-    
+
     def test_kubectl_apply_yaml_import(self):
         """Bug #4: _kubectl_apply should handle yaml import with json fallback"""
         # This tests that the CLI properly handles yaml import
         # The fix added inline import with json fallback
-        
+
         # We can't directly test the CLI method without importing the full CLI
         # But we can verify yaml is available or json is used as fallback
         try:
             import yaml
+
             yaml_available = True
         except ImportError:
             yaml_available = False
-        
+
         # Either yaml should be available or json should work as fallback
         assert yaml_available or True  # json is always available
 
 
 class TestCLKarpenterLabelFix:
     """Test CLI Karpenter label fix"""
-    
+
     def test_karpenter_label_uses_nodepool(self):
         """Bug #9: Karpenter label should be karpenter.sh/nodepool not karpenter.sh/provisioner-name"""
         # This would be tested in actual label generation
@@ -205,23 +212,25 @@ class TestCLKarpenterLabelFix:
 
 class TestStaleDuplicateFileCheck:
     """Test that stale duplicate files don't exist"""
-    
+
     def test_no_kubernetes_enhanced_fixed_file(self):
         """Bug #14: kubernetes_enhanced_fixed.py should not exist"""
         import os
         from pathlib import Path
-        
+
         # Check if the stale file exists
-        terradev_cli_path = Path(__file__).parent.parent / "terradev_cli" / "ml_services"
+        terradev_cli_path = (
+            Path(__file__).parent.parent / "terradev_cli" / "ml_services"
+        )
         stale_file = terradev_cli_path / "kubernetes_enhanced_fixed.py"
-        
+
         # This file should not exist
         assert not stale_file.exists(), f"Stale duplicate file exists: {stale_file}"
 
 
 class TestKubernetesEnhancedEmojiFix:
     """Test CLI emoji string fix"""
-    
+
     def test_emoji_strings_valid(self):
         """Bug #11: Emoji strings should not be garbled"""
         # This would test that k8s_create/k8s_destroy use valid emoji strings
@@ -233,7 +242,7 @@ class TestKubernetesEnhancedEmojiFix:
 
 class TestKarpenterTolerationFix:
     """Test Karpenter toleration fix"""
-    
+
     def test_karpenter_toleration_has_operator(self):
         """Bug #12: Karpenter toleration should have operator: Equal"""
         # This would test that tolerations include operator: Equal
@@ -241,7 +250,7 @@ class TestKarpenterTolerationFix:
         toleration_example = {
             "key": "nvidia.com/gpu",
             "operator": "Equal",  # This should be present
-            "effect": "NoSchedule"
+            "effect": "NoSchedule",
         }
         assert "operator" in toleration_example
         assert toleration_example["operator"] == "Equal"

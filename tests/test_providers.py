@@ -45,17 +45,35 @@ class TestBaseProviderContract:
 
     def test_gpu_specs_known_types(self):
         """Verify GPU spec lookup works for known GPU types."""
+
         # Create a concrete subclass just for testing
         class DummyProvider(BaseProvider):
-            async def get_instance_quotes(self, gpu_type, region=None): return []
-            async def provision_instance(self, it, r, g): return {}
-            async def get_instance_status(self, iid): return {}
-            async def stop_instance(self, iid): return {}
-            async def start_instance(self, iid): return {}
-            async def terminate_instance(self, iid): return {}
-            async def list_instances(self): return []
-            async def execute_command(self, iid, cmd, ae): return {}
-            def _get_auth_headers(self): return {}
+            async def get_instance_quotes(self, gpu_type, region=None):
+                return []
+
+            async def provision_instance(self, it, r, g):
+                return {}
+
+            async def get_instance_status(self, iid):
+                return {}
+
+            async def stop_instance(self, iid):
+                return {}
+
+            async def start_instance(self, iid):
+                return {}
+
+            async def terminate_instance(self, iid):
+                return {}
+
+            async def list_instances(self):
+                return []
+
+            async def execute_command(self, iid, cmd, ae):
+                return {}
+
+            def _get_auth_headers(self):
+                return {}
 
         p = DummyProvider(credentials={})
         for gpu in ["A100", "V100", "H100", "RTX4090", "RTX3090"]:
@@ -66,15 +84,32 @@ class TestBaseProviderContract:
 
     def test_unknown_gpu_returns_empty(self):
         class DummyProvider(BaseProvider):
-            async def get_instance_quotes(self, gpu_type, region=None): return []
-            async def provision_instance(self, it, r, g): return {}
-            async def get_instance_status(self, iid): return {}
-            async def stop_instance(self, iid): return {}
-            async def start_instance(self, iid): return {}
-            async def terminate_instance(self, iid): return {}
-            async def list_instances(self): return []
-            async def execute_command(self, iid, cmd, ae): return {}
-            def _get_auth_headers(self): return {}
+            async def get_instance_quotes(self, gpu_type, region=None):
+                return []
+
+            async def provision_instance(self, it, r, g):
+                return {}
+
+            async def get_instance_status(self, iid):
+                return {}
+
+            async def stop_instance(self, iid):
+                return {}
+
+            async def start_instance(self, iid):
+                return {}
+
+            async def terminate_instance(self, iid):
+                return {}
+
+            async def list_instances(self):
+                return []
+
+            async def execute_command(self, iid, cmd, ae):
+                return {}
+
+            def _get_auth_headers(self):
+                return {}
 
         p = DummyProvider(credentials={})
         assert p._get_gpu_specs("NONEXISTENT") == {}
@@ -148,7 +183,9 @@ class TestRunPodProvider:
             }
         }
 
-        with patch.object(provider, "_make_request", new_callable=AsyncMock) as mock_req:
+        with patch.object(
+            provider, "_make_request", new_callable=AsyncMock
+        ) as mock_req:
             mock_req.return_value = mock_response
             quotes = await provider.get_instance_quotes("A100")
 
@@ -174,16 +211,16 @@ class TestRunPodProvider:
             "data": {
                 "podFindAndDeployOnDemand": {
                     "id": "new-pod-id",
-                    "desiredState": "RUNNING"
+                    "desiredState": "RUNNING",
                 }
             }
         }
 
-        with patch.object(provider, "_make_request", new_callable=AsyncMock) as mock_req:
+        with patch.object(
+            provider, "_make_request", new_callable=AsyncMock
+        ) as mock_req:
             # Need to also patch GPU_PRICING since it's missing on the class
-            provider.GPU_PRICING = {
-                "A100": {"id": "NVIDIA A100 80GB", "price": 2.49}
-            }
+            provider.GPU_PRICING = {"A100": {"id": "NVIDIA A100 80GB", "price": 2.49}}
             mock_req.return_value = mock_response
             result = await provider.provision_instance(
                 "runpod-community-A100", "us-east-1", "A100"
@@ -207,16 +244,16 @@ class TestRunPodProvider:
                             "name": "test-pod",
                             "desiredStatus": "RUNNING",
                             "gpuCount": 1,
-                            "machine": {
-                                "gpuDisplayName": "NVIDIA A100-80GB"
-                            }
+                            "machine": {"gpuDisplayName": "NVIDIA A100-80GB"},
                         }
                     ]
                 }
             }
         }
 
-        with patch.object(provider, "_make_request", new_callable=AsyncMock) as mock_req:
+        with patch.object(
+            provider, "_make_request", new_callable=AsyncMock
+        ) as mock_req:
             mock_req.return_value = mock_response
             instances = await provider.list_instances()
 
@@ -233,12 +270,18 @@ class TestOutputSchemaConsistency:
     """Verify all providers return consistent output schemas."""
 
     QUOTE_REQUIRED_KEYS = {
-        "instance_type", "gpu_type", "price_per_hour", "region",
-        "available", "provider",
+        "instance_type",
+        "gpu_type",
+        "price_per_hour",
+        "region",
+        "available",
+        "provider",
     }
 
     PROVISION_REQUIRED_KEYS = {
-        "instance_id", "status", "provider",
+        "instance_id",
+        "status",
+        "provider",
     }
 
     @pytest.mark.asyncio
@@ -251,13 +294,15 @@ class TestOutputSchemaConsistency:
                         "id": "A100-80GB",
                         "displayName": "NVIDIA A100-80GB",
                         "communityPrice": 2.49,
-                        "memoryInGb": 80
+                        "memoryInGb": 80,
                     }
                 ]
             }
         }
 
-        with patch.object(provider, "_get_live_pricing", new_callable=AsyncMock) as mock_req:
+        with patch.object(
+            provider, "_get_live_pricing", new_callable=AsyncMock
+        ) as mock_req:
             mock_req.return_value = [
                 {
                     "instance_type": "runpod-community-A100-80GB",
@@ -268,7 +313,7 @@ class TestOutputSchemaConsistency:
                     "provider": "runpod",
                     "vcpus": 16,
                     "memory_gb": 80,
-                    "gpu_count": 1
+                    "gpu_count": 1,
                 }
             ]
             quotes = await provider.get_instance_quotes("A100")

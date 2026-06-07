@@ -32,24 +32,26 @@ logger = logging.getLogger(__name__)
 
 class ServingPattern(Enum):
     """MoE serving patterns supported by Ray Serve LLM"""
-    PURE_TP = "pure_tp"           # Traditional: all GPUs do tensor parallelism
-    WIDE_EP = "wide_ep"           # EP + DP: experts distributed, data parallel attention
-    DISAGGREGATED_PD = "disagg"   # Prefill/Decode separation with KV transfer
-    WIDE_EP_PD = "wide_ep_pd"    # Wide-EP + disaggregated P/D (full stack)
+
+    PURE_TP = "pure_tp"  # Traditional: all GPUs do tensor parallelism
+    WIDE_EP = "wide_ep"  # EP + DP: experts distributed, data parallel attention
+    DISAGGREGATED_PD = "disagg"  # Prefill/Decode separation with KV transfer
+    WIDE_EP_PD = "wide_ep_pd"  # Wide-EP + disaggregated P/D (full stack)
 
 
 @dataclass
 class MoEModelProfile:
     """Memory and parallelism profile for a Mixture-of-Experts model"""
+
     model_id: str
-    total_params_b: float             # Total parameters (e.g., 744 for GLM-5)
-    active_params_b: float            # Active parameters per token (e.g., 40 for GLM-5)
-    num_experts: int                  # Total expert count (e.g., 256 for DeepSeek-V3)
-    experts_per_token: int            # Top-K routing (e.g., 8)
-    total_weight_gb: float            # Full model weight size in GPU memory
-    active_memory_gb: float           # Memory used during inference (KV cache + active experts)
-    recommended_tp: int = 1           # TP degree per EP rank
-    recommended_dp: int = 8           # DP/EP degree
+    total_params_b: float  # Total parameters (e.g., 744 for GLM-5)
+    active_params_b: float  # Active parameters per token (e.g., 40 for GLM-5)
+    num_experts: int  # Total expert count (e.g., 256 for DeepSeek-V3)
+    experts_per_token: int  # Top-K routing (e.g., 8)
+    total_weight_gb: float  # Full model weight size in GPU memory
+    active_memory_gb: float  # Memory used during inference (KV cache + active experts)
+    recommended_tp: int = 1  # TP degree per EP rank
+    recommended_dp: int = 8  # DP/EP degree
     supports_fp8: bool = True
     supports_eplb: bool = True
 
@@ -58,33 +60,58 @@ class MoEModelProfile:
 MOE_MODEL_PROFILES: Dict[str, MoEModelProfile] = {
     "zai-org/GLM-5-FP8": MoEModelProfile(
         model_id="zai-org/GLM-5-FP8",
-        total_params_b=744, active_params_b=40, num_experts=256,
-        experts_per_token=8, total_weight_gb=380, active_memory_gb=45,
-        recommended_tp=1, recommended_dp=8,
+        total_params_b=744,
+        active_params_b=40,
+        num_experts=256,
+        experts_per_token=8,
+        total_weight_gb=380,
+        active_memory_gb=45,
+        recommended_tp=1,
+        recommended_dp=8,
     ),
     "deepseek-ai/DeepSeek-V3": MoEModelProfile(
         model_id="deepseek-ai/DeepSeek-V3",
-        total_params_b=671, active_params_b=37, num_experts=256,
-        experts_per_token=8, total_weight_gb=340, active_memory_gb=42,
-        recommended_tp=1, recommended_dp=8,
+        total_params_b=671,
+        active_params_b=37,
+        num_experts=256,
+        experts_per_token=8,
+        total_weight_gb=340,
+        active_memory_gb=42,
+        recommended_tp=1,
+        recommended_dp=8,
     ),
     "Qwen/Qwen3.5-397B-A17B": MoEModelProfile(
         model_id="Qwen/Qwen3.5-397B-A17B",
-        total_params_b=397, active_params_b=17, num_experts=128,
-        experts_per_token=8, total_weight_gb=200, active_memory_gb=22,
-        recommended_tp=1, recommended_dp=8,
+        total_params_b=397,
+        active_params_b=17,
+        num_experts=128,
+        experts_per_token=8,
+        total_weight_gb=200,
+        active_memory_gb=22,
+        recommended_tp=1,
+        recommended_dp=8,
     ),
     "mistralai/Mistral-Large-3-MoE": MoEModelProfile(
         model_id="mistralai/Mistral-Large-3-MoE",
-        total_params_b=405, active_params_b=70, num_experts=16,
-        experts_per_token=2, total_weight_gb=210, active_memory_gb=55,
-        recommended_tp=2, recommended_dp=4,
+        total_params_b=405,
+        active_params_b=70,
+        num_experts=16,
+        experts_per_token=2,
+        total_weight_gb=210,
+        active_memory_gb=55,
+        recommended_tp=2,
+        recommended_dp=4,
     ),
     "meta-llama/Llama-4-405B-MoE": MoEModelProfile(
         model_id="meta-llama/Llama-4-405B-MoE",
-        total_params_b=405, active_params_b=52, num_experts=16,
-        experts_per_token=2, total_weight_gb=210, active_memory_gb=48,
-        recommended_tp=2, recommended_dp=4,
+        total_params_b=405,
+        active_params_b=52,
+        num_experts=16,
+        experts_per_token=2,
+        total_weight_gb=210,
+        active_memory_gb=48,
+        recommended_tp=2,
+        recommended_dp=4,
     ),
 }
 
@@ -92,6 +119,7 @@ MOE_MODEL_PROFILES: Dict[str, MoEModelProfile] = {
 @dataclass
 class EnhancedRayConfig:
     """Enhanced Ray configuration with MoE and monitoring support"""
+
     # Base Ray config
     dashboard_uri: Optional[str] = None
     cluster_name: Optional[str] = None
@@ -103,7 +131,7 @@ class EnhancedRayConfig:
     # MoE serving config
     serving_pattern: ServingPattern = ServingPattern.WIDE_EP
     model_id: Optional[str] = None
-    serving_backend: str = "vllm"      # vllm or sglang
+    serving_backend: str = "vllm"  # vllm or sglang
     tp_size: int = 1
     dp_size: int = 8
     gpu_count: int = 8
@@ -119,7 +147,7 @@ class EnhancedRayConfig:
     decode_tp: int = 1
     decode_dp: int = 4
     kv_connector: str = "NixlConnector"  # NixlConnector or LMCacheConnector
-    kv_buffer_size: int = 5368709120     # 5GB default
+    kv_buffer_size: int = 5368709120  # 5GB default
 
     # Monitoring
     monitoring_enabled: bool = False
@@ -153,27 +181,26 @@ class EnhancedRayService:
         """Test Ray connection and return cluster info"""
         try:
             result = subprocess.run(
-                ["ray", "--version"],
-                capture_output=True, text=True, timeout=10
+                ["ray", "--version"], capture_output=True, text=True, timeout=10
             )
             if result.returncode != 0:
                 return {
                     "status": "failed",
-                    "error": "Ray not installed. Run: pip install ray[default]"
+                    "error": "Ray not installed. Run: pip install ray[default]",
                 }
             ray_version = result.stdout.strip()
 
             # Check if cluster is running
             status_result = subprocess.run(
-                ["ray", "status"],
-                capture_output=True, text=True, timeout=15
+                ["ray", "status"], capture_output=True, text=True, timeout=15
             )
             if status_result.returncode == 0:
                 return {
                     "status": "connected",
                     "ray_version": ray_version,
                     "cluster_name": self.config.cluster_name or "local",
-                    "dashboard_uri": self.config.dashboard_uri or "http://localhost:8265",
+                    "dashboard_uri": self.config.dashboard_uri
+                    or "http://localhost:8265",
                     "serving_pattern": self.config.serving_pattern.value,
                     "model_id": self.config.model_id,
                     "ep_enabled": self.config.enable_expert_parallel,
@@ -184,12 +211,12 @@ class EnhancedRayService:
                     "status": "not_connected",
                     "ray_version": ray_version,
                     "error": "Ray installed but no active cluster",
-                    "suggestion": "Run: terradev ml ray --start"
+                    "suggestion": "Run: terradev ml ray --start",
                 }
         except FileNotFoundError:
             return {
                 "status": "failed",
-                "error": "Ray not installed. Run: pip install ray[default]"
+                "error": "Ray not installed. Run: pip install ray[default]",
             }
         except Exception as e:
             return {"status": "failed", "error": str(e)}
@@ -201,17 +228,20 @@ class EnhancedRayService:
         try:
             if head_node:
                 cmd = [
-                    "ray", "start", "--head",
-                    "--port", str(port),
-                    "--dashboard-host", "0.0.0.0",
-                    "--object-store-memory", str(self.config.kv_buffer_size),
+                    "ray",
+                    "start",
+                    "--head",
+                    "--port",
+                    str(port),
+                    "--dashboard-host",
+                    "0.0.0.0",
+                    "--object-store-memory",
+                    str(self.config.kv_buffer_size),
                 ]
                 if self.config.gpu_count > 0:
                     cmd.extend(["--num-gpus", str(self.config.gpu_count)])
 
-                result = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=30
-                )
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                 if result.returncode == 0:
                     return {
                         "status": "head_started",
@@ -224,9 +254,7 @@ class EnhancedRayService:
             elif workers > 0:
                 head_addr = f"{self.config.head_node_ip or 'localhost'}:{port}"
                 cmd = ["ray", "start", "--address", head_addr]
-                result = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=30
-                )
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                 if result.returncode == 0:
                     return {
                         "status": "worker_started",
@@ -269,9 +297,14 @@ class EnhancedRayService:
         # Default estimation for unknown MoE models
         self._model_profile = MoEModelProfile(
             model_id=mid or "unknown",
-            total_params_b=400, active_params_b=40, num_experts=64,
-            experts_per_token=4, total_weight_gb=200, active_memory_gb=40,
-            recommended_tp=1, recommended_dp=self.config.gpu_count,
+            total_params_b=400,
+            active_params_b=40,
+            num_experts=64,
+            experts_per_token=4,
+            total_weight_gb=200,
+            active_memory_gb=40,
+            recommended_tp=1,
+            recommended_dp=self.config.gpu_count,
         )
         logger.warning(
             f"No profile for {mid}, using default estimates "
@@ -650,7 +683,7 @@ print(f"  KV Connector: {kv["type"]}")
             if status.returncode != 0:
                 return {
                     "status": "failed",
-                    "error": "Ray cluster not running. Start with: terradev ml ray --start"
+                    "error": "Ray cluster not running. Start with: terradev ml ray --start",
                 }
 
             # Ray Dashboard is built-in at :8265
@@ -687,7 +720,8 @@ print(f"  KV Connector: {kv["type"]}")
                         "status": "running",
                         "version": self._get_ray_version(),
                         "cluster_name": self.config.cluster_name or "local",
-                        "dashboard_uri": self.config.dashboard_uri or "http://localhost:8265",
+                        "dashboard_uri": self.config.dashboard_uri
+                        or "http://localhost:8265",
                     },
                     "monitoring": {
                         "prometheus": self.config.monitoring_enabled,
@@ -809,67 +843,116 @@ applications:
                     "headGroupSpec": {
                         "template": {
                             "spec": {
-                                "containers": [{
-                                    "name": "ray-head",
-                                    "image": "rayproject/ray:2.44.1-py311-gpu",
-                                    "resources": {
-                                        "limits": {"nvidia.com/gpu": "0"},
-                                        "requests": {"cpu": "8", "memory": "32Gi"},
-                                    },
-                                    "env": [
-                                        {"name": "VLLM_USE_DEEP_GEMM", "value": "1"},
-                                        {"name": "VLLM_ALL2ALL_BACKEND", "value": "deepep_low_latency"},
-                                    ],
-                                }],
+                                "containers": [
+                                    {
+                                        "name": "ray-head",
+                                        "image": "rayproject/ray:2.44.1-py311-gpu",
+                                        "resources": {
+                                            "limits": {"nvidia.com/gpu": "0"},
+                                            "requests": {"cpu": "8", "memory": "32Gi"},
+                                        },
+                                        "env": [
+                                            {
+                                                "name": "VLLM_USE_DEEP_GEMM",
+                                                "value": "1",
+                                            },
+                                            {
+                                                "name": "VLLM_ALL2ALL_BACKEND",
+                                                "value": "deepep_low_latency",
+                                            },
+                                        ],
+                                    }
+                                ],
                             },
                         },
                     },
-                    "workerGroupSpecs": [{
-                        "groupName": "gpu-workers",
-                        "replicas": 1,
-                        "minReplicas": 1,
-                        "maxReplicas": 4,
-                        "template": {
-                            "spec": {
-                                "nodeSelector": {
-                                    "nvidia.com/gpu.product": "NVIDIA-H100-80GB-HBM3",
-                                },
-                                "tolerations": [
-                                    {"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"},
-                                ],
-                                "containers": [{
-                                    "name": "ray-worker",
-                                    "image": "rayproject/ray:2.44.1-py311-gpu",
-                                    "resources": {
-                                        "limits": {
-                                            "nvidia.com/gpu": str(self.config.gpu_count),
-                                            "cpu": "96",
-                                            "memory": "512Gi",
-                                        },
-                                        "requests": {
-                                            "nvidia.com/gpu": str(self.config.gpu_count),
-                                            "cpu": "64",
-                                            "memory": "256Gi",
-                                        },
+                    "workerGroupSpecs": [
+                        {
+                            "groupName": "gpu-workers",
+                            "replicas": 1,
+                            "minReplicas": 1,
+                            "maxReplicas": 4,
+                            "template": {
+                                "spec": {
+                                    "nodeSelector": {
+                                        "nvidia.com/gpu.product": "NVIDIA-H100-80GB-HBM3",
                                     },
-                                    "env": [
-                                        {"name": "VLLM_USE_DEEP_GEMM", "value": "1"},
-                                        {"name": "VLLM_ALL2ALL_BACKEND", "value": "deepep_low_latency"},
-                                        {"name": "NCCL_P2P_DISABLE", "value": "0"},
-                                        {"name": "NCCL_IB_DISABLE", "value": "0"},
+                                    "tolerations": [
+                                        {
+                                            "key": "nvidia.com/gpu",
+                                            "operator": "Exists",
+                                            "effect": "NoSchedule",
+                                        },
                                     ],
-                                    "volumeMounts": [
-                                        {"name": "model-cache", "mountPath": "/models"},
-                                        {"name": "dshm", "mountPath": "/dev/shm"},
+                                    "containers": [
+                                        {
+                                            "name": "ray-worker",
+                                            "image": "rayproject/ray:2.44.1-py311-gpu",
+                                            "resources": {
+                                                "limits": {
+                                                    "nvidia.com/gpu": str(
+                                                        self.config.gpu_count
+                                                    ),
+                                                    "cpu": "96",
+                                                    "memory": "512Gi",
+                                                },
+                                                "requests": {
+                                                    "nvidia.com/gpu": str(
+                                                        self.config.gpu_count
+                                                    ),
+                                                    "cpu": "64",
+                                                    "memory": "256Gi",
+                                                },
+                                            },
+                                            "env": [
+                                                {
+                                                    "name": "VLLM_USE_DEEP_GEMM",
+                                                    "value": "1",
+                                                },
+                                                {
+                                                    "name": "VLLM_ALL2ALL_BACKEND",
+                                                    "value": "deepep_low_latency",
+                                                },
+                                                {
+                                                    "name": "NCCL_P2P_DISABLE",
+                                                    "value": "0",
+                                                },
+                                                {
+                                                    "name": "NCCL_IB_DISABLE",
+                                                    "value": "0",
+                                                },
+                                            ],
+                                            "volumeMounts": [
+                                                {
+                                                    "name": "model-cache",
+                                                    "mountPath": "/models",
+                                                },
+                                                {
+                                                    "name": "dshm",
+                                                    "mountPath": "/dev/shm",
+                                                },
+                                            ],
+                                        }
                                     ],
-                                }],
-                                "volumes": [
-                                    {"name": "model-cache", "persistentVolumeClaim": {"claimName": "moe-model-cache"}},
-                                    {"name": "dshm", "emptyDir": {"medium": "Memory", "sizeLimit": "32Gi"}},
-                                ],
+                                    "volumes": [
+                                        {
+                                            "name": "model-cache",
+                                            "persistentVolumeClaim": {
+                                                "claimName": "moe-model-cache"
+                                            },
+                                        },
+                                        {
+                                            "name": "dshm",
+                                            "emptyDir": {
+                                                "medium": "Memory",
+                                                "sizeLimit": "32Gi",
+                                            },
+                                        },
+                                    ],
+                                },
                             },
-                        },
-                    }],
+                        }
+                    ],
                 },
             },
         }
@@ -967,14 +1050,22 @@ applications:
                     {
                         "title": "EPLB Rebalance Events",
                         "type": "stat",
-                        "targets": [{"expr": "increase(vllm:eplb_rebalance_total[5m])"}],
+                        "targets": [
+                            {"expr": "increase(vllm:eplb_rebalance_total[5m])"}
+                        ],
                     },
                     {
                         "title": "GPU Memory (Weight vs KV Cache)",
                         "type": "timeseries",
                         "targets": [
-                            {"expr": "vllm:gpu_cache_usage_perc", "legendFormat": "KV Cache"},
-                            {"expr": "vllm:weight_memory_bytes", "legendFormat": "Weights"},
+                            {
+                                "expr": "vllm:gpu_cache_usage_perc",
+                                "legendFormat": "KV Cache",
+                            },
+                            {
+                                "expr": "vllm:weight_memory_bytes",
+                                "legendFormat": "Weights",
+                            },
                         ],
                     },
                     {
@@ -986,8 +1077,14 @@ applications:
                         "title": "Tokens/Second (Prefill vs Decode)",
                         "type": "timeseries",
                         "targets": [
-                            {"expr": "rate(vllm:prompt_tokens_total[1m])", "legendFormat": "Prefill tok/s"},
-                            {"expr": "rate(vllm:generation_tokens_total[1m])", "legendFormat": "Decode tok/s"},
+                            {
+                                "expr": "rate(vllm:prompt_tokens_total[1m])",
+                                "legendFormat": "Prefill tok/s",
+                            },
+                            {
+                                "expr": "rate(vllm:generation_tokens_total[1m])",
+                                "legendFormat": "Decode tok/s",
+                            },
                         ],
                     },
                 ],
@@ -1026,7 +1123,8 @@ def create_enhanced_ray_service_from_credentials(
         gpu_count=int(credentials.get("ray_gpu_count", "8")),
         gpu_memory_utilization=float(credentials.get("ray_gpu_mem_util", "0.85")),
         max_model_len=int(credentials.get("ray_max_model_len", "32768")),
-        enable_expert_parallel=credentials.get("ray_enable_ep", "true").lower() == "true",
+        enable_expert_parallel=credentials.get("ray_enable_ep", "true").lower()
+        == "true",
         enable_eplb=credentials.get("ray_enable_eplb", "true").lower() == "true",
         enable_dbo=credentials.get("ray_enable_dbo", "true").lower() == "true",
         # Disaggregated P/D
@@ -1037,7 +1135,8 @@ def create_enhanced_ray_service_from_credentials(
         kv_connector=credentials.get("ray_kv_connector", "NixlConnector"),
         kv_buffer_size=int(credentials.get("ray_kv_buffer_size", "5368709120")),
         # Monitoring
-        monitoring_enabled=credentials.get("ray_monitoring_enabled", "false").lower() == "true",
+        monitoring_enabled=credentials.get("ray_monitoring_enabled", "false").lower()
+        == "true",
     )
 
     return EnhancedRayService(config)

@@ -43,8 +43,18 @@ OPTIONAL_CREDENTIALS = {
 
 def get_credential_prompts() -> List[Dict[str, str]]:
     return [
-        {"key": "helicone_api_key", "prompt": "Helicone API Key", "required": True, "hide": True},
-        {"key": "helicone_eu", "prompt": "EU region? (true/false, default: false)", "required": False, "hide": False},
+        {
+            "key": "helicone_api_key",
+            "prompt": "Helicone API Key",
+            "required": True,
+            "hide": True,
+        },
+        {
+            "key": "helicone_eu",
+            "prompt": "EU region? (true/false, default: false)",
+            "required": False,
+            "hide": False,
+        },
     ]
 
 
@@ -53,7 +63,11 @@ def _is_eu(creds: Dict[str, str]) -> bool:
 
 
 def _gateway_url(creds: Dict[str, str]) -> str:
-    return "https://eu.gateway.helicone.ai" if _is_eu(creds) else "https://gateway.helicone.ai"
+    return (
+        "https://eu.gateway.helicone.ai"
+        if _is_eu(creds)
+        else "https://gateway.helicone.ai"
+    )
 
 
 def _api_url(creds: Dict[str, str]) -> str:
@@ -80,7 +94,8 @@ def is_configured(creds: Dict[str, str]) -> bool:
 
 def get_status_summary(creds: Dict[str, str]) -> Dict[str, Any]:
     return {
-        "integration": "helicone", "name": "Helicone",
+        "integration": "helicone",
+        "name": "Helicone",
         "configured": is_configured(creds),
         "region": "EU" if _is_eu(creds) else "US",
         "gateway_url": _gateway_url(creds),
@@ -91,6 +106,7 @@ def get_status_summary(creds: Dict[str, str]) -> Dict[str, Any]:
 # ═══════════════════════════════════════════════════════════════════════
 # REQUEST LOG QUERIES (POST /v1/request/query)
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def _build_request_query(
     *,
@@ -155,11 +171,18 @@ async def query_requests(creds: Dict[str, str], **kwargs) -> Dict[str, Any]:
 
     try:
         async with aiohttp.ClientSession() as s:
-            async with s.post(url, json=body, headers=_api_auth_headers(creds),
-                              timeout=aiohttp.ClientTimeout(total=30)) as r:
+            async with s.post(
+                url,
+                json=body,
+                headers=_api_auth_headers(creds),
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as r:
                 if r.status == 200:
                     return {"success": True, "data": await r.json()}
-                return {"success": False, "error": f"HTTP {r.status}: {(await r.text())[:500]}"}
+                return {
+                    "success": False,
+                    "error": f"HTTP {r.status}: {(await r.text())[:500]}",
+                }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -173,7 +196,9 @@ def _query_requests_sync(creds: Dict[str, str], **kwargs) -> Dict[str, Any]:
     payload = json.dumps(body).encode()
 
     try:
-        req = urllib.request.Request(url, data=payload, headers=_api_auth_headers(creds), method="POST")
+        req = urllib.request.Request(
+            url, data=payload, headers=_api_auth_headers(creds), method="POST"
+        )
         with urllib.request.urlopen(req, timeout=30) as resp:
             return {"success": True, "data": json.loads(resp.read().decode())}
     except urllib.error.HTTPError as e:
@@ -186,10 +211,13 @@ def _query_requests_sync(creds: Dict[str, str], **kwargs) -> Dict[str, Any]:
 # COST AGGREGATION
 # ═══════════════════════════════════════════════════════════════════════
 
+
 async def get_cost_summary(creds: Dict[str, str], hours: int = 24) -> Dict[str, Any]:
     """Aggregate cost data from recent requests."""
     since = (datetime.utcnow() - timedelta(hours=hours)).isoformat() + "Z"
-    result = await query_requests(creds, limit=1000, created_after=since, include_inputs=False)
+    result = await query_requests(
+        creds, limit=1000, created_after=since, include_inputs=False
+    )
 
     if not result.get("success"):
         return result
@@ -224,7 +252,9 @@ async def get_cost_summary(creds: Dict[str, str], hours: int = 24) -> Dict[str, 
         "total_cost_usd": round(total_cost, 4),
         "total_tokens": total_tokens,
         "total_requests": total_requests,
-        "by_model": {k: {**v, "cost": round(v["cost"], 4)} for k, v in by_model.items()},
+        "by_model": {
+            k: {**v, "cost": round(v["cost"], 4)} for k, v in by_model.items()
+        },
     }
 
 
@@ -232,7 +262,10 @@ async def get_cost_summary(creds: Dict[str, str], hours: int = 24) -> Dict[str, 
 # FEEDBACK / SCORING
 # ═══════════════════════════════════════════════════════════════════════
 
-async def submit_feedback(creds: Dict[str, str], request_id: str, rating: bool) -> Dict[str, Any]:
+
+async def submit_feedback(
+    creds: Dict[str, str], request_id: str, rating: bool
+) -> Dict[str, Any]:
     """Submit feedback (thumbs up/down) for a Helicone request."""
     try:
         import aiohttp
@@ -244,11 +277,18 @@ async def submit_feedback(creds: Dict[str, str], request_id: str, rating: bool) 
 
     try:
         async with aiohttp.ClientSession() as s:
-            async with s.post(url, json=body, headers=_api_auth_headers(creds),
-                              timeout=aiohttp.ClientTimeout(total=15)) as r:
+            async with s.post(
+                url,
+                json=body,
+                headers=_api_auth_headers(creds),
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as r:
                 if r.status < 300:
                     return {"success": True, "request_id": request_id, "rating": rating}
-                return {"success": False, "error": f"HTTP {r.status}: {(await r.text())[:300]}"}
+                return {
+                    "success": False,
+                    "error": f"HTTP {r.status}: {(await r.text())[:300]}",
+                }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -257,8 +297,12 @@ async def submit_feedback(creds: Dict[str, str], request_id: str, rating: bool) 
 # PROPERTY UPDATES
 # ═══════════════════════════════════════════════════════════════════════
 
+
 async def update_request_property(
-    creds: Dict[str, str], request_id: str, key: str, value: str,
+    creds: Dict[str, str],
+    request_id: str,
+    key: str,
+    value: str,
 ) -> Dict[str, Any]:
     """Update a custom property on an existing request."""
     try:
@@ -271,11 +315,18 @@ async def update_request_property(
 
     try:
         async with aiohttp.ClientSession() as s:
-            async with s.put(url, json=body, headers=_api_auth_headers(creds),
-                             timeout=aiohttp.ClientTimeout(total=15)) as r:
+            async with s.put(
+                url,
+                json=body,
+                headers=_api_auth_headers(creds),
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as r:
                 if r.status < 300:
                     return {"success": True}
-                return {"success": False, "error": f"HTTP {r.status}: {(await r.text())[:300]}"}
+                return {
+                    "success": False,
+                    "error": f"HTTP {r.status}: {(await r.text())[:300]}",
+                }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -283,6 +334,7 @@ async def update_request_property(
 # ═══════════════════════════════════════════════════════════════════════
 # GATEWAY CONFIGURATION HELPERS
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def generate_gateway_config(
     creds: Dict[str, str],
@@ -357,36 +409,36 @@ def generate_gateway_snippet(creds: Dict[str, str], provider: str = "openai") ->
 
     if provider == "openai":
         return (
-            f'from openai import OpenAI\n\n'
-            f'client = OpenAI(\n'
+            f"from openai import OpenAI\n\n"
+            f"client = OpenAI(\n"
             f'    api_key="your-openai-key",\n'
             f'    base_url="{gateway}/v1",\n'
-            f'    default_headers={{\n'
+            f"    default_headers={{\n"
             f'        "Helicone-Auth": "Bearer {api_key[:8]}...",\n'
-            f'    }}\n'
-            f')\n\n'
-            f'response = client.chat.completions.create(\n'
+            f"    }}\n"
+            f")\n\n"
+            f"response = client.chat.completions.create(\n"
             f'    model="gpt-4o",\n'
             f'    messages=[{{"role": "user", "content": "Hello"}}]\n'
-            f')\n'
+            f")\n"
         )
     elif provider == "vllm":
         return (
-            f'from openai import OpenAI\n\n'
-            f'# Route vLLM through Helicone for logging\n'
-            f'client = OpenAI(\n'
+            f"from openai import OpenAI\n\n"
+            f"# Route vLLM through Helicone for logging\n"
+            f"client = OpenAI(\n"
             f'    api_key="not-needed",\n'
             f'    base_url="{gateway}/v1",\n'
-            f'    default_headers={{\n'
+            f"    default_headers={{\n"
             f'        "Helicone-Auth": "Bearer {api_key[:8]}...",\n'
             f'        "Helicone-Target-Url": "http://your-vllm:8000",\n'
             f'        "Helicone-Property-Source": "terradev",\n'
-            f'    }}\n'
-            f')\n\n'
-            f'response = client.chat.completions.create(\n'
+            f"    }}\n"
+            f")\n\n"
+            f"response = client.chat.completions.create(\n"
             f'    model="your-model",\n'
             f'    messages=[{{"role": "user", "content": "Hello"}}]\n'
-            f')\n'
+            f")\n"
         )
     return f"# Unsupported provider: {provider}"
 

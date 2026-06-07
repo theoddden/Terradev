@@ -52,7 +52,7 @@ class PrefixCacheIndex:
 
     def _hash_prefix(self, text: str) -> str:
         """Hash the first N whitespace-delimited tokens of a prompt."""
-        tokens = text.split(None, self._prefix_tokens)[:self._prefix_tokens]
+        tokens = text.split(None, self._prefix_tokens)[: self._prefix_tokens]
         prefix = " ".join(tokens)
         return hashlib.blake2b(prefix.encode(), digest_size=16).hexdigest()
 
@@ -124,6 +124,7 @@ class EndpointPhase(Enum):
 
     Adopted by vLLM, SGLang, NVIDIA Dynamo, MoonCake in 2025.
     """
+
     PREFILL = "prefill"
     DECODE = "decode"
     MIXED = "mixed"
@@ -134,9 +135,10 @@ class EndpointPhase(Enum):
 
 class KVConnectorType(Enum):
     """KV cache transfer connector types for disaggregated serving."""
-    NIXL = "NixlConnector"           # NVIDIA NIXL: zero-copy GPU-GPU via RDMA/NVLink
-    LMCACHE = "LMCacheConnector"     # LMCache: CPU-mediated transfer (wider compat)
-    MOONCAKE = "MooncakeConnector"   # MoonCake: distributed KV store
+
+    NIXL = "NixlConnector"  # NVIDIA NIXL: zero-copy GPU-GPU via RDMA/NVLink
+    LMCACHE = "LMCacheConnector"  # LMCache: CPU-mediated transfer (wider compat)
+    MOONCAKE = "MooncakeConnector"  # MoonCake: distributed KV store
     UNKNOWN = "unknown"
 
 
@@ -149,29 +151,31 @@ class KVConnectorConfig:
     This is critical for disaggregated MoE serving where KV caches can be
     several GB per request at long context lengths.
     """
+
     connector_type: KVConnectorType = KVConnectorType.NIXL
-    buffer_size_bytes: int = 5_368_709_120   # 5GB default NIXL buffer
+    buffer_size_bytes: int = 5_368_709_120  # 5GB default NIXL buffer
     rdma_enabled: bool = True
-    rdma_device: str = ""                    # e.g. "mlx5_0" for ConnectX-7
-    nvlink_direct: bool = False              # True if prefill/decode on same node
-    max_inflight_transfers: int = 16         # Concurrent KV transfer limit
-    compression_enabled: bool = False        # KV cache compression (lossy)
-    prefetch_enabled: bool = True            # Speculative KV prefetch
+    rdma_device: str = ""  # e.g. "mlx5_0" for ConnectX-7
+    nvlink_direct: bool = False  # True if prefill/decode on same node
+    max_inflight_transfers: int = 16  # Concurrent KV transfer limit
+    compression_enabled: bool = False  # KV cache compression (lossy)
+    prefetch_enabled: bool = True  # Speculative KV prefetch
 
 
 @dataclass
 class PrefillDecodeLink:
     """Tracks a KV cache handoff from a prefill endpoint to a decode endpoint."""
+
     prefill_endpoint_id: str
     decode_endpoint_id: str
     model: str
-    last_handoff: float = 0.0       # monotonic timestamp
+    last_handoff: float = 0.0  # monotonic timestamp
     handoff_count: int = 0
-    avg_transfer_ms: float = 0.0    # KV cache transfer latency
+    avg_transfer_ms: float = 0.0  # KV cache transfer latency
     # NIXL KV connector tracking
     kv_connector: KVConnectorType = KVConnectorType.UNKNOWN
-    kv_transfer_bytes: int = 0      # Avg KV cache size transferred
-    rdma_active: bool = False       # Whether RDMA was used for last transfer
+    kv_transfer_bytes: int = 0  # Avg KV cache size transferred
+    rdma_active: bool = False  # Whether RDMA was used for last transfer
 
 
 class PrefillDecodeTracker:
@@ -225,7 +229,11 @@ class PrefillDecodeTracker:
 
         # Resolve connector type
         try:
-            conn_type = KVConnectorType(kv_connector) if kv_connector else self.connector_config.connector_type
+            conn_type = (
+                KVConnectorType(kv_connector)
+                if kv_connector
+                else self.connector_config.connector_type
+            )
         except ValueError:
             conn_type = KVConnectorType.UNKNOWN
 
@@ -278,7 +286,9 @@ class PrefillDecodeTracker:
         return None
 
     def get_link_details(
-        self, prefill_id: str, model: str,
+        self,
+        prefill_id: str,
+        model: str,
     ) -> Optional[Dict[str, Any]]:
         """Get detailed link info including KV connector state."""
         key = (prefill_id, model)
@@ -298,7 +308,9 @@ class PrefillDecodeTracker:
         }
 
     def get_best_decode_by_transport(
-        self, model: str, max_age_s: float = 120.0,
+        self,
+        model: str,
+        max_age_s: float = 120.0,
     ) -> Optional[str]:
         """Find the decode endpoint with the best KV transport (lowest transfer latency).
 
@@ -323,7 +335,9 @@ class PrefillDecodeTracker:
 
             # Bonus for low transfer latency
             if link.avg_transfer_ms > 0:
-                latency_bonus = max(0, 1.0 - (link.avg_transfer_ms / 10.0))  # <10ms is good
+                latency_bonus = max(
+                    0, 1.0 - (link.avg_transfer_ms / 10.0)
+                )  # <10ms is good
                 score += latency_bonus
 
             if score > best_score:
@@ -374,6 +388,7 @@ class PrefillDecodeTracker:
 @dataclass
 class HealthProbe:
     """Result of a single health probe"""
+
     endpoint_id: str
     provider: str
     timestamp: datetime
@@ -386,6 +401,7 @@ class HealthProbe:
 @dataclass
 class InferenceEndpoint:
     """Tracked inference endpoint with health state"""
+
     endpoint_id: str
     provider: str
     url: str
@@ -405,16 +421,16 @@ class InferenceEndpoint:
     backup_endpoint_id: Optional[str] = None
     # Disaggregated serving (DistServe)
     phase: EndpointPhase = EndpointPhase.MIXED
-    flops_tflops: float = 0.0           # peak TFLOPS (prefill scoring)
+    flops_tflops: float = 0.0  # peak TFLOPS (prefill scoring)
     memory_bandwidth_tbps: float = 0.0  # peak TB/s (decode scoring)
     kv_transfer_endpoint: Optional[str] = None  # paired endpoint for KV handoff
     # MoE Expert Parallelism topology
-    ep_group_id: Optional[str] = None        # EP group this endpoint belongs to
-    ep_rank: int = 0                          # Rank within the EP group
-    expert_range: Tuple[int, int] = (0, 0)   # (start, end) expert indices on this rank
-    nvlink_domain: Optional[str] = None       # NVLink domain ID for intra-group comms
-    dp_size: int = 1                          # Total DP/EP ranks in the group
-    tp_size: int = 1                          # TP degree per EP rank
+    ep_group_id: Optional[str] = None  # EP group this endpoint belongs to
+    ep_rank: int = 0  # Rank within the EP group
+    expert_range: Tuple[int, int] = (0, 0)  # (start, end) expert indices on this rank
+    nvlink_domain: Optional[str] = None  # NVLink domain ID for intra-group comms
+    dp_size: int = 1  # Total DP/EP ranks in the group
+    tp_size: int = 1  # TP degree per EP rank
 
 
 class InferenceRouter:
@@ -434,11 +450,14 @@ class InferenceRouter:
     LATENCY_HISTORY_SIZE = 20
     FAILOVER_COOLDOWN_S = 60
 
-    def __init__(self, config_dir: Optional[Path] = None,
-                 topology_report: Optional[Dict] = None,
-                 routing_policy_path: Optional[str] = None):
-        self.config_dir = config_dir or Path.home() / '.terradev'
-        self.endpoints_file = self.config_dir / 'inference_endpoints.json'
+    def __init__(
+        self,
+        config_dir: Optional[Path] = None,
+        topology_report: Optional[Dict] = None,
+        routing_policy_path: Optional[str] = None,
+    ):
+        self.config_dir = config_dir or Path.home() / ".terradev"
+        self.endpoints_file = self.config_dir / "inference_endpoints.json"
         self.endpoints: Dict[str, InferenceEndpoint] = {}
         self._load_endpoints()
         self._last_failover: Dict[str, float] = {}
@@ -463,6 +482,7 @@ class InferenceRouter:
         """Initialize the semantic router backend (called lazily)"""
         try:
             from .semantic_router import SemanticRouter
+
             self._semantic_router = SemanticRouter(
                 policy_path=self._routing_policy_path,
                 topology_report=self._topology_report,
@@ -478,26 +498,28 @@ class InferenceRouter:
         """Load tracked endpoints from disk"""
         if self.endpoints_file.exists():
             try:
-                with open(self.endpoints_file, 'r') as f:
+                with open(self.endpoints_file, "r") as f:
                     data = json.load(f)
                 for ep_data in data:
                     ep = InferenceEndpoint(
-                        endpoint_id=ep_data['endpoint_id'],
-                        provider=ep_data['provider'],
-                        url=ep_data.get('url', ''),
-                        model=ep_data.get('model', ''),
-                        gpu_type=ep_data.get('gpu_type', ''),
-                        region=ep_data.get('region', ''),
-                        price_per_hour=ep_data.get('price_per_hour', 0.0),
-                        created_at=datetime.fromisoformat(ep_data.get('created_at', datetime.now().isoformat())),
-                        health=EndpointHealth(ep_data.get('health', 'unknown')),
-                        is_primary=ep_data.get('is_primary', True),
-                        backup_endpoint_id=ep_data.get('backup_endpoint_id'),
-                        avg_latency_ms=ep_data.get('avg_latency_ms', 0.0),
-                        phase=EndpointPhase(ep_data.get('phase', 'mixed')),
-                        flops_tflops=ep_data.get('flops_tflops', 0.0),
-                        memory_bandwidth_tbps=ep_data.get('memory_bandwidth_tbps', 0.0),
-                        kv_transfer_endpoint=ep_data.get('kv_transfer_endpoint'),
+                        endpoint_id=ep_data["endpoint_id"],
+                        provider=ep_data["provider"],
+                        url=ep_data.get("url", ""),
+                        model=ep_data.get("model", ""),
+                        gpu_type=ep_data.get("gpu_type", ""),
+                        region=ep_data.get("region", ""),
+                        price_per_hour=ep_data.get("price_per_hour", 0.0),
+                        created_at=datetime.fromisoformat(
+                            ep_data.get("created_at", datetime.now().isoformat())
+                        ),
+                        health=EndpointHealth(ep_data.get("health", "unknown")),
+                        is_primary=ep_data.get("is_primary", True),
+                        backup_endpoint_id=ep_data.get("backup_endpoint_id"),
+                        avg_latency_ms=ep_data.get("avg_latency_ms", 0.0),
+                        phase=EndpointPhase(ep_data.get("phase", "mixed")),
+                        flops_tflops=ep_data.get("flops_tflops", 0.0),
+                        memory_bandwidth_tbps=ep_data.get("memory_bandwidth_tbps", 0.0),
+                        kv_transfer_endpoint=ep_data.get("kv_transfer_endpoint"),
                     )
                     self.endpoints[ep.endpoint_id] = ep
             except Exception:
@@ -508,45 +530,54 @@ class InferenceRouter:
         self.config_dir.mkdir(parents=True, exist_ok=True)
         data = []
         for ep in self.endpoints.values():
-            data.append({
-                'endpoint_id': ep.endpoint_id,
-                'provider': ep.provider,
-                'url': ep.url,
-                'model': ep.model,
-                'gpu_type': ep.gpu_type,
-                'region': ep.region,
-                'price_per_hour': ep.price_per_hour,
-                'created_at': ep.created_at.isoformat(),
-                'health': ep.health.value,
-                'is_primary': ep.is_primary,
-                'backup_endpoint_id': ep.backup_endpoint_id,
-                'avg_latency_ms': ep.avg_latency_ms,
-                'phase': ep.phase.value,
-                'flops_tflops': ep.flops_tflops,
-                'memory_bandwidth_tbps': ep.memory_bandwidth_tbps,
-                'kv_transfer_endpoint': ep.kv_transfer_endpoint,
-            })
-        with open(self.endpoints_file, 'w') as f:
+            data.append(
+                {
+                    "endpoint_id": ep.endpoint_id,
+                    "provider": ep.provider,
+                    "url": ep.url,
+                    "model": ep.model,
+                    "gpu_type": ep.gpu_type,
+                    "region": ep.region,
+                    "price_per_hour": ep.price_per_hour,
+                    "created_at": ep.created_at.isoformat(),
+                    "health": ep.health.value,
+                    "is_primary": ep.is_primary,
+                    "backup_endpoint_id": ep.backup_endpoint_id,
+                    "avg_latency_ms": ep.avg_latency_ms,
+                    "phase": ep.phase.value,
+                    "flops_tflops": ep.flops_tflops,
+                    "memory_bandwidth_tbps": ep.memory_bandwidth_tbps,
+                    "kv_transfer_endpoint": ep.kv_transfer_endpoint,
+                }
+            )
+        with open(self.endpoints_file, "w") as f:
             json.dump(data, f, indent=2)
         os.chmod(self.endpoints_file, 0o600)
 
     # ── Endpoint Management ──
 
-    def register_endpoint(self, endpoint_id: str, provider: str, url: str,
-                          model: str, gpu_type: str, region: str,
-                          price_per_hour: float, is_primary: bool = True,
-                          backup_endpoint_id: Optional[str] = None,
-                          phase: str = "mixed",
-                          flops_tflops: float = 0.0,
-                          memory_bandwidth_tbps: float = 0.0,
-                          kv_transfer_endpoint: Optional[str] = None,
-                          ep_group_id: Optional[str] = None,
-                          ep_rank: int = 0,
-                          expert_range: Tuple[int, int] = (0, 0),
-                          nvlink_domain: Optional[str] = None,
-                          dp_size: int = 1,
-                          tp_size: int = 1,
-                          ) -> InferenceEndpoint:
+    def register_endpoint(
+        self,
+        endpoint_id: str,
+        provider: str,
+        url: str,
+        model: str,
+        gpu_type: str,
+        region: str,
+        price_per_hour: float,
+        is_primary: bool = True,
+        backup_endpoint_id: Optional[str] = None,
+        phase: str = "mixed",
+        flops_tflops: float = 0.0,
+        memory_bandwidth_tbps: float = 0.0,
+        kv_transfer_endpoint: Optional[str] = None,
+        ep_group_id: Optional[str] = None,
+        ep_rank: int = 0,
+        expert_range: Tuple[int, int] = (0, 0),
+        nvlink_domain: Optional[str] = None,
+        dp_size: int = 1,
+        tp_size: int = 1,
+    ) -> InferenceEndpoint:
         """Register a new inference endpoint for health tracking and routing.
 
         Args:
@@ -629,15 +660,15 @@ class InferenceRouter:
         if not ep or not ep.url:
             return HealthProbe(
                 endpoint_id=endpoint_id,
-                provider=ep.provider if ep else 'unknown',
+                provider=ep.provider if ep else "unknown",
                 timestamp=datetime.now(),
                 latency_ms=0,
                 status_code=0,
                 healthy=False,
-                error='No URL configured',
+                error="No URL configured",
             )
 
-        probe_url = ep.url.rstrip('/') + '/health'
+        probe_url = ep.url.rstrip("/") + "/health"
         start = time.monotonic()
         try:
             session = await self._get_probe_session()
@@ -701,7 +732,7 @@ class InferenceRouter:
             # Track latency
             ep.latency_history.append(probe.latency_ms)
             if len(ep.latency_history) > self.LATENCY_HISTORY_SIZE:
-                ep.latency_history = ep.latency_history[-self.LATENCY_HISTORY_SIZE:]
+                ep.latency_history = ep.latency_history[-self.LATENCY_HISTORY_SIZE :]
             ep.avg_latency_ms = sum(ep.latency_history) / len(ep.latency_history)
         else:
             ep.consecutive_failures += 1
@@ -730,7 +761,10 @@ class InferenceRouter:
                     continue
 
                 backup = self.endpoints.get(ep.backup_endpoint_id)
-                if backup and backup.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN):
+                if backup and backup.health in (
+                    EndpointHealth.HEALTHY,
+                    EndpointHealth.UNKNOWN,
+                ):
                     # Promote backup to primary
                     backup.is_primary = True
                     ep.is_primary = False
@@ -739,13 +773,13 @@ class InferenceRouter:
                     self._last_failover[eid] = time.time()
 
                     event = {
-                        'type': 'failover',
-                        'timestamp': datetime.now().isoformat(),
-                        'failed_endpoint': eid,
-                        'failed_provider': ep.provider,
-                        'new_primary': backup.endpoint_id,
-                        'new_provider': backup.provider,
-                        'reason': f'{ep.consecutive_failures} consecutive health check failures',
+                        "type": "failover",
+                        "timestamp": datetime.now().isoformat(),
+                        "failed_endpoint": eid,
+                        "failed_provider": ep.provider,
+                        "new_primary": backup.endpoint_id,
+                        "new_provider": backup.provider,
+                        "reason": f"{ep.consecutive_failures} consecutive health check failures",
                     }
                     failover_events.append(event)
                     logger.warning(
@@ -760,57 +794,70 @@ class InferenceRouter:
 
     def _save_failover_log(self, events: List[Dict]):
         """Append failover events to audit log"""
-        log_file = self.config_dir / 'failover_log.json'
+        log_file = self.config_dir / "failover_log.json"
         existing = []
         if log_file.exists():
             try:
-                with open(log_file, 'r') as f:
+                with open(log_file, "r") as f:
                     existing = json.load(f)
             except Exception:
                 pass
         existing.extend(events)
-        with open(log_file, 'w') as f:
+        with open(log_file, "w") as f:
             json.dump(existing, f, indent=2)
         os.chmod(log_file, 0o600)
 
     # ── Latency-Aware Routing ──
 
-    async def measure_latency_ping(self, target: str, count: int = 3) -> Optional[float]:
+    async def measure_latency_ping(
+        self, target: str, count: int = 3
+    ) -> Optional[float]:
         """Measure latency to a target via async ping (ms)"""
         try:
             proc = await asyncio.create_subprocess_exec(
-                'ping', '-c', str(count), '-W', '2', target,
+                "ping",
+                "-c",
+                str(count),
+                "-W",
+                "2",
+                target,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
             output = stdout.decode()
             latencies = []
-            for line in output.split('\n'):
-                if 'time=' in line:
-                    t = float(line.split('time=')[1].split()[0])
+            for line in output.split("\n"):
+                if "time=" in line:
+                    t = float(line.split("time=")[1].split()[0])
                     latencies.append(t)
             return sum(latencies) / len(latencies) if latencies else None
         except Exception:
             return None
 
-    async def measure_latency_wpt(self, url: str, wpt_api_key: Optional[str] = None) -> Optional[float]:
+    async def measure_latency_wpt(
+        self, url: str, wpt_api_key: Optional[str] = None
+    ) -> Optional[float]:
         """Measure TTFB via WebPageTest API (ms).
         Falls back to direct HTTP probe if no WPT key."""
         if wpt_api_key:
             try:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                async with aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as session:
                     # Submit test
                     params = {
-                        'url': url,
-                        'f': 'json',
-                        'k': wpt_api_key,
-                        'runs': '1',
-                        'fvonly': '1',
+                        "url": url,
+                        "f": "json",
+                        "k": wpt_api_key,
+                        "runs": "1",
+                        "fvonly": "1",
                     }
-                    async with session.get('https://www.webpagetest.org/runtest.php', params=params) as resp:
+                    async with session.get(
+                        "https://www.webpagetest.org/runtest.php", params=params
+                    ) as resp:
                         result = await resp.json()
-                        test_id = result.get('data', {}).get('testId')
+                        test_id = result.get("data", {}).get("testId")
                         if not test_id:
                             return None
 
@@ -818,14 +865,18 @@ class InferenceRouter:
                     for _ in range(12):
                         await asyncio.sleep(5)
                         async with session.get(
-                            f'https://www.webpagetest.org/jsonResult.php?test={test_id}'
+                            f"https://www.webpagetest.org/jsonResult.php?test={test_id}"
                         ) as resp:
                             result = await resp.json()
-                            status = result.get('statusCode', 0)
+                            status = result.get("statusCode", 0)
                             if status == 200:
-                                ttfb = (result.get('data', {})
-                                        .get('runs', {}).get('1', {})
-                                        .get('firstView', {}).get('TTFB', None))
+                                ttfb = (
+                                    result.get("data", {})
+                                    .get("runs", {})
+                                    .get("1", {})
+                                    .get("firstView", {})
+                                    .get("TTFB", None)
+                                )
                                 return float(ttfb) if ttfb is not None else None
                     return None
             except Exception:
@@ -834,16 +885,21 @@ class InferenceRouter:
         # Fallback: direct HTTP TTFB probe
         try:
             start = time.monotonic()
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as session:
                 async with session.get(url) as resp:
                     ttfb_ms = (time.monotonic() - start) * 1000
                     return ttfb_ms
         except Exception:
             return None
 
-    def get_best_endpoint(self, model: Optional[str] = None,
-                          strategy: str = 'latency',
-                          query: Optional[Dict] = None) -> Optional[InferenceEndpoint]:
+    def get_best_endpoint(
+        self,
+        model: Optional[str] = None,
+        strategy: str = "latency",
+        query: Optional[Dict] = None,
+    ) -> Optional[InferenceEndpoint]:
         """Select the best healthy endpoint for routing.
 
         Strategies:
@@ -877,7 +933,8 @@ class InferenceRouter:
 
         # ── Classic routing (latency / cost / score) ──
         candidates = [
-            ep for ep in self.endpoints.values()
+            ep
+            for ep in self.endpoints.values()
             if ep.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN)
             and (model is None or ep.model == model)
         ]
@@ -892,24 +949,33 @@ class InferenceRouter:
             for eid, freshness in hits:
                 cache_boost[eid] = freshness
 
-        if strategy == 'latency':
-            candidates.sort(key=lambda e: (
-                (e.avg_latency_ms or 9999) * (0.3 if e.endpoint_id in cache_boost else 1.0),
-                e.price_per_hour,
-            ))
-        elif strategy == 'cost':
-            candidates.sort(key=lambda e: (
-                e.price_per_hour * (0.5 if e.endpoint_id in cache_boost else 1.0),
-                e.avg_latency_ms or 9999,
-            ))
-        elif strategy == 'score':
+        if strategy == "latency":
+            candidates.sort(
+                key=lambda e: (
+                    (e.avg_latency_ms or 9999)
+                    * (0.3 if e.endpoint_id in cache_boost else 1.0),
+                    e.price_per_hour,
+                )
+            )
+        elif strategy == "cost":
+            candidates.sort(
+                key=lambda e: (
+                    e.price_per_hour * (0.5 if e.endpoint_id in cache_boost else 1.0),
+                    e.avg_latency_ms or 9999,
+                )
+            )
+        elif strategy == "score":
             max_lat = max(e.avg_latency_ms for e in candidates) or 1
             max_price = max(e.price_per_hour for e in candidates) or 1
-            candidates.sort(key=lambda e: (
-                0.5 * ((e.avg_latency_ms or 9999) / max_lat) +
-                0.3 * (e.price_per_hour / max_price) +
-                (-0.2 * cache_boost.get(e.endpoint_id, 0.0))  # cache hit = lower score = better
-            ))
+            candidates.sort(
+                key=lambda e: (
+                    0.5 * ((e.avg_latency_ms or 9999) / max_lat)
+                    + 0.3 * (e.price_per_hour / max_price)
+                    + (
+                        -0.2 * cache_boost.get(e.endpoint_id, 0.0)
+                    )  # cache hit = lower score = better
+                )
+            )
 
         best = candidates[0]
         # Record prefix for future lookups
@@ -936,15 +1002,23 @@ class InferenceRouter:
         # Determine candidate pool
         target_model = decision.route_to
         candidates = [
-            ep for ep in self.endpoints.values()
+            ep
+            for ep in self.endpoints.values()
             if ep.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN)
-            and (target_model is None or ep.model == target_model
-                 or target_model in ("__local_only__",))
+            and (
+                target_model is None
+                or ep.model == target_model
+                or target_model in ("__local_only__",)
+            )
         ]
 
         # __local_only__ filter: prefer endpoints on local providers
         if decision.route_to == "__local_only__":
-            local = [ep for ep in candidates if ep.provider in ("local", "vllm", "self-hosted")]
+            local = [
+                ep
+                for ep in candidates
+                if ep.provider in ("local", "vllm", "self-hosted")
+            ]
             if local:
                 candidates = local
 
@@ -981,10 +1055,12 @@ class InferenceRouter:
         else:
             max_lat = max((e.avg_latency_ms or 0) for e in candidates) or 1
             max_price = max(e.price_per_hour for e in candidates) or 1
-            candidates.sort(key=lambda e: (
-                0.6 * ((e.avg_latency_ms or 9999) / max_lat) +
-                0.4 * (e.price_per_hour / max_price)
-            ))
+            candidates.sort(
+                key=lambda e: (
+                    0.6 * ((e.avg_latency_ms or 9999) / max_lat)
+                    + 0.4 * (e.price_per_hour / max_price)
+                )
+            )
 
         return candidates[0]
 
@@ -1005,12 +1081,15 @@ class InferenceRouter:
         return 0.6 * bw_score + 0.3 * latency_score + 0.1 * (ep.price_per_hour / 100)
 
     def get_best_prefill_endpoint(
-        self, model: Optional[str] = None, query: Optional[Dict] = None,
+        self,
+        model: Optional[str] = None,
+        query: Optional[Dict] = None,
     ) -> Optional[InferenceEndpoint]:
         """Select the best endpoint for the prefill phase (compute-bound).
         Filters to PREFILL and MIXED endpoints, scores by FLOPS."""
         candidates = [
-            ep for ep in self.endpoints.values()
+            ep
+            for ep in self.endpoints.values()
             if ep.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN)
             and ep.phase in (EndpointPhase.PREFILL, EndpointPhase.MIXED)
             and (model is None or ep.model == model)
@@ -1026,10 +1105,12 @@ class InferenceRouter:
                 for eid, freshness in self._prefix_cache.lookup(text):
                     cache_boost[eid] = freshness
 
-        candidates.sort(key=lambda e: (
-            self._score_prefill_endpoint(e)
-            - 0.3 * cache_boost.get(e.endpoint_id, 0.0)
-        ))
+        candidates.sort(
+            key=lambda e: (
+                self._score_prefill_endpoint(e)
+                - 0.3 * cache_boost.get(e.endpoint_id, 0.0)
+            )
+        )
         return candidates[0]
 
     def get_best_decode_endpoint(
@@ -1041,7 +1122,8 @@ class InferenceRouter:
         Sticky routing: prefers the decode endpoint that already received
         the KV cache from the given prefill endpoint."""
         candidates = [
-            ep for ep in self.endpoints.values()
+            ep
+            for ep in self.endpoints.values()
             if ep.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN)
             and ep.phase in (EndpointPhase.DECODE, EndpointPhase.MIXED)
             and (model is None or ep.model == model)
@@ -1103,7 +1185,9 @@ class InferenceRouter:
         try:
             from .dag_executor import DAGExecutor
 
-            dag = DAGExecutor(max_workers=2, name="disaggregated_route", reuse_pool=False)
+            dag = DAGExecutor(
+                max_workers=2, name="disaggregated_route", reuse_pool=False
+            )
 
             def select_prefill(ctx):
                 return self.get_best_prefill_endpoint(
@@ -1161,10 +1245,7 @@ class InferenceRouter:
 
     def get_ep_group_endpoints(self, ep_group_id: str) -> List[InferenceEndpoint]:
         """Get all endpoints in an EP group, sorted by rank."""
-        eps = [
-            ep for ep in self.endpoints.values()
-            if ep.ep_group_id == ep_group_id
-        ]
+        eps = [ep for ep in self.endpoints.values() if ep.ep_group_id == ep_group_id]
         eps.sort(key=lambda e: e.ep_rank)
         return eps
 
@@ -1217,7 +1298,8 @@ class InferenceRouter:
             "covered_experts": len(covered_experts),
             "expert_coverage_pct": (
                 (len(covered_experts) / total_experts * 100)
-                if total_experts > 0 else 0.0
+                if total_experts > 0
+                else 0.0
             ),
             "nvlink_domain": eps[0].nvlink_domain if eps else None,
             "dp_size": eps[0].dp_size if eps else 0,
@@ -1225,7 +1307,9 @@ class InferenceRouter:
         }
 
     def route_to_ep_rank_for_experts(
-        self, model: str, expert_ids: Optional[List[int]] = None,
+        self,
+        model: str,
+        expert_ids: Optional[List[int]] = None,
     ) -> Optional[InferenceEndpoint]:
         """Route to the EP rank most likely to hold the needed experts.
 
@@ -1242,7 +1326,8 @@ class InferenceRouter:
 
         eps = self.get_ep_group_endpoints(group_id)
         healthy_eps = [
-            ep for ep in eps
+            ep
+            for ep in eps
             if ep.health in (EndpointHealth.HEALTHY, EndpointHealth.UNKNOWN)
             and ep.expert_range != (0, 0)
         ]
@@ -1285,28 +1370,32 @@ class InferenceRouter:
         """Get full inference routing status"""
         endpoints = []
         for ep in self.endpoints.values():
-            endpoints.append({
-                'endpoint_id': ep.endpoint_id,
-                'provider': ep.provider,
-                'model': ep.model,
-                'health': ep.health.value,
-                'avg_latency_ms': round(ep.avg_latency_ms, 1),
-                'price_per_hour': ep.price_per_hour,
-                'is_primary': ep.is_primary,
-                'backup': ep.backup_endpoint_id,
-                'consecutive_failures': ep.consecutive_failures,
-                'region': ep.region,
-                'phase': ep.phase.value,
-                'flops_tflops': ep.flops_tflops,
-                'memory_bandwidth_tbps': ep.memory_bandwidth_tbps,
-            })
+            endpoints.append(
+                {
+                    "endpoint_id": ep.endpoint_id,
+                    "provider": ep.provider,
+                    "model": ep.model,
+                    "health": ep.health.value,
+                    "avg_latency_ms": round(ep.avg_latency_ms, 1),
+                    "price_per_hour": ep.price_per_hour,
+                    "is_primary": ep.is_primary,
+                    "backup": ep.backup_endpoint_id,
+                    "consecutive_failures": ep.consecutive_failures,
+                    "region": ep.region,
+                    "phase": ep.phase.value,
+                    "flops_tflops": ep.flops_tflops,
+                    "memory_bandwidth_tbps": ep.memory_bandwidth_tbps,
+                }
+            )
 
-        healthy = sum(1 for e in self.endpoints.values() if e.health == EndpointHealth.HEALTHY)
+        healthy = sum(
+            1 for e in self.endpoints.values() if e.health == EndpointHealth.HEALTHY
+        )
         total = len(self.endpoints)
 
         return {
-            'total_endpoints': total,
-            'healthy': healthy,
-            'unhealthy': total - healthy,
-            'endpoints': endpoints,
+            "total_endpoints": total,
+            "healthy": healthy,
+            "unhealthy": total - healthy,
+            "endpoints": endpoints,
         }

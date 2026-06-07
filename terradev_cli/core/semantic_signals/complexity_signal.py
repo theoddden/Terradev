@@ -15,31 +15,35 @@ from .base_signal import BaseSignal, SignalResult, SignalType
 
 # Reasoning complexity markers
 _MULTI_STEP_RE = re.compile(
-    r'\b(?:step\s*by\s*step|first.*then.*finally|chain\s*of\s*thought|'
-    r'let\'?s\s+think|walk\s+(?:me\s+)?through|break\s+(?:it\s+)?down|'
-    r'systematically|comprehensive|in\s+depth|detailed\s+analysis)\b', re.I
+    r"\b(?:step\s*by\s*step|first.*then.*finally|chain\s*of\s*thought|"
+    r"let\'?s\s+think|walk\s+(?:me\s+)?through|break\s+(?:it\s+)?down|"
+    r"systematically|comprehensive|in\s+depth|detailed\s+analysis)\b",
+    re.I,
 )
 
 _CONSTRAINT_RE = re.compile(
-    r'\b(?:must|shall|require|constraint|condition|ensure|guarantee|'
-    r'at\s+least|at\s+most|no\s+more\s+than|exactly|between\s+\d+\s+and)\b', re.I
+    r"\b(?:must|shall|require|constraint|condition|ensure|guarantee|"
+    r"at\s+least|at\s+most|no\s+more\s+than|exactly|between\s+\d+\s+and)\b",
+    re.I,
 )
 
 _COMPARISON_RE = re.compile(
-    r'\b(?:compare|contrast|difference|versus|vs\.?|trade-?off|'
-    r'pros?\s+and\s+cons?|advantages?\s+and\s+disadvantages?)\b', re.I
+    r"\b(?:compare|contrast|difference|versus|vs\.?|trade-?off|"
+    r"pros?\s+and\s+cons?|advantages?\s+and\s+disadvantages?)\b",
+    re.I,
 )
 
 _NESTED_LOGIC_RE = re.compile(
-    r'\b(?:if.*then.*else|while.*do|for\s+each|nested|recursive|'
-    r'given\s+that.*and.*then|assuming|suppose)\b', re.I
+    r"\b(?:if.*then.*else|while.*do|for\s+each|nested|recursive|"
+    r"given\s+that.*and.*then|assuming|suppose)\b",
+    re.I,
 )
 
 # Simple query indicators
 _SIMPLE_PATTERNS = [
-    re.compile(r'^(?:what|who|when|where)\s+(?:is|are|was|were)\s+', re.I),
-    re.compile(r'^(?:define|translate|summarize|list)\s+', re.I),
-    re.compile(r'^(?:hi|hello|hey|thanks|thank you|ok|okay)\b', re.I),
+    re.compile(r"^(?:what|who|when|where)\s+(?:is|are|was|were)\s+", re.I),
+    re.compile(r"^(?:define|translate|summarize|list)\s+", re.I),
+    re.compile(r"^(?:hi|hello|hey|thanks|thank you|ok|okay)\b", re.I),
 ]
 
 
@@ -62,7 +66,9 @@ class ComplexitySignal(BaseSignal):
     """
 
     def __init__(self, enabled: bool = True):
-        super().__init__(name="complexity", signal_type=SignalType.COMPLEXITY, enabled=enabled)
+        super().__init__(
+            name="complexity", signal_type=SignalType.COMPLEXITY, enabled=enabled
+        )
 
     def extract(self, query: Dict[str, Any]) -> SignalResult:
         content = self._get_content(query)
@@ -103,12 +109,12 @@ class ComplexitySignal(BaseSignal):
         features["nested_logic"] = 1.0 if _NESTED_LOGIC_RE.search(content) else 0.0
 
         # 7. Code blocks present
-        code_blocks = len(re.findall(r'```', content)) // 2
+        code_blocks = len(re.findall(r"```", content)) // 2
         features["code_blocks"] = min(1.0, code_blocks / 2.0)
 
         # 8. Multi-part question (question marks, numbered lists)
-        question_marks = content.count('?')
-        numbered_items = len(re.findall(r'(?:^|\n)\s*\d+[\.\)]\s', content))
+        question_marks = content.count("?")
+        numbered_items = len(re.findall(r"(?:^|\n)\s*\d+[\.\)]\s", content))
         features["multi_part"] = min(1.0, (question_marks + numbered_items) / 4.0)
 
         # 9. Simple query penalty
@@ -132,7 +138,9 @@ class ComplexitySignal(BaseSignal):
         complexity = max(0.0, min(1.0, raw_score))
 
         # Confidence: higher when features are clearly present or absent
-        feature_variance = sum((v - complexity) ** 2 for k, v in features.items() if k != "simple_penalty") / max(len(features) - 1, 1)
+        feature_variance = sum(
+            (v - complexity) ** 2 for k, v in features.items() if k != "simple_penalty"
+        ) / max(len(features) - 1, 1)
         confidence = max(0.5, 1.0 - feature_variance)
 
         return SignalResult(

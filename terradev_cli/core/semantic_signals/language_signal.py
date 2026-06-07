@@ -13,24 +13,162 @@ from .base_signal import BaseSignal, SignalResult, SignalType
 
 # High-frequency function words for language detection
 _LANG_MARKERS: Dict[str, Set[str]] = {
-    "en": {"the", "is", "are", "was", "were", "have", "has", "been", "will",
-            "would", "could", "should", "with", "from", "that", "this", "which",
-            "they", "their", "there", "about", "when", "where", "what", "how"},
-    "de": {"der", "die", "das", "und", "ist", "ein", "eine", "nicht", "ich",
-            "auf", "mit", "sich", "den", "von", "auch", "nach", "wie", "aus",
-            "noch", "aber", "bei", "nur", "sind", "kann", "wird", "haben"},
-    "fr": {"les", "des", "une", "est", "pas", "que", "pour", "dans", "sur",
-            "avec", "son", "qui", "sont", "mais", "tout", "elle", "nous",
-            "vous", "ont", "cette", "plus", "bien", "comme", "peut"},
-    "es": {"los", "las", "una", "que", "por", "con", "para", "del", "son",
-            "pero", "como", "esta", "todo", "tiene", "puede", "cuando",
-            "desde", "algo", "muy", "hay", "entre", "sobre", "ella", "ser"},
-    "pt": {"que", "para", "com", "uma", "dos", "por", "como", "mais",
-            "mas", "tem", "foi", "quando", "muito", "pode", "esta", "nos",
-            "isso", "bem", "aqui", "onde", "ainda", "mesmo", "fazer"},
-    "it": {"che", "per", "con", "una", "sono", "come", "anche", "questo",
-            "dal", "della", "nella", "suo", "tutto", "molto", "essere",
-            "stato", "fatto", "hanno", "quando", "dopo", "ancora", "dove"},
+    "en": {
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "have",
+        "has",
+        "been",
+        "will",
+        "would",
+        "could",
+        "should",
+        "with",
+        "from",
+        "that",
+        "this",
+        "which",
+        "they",
+        "their",
+        "there",
+        "about",
+        "when",
+        "where",
+        "what",
+        "how",
+    },
+    "de": {
+        "der",
+        "die",
+        "das",
+        "und",
+        "ist",
+        "ein",
+        "eine",
+        "nicht",
+        "ich",
+        "auf",
+        "mit",
+        "sich",
+        "den",
+        "von",
+        "auch",
+        "nach",
+        "wie",
+        "aus",
+        "noch",
+        "aber",
+        "bei",
+        "nur",
+        "sind",
+        "kann",
+        "wird",
+        "haben",
+    },
+    "fr": {
+        "les",
+        "des",
+        "une",
+        "est",
+        "pas",
+        "que",
+        "pour",
+        "dans",
+        "sur",
+        "avec",
+        "son",
+        "qui",
+        "sont",
+        "mais",
+        "tout",
+        "elle",
+        "nous",
+        "vous",
+        "ont",
+        "cette",
+        "plus",
+        "bien",
+        "comme",
+        "peut",
+    },
+    "es": {
+        "los",
+        "las",
+        "una",
+        "que",
+        "por",
+        "con",
+        "para",
+        "del",
+        "son",
+        "pero",
+        "como",
+        "esta",
+        "todo",
+        "tiene",
+        "puede",
+        "cuando",
+        "desde",
+        "algo",
+        "muy",
+        "hay",
+        "entre",
+        "sobre",
+        "ella",
+        "ser",
+    },
+    "pt": {
+        "que",
+        "para",
+        "com",
+        "uma",
+        "dos",
+        "por",
+        "como",
+        "mais",
+        "mas",
+        "tem",
+        "foi",
+        "quando",
+        "muito",
+        "pode",
+        "esta",
+        "nos",
+        "isso",
+        "bem",
+        "aqui",
+        "onde",
+        "ainda",
+        "mesmo",
+        "fazer",
+    },
+    "it": {
+        "che",
+        "per",
+        "con",
+        "una",
+        "sono",
+        "come",
+        "anche",
+        "questo",
+        "dal",
+        "della",
+        "nella",
+        "suo",
+        "tutto",
+        "molto",
+        "essere",
+        "stato",
+        "fatto",
+        "hanno",
+        "quando",
+        "dopo",
+        "ancora",
+        "dove",
+    },
     "zh": set(),  # detected via character ranges
     "ja": set(),  # detected via character ranges
     "ko": set(),  # detected via character ranges
@@ -39,13 +177,13 @@ _LANG_MARKERS: Dict[str, Set[str]] = {
 }
 
 # Unicode character range patterns
-_CJK_RE = re.compile(r'[\u4e00-\u9fff\u3400-\u4dbf]')
-_HIRAGANA_RE = re.compile(r'[\u3040-\u309f]')
-_KATAKANA_RE = re.compile(r'[\u30a0-\u30ff]')
-_HANGUL_RE = re.compile(r'[\uac00-\ud7af\u1100-\u11ff]')
-_ARABIC_RE = re.compile(r'[\u0600-\u06ff\u0750-\u077f]')
-_CYRILLIC_RE = re.compile(r'[\u0400-\u04ff]')
-_DEVANAGARI_RE = re.compile(r'[\u0900-\u097f]')
+_CJK_RE = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
+_HIRAGANA_RE = re.compile(r"[\u3040-\u309f]")
+_KATAKANA_RE = re.compile(r"[\u30a0-\u30ff]")
+_HANGUL_RE = re.compile(r"[\uac00-\ud7af\u1100-\u11ff]")
+_ARABIC_RE = re.compile(r"[\u0600-\u06ff\u0750-\u077f]")
+_CYRILLIC_RE = re.compile(r"[\u0400-\u04ff]")
+_DEVANAGARI_RE = re.compile(r"[\u0900-\u097f]")
 
 
 class LanguageSignal(BaseSignal):
@@ -58,7 +196,9 @@ class LanguageSignal(BaseSignal):
     """
 
     def __init__(self, enabled: bool = True):
-        super().__init__(name="language", signal_type=SignalType.LANGUAGE, enabled=enabled)
+        super().__init__(
+            name="language", signal_type=SignalType.LANGUAGE, enabled=enabled
+        )
 
     def extract(self, query: Dict[str, Any]) -> SignalResult:
         content = self._get_content(query)
@@ -84,7 +224,7 @@ class LanguageSignal(BaseSignal):
             )
 
         # Phase 2: Function-word frequency for Latin-script languages
-        words = set(re.findall(r'\b\w+\b', content.lower()))
+        words = set(re.findall(r"\b\w+\b", content.lower()))
         scores: Dict[str, float] = {}
 
         for lang, markers in _LANG_MARKERS.items():
@@ -105,7 +245,9 @@ class LanguageSignal(BaseSignal):
 
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         primary = ranked[0][0]
-        confidence = min(1.0, ranked[0][1] * 5)  # scale up since marker overlap is small
+        confidence = min(
+            1.0, ranked[0][1] * 5
+        )  # scale up since marker overlap is small
 
         # Disambiguate close scores
         if len(ranked) > 1 and ranked[0][1] - ranked[1][1] < 0.05:
@@ -125,13 +267,13 @@ class LanguageSignal(BaseSignal):
     def _detect_by_script(self, text: str) -> Tuple[str, float]:
         """Detect language from non-Latin character scripts"""
         checks = [
-            (_HIRAGANA_RE, "ja", 0.95),   # Hiragana is uniquely Japanese
+            (_HIRAGANA_RE, "ja", 0.95),  # Hiragana is uniquely Japanese
             (_KATAKANA_RE, "ja", 0.90),
             (_HANGUL_RE, "ko", 0.95),
             (_ARABIC_RE, "ar", 0.90),
-            (_CYRILLIC_RE, "ru", 0.85),    # Could be Ukrainian, etc.
+            (_CYRILLIC_RE, "ru", 0.85),  # Could be Ukrainian, etc.
             (_DEVANAGARI_RE, "hi", 0.85),
-            (_CJK_RE, "zh", 0.80),         # CJK could be Chinese or Japanese kanji
+            (_CJK_RE, "zh", 0.80),  # CJK could be Chinese or Japanese kanji
         ]
 
         for pattern, lang, conf in checks:

@@ -18,6 +18,7 @@ def isolated_ssh_dir(tmp_path, monkeypatch):
     keyfile = terradev_dir / ".keyfile"
 
     import terradev_cli.core.ssh_key_manager as skm
+
     monkeypatch.setattr(skm, "_SSH_DIR", ssh_dir)
     monkeypatch.setattr(skm, "_TERRADEV_DIR", terradev_dir)
     monkeypatch.setattr(skm, "_KEYFILE_PATH", keyfile)

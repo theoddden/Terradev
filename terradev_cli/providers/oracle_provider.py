@@ -77,54 +77,69 @@ class OracleProvider(BaseProvider):
         if not info:
             return []
 
-        return [{
-            "instance_type": info["shape"],
-            "gpu_type": gpu_type,
-            "price_per_hour": info["price"],
-            "region": region or self.region,
-            "available": True,
-            "provider": "oracle",
-            "vcpus": info["vcpus"],
-            "memory_gb": info["mem"],
-            "gpu_count": info["gpus"],
-            "spot": False,
-        }]
+        return [
+            {
+                "instance_type": info["shape"],
+                "gpu_type": gpu_type,
+                "price_per_hour": info["price"],
+                "region": region or self.region,
+                "available": True,
+                "provider": "oracle",
+                "vcpus": info["vcpus"],
+                "memory_gb": info["mem"],
+                "gpu_count": info["gpus"],
+                "spot": False,
+            }
+        ]
 
-    async def _get_live_shapes(self, gpu_type: str, region: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def _get_live_shapes(
+        self, gpu_type: str, region: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Query OCI ListShapes API for GPU availability"""
         r = region or self.region
         url = f"https://iaas.{r}.oraclecloud.com/20160918/shapes?compartmentId={self.tenancy_id}"
         data = await self._make_request("GET", url)
         quotes = []
-        for shape in data if isinstance(data, list) else data.get("items", data.get("shapes", [])):
+        for shape in (
+            data
+            if isinstance(data, list)
+            else data.get("items", data.get("shapes", []))
+        ):
             shape_name = shape.get("shape", "")
             gpus = shape.get("gpus", 0)
             if gpus > 0 and gpu_type.lower() in shape_name.lower():
-                price = shape.get("price", self.GPU_SHAPES.get(gpu_type, {}).get("price", 0))
-                quotes.append({
-                    "instance_type": shape_name,
-                    "gpu_type": gpu_type,
-                    "price_per_hour": price,
-                    "region": r,
-                    "available": True,
-                    "provider": "oracle",
-                    "vcpus": shape.get("ocpus", 0) * 2,
-                    "memory_gb": shape.get("memoryInGBs", 0),
-                    "gpu_count": gpus,
-                    "spot": False,
-                })
+                price = shape.get(
+                    "price", self.GPU_SHAPES.get(gpu_type, {}).get("price", 0)
+                )
+                quotes.append(
+                    {
+                        "instance_type": shape_name,
+                        "gpu_type": gpu_type,
+                        "price_per_hour": price,
+                        "region": r,
+                        "available": True,
+                        "provider": "oracle",
+                        "vcpus": shape.get("ocpus", 0) * 2,
+                        "memory_gb": shape.get("memoryInGBs", 0),
+                        "gpu_count": gpus,
+                        "spot": False,
+                    }
+                )
         return sorted(quotes, key=lambda q: q["price_per_hour"])
 
     async def provision_instance(
         self, instance_type: str, region: str, gpu_type: str
     ) -> Dict[str, Any]:
         if not self.api_key or not self.tenancy_id:
-            raise Exception("OCI credentials not configured (api_key + tenancy OCID required)")
+            raise Exception(
+                "OCI credentials not configured (api_key + tenancy OCID required)"
+            )
 
         r = region or self.region
         url = f"https://iaas.{r}.oraclecloud.com/20160918/instances"
         data = await self._make_request(
-            "POST", url,
+            "POST",
+            url,
             json={
                 "compartmentId": self.tenancy_id,
                 "shape": instance_type,
@@ -138,7 +153,9 @@ class OracleProvider(BaseProvider):
                 },
             },
         )
-        instance_id = data.get("id", f"oracle-{datetime.now().strftime('%Y%m%d%H%M%S')}")
+        instance_id = data.get(
+            "id", f"oracle-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
         return {
             "instance_id": instance_id,
             "instance_type": instance_type,
@@ -153,8 +170,14 @@ class OracleProvider(BaseProvider):
             raise Exception("OCI credentials not configured")
         url = f"https://iaas.{self.region}.oraclecloud.com/20160918/instances/{instance_id}"
         data = await self._make_request("GET", url)
-        status_map = {"RUNNING": "running", "STOPPED": "stopped", "TERMINATED": "terminated",
-                       "PROVISIONING": "provisioning", "STARTING": "starting", "STOPPING": "stopping"}
+        status_map = {
+            "RUNNING": "running",
+            "STOPPED": "stopped",
+            "TERMINATED": "terminated",
+            "PROVISIONING": "provisioning",
+            "STARTING": "starting",
+            "STOPPING": "stopping",
+        }
         return {
             "instance_id": instance_id,
             "status": status_map.get(data.get("lifecycleState", ""), "unknown"),
@@ -181,7 +204,11 @@ class OracleProvider(BaseProvider):
             raise Exception("OCI credentials not configured")
         url = f"https://iaas.{self.region}.oraclecloud.com/20160918/instances/{instance_id}"
         await self._make_request("DELETE", url)
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key or not self.tenancy_id:

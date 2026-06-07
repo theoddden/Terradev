@@ -36,16 +36,22 @@ DB_PATH = Path.home() / ".terradev" / "cost_tracking.db"
 # Rust price intelligence integration
 try:
     from terradev_price_intelligence import PriceIntelligence
+
     USE_RUST_PRICE_INTEL = True
-    logging.getLogger(__name__).info("Using Rust price intelligence for 10-20x faster statistics")
+    logging.getLogger(__name__).info(
+        "Using Rust price intelligence for 10-20x faster statistics"
+    )
 except ImportError:
     USE_RUST_PRICE_INTEL = False
-    logging.getLogger(__name__).info("Rust price intelligence not available, using Python fallback")
+    logging.getLogger(__name__).info(
+        "Rust price intelligence not available, using Python fallback"
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # Database helpers
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def _conn() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -57,7 +63,8 @@ def _conn() -> sqlite3.Connection:
 
 
 def _ensure_price_schema(conn: sqlite3.Connection):
-    conn.executescript("""
+    conn.executescript(
+        """
         -- Raw price observations (tick level)
         CREATE TABLE IF NOT EXISTS price_ticks (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,18 +168,19 @@ def _ensure_price_schema(conn: sqlite3.Connection):
 
         CREATE INDEX IF NOT EXISTS idx_events_provider
             ON provider_events (provider, ts);
-    """)
+    """
+    )
     conn.commit()
 
     # Migrate existing DBs: add reliability columns if missing
     cursor = conn.execute("PRAGMA table_info(provider_events)")
     existing_cols = {row[1] for row in cursor.fetchall()}
     _new_cols = [
-        ("gpu_type",   "TEXT NOT NULL DEFAULT ''"),
-        ("region",     "TEXT NOT NULL DEFAULT ''"),
-        ("success",    "INTEGER"),
+        ("gpu_type", "TEXT NOT NULL DEFAULT ''"),
+        ("region", "TEXT NOT NULL DEFAULT ''"),
+        ("success", "INTEGER"),
         ("latency_ms", "REAL"),
-        ("error",      "TEXT"),
+        ("error", "TEXT"),
     ]
     for col_name, col_def in _new_cols:
         if col_name not in existing_cols:
@@ -183,6 +191,7 @@ def _ensure_price_schema(conn: sqlite3.Connection):
 # ═══════════════════════════════════════════════════════════════════════
 # Tick recording
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def record_price_tick(
     gpu_type: str,
@@ -199,8 +208,15 @@ def record_price_tick(
         "INSERT INTO price_ticks "
         "(gpu_type, provider, region, price_hr, spot, workload_type, source) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (gpu_type.upper(), provider.lower(), region, price_hr,
-         1 if spot else 0, workload_type.lower(), source),
+        (
+            gpu_type.upper(),
+            provider.lower(),
+            region,
+            price_hr,
+            1 if spot else 0,
+            workload_type.lower(),
+            source,
+        ),
     )
     conn.commit()
     conn.close()
@@ -231,6 +247,7 @@ def record_price_ticks_batch(ticks: List[Dict[str, Any]]):
 # ═══════════════════════════════════════════════════════════════════════
 # Time-series retrieval
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def get_price_series(
     gpu_type: str,
@@ -288,6 +305,7 @@ def _get_prices_array(
 # Delta — first derivative (rate of price change)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def compute_delta(prices: List[float], window: int = 1) -> Optional[float]:
     """Compute percentage price change over `window` observations.
 
@@ -314,6 +332,7 @@ def compute_delta_absolute(prices: List[float], window: int = 1) -> Optional[flo
 # ═══════════════════════════════════════════════════════════════════════
 # Gamma — second derivative (acceleration of price change)
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def compute_gamma(prices: List[float], window: int = 1) -> Optional[float]:
     """Compute acceleration of price change (second derivative).
@@ -344,6 +363,7 @@ def compute_gamma(prices: List[float], window: int = 1) -> Optional[float]:
 # ═══════════════════════════════════════════════════════════════════════
 # Realized volatility
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def compute_realized_volatility(prices: List[float]) -> Optional[float]:
     """Compute annualized realized volatility from log returns.
@@ -376,6 +396,7 @@ def compute_realized_volatility(prices: List[float]) -> Optional[float]:
 # ═══════════════════════════════════════════════════════════════════════
 # Stats refresh — recompute all rolling statistics
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def refresh_stats():
     """Recompute δ, γ, and σ for all active series."""
@@ -465,14 +486,29 @@ def refresh_stats():
                    tick_count = excluded.tick_count,
                    ts = excluded.ts
             """,
-            (gpu_type, provider, spot, wtype,
-             price_latest,
-             delta_1h, delta_24h, delta_7d,
-             gamma_1h, gamma_24h, gamma_7d,
-             vol_24h, vol_7d, vol_30d,
-             price_min_24h, price_max_24h, price_mean_24h,
-             price_min_7d, price_max_7d, price_mean_7d,
-             tick_count),
+            (
+                gpu_type,
+                provider,
+                spot,
+                wtype,
+                price_latest,
+                delta_1h,
+                delta_24h,
+                delta_7d,
+                gamma_1h,
+                gamma_24h,
+                gamma_7d,
+                vol_24h,
+                vol_7d,
+                vol_30d,
+                price_min_24h,
+                price_max_24h,
+                price_mean_24h,
+                price_min_7d,
+                price_max_7d,
+                price_mean_7d,
+                tick_count,
+            ),
         )
 
     conn.commit()
@@ -483,6 +519,7 @@ def refresh_stats():
 # ═══════════════════════════════════════════════════════════════════════
 # Insights — full dashboard for a GPU type
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def get_insights(
     gpu_type: str,
@@ -521,40 +558,66 @@ def get_insights(
 
     # Recommendations
     cheapest = providers[0] if providers else None
-    most_stable = max(providers, key=lambda x: x.get("stability_score", 0)) if providers else None
+    most_stable = (
+        max(providers, key=lambda x: x.get("stability_score", 0)) if providers else None
+    )
 
     # Find best value: cheapest among stable options (stability > 60)
     stable_options = [p for p in providers if p.get("stability_score", 0) > 60]
-    best_value = min(stable_options, key=lambda x: x.get("price_latest") or 999) if stable_options else cheapest
+    best_value = (
+        min(stable_options, key=lambda x: x.get("price_latest") or 999)
+        if stable_options
+        else cheapest
+    )
 
     return {
         "gpu_type": gpu_type.upper(),
         "workload_type": workload_type or "all",
         "providers": providers,
         "recommendations": {
-            "cheapest": {
-                "provider": cheapest["provider"] if cheapest else None,
-                "price": cheapest["price_latest"] if cheapest else None,
-                "spot": bool(cheapest["spot"]) if cheapest else None,
-            } if cheapest else None,
-            "most_stable": {
-                "provider": most_stable["provider"] if most_stable else None,
-                "stability_score": most_stable["stability_score"] if most_stable else None,
-                "price": most_stable["price_latest"] if most_stable else None,
-            } if most_stable else None,
-            "best_value": {
-                "provider": best_value["provider"] if best_value else None,
-                "price": best_value["price_latest"] if best_value else None,
-                "stability_score": best_value["stability_score"] if best_value else None,
-                "reason": "Cheapest option with stability score > 60",
-            } if best_value else None,
+            "cheapest": (
+                {
+                    "provider": cheapest["provider"] if cheapest else None,
+                    "price": cheapest["price_latest"] if cheapest else None,
+                    "spot": bool(cheapest["spot"]) if cheapest else None,
+                }
+                if cheapest
+                else None
+            ),
+            "most_stable": (
+                {
+                    "provider": most_stable["provider"] if most_stable else None,
+                    "stability_score": (
+                        most_stable["stability_score"] if most_stable else None
+                    ),
+                    "price": most_stable["price_latest"] if most_stable else None,
+                }
+                if most_stable
+                else None
+            ),
+            "best_value": (
+                {
+                    "provider": best_value["provider"] if best_value else None,
+                    "price": best_value["price_latest"] if best_value else None,
+                    "stability_score": (
+                        best_value["stability_score"] if best_value else None
+                    ),
+                    "reason": "Cheapest option with stability score > 60",
+                }
+                if best_value
+                else None
+            ),
         },
         "summary": {
             "total_providers": len(providers),
             "price_range": (
-                f"${min(p['price_latest'] for p in providers if p.get('price_latest')):.2f}"
-                f" — ${max(p['price_latest'] for p in providers if p.get('price_latest')):.2f}"
-            ) if providers and any(p.get("price_latest") for p in providers) else "N/A",
+                (
+                    f"${min(p['price_latest'] for p in providers if p.get('price_latest')):.2f}"
+                    f" — ${max(p['price_latest'] for p in providers if p.get('price_latest')):.2f}"
+                )
+                if providers and any(p.get("price_latest") for p in providers)
+                else "N/A"
+            ),
         },
     }
 
@@ -562,7 +625,9 @@ def get_insights(
 def get_all_tracked_gpus() -> List[str]:
     """Return list of all GPU types with price data."""
     conn = _conn()
-    rows = conn.execute("SELECT DISTINCT gpu_type FROM price_ticks ORDER BY gpu_type").fetchall()
+    rows = conn.execute(
+        "SELECT DISTINCT gpu_type FROM price_ticks ORDER BY gpu_type"
+    ).fetchall()
     conn.close()
     return [r["gpu_type"] for r in rows]
 
@@ -586,11 +651,21 @@ def get_training_vs_inference(gpu_type: str) -> Dict[str, Any]:
     conn.close()
 
     # Compute premium/discount
-    train_price = result["training"]["cheapest"]["price_latest"] if result["training"]["cheapest"] else None
-    infer_price = result["inference"]["cheapest"]["price_latest"] if result["inference"]["cheapest"] else None
+    train_price = (
+        result["training"]["cheapest"]["price_latest"]
+        if result["training"]["cheapest"]
+        else None
+    )
+    infer_price = (
+        result["inference"]["cheapest"]["price_latest"]
+        if result["inference"]["cheapest"]
+        else None
+    )
 
     if train_price and infer_price and train_price > 0:
-        result["inference_premium"] = round((infer_price - train_price) / train_price * 100, 1)
+        result["inference_premium"] = round(
+            (infer_price - train_price) / train_price * 100, 1
+        )
     else:
         result["inference_premium"] = None
 
@@ -600,6 +675,7 @@ def get_training_vs_inference(gpu_type: str) -> Dict[str, Any]:
 # ═══════════════════════════════════════════════════════════════════════
 # FEATURE: Historical Price Percentiles
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def _percentile(sorted_values: List[float], p: float) -> float:
     """Compute the p-th percentile (0-100) from a pre-sorted list."""
@@ -626,8 +702,7 @@ def compute_percentiles(
     conn = _conn()
     cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
 
-    sql = ("SELECT provider, price_hr FROM price_ticks "
-           "WHERE gpu_type = ? AND ts >= ?")
+    sql = "SELECT provider, price_hr FROM price_ticks " "WHERE gpu_type = ? AND ts >= ?"
     params: list = [gpu_type.upper(), cutoff]
     if provider:
         sql += " AND provider = ?"
@@ -641,6 +716,7 @@ def compute_percentiles(
     conn.close()
 
     from collections import defaultdict
+
     by_provider: Dict[str, List[float]] = defaultdict(list)
     for r in rows:
         by_provider[r["provider"]].append(r["price_hr"])
@@ -671,6 +747,7 @@ def compute_percentiles(
 # FEATURE: Availability / Stock Tracking
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def record_availability(
     gpu_type: str,
     provider: str,
@@ -685,8 +762,14 @@ def record_availability(
         "INSERT INTO availability_log "
         "(gpu_type, provider, region, available, response_ms, error) "
         "VALUES (?, ?, ?, ?, ?, ?)",
-        (gpu_type.upper(), provider.lower(), region,
-         1 if available else 0, response_ms, error),
+        (
+            gpu_type.upper(),
+            provider.lower(),
+            region,
+            1 if available else 0,
+            response_ms,
+            error,
+        ),
     )
     conn.commit()
     conn.close()
@@ -735,6 +818,7 @@ def get_availability(
     conn.close()
 
     from collections import defaultdict
+
     by_provider: Dict[str, List[dict]] = defaultdict(list)
     for r in rows:
         by_provider[r["provider"]].append(dict(r))
@@ -778,6 +862,7 @@ def get_availability_summary() -> Dict[str, Dict[str, bool]]:
     conn.close()
 
     from collections import defaultdict
+
     summary: Dict[str, Dict[str, bool]] = defaultdict(dict)
     for r in rows:
         summary[r["gpu_type"]][r["provider"]] = bool(r["available"])
@@ -787,6 +872,7 @@ def get_availability_summary() -> Dict[str, Dict[str, bool]]:
 # ═══════════════════════════════════════════════════════════════════════
 # FEATURE: Provider Reliability Scoring
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def record_provider_event(
     provider: str,
@@ -806,8 +892,15 @@ def record_provider_event(
         "INSERT INTO provider_events "
         "(provider, event_type, gpu_type, region, success, latency_ms, error) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (provider.lower(), event_type.lower(), gpu_type.upper(), region,
-         1 if success else 0, latency_ms, error),
+        (
+            provider.lower(),
+            event_type.lower(),
+            gpu_type.upper(),
+            region,
+            1 if success else 0,
+            latency_ms,
+            error,
+        ),
     )
     conn.commit()
     conn.close()
@@ -827,8 +920,10 @@ def get_provider_reliability(
     conn = _conn()
     cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
 
-    sql = ("SELECT provider, event_type, success, latency_ms, error "
-           "FROM provider_events WHERE ts >= ?")
+    sql = (
+        "SELECT provider, event_type, success, latency_ms, error "
+        "FROM provider_events WHERE ts >= ?"
+    )
     params: list = [cutoff]
     if provider:
         sql += " AND provider = ?"
@@ -839,6 +934,7 @@ def get_provider_reliability(
     conn.close()
 
     from collections import defaultdict
+
     by_provider: Dict[str, List[dict]] = defaultdict(list)
     for r in rows:
         by_provider[r["provider"]].append(dict(r))
@@ -852,15 +948,33 @@ def get_provider_reliability(
         provisions = [e for e in events if e["event_type"] == "provision"]
         other = [e for e in events if e["event_type"] not in ("quote", "provision")]
 
-        quote_success = sum(1 for e in quotes if e["success"]) / len(quotes) if quotes else 1.0
-        provision_success = sum(1 for e in provisions if e["success"]) / len(provisions) if provisions else 1.0
-        other_success = sum(1 for e in other if e["success"]) / len(other) if other else 1.0
+        quote_success = (
+            sum(1 for e in quotes if e["success"]) / len(quotes) if quotes else 1.0
+        )
+        provision_success = (
+            sum(1 for e in provisions if e["success"]) / len(provisions)
+            if provisions
+            else 1.0
+        )
+        other_success = (
+            sum(1 for e in other if e["success"]) / len(other) if other else 1.0
+        )
 
         # Latency averages
-        quote_latencies = [e["latency_ms"] for e in quotes if e["latency_ms"] is not None]
-        provision_latencies = [e["latency_ms"] for e in provisions if e["latency_ms"] is not None]
-        avg_quote_ms = sum(quote_latencies) / len(quote_latencies) if quote_latencies else 0
-        avg_provision_ms = sum(provision_latencies) / len(provision_latencies) if provision_latencies else 0
+        quote_latencies = [
+            e["latency_ms"] for e in quotes if e["latency_ms"] is not None
+        ]
+        provision_latencies = [
+            e["latency_ms"] for e in provisions if e["latency_ms"] is not None
+        ]
+        avg_quote_ms = (
+            sum(quote_latencies) / len(quote_latencies) if quote_latencies else 0
+        )
+        avg_provision_ms = (
+            sum(provision_latencies) / len(provision_latencies)
+            if provision_latencies
+            else 0
+        )
 
         # Error breakdown
         errors: Dict[str, int] = defaultdict(int)
@@ -870,11 +984,7 @@ def get_provider_reliability(
 
         # Overall score: weighted average
         # Provision success matters most (50%), quote success (30%), other (20%)
-        overall = (
-            provision_success * 50 +
-            quote_success * 30 +
-            other_success * 20
-        )
+        overall = provision_success * 50 + quote_success * 30 + other_success * 20
         # Latency penalty: subtract up to 10 points for slow providers
         if avg_quote_ms > 5000:
             overall -= min(10, (avg_quote_ms - 5000) / 1000)

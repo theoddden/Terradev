@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class KServeConfig:
     """KServe configuration"""
+
     kubernetes_config: Optional[str] = None  # Path to kubeconfig
     namespace: str = "default"
     auth_token: Optional[str] = None
@@ -35,225 +36,255 @@ class KServeConfig:
 
 class KServeService:
     """KServe integration service for model deployment and management"""
-    
+
     def __init__(self, config: KServeConfig):
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
-        
+
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
-    
+
     async def test_connection(self) -> Dict[str, Any]:
         """Test KServe connection and get cluster info"""
         try:
             # Try to use kubectl command first
             import subprocess
-            
+
             result = subprocess.run(
-                ["kubectl", "cluster-info"],
-                capture_output=True,
-                text=True,
-                timeout=10
+                ["kubectl", "cluster-info"], capture_output=True, text=True, timeout=10
             )
-            
+
             if result.returncode == 0:
                 return {
                     "status": "connected",
                     "method": "kubectl",
                     "cluster_info": result.stdout,
-                    "namespace": self.config.namespace
+                    "namespace": self.config.namespace,
                 }
             else:
-                return {
-                    "status": "failed",
-                    "error": result.stderr
-                }
+                return {"status": "failed", "error": result.stderr}
         except FileNotFoundError:
             return {
                 "status": "failed",
-                "error": "kubectl not found. Please install kubectl."
+                "error": "kubectl not found. Please install kubectl.",
             }
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def list_inference_services(self) -> List[Dict[str, Any]]:
         """List all InferenceServices in the namespace"""
         try:
             import subprocess
-            
-            result = subprocess.run([
-                "kubectl", "get", "inferenceservices",
-                "-n", self.config.namespace,
-                "-o", "json"
-            ], capture_output=True, text=True, timeout=30)
-            
+
+            result = subprocess.run(
+                [
+                    "kubectl",
+                    "get",
+                    "inferenceservices",
+                    "-n",
+                    self.config.namespace,
+                    "-o",
+                    "json",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
             if result.returncode == 0:
                 data = json.loads(result.stdout)
                 services = []
-                
+
                 for item in data.get("items", []):
                     service = {
                         "name": item["metadata"]["name"],
                         "namespace": item["metadata"]["namespace"],
                         "created": item["metadata"]["creationTimestamp"],
                         "predictor": item.get("spec", {}).get("predictor", {}),
-                        "status": item.get("status", {})
+                        "status": item.get("status", {}),
                     }
                     services.append(service)
-                
+
                 return services
             else:
                 raise Exception(f"kubectl command failed: {result.stderr}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to list InferenceServices: {e}")
-    
-    async def create_inference_service(self, 
-                                      name: str,
-                                      model_uri: str,
-                                      framework: str = "tensorflow",
-                                      runtime_version: str = "latest",
-                                      min_replicas: int = 1,
-                                      max_replicas: int = 3) -> Dict[str, Any]:
+
+    async def create_inference_service(
+        self,
+        name: str,
+        model_uri: str,
+        framework: str = "tensorflow",
+        runtime_version: str = "latest",
+        min_replicas: int = 1,
+        max_replicas: int = 3,
+    ) -> Dict[str, Any]:
         """Create a new InferenceService"""
-        
+
         # Generate InferenceService YAML
         service_spec = {
             "apiVersion": "serving.kserve.io/v1beta1",
             "kind": "InferenceService",
-            "metadata": {
-                "name": name,
-                "namespace": self.config.namespace
-            },
+            "metadata": {"name": name, "namespace": self.config.namespace},
             "spec": {
                 "predictor": {
                     "framework": framework,
                     "runtimeVersion": runtime_version,
                     "model": {
-                        "modelFormat": {
-                            "name": framework
-                        },
-                        "storageUri": model_uri
+                        "modelFormat": {"name": framework},
+                        "storageUri": model_uri,
                     },
                     "minReplicas": min_replicas,
-                    "maxReplicas": max_replicas
+                    "maxReplicas": max_replicas,
                 }
-            }
+            },
         }
-        
+
         try:
             # Write spec to temporary file and apply
             import tempfile
             import subprocess
-            
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".yaml", delete=False
+            ) as f:
                 json.dump(service_spec, f, indent=2)
                 temp_file = f.name
-            
+
             try:
-                result = subprocess.run([
-                    "kubectl", "apply", "-f", temp_file,
-                    "-n", self.config.namespace
-                ], capture_output=True, text=True, timeout=30)
-                
+                result = subprocess.run(
+                    ["kubectl", "apply", "-f", temp_file, "-n", self.config.namespace],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+
                 if result.returncode == 0:
                     return {
                         "status": "created",
                         "name": name,
                         "namespace": self.config.namespace,
-                        "output": result.stdout
+                        "output": result.stdout,
                     }
                 else:
-                    raise Exception(f"Failed to create InferenceService: {result.stderr}")
+                    raise Exception(
+                        f"Failed to create InferenceService: {result.stderr}"
+                    )
             finally:
                 os.unlink(temp_file)
-                
+
         except Exception as e:
             raise Exception(f"Failed to create InferenceService {name}: {e}")
-    
+
     async def delete_inference_service(self, name: str) -> Dict[str, Any]:
         """Delete an InferenceService"""
         try:
             import subprocess
-            
-            result = subprocess.run([
-                "kubectl", "delete", "inferenceservice", name,
-                "-n", self.config.namespace
-            ], capture_output=True, text=True, timeout=30)
-            
+
+            result = subprocess.run(
+                [
+                    "kubectl",
+                    "delete",
+                    "inferenceservice",
+                    name,
+                    "-n",
+                    self.config.namespace,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
             if result.returncode == 0:
-                return {
-                    "status": "deleted",
-                    "name": name,
-                    "output": result.stdout
-                }
+                return {"status": "deleted", "name": name, "output": result.stdout}
             else:
                 raise Exception(f"Failed to delete InferenceService: {result.stderr}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to delete InferenceService {name}: {e}")
-    
+
     async def get_service_url(self, name: str) -> Optional[str]:
         """Get the prediction URL for an InferenceService"""
         try:
             import subprocess
-            
+
             # Get the service URL
-            result = subprocess.run([
-                "kubectl", "get", "inferenceservice", name,
-                "-n", self.config.namespace,
-                "-o", "jsonpath='{.status.url}'"
-            ], capture_output=True, text=True, timeout=30)
-            
+            result = subprocess.run(
+                [
+                    "kubectl",
+                    "get",
+                    "inferenceservice",
+                    name,
+                    "-n",
+                    self.config.namespace,
+                    "-o",
+                    "jsonpath='{.status.url}'",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
             if result.returncode == 0 and result.stdout.strip():
                 url = result.stdout.strip().strip("'\"")
                 return url
             else:
                 # Try to construct URL from service name
-                cluster_info = subprocess.run([
-                    "kubectl", "config", "view", "--minify", "-o", "jsonpath='{.clusters[0].cluster.server}'"
-                ], capture_output=True, text=True, timeout=10)
-                
+                cluster_info = subprocess.run(
+                    [
+                        "kubectl",
+                        "config",
+                        "view",
+                        "--minify",
+                        "-o",
+                        "jsonpath='{.clusters[0].cluster.server}'",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+
                 if cluster_info.returncode == 0:
                     base_url = cluster_info.stdout.strip().strip("'\"")
                     return f"{base_url}/serving/{self.config.namespace}/v1/models/{name}:predict"
-                
+
             return None
-            
+
         except Exception as e:
             raise Exception(f"Failed to get service URL for {name}: {e}")
-    
+
     async def predict(self, name: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Make a prediction request to the InferenceService"""
         try:
             url = await self.get_service_url(name)
             if not url:
                 raise Exception(f"Could not get URL for service {name}")
-            
+
             if not self.session:
                 self.session = aiohttp.ClientSession()
-            
+
             # Make prediction request
             async with self.session.post(
                 url,
                 json=data,
                 headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status == 200:
                     return await response.json()
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Prediction failed: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Prediction failed: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to make prediction to {name}: {e}")
 
@@ -293,10 +324,17 @@ class KServeService:
         if vram_gb and gpu_count == 1:
             # Common GPU VRAM sizes
             gpu_vram_map = {
-                "A100": 80, "A100-80G": 80, "A100-40G": 40,
-                "H100": 80, "H200": 141,
-                "A10G": 24, "L4": 24, "T4": 16,
-                "L40S": 48, "A6000": 48, "RTX4090": 24,
+                "A100": 80,
+                "A100-80G": 80,
+                "A100-40G": 40,
+                "H100": 80,
+                "H200": 141,
+                "A10G": 24,
+                "L4": 24,
+                "T4": 16,
+                "L40S": 48,
+                "A6000": 48,
+                "RTX4090": 24,
             }
             single_gpu_vram = gpu_vram_map.get(gpu_type or "", 80)
             if vram_gb > single_gpu_vram:
@@ -323,7 +361,12 @@ class KServeService:
         # Build env vars
         env_list = []
         if numa_pinning:
-            env_list.append({"name": "CUDA_VISIBLE_DEVICES", "value": ",".join(str(i) for i in range(gpu_count))})
+            env_list.append(
+                {
+                    "name": "CUDA_VISIBLE_DEVICES",
+                    "value": ",".join(str(i) for i in range(gpu_count)),
+                }
+            )
             env_list.append({"name": "NCCL_TOPOLOGY", "value": "NUMA"})
         if extra_env:
             for k, v in extra_env.items():
@@ -425,6 +468,7 @@ class KServeService:
                 print(event["phase"], event["ready_replicas"])
         """
         import time
+
         deadline = time.monotonic() + timeout_seconds
         prev_phase = None
 
@@ -432,9 +476,14 @@ class KServeService:
             try:
                 result = subprocess.run(
                     [
-                        "kubectl", "get", "inferenceservice", name,
-                        "-n", self.config.namespace,
-                        "-o", "json",
+                        "kubectl",
+                        "get",
+                        "inferenceservice",
+                        name,
+                        "-n",
+                        self.config.namespace,
+                        "-o",
+                        "json",
                     ],
                     capture_output=True,
                     text=True,
@@ -446,7 +495,9 @@ class KServeService:
                         "phase": "error",
                         "name": name,
                         "message": result.stderr.strip(),
-                        "elapsed_seconds": round(timeout_seconds - (deadline - time.monotonic()), 1),
+                        "elapsed_seconds": round(
+                            timeout_seconds - (deadline - time.monotonic()), 1
+                        ),
                     }
                     await asyncio.sleep(poll_interval)
                     continue
@@ -469,8 +520,14 @@ class KServeService:
 
                 # Check for failure conditions
                 for cond in conditions:
-                    if cond.get("type") == "IngressReady" and cond.get("status") == "False":
-                        if "revision" in cond.get("message", "").lower() and "failed" in cond.get("message", "").lower():
+                    if (
+                        cond.get("type") == "IngressReady"
+                        and cond.get("status") == "False"
+                    ):
+                        if (
+                            "revision" in cond.get("message", "").lower()
+                            and "failed" in cond.get("message", "").lower()
+                        ):
                             phase = "failed"
                             message = cond.get("message", "")
 
@@ -487,7 +544,11 @@ class KServeService:
                     "message": message,
                     "elapsed_seconds": elapsed,
                     "conditions": [
-                        {"type": c.get("type"), "status": c.get("status"), "message": c.get("message", "")}
+                        {
+                            "type": c.get("type"),
+                            "status": c.get("status"),
+                            "message": c.get("message", ""),
+                        }
                         for c in conditions
                     ],
                 }
@@ -510,7 +571,9 @@ class KServeService:
                     "phase": "error",
                     "name": name,
                     "message": str(e),
-                    "elapsed_seconds": round(timeout_seconds - (deadline - time.monotonic()), 1),
+                    "elapsed_seconds": round(
+                        timeout_seconds - (deadline - time.monotonic()), 1
+                    ),
                 }
 
             await asyncio.sleep(poll_interval)
@@ -524,15 +587,17 @@ class KServeService:
         }
 
 
-def create_kserve_service_from_credentials(credentials: Dict[str, str]) -> KServeService:
+def create_kserve_service_from_credentials(
+    credentials: Dict[str, str]
+) -> KServeService:
     """Create KServeService from credential dictionary"""
     config = KServeConfig(
         kubernetes_config=credentials.get("kubeconfig_path"),
         namespace=credentials.get("namespace", "default"),
         auth_token=credentials.get("auth_token"),
-        cluster_endpoint=credentials.get("cluster_endpoint")
+        cluster_endpoint=credentials.get("cluster_endpoint"),
     )
-    
+
     return KServeService(config)
 
 

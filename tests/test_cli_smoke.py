@@ -49,8 +49,15 @@ class TestTopLevel:
     def test_help_contains_train_commands(self, runner):
         result = runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        for cmd in ["train", "preflight", "monitor", "checkpoint",
-                     "train-status", "train-stop", "train-resume"]:
+        for cmd in [
+            "train",
+            "preflight",
+            "monitor",
+            "checkpoint",
+            "train-status",
+            "train-stop",
+            "train-resume",
+        ]:
             assert cmd in result.output, f"Missing command in help: {cmd}"
 
     def test_help_contains_provision(self, runner):

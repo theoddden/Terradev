@@ -19,39 +19,54 @@ from .base_signal import BaseSignal, SignalResult, SignalType
 
 # Stage 1: Toxicity keyword patterns
 _TOXICITY_PATTERNS = [
-    re.compile(r'\b(?:kill|murder|attack|bomb|weapon|explosive|poison)\b', re.I),
-    re.compile(r'\b(?:hack|exploit|breach|bypass|crack|phish)\b', re.I),
-    re.compile(r'\b(?:illegal|illicit|drugs|narcotic|trafficking)\b', re.I),
+    re.compile(r"\b(?:kill|murder|attack|bomb|weapon|explosive|poison)\b", re.I),
+    re.compile(r"\b(?:hack|exploit|breach|bypass|crack|phish)\b", re.I),
+    re.compile(r"\b(?:illegal|illicit|drugs|narcotic|trafficking)\b", re.I),
 ]
 
 # Stage 2: PII detection patterns
 _PII_PATTERNS = {
-    "email": re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'),
-    "phone": re.compile(r'\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b'),
-    "ssn": re.compile(r'\b\d{3}-\d{2}-\d{4}\b'),
-    "credit_card": re.compile(r'\b(?:\d{4}[-\s]?){3}\d{4}\b'),
-    "ip_address": re.compile(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'),
-    "api_key": re.compile(r'\b(?:sk-|pk-|api[_-]?key[=:]\s*)[A-Za-z0-9_-]{20,}\b', re.I),
-    "aws_key": re.compile(r'\bAKIA[A-Z0-9]{16}\b'),
+    "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
+    "phone": re.compile(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
+    "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
+    "credit_card": re.compile(r"\b(?:\d{4}[-\s]?){3}\d{4}\b"),
+    "ip_address": re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"),
+    "api_key": re.compile(
+        r"\b(?:sk-|pk-|api[_-]?key[=:]\s*)[A-Za-z0-9_-]{20,}\b", re.I
+    ),
+    "aws_key": re.compile(r"\bAKIA[A-Z0-9]{16}\b"),
 }
 
 # Stage 3: Jailbreak attempt patterns
 _JAILBREAK_PATTERNS = [
-    re.compile(r'\bignore\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions?|prompts?|rules?)\b', re.I),
-    re.compile(r'\bpretend\s+(?:you\s+are|to\s+be)\s+(?:a\s+)?(?:different|new|evil|unrestricted)\b', re.I),
-    re.compile(r'\bDAN\s+mode\b|\bdo\s+anything\s+now\b', re.I),
-    re.compile(r'\byou\s+(?:are|will)\s+(?:now\s+)?(?:free|unrestricted|unfiltered)\b', re.I),
-    re.compile(r'\b(?:bypass|override|disable)\s+(?:your\s+)?(?:safety|filter|restriction|guideline)\b', re.I),
-    re.compile(r'\bacting\s+as\s+(?:a\s+)?(?:system|admin|root|developer)\b', re.I),
-    re.compile(r'\brole[\s-]?play\s+(?:as\s+)?(?:a\s+)?(?:hacker|criminal|villain)\b', re.I),
+    re.compile(
+        r"\bignore\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions?|prompts?|rules?)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\bpretend\s+(?:you\s+are|to\s+be)\s+(?:a\s+)?(?:different|new|evil|unrestricted)\b",
+        re.I,
+    ),
+    re.compile(r"\bDAN\s+mode\b|\bdo\s+anything\s+now\b", re.I),
+    re.compile(
+        r"\byou\s+(?:are|will)\s+(?:now\s+)?(?:free|unrestricted|unfiltered)\b", re.I
+    ),
+    re.compile(
+        r"\b(?:bypass|override|disable)\s+(?:your\s+)?(?:safety|filter|restriction|guideline)\b",
+        re.I,
+    ),
+    re.compile(r"\bacting\s+as\s+(?:a\s+)?(?:system|admin|root|developer)\b", re.I),
+    re.compile(
+        r"\brole[\s-]?play\s+(?:as\s+)?(?:a\s+)?(?:hacker|criminal|villain)\b", re.I
+    ),
 ]
 
 # Prompt injection patterns
 _INJECTION_PATTERNS = [
-    re.compile(r'\bsystem:\s', re.I),
-    re.compile(r'\b\[INST\]|\b\[/INST\]|\b<<SYS>>|\b<</SYS>>', re.I),
-    re.compile(r'\b<\|im_start\|>|\b<\|im_end\|>', re.I),
-    re.compile(r'\bHuman:\s|\bAssistant:\s', re.I),
+    re.compile(r"\bsystem:\s", re.I),
+    re.compile(r"\b\[INST\]|\b\[/INST\]|\b<<SYS>>|\b<</SYS>>", re.I),
+    re.compile(r"\b<\|im_start\|>|\b<\|im_end\|>", re.I),
+    re.compile(r"\bHuman:\s|\bAssistant:\s", re.I),
 ]
 
 
@@ -75,7 +90,9 @@ class SafetySignal(BaseSignal):
           - "severity": float 0.0–1.0
     """
 
-    def __init__(self, pii_scan: bool = True, jailbreak_scan: bool = True, enabled: bool = True):
+    def __init__(
+        self, pii_scan: bool = True, jailbreak_scan: bool = True, enabled: bool = True
+    ):
         super().__init__(name="safety", signal_type=SignalType.SAFETY, enabled=enabled)
         self.pii_scan = pii_scan
         self.jailbreak_scan = jailbreak_scan
@@ -101,7 +118,9 @@ class SafetySignal(BaseSignal):
             if pii_types:
                 flags.append(SafetyFlag.PII_DETECTED)
                 # API keys and SSNs are more severe
-                if any(t in pii_types for t in ("ssn", "credit_card", "api_key", "aws_key")):
+                if any(
+                    t in pii_types for t in ("ssn", "credit_card", "api_key", "aws_key")
+                ):
                     severity = max(severity, 0.8)
                 else:
                     severity = max(severity, 0.4)

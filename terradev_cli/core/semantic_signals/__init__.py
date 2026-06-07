@@ -21,15 +21,15 @@ from .safety_signal import SafetySignal
 from .orchestrator import SignalOrchestrator, SignalVector
 
 __all__ = [
-    'BaseSignal',
-    'SignalResult',
-    'SignalType',
-    'KeywordSignal',
-    'ModalitySignal',
-    'ComplexitySignal',
-    'DomainSignal',
-    'LanguageSignal',
-    'SafetySignal',
-    'SignalOrchestrator',
-    'SignalVector',
+    "BaseSignal",
+    "SignalResult",
+    "SignalType",
+    "KeywordSignal",
+    "ModalitySignal",
+    "ComplexitySignal",
+    "DomainSignal",
+    "LanguageSignal",
+    "SafetySignal",
+    "SignalOrchestrator",
+    "SignalVector",
 ]

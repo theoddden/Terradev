@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # Rust DAG executor integration
 try:
     from terradev_dag_executor import DAGExecutor as RustDAGExecutor
+
     USE_RUST_DAG = True
     logger.info("Using Rust DAG executor for 5-10x performance improvement")
 except ImportError:
@@ -55,6 +56,7 @@ class DAGNode:
     receives a context dict containing outputs from all upstream
     dependencies, keyed by their node name.
     """
+
     name: str
     execute: Callable[[Dict[str, Any]], Any]
     dependencies: Set[str] = field(default_factory=set)
@@ -72,6 +74,7 @@ class ExecutionWave:
     Terraform calls these "walk groups" — all nodes in a wave have their
     dependencies satisfied by prior waves.
     """
+
     depth: int
     nodes: List[str] = field(default_factory=list)
 
@@ -83,6 +86,7 @@ class ExecutionPlan:
     Contains the topologically sorted wave schedule and the total
     estimated parallelism factor.
     """
+
     waves: List[ExecutionWave] = field(default_factory=list)
     total_nodes: int = 0
     max_parallelism: int = 0  # widest wave
@@ -92,6 +96,7 @@ class ExecutionPlan:
 @dataclass
 class ExecutionResult:
     """Result of executing the full DAG — analogous to `terraform apply` output."""
+
     outputs: Dict[str, Any] = field(default_factory=dict)
     node_latencies: Dict[str, float] = field(default_factory=dict)
     node_statuses: Dict[str, str] = field(default_factory=dict)
@@ -111,14 +116,19 @@ class ExecutionResult:
 class DAGExecutor:
     """
     Execute DAGs with topological wave parallelism.
-    
+
     Enhanced with scalable thread pool management:
     - Adaptive worker count based on system resources
     - Thread-safe pool sharing across executions
     - Automatic scaling based on load
     """
-    
-    def __init__(self, name: str = "dag_executor", max_workers: Optional[int] = None, reuse_pool: bool = True):
+
+    def __init__(
+        self,
+        name: str = "dag_executor",
+        max_workers: Optional[int] = None,
+        reuse_pool: bool = True,
+    ):
         self._nodes: Dict[str, DAGNode] = {}
         self._edges: Dict[str, Set[str]] = defaultdict(set)
         self._max_workers = max_workers or self._calculate_optimal_workers()
@@ -127,8 +137,10 @@ class DAGExecutor:
         self._pool: Optional[ThreadPoolExecutor] = None
         self._pool_lock = threading.Lock()
         if reuse_pool:
-            self._pool = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix=f"dag-{name}")
-    
+            self._pool = ThreadPoolExecutor(
+                max_workers=self._max_workers, thread_name_prefix=f"dag-{name}"
+            )
+
     def _calculate_optimal_workers(self) -> int:
         """Calculate optimal worker count based on system resources."""
         cpu_count = os.cpu_count() or 4
@@ -225,9 +237,7 @@ class DAGExecutor:
                 forward[dep].add(name)
 
         waves: List[ExecutionWave] = []
-        queue = deque(
-            name for name, deg in in_degree.items() if deg == 0
-        )
+        queue = deque(name for name, deg in in_degree.items() if deg == 0)
         depth = 0
         processed = 0
 
@@ -273,16 +283,18 @@ class DAGExecutor:
         """Get a thread pool — reuse persistent one or create ephemeral with scaling."""
         if self._pool:
             return self._pool
-        
+
         # Scale workers based on request and system capacity
         worker_count = workers or self._max_workers
         optimal_workers = min(worker_count, self._calculate_optimal_workers())
-        
+
         with self._pool_lock:
             if not self._pool and self._reuse_pool:
-                self._pool = ThreadPoolExecutor(max_workers=optimal_workers, thread_name_prefix=f"dag-{self._name}")
+                self._pool = ThreadPoolExecutor(
+                    max_workers=optimal_workers, thread_name_prefix=f"dag-{self._name}"
+                )
                 return self._pool
-        
+
         return ThreadPoolExecutor(max_workers=optimal_workers)
 
     def apply(
@@ -318,10 +330,7 @@ class DAGExecutor:
                     node.status = "running"
 
                     # Build dependency context for this node
-                    dep_ctx = {
-                        dep: context.get(dep)
-                        for dep in node.dependencies
-                    }
+                    dep_ctx = {dep: context.get(dep) for dep in node.dependencies}
                     # Merge full context so nodes can access anything
                     merged_ctx = {**context, **dep_ctx, "__deps__": dep_ctx}
 
@@ -367,9 +376,7 @@ class DAGExecutor:
 
         result.total_latency_ms = total_node_ms
         result.wall_clock_ms = wall_ms
-        result.parallelism_achieved = (
-            total_node_ms / wall_ms if wall_ms > 0 else 1.0
-        )
+        result.parallelism_achieved = total_node_ms / wall_ms if wall_ms > 0 else 1.0
 
         logger.debug(
             f"DAG '{self._name}' apply: wall={wall_ms:.2f}ms, "
@@ -537,9 +544,11 @@ def build_signal_dag(orchestrator) -> DAGExecutor:
 
         def make_fn(sig):
             """Capture signal in closure"""
+
             def fn(ctx: Dict[str, Any]) -> Any:
                 query = ctx.get("__query__", {})
                 return sig.run(query)
+
             return fn
 
         dag.add_node(name, make_fn(signal))

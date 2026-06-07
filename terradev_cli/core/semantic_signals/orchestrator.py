@@ -22,6 +22,7 @@ from .safety_signal import SafetySignal
 
 try:
     from terradev_cli.core.dag_executor import DAGExecutor
+
     _HAS_DAG = True
 except ImportError:
     _HAS_DAG = False
@@ -37,6 +38,7 @@ class SignalVector:
 
     Provides dict-like access for the policy engine's expression evaluator.
     """
+
     signals: Dict[str, SignalResult] = field(default_factory=dict)
     total_latency_ms: float = 0.0
     timestamp: float = 0.0
@@ -177,7 +179,7 @@ class SignalOrchestrator:
         self.signals.pop(name, None)
         self._dag_dirty = True
 
-    def _get_warm_dag(self) -> 'DAGExecutor':
+    def _get_warm_dag(self) -> "DAGExecutor":
         """Get or rebuild the warm DAGExecutor with persistent thread pool."""
         if self._warm_dag is None or self._dag_dirty:
             if self._warm_dag is not None:
@@ -191,10 +193,13 @@ class SignalOrchestrator:
             for name, signal in self.signals.items():
                 if not signal.enabled:
                     continue
+
                 def make_fn(sig):
                     def fn(ctx):
                         return sig.run(ctx.get("__query__", {}))
+
                     return fn
+
                 dag.add_node(name, make_fn(signal))
             self._warm_dag = dag
             self._dag_dirty = False
@@ -297,11 +302,13 @@ class SignalOrchestrator:
                 for name, output in br.outputs.items():
                     if output is not None:
                         results[name] = output
-                vectors.append(SignalVector(
-                    signals=results,
-                    total_latency_ms=br.wall_clock_ms,
-                    timestamp=time.time(),
-                ))
+                vectors.append(
+                    SignalVector(
+                        signals=results,
+                        total_latency_ms=br.wall_clock_ms,
+                        timestamp=time.time(),
+                    )
+                )
             return vectors
 
         # Sequential fallback

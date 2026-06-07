@@ -39,10 +39,16 @@ class GCPProvider(BaseProvider):
 
             creds_path = credentials.get("credentials_file")
             if creds_path:
-                sa_creds = service_account.Credentials.from_service_account_file(creds_path)
+                sa_creds = service_account.Credentials.from_service_account_file(
+                    creds_path
+                )
                 self.instances_client = compute_v1.InstancesClient(credentials=sa_creds)
-                self.accelerator_client = compute_v1.AcceleratorTypesClient(credentials=sa_creds)
-                self.reservation_client = compute_v1.ReservationsClient(credentials=sa_creds)
+                self.accelerator_client = compute_v1.AcceleratorTypesClient(
+                    credentials=sa_creds
+                )
+                self.reservation_client = compute_v1.ReservationsClient(
+                    credentials=sa_creds
+                )
             else:
                 self.instances_client = compute_v1.InstancesClient()
                 self.accelerator_client = compute_v1.AcceleratorTypesClient()
@@ -63,18 +69,66 @@ class GCPProvider(BaseProvider):
             {"machine": "a2-highgpu-8g", "gpus": 8, "vcpus": 96, "mem": 680},
         ],
         "V100": [
-            {"machine": "n1-standard-8", "accel": "nvidia-tesla-v100", "gpus": 1, "vcpus": 8, "mem": 30},
-            {"machine": "n1-standard-16", "accel": "nvidia-tesla-v100", "gpus": 2, "vcpus": 16, "mem": 60},
+            {
+                "machine": "n1-standard-8",
+                "accel": "nvidia-tesla-v100",
+                "gpus": 1,
+                "vcpus": 8,
+                "mem": 30,
+            },
+            {
+                "machine": "n1-standard-16",
+                "accel": "nvidia-tesla-v100",
+                "gpus": 2,
+                "vcpus": 16,
+                "mem": 60,
+            },
         ],
         "T4": [
-            {"machine": "n1-standard-4", "accel": "nvidia-tesla-t4", "gpus": 1, "vcpus": 4, "mem": 15},
-            {"machine": "n1-standard-8", "accel": "nvidia-tesla-t4", "gpus": 1, "vcpus": 8, "mem": 30},
+            {
+                "machine": "n1-standard-4",
+                "accel": "nvidia-tesla-t4",
+                "gpus": 1,
+                "vcpus": 4,
+                "mem": 15,
+            },
+            {
+                "machine": "n1-standard-8",
+                "accel": "nvidia-tesla-t4",
+                "gpus": 1,
+                "vcpus": 8,
+                "mem": 30,
+            },
         ],
         "H100": [
-            {"machine": "a3-highgpu-8g", "gpus": 8, "vcpus": 208, "mem": 1872, "requires_reservation": True},
-            {"machine": "a4-highgpu-1g", "gpus": 1, "vcpus": 72, "mem": 416, "requires_reservation": True},
-            {"machine": "a4-highgpu-8g", "gpus": 8, "vcpus": 176, "mem": 3328, "requires_reservation": True},
-            {"machine": "a4x-highgpu-1g", "gpus": 1, "vcpus": 96, "mem": 832, "requires_reservation": True},
+            {
+                "machine": "a3-highgpu-8g",
+                "gpus": 8,
+                "vcpus": 208,
+                "mem": 1872,
+                "requires_reservation": True,
+            },
+            {
+                "machine": "a4-highgpu-1g",
+                "gpus": 1,
+                "vcpus": 72,
+                "mem": 416,
+                "requires_reservation": True,
+            },
+            {
+                "machine": "a4-highgpu-8g",
+                "gpus": 8,
+                "vcpus": 176,
+                "mem": 3328,
+                "requires_reservation": True,
+            },
+            {
+                "machine": "a4x-highgpu-1g",
+                "gpus": 1,
+                "vcpus": 96,
+                "mem": 832,
+                "requires_reservation": True,
+            },
         ],
     }
 
@@ -100,25 +154,27 @@ class GCPProvider(BaseProvider):
         # Return empty list if no valid credentials
         if not self.credentials:
             return []
-        
+
         configs = self.GPU_INSTANCE_MAP.get(gpu_type, [])
         if not configs:
             return []
 
-        target_region = region or self.zone.rsplit('-', 1)[0]
-        
+        target_region = region or self.zone.rsplit("-", 1)[0]
+
         # CRITICAL: Check zone availability first
         zone_availability = await self._check_zone_availability(gpu_type, target_region)
-        
+
         quotes = []
         for cfg in configs:
             # Check if this instance requires capacity reservation
             requires_reservation = cfg.get("requires_reservation", False)
-            
+
             key = cfg["machine"]
             if "accel" in cfg:
                 key = f"{cfg['machine']}+{cfg['accel'].split('-')[-1]}x{cfg['gpus']}"
-            price = self.ON_DEMAND_PRICES.get(key, self._estimate_price(cfg["machine"], gpu_type, target_region))
+            price = self.ON_DEMAND_PRICES.get(
+                key, self._estimate_price(cfg["machine"], gpu_type, target_region)
+            )
 
             quote = {
                 "instance_type": cfg["machine"],
@@ -133,7 +189,7 @@ class GCPProvider(BaseProvider):
                 "requires_reservation": requires_reservation,
                 "zone_availability": zone_availability,
             }
-            
+
             # CRITICAL: Add reservation workflow for A3/A4/A4X
             if requires_reservation:
                 quote["reservation_info"] = {
@@ -142,28 +198,38 @@ class GCPProvider(BaseProvider):
                     "lead_time_hours": 24,
                     "auto_reserve_available": True,
                 }
-            
+
             # CRITICAL: Add TPU vs GPU guidance
             if gpu_type in ["A100", "H100"]:
-                quote["tpu_alternative"] = await self._get_tpu_alternative(gpu_type, target_region)
-            
+                quote["tpu_alternative"] = await self._get_tpu_alternative(
+                    gpu_type, target_region
+                )
+
             # CRITICAL: Add Flex-start VM option for short workloads
             if not requires_reservation:
-                quote["flex_start_available"] = await self._check_flex_start_availability(cfg["machine"], target_region)
-            
+                quote["flex_start_available"] = (
+                    await self._check_flex_start_availability(
+                        cfg["machine"], target_region
+                    )
+                )
+
             quotes.append(quote)
 
         # If client is live, try to fetch real spot (preemptible) pricing
         if self.instances_client and self.project_id:
             try:
-                preemptible_quotes = await self._get_preemptible_quotes(gpu_type, region)
+                preemptible_quotes = await self._get_preemptible_quotes(
+                    gpu_type, region
+                )
                 quotes.extend(preemptible_quotes)
             except Exception:
                 pass  # Fall back to static pricing
 
         return sorted(quotes, key=lambda q: q["price_per_hour"])
 
-    async def _get_preemptible_quotes(self, gpu_type: str, region: Optional[str]) -> List[Dict[str, Any]]:
+    async def _get_preemptible_quotes(
+        self, gpu_type: str, region: Optional[str]
+    ) -> List[Dict[str, Any]]:
         """Attempt to get preemptible pricing via live API"""
         configs = self.GPU_INSTANCE_MAP.get(gpu_type, [])
         quotes = []
@@ -172,18 +238,22 @@ class GCPProvider(BaseProvider):
             if "accel" in cfg:
                 key = f"{cfg['machine']}+{cfg['accel'].split('-')[-1]}x{cfg['gpus']}"
             base = self.ON_DEMAND_PRICES.get(key, 3.0)
-            quotes.append({
-                "instance_type": cfg["machine"],
-                "gpu_type": gpu_type,
-                "price_per_hour": round(base * 0.4, 2),  # ~60% discount for preemptible
-                "region": region or "us-central1",
-                "available": True,
-                "provider": "gcp",
-                "vcpus": cfg["vcpus"],
-                "memory_gb": cfg["mem"],
-                "gpu_count": cfg["gpus"],
-                "spot": True,
-            })
+            quotes.append(
+                {
+                    "instance_type": cfg["machine"],
+                    "gpu_type": gpu_type,
+                    "price_per_hour": round(
+                        base * 0.4, 2
+                    ),  # ~60% discount for preemptible
+                    "region": region or "us-central1",
+                    "available": True,
+                    "provider": "gcp",
+                    "vcpus": cfg["vcpus"],
+                    "memory_gb": cfg["mem"],
+                    "gpu_count": cfg["gpus"],
+                    "spot": True,
+                }
+            )
         return quotes
 
     async def provision_instance(
@@ -193,14 +263,18 @@ class GCPProvider(BaseProvider):
             raise Exception("GCP client not initialised – configure credentials first")
 
         zone = f"{region}-a"
-        instance_name = f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        instance_name = (
+            f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
 
         try:
             from google.cloud import compute_v1
 
             instance_resource = compute_v1.Instance()
             instance_resource.name = instance_name
-            instance_resource.machine_type = f"zones/{zone}/machineTypes/{instance_type}"
+            instance_resource.machine_type = (
+                f"zones/{zone}/machineTypes/{instance_type}"
+            )
 
             disk = compute_v1.AttachedDisk()
             disk.auto_delete = True
@@ -218,7 +292,10 @@ class GCPProvider(BaseProvider):
             net.access_configs = [access]
             instance_resource.network_interfaces = [net]
 
-            instance_resource.labels = {"managed-by": "terradev", "gpu-type": gpu_type.lower()}
+            instance_resource.labels = {
+                "managed-by": "terradev",
+                "gpu-type": gpu_type.lower(),
+            }
 
             request = compute_v1.InsertInstanceRequest(
                 project=self.project_id, zone=zone, instance_resource=instance_resource
@@ -244,6 +321,7 @@ class GCPProvider(BaseProvider):
             raise Exception("GCP client not initialised")
         try:
             from google.cloud import compute_v1
+
             request = compute_v1.GetInstanceRequest(
                 project=self.project_id, zone=self.zone, instance=instance_id
             )
@@ -263,6 +341,7 @@ class GCPProvider(BaseProvider):
         if not self.instances_client or not self.project_id:
             raise Exception("GCP client not initialised")
         from google.cloud import compute_v1
+
         request = compute_v1.StopInstanceRequest(
             project=self.project_id, zone=self.zone, instance=instance_id
         )
@@ -274,6 +353,7 @@ class GCPProvider(BaseProvider):
         if not self.instances_client or not self.project_id:
             raise Exception("GCP client not initialised")
         from google.cloud import compute_v1
+
         request = compute_v1.StartInstanceRequest(
             project=self.project_id, zone=self.zone, instance=instance_id
         )
@@ -285,33 +365,42 @@ class GCPProvider(BaseProvider):
         if not self.instances_client or not self.project_id:
             raise Exception("GCP client not initialised")
         from google.cloud import compute_v1
+
         request = compute_v1.DeleteInstanceRequest(
             project=self.project_id, zone=self.zone, instance=instance_id
         )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.instances_client.delete, request)
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.instances_client or not self.project_id:
             return []
         try:
             from google.cloud import compute_v1
+
             request = compute_v1.ListInstancesRequest(
-                project=self.project_id, zone=self.zone,
+                project=self.project_id,
+                zone=self.zone,
                 filter='labels.managed-by="terradev"',
             )
             loop = asyncio.get_running_loop()
             page = await loop.run_in_executor(None, self.instances_client.list, request)
             instances = []
             for inst in page:
-                instances.append({
-                    "instance_id": inst.name,
-                    "status": inst.status.lower(),
-                    "instance_type": inst.machine_type.split("/")[-1],
-                    "region": self.zone.rsplit("-", 1)[0],
-                    "provider": "gcp",
-                })
+                instances.append(
+                    {
+                        "instance_id": inst.name,
+                        "status": inst.status.lower(),
+                        "instance_type": inst.machine_type.split("/")[-1],
+                        "region": self.zone.rsplit("-", 1)[0],
+                        "provider": "gcp",
+                    }
+                )
             return instances
         except Exception:
             return []
@@ -325,16 +414,25 @@ class GCPProvider(BaseProvider):
 
         try:
             import subprocess
+
             # Try gcloud compute ssh first (handles IAP tunneling, OS Login, etc.)
             gcloud_cmd = [
-                "gcloud", "compute", "ssh", instance_id,
-                "--project", self.project_id,
-                "--zone", self.zone,
-                "--command", command,
+                "gcloud",
+                "compute",
+                "ssh",
+                instance_id,
+                "--project",
+                self.project_id,
+                "--zone",
+                self.zone,
+                "--command",
+                command,
                 "--quiet",
             ]
             if async_exec:
-                proc = subprocess.Popen(gcloud_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                proc = subprocess.Popen(
+                    gcloud_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
                 return {
                     "instance_id": instance_id,
                     "command": command,
@@ -346,7 +444,9 @@ class GCPProvider(BaseProvider):
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None,
-                lambda: subprocess.run(gcloud_cmd, capture_output=True, text=True, timeout=300),
+                lambda: subprocess.run(
+                    gcloud_cmd, capture_output=True, text=True, timeout=300
+                ),
             )
             return {
                 "instance_id": instance_id,
@@ -363,21 +463,41 @@ class GCPProvider(BaseProvider):
                 # GCP instances don't always expose public IP in our status dict,
                 # so fall back to gcloud describe
                 import subprocess
+
                 desc = subprocess.run(
-                    ["gcloud", "compute", "instances", "describe", instance_id,
-                     "--project", self.project_id, "--zone", self.zone,
-                     "--format", "get(networkInterfaces[0].accessConfigs[0].natIP)"],
-                    capture_output=True, text=True, timeout=15,
+                    [
+                        "gcloud",
+                        "compute",
+                        "instances",
+                        "describe",
+                        instance_id,
+                        "--project",
+                        self.project_id,
+                        "--zone",
+                        self.zone,
+                        "--format",
+                        "get(networkInterfaces[0].accessConfigs[0].natIP)",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
                 )
                 public_ip = desc.stdout.strip()
                 if public_ip:
                     ssh_cmd = [
-                        "ssh", "-o", "StrictHostKeyChecking=accept-new",
-                        "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                        "-o", "ConnectTimeout=10",
-                        f"terradev@{public_ip}", command,
+                        "ssh",
+                        "-o",
+                        "StrictHostKeyChecking=accept-new",
+                        "-o",
+                        f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                        "-o",
+                        "ConnectTimeout=10",
+                        f"terradev@{public_ip}",
+                        command,
                     ]
-                    result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=300)
+                    result = subprocess.run(
+                        ssh_cmd, capture_output=True, text=True, timeout=300
+                    )
                     return {
                         "instance_id": instance_id,
                         "command": command,
@@ -406,33 +526,35 @@ class GCPProvider(BaseProvider):
 
     def _get_auth_headers(self) -> Dict[str, str]:
         return {}
-    
-    async def _check_zone_availability(self, gpu_type: str, region: str) -> Dict[str, Any]:
+
+    async def _check_zone_availability(
+        self, gpu_type: str, region: str
+    ) -> Dict[str, Any]:
         """CRITICAL: Check zone availability for GPU types
-        
+
         H100s on GCP are often only in us-central1-a and us-east4-b.
         Probing avoids silent failures.
         """
         if not self.accelerator_client:
             return {"status": "unknown", "reason": "client not initialized"}
-        
+
         try:
             # Map GPU types to accelerator names
             accelerator_map = {
                 "A100": "nvidia-tesla-a100",
-                "H100": "nvidia-tesla-h100", 
+                "H100": "nvidia-tesla-h100",
                 "V100": "nvidia-tesla-v100",
                 "T4": "nvidia-tesla-t4",
             }
-            
+
             accelerator_name = accelerator_map.get(gpu_type)
             if not accelerator_name:
                 return {"status": "unknown", "reason": f"unknown GPU type: {gpu_type}"}
-            
+
             # Check common zones in the region
             zones = [f"{region}-a", f"{region}-b", f"{region}-c", f"{region}-d"]
             available_zones = []
-            
+
             for zone in zones:
                 try:
                     loop = asyncio.get_running_loop()
@@ -441,35 +563,40 @@ class GCPProvider(BaseProvider):
                         lambda z=zone: self.accelerator_client.get(
                             project=self.project_id,
                             zone=z,
-                            accelerator_type=accelerator_name
-                        )
+                            accelerator_type=accelerator_name,
+                        ),
                     )
                     available_zones.append(zone)
                 except Exception:
                     continue  # Zone doesn't have this GPU type
-            
+
             if not available_zones:
                 return {
                     "status": "unavailable",
                     "reason": f"{gpu_type} not available in any zone of {region}",
                     "available_zones": [],
-                    "recommended_regions": ["us-central1", "us-east4"],  # Known H100 regions
+                    "recommended_regions": [
+                        "us-central1",
+                        "us-east4",
+                    ],  # Known H100 regions
                 }
-            
+
             return {
                 "status": "available",
                 "available_zones": available_zones,
                 "recommended_zone": available_zones[0],
                 "zone_count": len(available_zones),
             }
-            
+
         except Exception as e:
             logger.debug(f"Zone availability check failed: {e}")
             return {"status": "error", "reason": str(e)}
-    
-    async def _get_tpu_alternative(self, gpu_type: str, region: str) -> Optional[Dict[str, Any]]:
+
+    async def _get_tpu_alternative(
+        self, gpu_type: str, region: str
+    ) -> Optional[Dict[str, Any]]:
         """CRITICAL: Provide TPU vs GPU guidance
-        
+
         GCP actively pushes TPUs for inference. Compare costs and performance.
         """
         # TPU mapping for GPU alternatives
@@ -481,28 +608,32 @@ class GCPProvider(BaseProvider):
                 "use_case": "training",
             },
             "H100": {
-                "tpu_type": "tpu-v5p-podslice-8", 
+                "tpu_type": "tpu-v5p-podslice-8",
                 "performance_ratio": 0.9,  # TPU is ~90% of H100 performance
                 "cost_ratio": 0.5,  # TPU is ~50% cheaper
                 "use_case": "training",
             },
         }
-        
+
         alternative = tpu_alternatives.get(gpu_type)
         if not alternative:
             return None
-        
+
         return {
             "recommended": True,
             "reason": f"TPU {alternative['tpu_type']} offers {alternative['cost_ratio']*100:.0f}% cost with {alternative['performance_ratio']*100:.0f}% performance",
             "tpu_type": alternative["tpu_type"],
             "cost_savings_percent": int((1 - alternative["cost_ratio"]) * 100),
-            "performance_impact_percent": int((1 - alternative["performance_ratio"]) * 100),
+            "performance_impact_percent": int(
+                (1 - alternative["performance_ratio"]) * 100
+            ),
             "use_case": alternative["use_case"],
             "egress_warning": "Moving data to TPU may incur egress costs if data is in another cloud",
         }
-    
-    async def _check_flex_start_availability(self, machine_type: str, region: str) -> bool:
+
+    async def _check_flex_start_availability(
+        self, machine_type: str, region: str
+    ) -> bool:
         """Check if Flex-start VMs are available for short workloads"""
         # Flex-start is available for most N1-series machines
         if machine_type.startswith("n1-"):
@@ -511,20 +642,22 @@ class GCPProvider(BaseProvider):
         if machine_type.startswith(("a2-", "a3-", "a4-")):
             return False
         return False
-    
+
     async def create_capacity_reservation(
         self, gpu_type: str, instance_type: str, region: str, count: int = 1
     ) -> Dict[str, Any]:
         """CRITICAL: Create capacity reservation for A3/A4/A4X instances"""
         if not self.reservation_client:
             raise Exception("Reservation client not initialized")
-        
-        reservation_name = f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        
+
+        reservation_name = (
+            f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
+
         try:
             from google.cloud import compute_v1
             from google.protobuf import field_mask_pb2
-            
+
             # Map GPU types to accelerator configurations
             accelerator_configs = {
                 "H100": {
@@ -532,11 +665,11 @@ class GCPProvider(BaseProvider):
                     "accelerator_count": 8 if "8g" in instance_type else 1,
                 }
             }
-            
+
             config = accelerator_configs.get(gpu_type)
             if not config:
                 raise Exception(f"No accelerator config for {gpu_type}")
-            
+
             # Create reservation
             reservation = compute_v1.Reservation(
                 name=reservation_name,
@@ -554,7 +687,7 @@ class GCPProvider(BaseProvider):
                     ),
                 ),
             )
-            
+
             loop = asyncio.get_running_loop()
             operation = await loop.run_in_executor(
                 None,
@@ -562,9 +695,9 @@ class GCPProvider(BaseProvider):
                     project=self.project_id,
                     region=region,
                     reservation_resource=reservation,
-                )
+                ),
             )
-            
+
             return {
                 "reservation_id": reservation_name,
                 "status": "creating",
@@ -575,6 +708,6 @@ class GCPProvider(BaseProvider):
                 "operation": operation.name,
                 "estimated_ready_minutes": 15,
             }
-            
+
         except Exception as e:
             raise Exception(f"Failed to create capacity reservation: {e}")

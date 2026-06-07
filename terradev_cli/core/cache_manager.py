@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # Rust cache eviction integration
 try:
     from terradev_cache_eviction import PyCacheEngine, PyCacheEntry, PyEvictionPolicy
+
     USE_RUST_CACHE = True
     logger.info("Using Rust cache engine for 40% better hit rates")
 except ImportError:
@@ -28,28 +29,29 @@ except ImportError:
 
 class CacheManager:
     """Cache manager with Rust backend or Python fallback"""
-    
+
     def __init__(self, max_capacity: int = 1000, policy: str = "tinylfu"):
         if USE_RUST_CACHE:
             self._rust_cache = PyCacheEngine(
-                max_capacity=max_capacity,
-                policy=PyEvictionPolicy(policy_type=policy)
+                max_capacity=max_capacity, policy=PyEvictionPolicy(policy_type=policy)
             )
         else:
             self._cache: Dict[str, Any] = {}
             self._max_capacity = max_capacity
             self._access_count: Dict[str, int] = {}
-    
+
     def put(self, key: str, value: Any, size_bytes: int = 0):
         """Put a value in the cache"""
         if USE_RUST_CACHE:
             entry = PyCacheEntry(
                 key=key,
-                value=json.dumps(value) if not isinstance(value, (str, bytes)) else value,
+                value=(
+                    json.dumps(value) if not isinstance(value, (str, bytes)) else value
+                ),
                 size_bytes=size_bytes,
                 created_at=datetime.now().isoformat(),
                 last_accessed=datetime.now().isoformat(),
-                access_count=0
+                access_count=0,
             )
             self._rust_cache.put(entry)
         else:
@@ -61,7 +63,7 @@ class CacheManager:
                 del self._access_count[lru_key]
             self._cache[key] = value
             self._access_count[key] = 0
-    
+
     def get(self, key: str) -> Optional[Any]:
         """Get a value from the cache"""
         if USE_RUST_CACHE:
@@ -79,7 +81,7 @@ class CacheManager:
                 self._access_count[key] = self._access_count.get(key, 0) + 1
                 return self._cache[key]
             return None
-    
+
     def access_count(self, key: str) -> int:
         """Get access count for a key"""
         if USE_RUST_CACHE:

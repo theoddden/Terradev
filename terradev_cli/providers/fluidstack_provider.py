@@ -151,9 +151,12 @@ class FluidStackProvider(BaseProvider):
 
         quotes = []
         gpu_upper = gpu_type.upper()
-        for config in (data if isinstance(data, list) else []):
+        for config in data if isinstance(data, list) else []:
             config_gpu = config.get("gpu_type", "")
-            if gpu_upper not in config_gpu.upper() and config_gpu.upper() not in gpu_upper:
+            if (
+                gpu_upper not in config_gpu.upper()
+                and config_gpu.upper() not in gpu_upper
+            ):
                 # Also try matching common names
                 if not any(
                     alias in config_gpu.upper()
@@ -210,12 +213,12 @@ class FluidStackProvider(BaseProvider):
         if ssh_key_name:
             body["ssh_keys"] = [ssh_key_name]
 
-        data = await self._make_request(
-            "POST", f"{self.API_BASE}/instances", json=body
-        )
+        data = await self._make_request("POST", f"{self.API_BASE}/instances", json=body)
 
         return {
-            "instance_id": data.get("id", f"fs-{datetime.now().strftime('%Y%m%d%H%M%S')}"),
+            "instance_id": data.get(
+                "id", f"fs-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            ),
             "instance_type": instance_type,
             "region": region,
             "gpu_type": gpu_type,
@@ -264,10 +267,12 @@ class FluidStackProvider(BaseProvider):
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("FluidStack API key not configured")
-        await self._make_request(
-            "DELETE", f"{self.API_BASE}/instances/{instance_id}"
-        )
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        await self._make_request("DELETE", f"{self.API_BASE}/instances/{instance_id}")
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key:
@@ -308,15 +313,23 @@ class FluidStackProvider(BaseProvider):
                 }
 
             import subprocess
+
             ssh_cmd = [
-                "ssh", "-o", "StrictHostKeyChecking=accept-new",
-                "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                "-o", "ConnectTimeout=10",
-                f"root@{public_ip}", command,
+                "ssh",
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                "-o",
+                "ConnectTimeout=10",
+                f"root@{public_ip}",
+                command,
             ]
 
             if async_exec:
-                proc = subprocess.Popen(ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                proc = subprocess.Popen(
+                    ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
                 return {
                     "instance_id": instance_id,
                     "command": command,
@@ -326,7 +339,9 @@ class FluidStackProvider(BaseProvider):
                     "async": True,
                 }
 
-            result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                ssh_cmd, capture_output=True, text=True, timeout=300
+            )
             return {
                 "instance_id": instance_id,
                 "command": command,

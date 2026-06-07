@@ -13,6 +13,7 @@ import json
 # Rust connection pool integration
 try:
     from terradev_connection_pool import PyConnectionPool, PyConnectionConfig
+
     USE_RUST_POOL = True
 except ImportError:
     USE_RUST_POOL = False
@@ -91,6 +92,7 @@ class BaseProvider(ABC):
         if cls._rate_limiter is None:
             try:
                 from terradev_cli.core.rate_limiter import RateLimiter
+
                 cls._rate_limiter = RateLimiter()
             except Exception:
                 cls._rate_limiter = False  # sentinel: don't retry

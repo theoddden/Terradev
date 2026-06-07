@@ -15,12 +15,31 @@ from typing import Dict, List, Any, Optional, Tuple
 
 class ProvisionResult:
     """Result of a single provision attempt."""
-    __slots__ = ("provider", "region", "instance_id", "gpu_type", "price_hr",
-                 "spot", "status", "error", "elapsed_ms")
 
-    def __init__(self, provider: str, region: str, instance_id: str,
-                 gpu_type: str, price_hr: float, spot: bool,
-                 status: str, error: Optional[str], elapsed_ms: float):
+    __slots__ = (
+        "provider",
+        "region",
+        "instance_id",
+        "gpu_type",
+        "price_hr",
+        "spot",
+        "status",
+        "error",
+        "elapsed_ms",
+    )
+
+    def __init__(
+        self,
+        provider: str,
+        region: str,
+        instance_id: str,
+        gpu_type: str,
+        price_hr: float,
+        spot: bool,
+        status: str,
+        error: Optional[str],
+        elapsed_ms: float,
+    ):
         self.provider = provider
         self.region = region
         self.instance_id = instance_id
@@ -56,6 +75,7 @@ class ParallelProvisioner:
 
     def __init__(self):
         from terradev_cli.providers.provider_factory import ProviderFactory
+
         self.factory = ProviderFactory()
 
     async def _provision_one(
@@ -76,7 +96,10 @@ class ParallelProvisioner:
                 spot=spot,
             )
             elapsed = (time.monotonic() - t0) * 1000
-            instance_id = result.get("instance_id", f"{provider_name}_{int(time.time())}_{uuid.uuid4().hex[:6]}")
+            instance_id = result.get(
+                "instance_id",
+                f"{provider_name}_{int(time.time())}_{uuid.uuid4().hex[:6]}",
+            )
             return ProvisionResult(
                 provider=provider_name,
                 region=region,
@@ -119,7 +142,7 @@ class ParallelProvisioner:
         # Dynamic concurrency scaling - adaptive based on allocation size
         if max_concurrency is None:
             max_concurrency = min(50, max(6, len(allocations) * 2))
-        
+
         group_id = f"pg_{int(time.time())}_{uuid.uuid4().hex[:8]}"
         sem = asyncio.Semaphore(max_concurrency)
 
@@ -172,14 +195,16 @@ class ParallelProvisioner:
             if provider_counts.get(prov, 0) >= max_per_provider:
                 continue
             provider_counts[prov] = provider_counts.get(prov, 0) + 1
-            allocations.append({
-                "provider": prov,
-                "credentials": creds_map.get(prov, {}),
-                "gpu_type": q.get("gpu_type", "A100"),
-                "region": q.get("region", "us-east-1"),
-                "spot": q.get("availability") == "spot",
-                "price_hr": q.get("price", 0),
-            })
+            allocations.append(
+                {
+                    "provider": prov,
+                    "credentials": creds_map.get(prov, {}),
+                    "gpu_type": q.get("gpu_type", "A100"),
+                    "region": q.get("region", "us-east-1"),
+                    "spot": q.get("availability") == "spot",
+                    "price_hr": q.get("price", 0),
+                }
+            )
 
         # If we still need more, relax the per-provider cap
         if len(allocations) < count:
@@ -187,13 +212,15 @@ class ParallelProvisioner:
                 if len(allocations) >= count:
                     break
                 prov = q.get("provider", "").lower().replace(" ", "_")
-                allocations.append({
-                    "provider": prov,
-                    "credentials": creds_map.get(prov, {}),
-                    "gpu_type": q.get("gpu_type", "A100"),
-                    "region": q.get("region", "us-east-1"),
-                    "spot": q.get("availability") == "spot",
-                    "price_hr": q.get("price", 0),
-                })
+                allocations.append(
+                    {
+                        "provider": prov,
+                        "credentials": creds_map.get(prov, {}),
+                        "gpu_type": q.get("gpu_type", "A100"),
+                        "region": q.get("region", "us-east-1"),
+                        "spot": q.get("availability") == "spot",
+                        "price_hr": q.get("price", 0),
+                    }
+                )
 
         return allocations[:count]

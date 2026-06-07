@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 # Rust semantic router integration
 try:
     from terradev_semantic_router import SemanticRouter
+
     USE_RUST_ROUTER = True
     logger.info("Using Rust semantic router for 5-15x faster routing")
 except ImportError:
@@ -51,12 +52,13 @@ except ImportError:
 @dataclass
 class RoutingRule:
     """A single routing rule: condition -> action"""
+
     name: str
-    condition: str                          # Boolean expression over signals
-    route_to: Optional[str] = None          # Target model name/pattern
-    strategy: Optional[str] = None          # Fallback: 'latency', 'cost', 'score', 'numa'
-    priority: int = 0                       # Higher = evaluated first
-    numa_policy: Optional[str] = None       # 'strict' | 'prefer' | None
+    condition: str  # Boolean expression over signals
+    route_to: Optional[str] = None  # Target model name/pattern
+    strategy: Optional[str] = None  # Fallback: 'latency', 'cost', 'score', 'numa'
+    priority: int = 0  # Higher = evaluated first
+    numa_policy: Optional[str] = None  # 'strict' | 'prefer' | None
     tags: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -64,44 +66,47 @@ class RoutingRule:
 @dataclass
 class RoutingPolicy:
     """A complete routing policy — ordered list of rules + defaults"""
+
     name: str
     description: str = ""
     rules: List[RoutingRule] = field(default_factory=list)
-    default_strategy: str = "cost"          # fallback when no rule matches
+    default_strategy: str = "cost"  # fallback when no rule matches
     default_model: Optional[str] = None
-    default_numa_policy: str = "prefer"     # 'strict' | 'prefer' | 'none'
+    default_numa_policy: str = "prefer"  # 'strict' | 'prefer' | 'none'
     signals_config: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class NUMAScorecard:
     """NUMA topology score for an endpoint"""
+
     endpoint_id: str
     gpu_index: Optional[int] = None
     numa_node: Optional[int] = None
-    pcie_locality: Optional[str] = None     # PIX, PXB, PHB, SYS
-    locality_score: float = 0.0             # 0=PIX (best), 3=SYS (worst)
+    pcie_locality: Optional[str] = None  # PIX, PXB, PHB, SYS
+    locality_score: float = 0.0  # 0=PIX (best), 3=SYS (worst)
     has_rdma: bool = False
     nccl_optimal: bool = False
     # Intra-GPU NUMA (arXiv:2511.02132)
-    xcd_count: int = 0                      # 0 = unknown, 8 = MI300X
-    gpu_arch: str = ""                      # "mi300x", "h200", etc.
-    has_intra_gpu_numa: bool = False         # True if XCD count > 1
-    xcd_locality: Optional[str] = None      # same_xcd, adj_xcd, remote_xcd, unified
-    xcd_locality_score: float = 0.0         # 0=same_xcd (best), 2=remote_xcd (worst)
+    xcd_count: int = 0  # 0 = unknown, 8 = MI300X
+    gpu_arch: str = ""  # "mi300x", "h200", etc.
+    has_intra_gpu_numa: bool = False  # True if XCD count > 1
+    xcd_locality: Optional[str] = None  # same_xcd, adj_xcd, remote_xcd, unified
+    xcd_locality_score: float = 0.0  # 0=same_xcd (best), 2=remote_xcd (worst)
     metadata: Dict[str, Any] = field(default_factory=dict)  # Additional metadata
 
 
 @dataclass
 class RoutingDecision:
     """The output of the semantic router"""
-    matched_rule: Optional[str]             # Name of the matched rule, or None
-    route_to: Optional[str]                 # Target model name
-    strategy: Optional[str]                 # Routing strategy for InferenceRouter
-    signal_vector: Dict[str, Any]           # Flat signal dict for debugging
-    condition_evaluated: Optional[str]       # The condition that matched
+
+    matched_rule: Optional[str]  # Name of the matched rule, or None
+    route_to: Optional[str]  # Target model name
+    strategy: Optional[str]  # Routing strategy for InferenceRouter
+    signal_vector: Dict[str, Any]  # Flat signal dict for debugging
+    condition_evaluated: Optional[str]  # The condition that matched
     numa_score: Optional[NUMAScorecard] = None
-    latency_ms: float = 0.0                 # Total routing decision time
+    latency_ms: float = 0.0  # Total routing decision time
     confidence: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -110,9 +115,9 @@ class RoutingDecision:
 
 
 # Precompiled regex for Boolean keyword normalization (class-level, zero per-request cost)
-_RE_AND = re.compile(r'\bAND\b')
-_RE_OR = re.compile(r'\bOR\b')
-_RE_NOT = re.compile(r'\bNOT\b')
+_RE_AND = re.compile(r"\bAND\b")
+_RE_OR = re.compile(r"\bOR\b")
+_RE_NOT = re.compile(r"\bNOT\b")
 
 
 class PolicyExpressionEvaluator:
@@ -160,12 +165,12 @@ class PolicyExpressionEvaluator:
         """Pre-parse and cache an expression's AST. Call at init, not per-request."""
         if expression in self._ast_cache:
             return
-        normalized = _RE_AND.sub(' and ', expression)
-        normalized = _RE_OR.sub(' or ', normalized)
-        normalized = _RE_NOT.sub(' not ', normalized)
+        normalized = _RE_AND.sub(" and ", expression)
+        normalized = _RE_OR.sub(" or ", normalized)
+        normalized = _RE_NOT.sub(" not ", normalized)
         normalized = normalized.strip()
         try:
-            tree = ast.parse(normalized, mode='eval')
+            tree = ast.parse(normalized, mode="eval")
             self._ast_cache[expression] = tree.body
         except SyntaxError as e:
             logger.warning(f"Policy expression compile failed: '{expression}' — {e}")
@@ -228,7 +233,7 @@ class PolicyExpressionEvaluator:
             return True
 
         if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name) and node.func.id == 'len':
+            if isinstance(node.func, ast.Name) and node.func.id == "len":
                 arg = self._eval_node(node.args[0], ctx)
                 return len(arg) if arg is not None else 0
 
@@ -285,10 +290,10 @@ class NUMAEndpointScorer:
 
     # PCIe locality -> numeric score (lower is better)
     LOCALITY_SCORES = {
-        "PIX": 0.0,   # Same PCIe switch — optimal
-        "PXB": 1.0,   # Same root complex, different switch
-        "PHB": 2.0,   # Same NUMA node, different root complex
-        "SYS": 3.0,   # Cross-socket — worst
+        "PIX": 0.0,  # Same PCIe switch — optimal
+        "PXB": 1.0,  # Same root complex, different switch
+        "PHB": 2.0,  # Same NUMA node, different root complex
+        "SYS": 3.0,  # Cross-socket — worst
     }
 
     # Intra-GPU XCD locality -> numeric score (lower is better)
@@ -296,31 +301,31 @@ class NUMAEndpointScorer:
         "same_xcd": 0.0,
         "adj_xcd": 1.0,
         "remote_xcd": 2.0,
-        "unified": 0.0,   # no intra-GPU NUMA = no penalty
+        "unified": 0.0,  # no intra-GPU NUMA = no penalty
     }
 
     # CUDA Graph compatibility scores based on NUMA topology
     # Higher scores = better CUDA Graph performance
     CUDA_GRAPH_NUMA_SCORES = {
-        "PIX": 1.0,    # Same PCIe switch - optimal for graph replay
-        "PXB": 0.8,    # Same root complex - very good
-        "PHB": 0.6,    # Same NUMA node - good
-        "SYS": 0.3,    # Cross-socket - poor for graphs
+        "PIX": 1.0,  # Same PCIe switch - optimal for graph replay
+        "PXB": 0.8,  # Same root complex - very good
+        "PHB": 0.6,  # Same NUMA node - good
+        "SYS": 0.3,  # Cross-socket - poor for graphs
     }
 
     # Intra-GPU NUMA impact on CUDA Graphs
     XCD_CUDA_GRAPH_PENALTIES = {
-        "same_xcd": 0.0,     # No penalty - optimal
-        "adj_xcd": 0.1,      # Minor penalty
-        "remote_xcd": 0.3,    # Significant penalty
-        "unified": 0.0,      # No intra-GPU NUMA = no penalty
+        "same_xcd": 0.0,  # No penalty - optimal
+        "adj_xcd": 0.1,  # Minor penalty
+        "remote_xcd": 0.3,  # Significant penalty
+        "unified": 0.0,  # No intra-GPU NUMA = no penalty
     }
 
     def __init__(self, topology_report: Optional[Dict[str, Any]] = None):
         self._topology = topology_report
-        self._gpu_numa_map: Dict[int, int] = {}       # gpu_index -> numa_node
-        self._gpu_locality_map: Dict[int, str] = {}    # gpu_index -> best locality
-        self._gpu_rdma_map: Dict[int, bool] = {}       # gpu_index -> has_rdma_pair
+        self._gpu_numa_map: Dict[int, int] = {}  # gpu_index -> numa_node
+        self._gpu_locality_map: Dict[int, str] = {}  # gpu_index -> best locality
+        self._gpu_rdma_map: Dict[int, bool] = {}  # gpu_index -> has_rdma_pair
         self._gpu_xcd_map: Dict[int, Dict[str, Any]] = {}  # gpu_index -> xcd info
         if topology_report:
             self._build_maps(topology_report)
@@ -359,6 +364,7 @@ class NUMAEndpointScorer:
         # Try to auto-detect from GPU name in topology report
         try:
             from .gpu_topology import build_intra_gpu_topology, GPUDevice
+
             for pair in (self._topology or {}).get("pairs", []):
                 gpu_str = pair.get("gpu", "")
                 try:
@@ -369,9 +375,12 @@ class NUMAEndpointScorer:
                     # Extract GPU name
                     name_part = gpu_str.split("(", 1)[-1].rstrip(")")
                     dummy_gpu = GPUDevice(
-                        index=idx, name=name_part, pci_bus_id="",
+                        index=idx,
+                        name=name_part,
+                        pci_bus_id="",
                         numa_node=self._gpu_numa_map.get(idx, 0),
-                        pcie_root="", pcie_switch="",
+                        pcie_root="",
+                        pcie_switch="",
                     )
                     topo = build_intra_gpu_topology(dummy_gpu)
                     info = {
@@ -400,7 +409,7 @@ class NUMAEndpointScorer:
         1. NUMA topology (GPU/NIC alignment)
         2. Intra-GPU NUMA (XCD locality for MI300X)
         3. Model type (MoE models have special CUDA Graph challenges)
-        
+
         CUDA Graph scoring happens automatically - no user intervention required.
         """
         if gpu_index is not None and gpu_index in self._gpu_locality_map:
@@ -412,12 +421,12 @@ class NUMAEndpointScorer:
             gpu_arch = xcd_info.get("gpu_arch", "")
             has_intra = xcd_info.get("has_intra_numa", False)
             xcd_loc = "unified" if not has_intra else "same_xcd"  # best-case default
-            
+
             # CUDA Graph optimization scoring (passive, automatic)
             cuda_graph_score = self._calculate_cuda_graph_score(
                 gpu_index, locality, xcd_loc, model_type
             )
-            
+
             # Enhanced NUMA scorecard with CUDA Graph metrics
             scorecard = NUMAScorecard(
                 endpoint_id=endpoint_id,
@@ -433,27 +442,33 @@ class NUMAEndpointScorer:
                 xcd_locality=xcd_loc,
                 xcd_locality_score=self.XCD_LOCALITY_SCORES.get(xcd_loc, 2.0),
             )
-            
+
             # Add CUDA Graph optimization metadata
-            scorecard.metadata.update({
-                "cuda_graph_score": cuda_graph_score,
-                "cuda_graph_recommended": cuda_graph_score > 0.7,
-                "numa_optimal_for_graphs": locality in ("PIX", "PXB"),
-                "xcd_optimal_for_graphs": xcd_loc in ("same_xcd", "unified"),
-                "model_type": model_type,
-                "graph_optimization_potential": self._estimate_graph_potential(cuda_graph_score, model_type),
-            })
-            
+            scorecard.metadata.update(
+                {
+                    "cuda_graph_score": cuda_graph_score,
+                    "cuda_graph_recommended": cuda_graph_score > 0.7,
+                    "numa_optimal_for_graphs": locality in ("PIX", "PXB"),
+                    "xcd_optimal_for_graphs": xcd_loc in ("same_xcd", "unified"),
+                    "model_type": model_type,
+                    "graph_optimization_potential": self._estimate_graph_potential(
+                        cuda_graph_score, model_type
+                    ),
+                }
+            )
+
             return scorecard
-        
+
         # Handle numa_node fallback: try to find a GPU on the specified NUMA node
         if gpu_index is None and numa_node is not None:
             # Find the first GPU on the specified NUMA node
             for gpu_idx, gpu_numa in self._gpu_numa_map.items():
                 if gpu_numa == numa_node:
                     # Found a GPU on this NUMA node, recurse with this gpu_index
-                    return self.score_endpoint(endpoint_id, gpu_idx, numa_node, model_type)
-        
+                    return self.score_endpoint(
+                        endpoint_id, gpu_idx, numa_node, model_type
+                    )
+
         # Fallback for unknown GPU index - use neutral score instead of worst
         return NUMAScorecard(
             endpoint_id=endpoint_id,
@@ -471,24 +486,24 @@ class NUMAEndpointScorer:
         )
 
     def _calculate_cuda_graph_score(
-        self, 
-        gpu_index: int, 
-        locality: str, 
-        xcd_locality: str, 
-        model_type: Optional[str]
+        self,
+        gpu_index: int,
+        locality: str,
+        xcd_locality: str,
+        model_type: Optional[str],
     ) -> float:
         """
         Calculate CUDA Graph optimization score (0.0-1.0) for this GPU topology.
-        
+
         Higher scores = better CUDA Graph performance potential.
         This is called automatically during endpoint scoring.
         """
         # Base score from NUMA topology
         numa_score = self.CUDA_GRAPH_NUMA_SCORES.get(locality, 0.3)
-        
+
         # Penalty for intra-GPU NUMA fragmentation
         xcd_penalty = self.XCD_CUDA_GRAPH_PENALTIES.get(xcd_locality, 0.0)
-        
+
         # Model-specific considerations
         model_penalty = 0.0
         if model_type:
@@ -501,15 +516,17 @@ class NUMAEndpointScorer:
             elif model_type.lower() in ["cnn", "vision"]:
                 # CNNs benefit but less than transformers
                 model_penalty = 0.1
-        
+
         # RDMA bonus - improves graph replay performance
         rdma_bonus = 0.1 if self._gpu_rdma_map.get(gpu_index, False) else 0.0
-        
+
         # Calculate final score
         final_score = numa_score - xcd_penalty - model_penalty + rdma_bonus
         return max(0.0, min(1.0, final_score))
-    
-    def _estimate_graph_potential(self, cuda_graph_score: float, model_type: Optional[str]) -> str:
+
+    def _estimate_graph_potential(
+        self, cuda_graph_score: float, model_type: Optional[str]
+    ) -> str:
         """
         Estimate the performance improvement potential from CUDA Graph optimization.
         """
@@ -549,9 +566,9 @@ class NUMAEndpointScorer:
             scored.append((eid, card))
 
         # Combined score: 80% node-level locality + 20% XCD locality
-        scored.sort(key=lambda x: (
-            0.8 * x[1].locality_score + 0.2 * x[1].xcd_locality_score
-        ))
+        scored.sort(
+            key=lambda x: (0.8 * x[1].locality_score + 0.2 * x[1].xcd_locality_score)
+        )
         return scored
 
 
@@ -562,16 +579,18 @@ def load_policy_from_dict(data: Dict[str, Any]) -> RoutingPolicy:
     """Load a RoutingPolicy from a parsed YAML/JSON dict"""
     rules = []
     for i, rule_data in enumerate(data.get("rules", [])):
-        rules.append(RoutingRule(
-            name=rule_data.get("name", f"rule_{i}"),
-            condition=rule_data["when"],
-            route_to=rule_data.get("route_to"),
-            strategy=rule_data.get("strategy"),
-            priority=rule_data.get("priority", len(data.get("rules", [])) - i),
-            numa_policy=rule_data.get("numa_policy"),
-            tags=rule_data.get("tags", []),
-            metadata=rule_data.get("metadata", {}),
-        ))
+        rules.append(
+            RoutingRule(
+                name=rule_data.get("name", f"rule_{i}"),
+                condition=rule_data["when"],
+                route_to=rule_data.get("route_to"),
+                strategy=rule_data.get("strategy"),
+                priority=rule_data.get("priority", len(data.get("rules", [])) - i),
+                numa_policy=rule_data.get("numa_policy"),
+                tags=rule_data.get("tags", []),
+                metadata=rule_data.get("metadata", {}),
+            )
+        )
 
     rules.sort(key=lambda r: r.priority, reverse=True)
 
@@ -593,23 +612,23 @@ def load_policy_from_yaml(path: str) -> RoutingPolicy:
     except ImportError:
         raise ImportError("PyYAML required for YAML policy files: pip install pyyaml")
 
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         data = yaml.safe_load(f)
     return load_policy_from_dict(data)
 
 
 def load_policy_from_json(path: str) -> RoutingPolicy:
     """Load a RoutingPolicy from a JSON file"""
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         data = json.load(f)
     return load_policy_from_dict(data)
 
 
 def load_policy(path: str) -> RoutingPolicy:
     """Auto-detect format and load policy"""
-    if path.endswith(('.yaml', '.yml')):
+    if path.endswith((".yaml", ".yml")):
         return load_policy_from_yaml(path)
-    elif path.endswith('.json'):
+    elif path.endswith(".json"):
         return load_policy_from_json(path)
     else:
         try:
@@ -912,7 +931,9 @@ class SemanticRouter:
                 route_to = matched_rule.route_to
                 strategy = matched_rule.strategy or self._policy.default_strategy
                 condition = matched_rule.condition
-                numa_policy = matched_rule.numa_policy or self._policy.default_numa_policy
+                numa_policy = (
+                    matched_rule.numa_policy or self._policy.default_numa_policy
+                )
             else:
                 route_to = self._policy.default_model
                 strategy = self._policy.default_strategy
@@ -940,23 +961,25 @@ class SemanticRouter:
             confidences = [r.confidence for r in signal_vector.signals.values()]
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
 
-            decisions.append(RoutingDecision(
-                matched_rule=matched_rule.name if matched_rule else None,
-                route_to=route_to,
-                strategy=strategy,
-                signal_vector=flat_signals,
-                condition_evaluated=condition,
-                numa_score=numa_score,
-                latency_ms=round(elapsed_ms, 3),
-                confidence=round(avg_confidence, 3),
-                metadata={
-                    "signal_summary": signal_vector.summary(),
-                    "signal_latency_ms": round(signal_vector.total_latency_ms, 3),
-                    "numa_policy": numa_policy,
-                    "policy_name": self._policy.name,
-                    "batch": True,
-                },
-            ))
+            decisions.append(
+                RoutingDecision(
+                    matched_rule=matched_rule.name if matched_rule else None,
+                    route_to=route_to,
+                    strategy=strategy,
+                    signal_vector=flat_signals,
+                    condition_evaluated=condition,
+                    numa_score=numa_score,
+                    latency_ms=round(elapsed_ms, 3),
+                    confidence=round(avg_confidence, 3),
+                    metadata={
+                        "signal_summary": signal_vector.summary(),
+                        "signal_latency_ms": round(signal_vector.total_latency_ms, 3),
+                        "numa_policy": numa_policy,
+                        "policy_name": self._policy.name,
+                        "batch": True,
+                    },
+                )
+            )
 
         total_ms = (time.perf_counter() - start) * 1000
         logger.debug(
@@ -1011,7 +1034,8 @@ class SemanticRouter:
         if numa_policy == "strict":
             # Only return PIX or PXB endpoints
             strict_candidates = [
-                (ep, card) for ep, card in scored
+                (ep, card)
+                for ep, card in scored
                 if card.pcie_locality in ("PIX", "PXB") or card.locality_score <= 1.0
             ]
             if strict_candidates:
@@ -1026,12 +1050,12 @@ class SemanticRouter:
         # 'prefer' policy: weight NUMA score into combined scoring
         # Combined score: 50% NUMA, 30% latency, 20% cost
         if len(scored) > 1:
-            max_latency = max(
-                (ep.get("avg_latency_ms", 0) for ep, _ in scored), default=1
-            ) or 1
-            max_price = max(
-                (ep.get("price_per_hour", 0) for ep, _ in scored), default=1
-            ) or 1
+            max_latency = (
+                max((ep.get("avg_latency_ms", 0) for ep, _ in scored), default=1) or 1
+            )
+            max_price = (
+                max((ep.get("price_per_hour", 0) for ep, _ in scored), default=1) or 1
+            )
 
             def combined_score(ep: Dict, card: NUMAScorecard) -> float:
                 numa_norm = card.locality_score / 3.0  # 0-1
@@ -1050,9 +1074,7 @@ class SemanticRouter:
 
     # ── NCCL Environment Generation ──────────────────────────────────────
 
-    def get_nccl_env_for_decision(
-        self, decision: RoutingDecision
-    ) -> Dict[str, str]:
+    def get_nccl_env_for_decision(self, decision: RoutingDecision) -> Dict[str, str]:
         """
         Generate NCCL environment variables optimized for the NUMA topology
         of the routed endpoint. Integrates with RDMAConfigurator.generate_nccl_env().
@@ -1071,7 +1093,10 @@ class SemanticRouter:
             env["NCCL_NET_GDR_READ"] = "1"
             env["NCCL_IB_DISABLE"] = "0"
             import tempfile
-            env["NCCL_TOPO_DUMP_FILE"] = tempfile.mktemp(prefix="nccl_topo_", suffix=".xml")
+
+            env["NCCL_TOPO_DUMP_FILE"] = tempfile.mktemp(
+                prefix="nccl_topo_", suffix=".xml"
+            )
         elif card.pcie_locality == "PXB":
             env["NCCL_NET_GDR_LEVEL"] = "PXB"
             env["NCCL_P2P_LEVEL"] = "PXB"

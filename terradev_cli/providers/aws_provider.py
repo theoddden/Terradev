@@ -40,11 +40,15 @@ class AWSProvider(BaseProvider):
         self.name = "aws"
         self._spot_monitors: Dict[str, threading.Thread] = {}
         self._spot_stop_events: Dict[str, threading.Event] = {}
-        self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="aws-spot")
+        self._executor = ThreadPoolExecutor(
+            max_workers=4, thread_name_prefix="aws-spot"
+        )
 
         if boto3 is None:
-            logger.warning("boto3 not installed — AWS provider unavailable. "
-                           "Install with: pip install boto3")
+            logger.warning(
+                "boto3 not installed — AWS provider unavailable. "
+                "Install with: pip install boto3"
+            )
             self.ec2_client = None
             self.ec2_resource = None
             return
@@ -256,7 +260,7 @@ class AWSProvider(BaseProvider):
 
             instance = response["Instances"][0]
             instance_id = instance["InstanceId"]
-            
+
             # CRITICAL: Start spot interruption monitoring for spot instances
             is_spot = self._should_use_spot(instance_type)
             if is_spot:
@@ -356,7 +360,7 @@ class AWSProvider(BaseProvider):
             await self._run_in_executor(
                 self.ec2_client.terminate_instances, InstanceIds=[instance_id]
             )
-            
+
             # CRITICAL: Stop spot interruption monitoring
             self._stop_spot_monitoring(instance_id)
 
@@ -445,6 +449,7 @@ class AWSProvider(BaseProvider):
 
             # Wait for command to complete
             import time
+
             for _ in range(60):
                 time.sleep(2)
                 result = await self._run_in_executor(
@@ -478,14 +483,22 @@ class AWSProvider(BaseProvider):
                 public_ip = status.get("public_ip")
                 if public_ip:
                     import subprocess
+
                     ssh_cmd = [
-                        "ssh", "-o", "StrictHostKeyChecking=accept-new",
-                        "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                        "-o", "ConnectTimeout=10",
-                        f"ec2-user@{public_ip}", command,
+                        "ssh",
+                        "-o",
+                        "StrictHostKeyChecking=accept-new",
+                        "-o",
+                        f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                        "-o",
+                        "ConnectTimeout=10",
+                        f"ec2-user@{public_ip}",
+                        command,
                     ]
                     if async_exec:
-                        proc = subprocess.Popen(ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        proc = subprocess.Popen(
+                            ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                        )
                         return {
                             "instance_id": instance_id,
                             "command": command,
@@ -494,7 +507,9 @@ class AWSProvider(BaseProvider):
                             "output": f"Async SSH started (PID: {proc.pid})",
                             "async": True,
                         }
-                    result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=300)
+                    result = subprocess.run(
+                        ssh_cmd, capture_output=True, text=True, timeout=300
+                    )
                     return {
                         "instance_id": instance_id,
                         "command": command,
@@ -572,16 +587,18 @@ class AWSProvider(BaseProvider):
         """Run blocking function in executor"""
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, func, *args)
-    
-    def _detect_p5_nccl_degradation(self, instance_type: str) -> Optional[Dict[str, Any]]:
+
+    def _detect_p5_nccl_degradation(
+        self, instance_type: str
+    ) -> Optional[Dict[str, Any]]:
         """CRITICAL: Detect P5.4xlarge NCCL+EFA degradation issue
-        
+
         Known compatibility issue: P5.4xlarge instances silently degrade
         when GPU-to-GPU communication uses EFA and NCCL simultaneously.
         """
         if instance_type != "p5.4xlarge":
             return None
-        
+
         return {
             "issue": "P5.4xlarge NCCL+EFA degradation",
             "description": "Silent performance degradation when using EFA and NCCL simultaneously",
@@ -595,43 +612,48 @@ class AWSProvider(BaseProvider):
             "severity": "HIGH",
             "auto_patch_available": True,
         }
-    
+
     def _start_spot_monitoring(self, instance_id: str, region: str):
         """CRITICAL: Start monitoring spot instance for interruption warnings
-        
+
         AWS gives 2-minute warning before spot termination.
         Monitor metadata endpoint for graceful checkpointing.
         """
         if instance_id in self._spot_monitors:
             return  # Already monitoring
-        
+
         stop_event = threading.Event()
         self._spot_stop_events[instance_id] = stop_event
-        
+
         def monitor_spot_interruption():
             import urllib.request
             import urllib.error
-            
-            metadata_url = "http://169.254.169.254/latest/meta-data/spot/termination-time"
-            
+
+            metadata_url = (
+                "http://169.254.169.254/latest/meta-data/spot/termination-time"
+            )
+
             while not stop_event.is_set():
                 try:
                     # Check termination notice
                     req = urllib.request.Request(
-                        metadata_url,
-                        headers={"Metadata": "true"}
+                        metadata_url, headers={"Metadata": "true"}
                     )
-                    
+
                     with urllib.request.urlopen(req, timeout=5) as response:
-                        termination_time = response.read().decode('utf-8')
-                        
+                        termination_time = response.read().decode("utf-8")
+
                         if termination_time:
-                            logger.warning(f"SPOT INTERRUPTION WARNING: {instance_id} terminates at {termination_time}")
-                            
+                            logger.warning(
+                                f"SPOT INTERRUPTION WARNING: {instance_id} terminates at {termination_time}"
+                            )
+
                             # Trigger graceful shutdown
-                            self._handle_spot_interruption(instance_id, termination_time)
+                            self._handle_spot_interruption(
+                                instance_id, termination_time
+                            )
                             break
-                
+
                 except urllib.error.HTTPError as e:
                     if e.code == 404:
                         # No termination notice, continue monitoring
@@ -640,44 +662,49 @@ class AWSProvider(BaseProvider):
                         logger.debug(f"Spot metadata error: {e}")
                 except Exception as e:
                     logger.debug(f"Spot monitoring error: {e}")
-                
+
                 # Check every 10 seconds
                 stop_event.wait(10.0)
-        
+
         monitor_thread = threading.Thread(
             target=monitor_spot_interruption,
             name=f"spot-monitor-{instance_id}",
-            daemon=True
+            daemon=True,
         )
-        
+
         self._spot_monitors[instance_id] = monitor_thread
         monitor_thread.start()
-        
+
         logger.info(f"Started spot interruption monitoring for {instance_id}")
-    
+
     def _stop_spot_monitoring(self, instance_id: str):
         """Stop spot interruption monitoring"""
         if instance_id in self._spot_stop_events:
             self._spot_stop_events[instance_id].set()
             del self._spot_stop_events[instance_id]
-        
+
         if instance_id in self._spot_monitors:
             monitor_thread = self._spot_monitors[instance_id]
             if monitor_thread.is_alive():
                 monitor_thread.join(timeout=5.0)
             del self._spot_monitors[instance_id]
-        
+
         logger.info(f"Stopped spot interruption monitoring for {instance_id}")
-    
+
     def _handle_spot_interruption(self, instance_id: str, termination_time: str):
         """Handle spot interruption — signal checkpoint, mark job preempted."""
-        logger.error(f"SPOT TERMINATION: {instance_id} terminating at {termination_time}")
+        logger.error(
+            f"SPOT TERMINATION: {instance_id} terminating at {termination_time}"
+        )
 
         time_remaining_s = 120  # AWS default 2-minute warning
         try:
             from datetime import datetime
-            term_dt = datetime.fromisoformat(termination_time.replace('Z', '+00:00'))
-            time_remaining_s = max(0, (term_dt - datetime.now(term_dt.tzinfo)).total_seconds())
+
+            term_dt = datetime.fromisoformat(termination_time.replace("Z", "+00:00"))
+            time_remaining_s = max(
+                0, (term_dt - datetime.now(term_dt.tzinfo)).total_seconds()
+            )
             logger.warning(f"Time remaining: {time_remaining_s:.0f}s")
         except Exception:
             pass
@@ -689,12 +716,14 @@ class AWSProvider(BaseProvider):
         # This SSH signal is a best-effort secondary path for redundancy.
         try:
             from core.job_state_manager import JobStateManager, JobStatus
+
             state_mgr = JobStateManager()
             running_jobs = state_mgr.list_jobs(status=JobStatus.RUNNING.value)
             matched_jobs = [
-                j for j in running_jobs
-                if instance_id in (j.nodes or []) or
-                   instance_id in j.config.get("instance_ids", [])
+                j
+                for j in running_jobs
+                if instance_id in (j.nodes or [])
+                or instance_id in j.config.get("instance_ids", [])
             ]
 
             for job in matched_jobs:
@@ -704,26 +733,42 @@ class AWSProvider(BaseProvider):
                 ssh_signaled = False
                 try:
                     from core.training_orchestrator import _run_on
-                    host = instance_id if instance_id not in ("localhost", "127.0.0.1") else None
+
+                    host = (
+                        instance_id
+                        if instance_id not in ("localhost", "127.0.0.1")
+                        else None
+                    )
                     rc, _, _ = _run_on(
                         host,
                         "pkill -SIGUSR1 -f 'torchrun|deepspeed|accelerate' 2>/dev/null || true",
-                        ssh_user, ssh_key, timeout=10,
+                        ssh_user,
+                        ssh_key,
+                        timeout=10,
                     )
                     ssh_signaled = rc == 0
                     if ssh_signaled:
-                        logger.info(f"SSH SIGUSR1 sent to {instance_id} for job {job.id}")
+                        logger.info(
+                            f"SSH SIGUSR1 sent to {instance_id} for job {job.id}"
+                        )
                 except Exception as sig_err:
-                    logger.warning(f"SSH signal failed on {instance_id} (sidecar is primary defense): {sig_err}")
+                    logger.warning(
+                        f"SSH signal failed on {instance_id} (sidecar is primary defense): {sig_err}"
+                    )
 
                 # 2. Mark job as PREEMPTED (distinguishes from user-initiated stop)
-                signal_note = "SSH+sidecar" if ssh_signaled else "sidecar only (SSH unreachable)"
-                state_mgr.update_job_status(
-                    job.id, JobStatus.PREEMPTED,
-                    error_message=f"Spot preemption on {instance_id}, termination at {termination_time}, "
-                                  f"{time_remaining_s:.0f}s warning. Checkpoint signal: {signal_note}."
+                signal_note = (
+                    "SSH+sidecar" if ssh_signaled else "sidecar only (SSH unreachable)"
                 )
-                logger.warning(f"Job {job.id} marked PREEMPTED (spot termination of {instance_id})")
+                state_mgr.update_job_status(
+                    job.id,
+                    JobStatus.PREEMPTED,
+                    error_message=f"Spot preemption on {instance_id}, termination at {termination_time}, "
+                    f"{time_remaining_s:.0f}s warning. Checkpoint signal: {signal_note}.",
+                )
+                logger.warning(
+                    f"Job {job.id} marked PREEMPTED (spot termination of {instance_id})"
+                )
 
         except Exception as e:
             logger.error(f"Failed to handle spot preemption for running jobs: {e}")

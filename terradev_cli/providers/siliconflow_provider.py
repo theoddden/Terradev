@@ -199,7 +199,10 @@ class SiliconFlowProvider(BaseProvider):
             # Fallback: SiliconFlow may use a different deployment path
             data = {"id": f"sf-deploy-{datetime.now().strftime('%Y%m%d%H%M%S')}"}
 
-        deployment_id = data.get("id", data.get("deployment_id", f"sf-{datetime.now().strftime('%Y%m%d%H%M%S')}"))
+        deployment_id = data.get(
+            "id",
+            data.get("deployment_id", f"sf-{datetime.now().strftime('%Y%m%d%H%M%S')}"),
+        )
 
         return {
             "instance_id": deployment_id,
@@ -252,7 +255,8 @@ class SiliconFlowProvider(BaseProvider):
         except Exception:
             # May use scale-to-zero instead
             await self._make_request(
-                "PATCH", f"{self.api_base}/deployments/{instance_id}",
+                "PATCH",
+                f"{self.api_base}/deployments/{instance_id}",
                 json={"replicas": 0},
             )
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
@@ -266,7 +270,8 @@ class SiliconFlowProvider(BaseProvider):
             )
         except Exception:
             await self._make_request(
-                "PATCH", f"{self.api_base}/deployments/{instance_id}",
+                "PATCH",
+                f"{self.api_base}/deployments/{instance_id}",
                 json={"replicas": 1},
             )
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
@@ -274,10 +279,12 @@ class SiliconFlowProvider(BaseProvider):
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("SiliconFlow API key not configured")
-        await self._make_request(
-            "DELETE", f"{self.api_base}/deployments/{instance_id}"
-        )
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        await self._make_request("DELETE", f"{self.api_base}/deployments/{instance_id}")
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key:

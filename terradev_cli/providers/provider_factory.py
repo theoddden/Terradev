@@ -20,36 +20,38 @@ def _lazy_import(module_attr: str):
 
     def _load():
         import importlib
+
         mod = importlib.import_module(module_path, package=__package__)
         return getattr(mod, class_name)
+
     return _load
 
 
 # Registry of provider name → lazy loader.  The actual import only fires
 # when ProviderFactory.create_provider() is called for that specific name.
 _PROVIDER_LOADERS = {
-    "aws":          _lazy_import(".aws_provider.AWSProvider"),
-    "gcp":          _lazy_import(".gcp_provider.GCPProvider"),
-    "azure":        _lazy_import(".azure_provider.AzureProvider"),
-    "runpod":       _lazy_import(".runpod_provider.RunPodProvider"),
-    "vastai":       _lazy_import(".vastai_provider.VastAIProvider"),
-    "lambda":       _lazy_import(".lambda_labs_provider.LambdaLabsProvider"),
-    "coreweave":    _lazy_import(".coreweave_provider.CoreWeaveProvider"),
-    "tensordock":   _lazy_import(".tensordock_provider.TensorDockProvider"),
-    "huggingface":  _lazy_import(".huggingface_provider.HuggingFaceProvider"),
-    "baseten":      _lazy_import(".baseten_provider.BasetenProvider"),
-    "oracle":       _lazy_import(".oracle_provider.OracleProvider"),
-    "crusoe":       _lazy_import(".crusoe_provider.CrusoeProvider"),
-    "hyperstack":   _lazy_import(".hyperstack_provider.HyperstackProvider"),
+    "aws": _lazy_import(".aws_provider.AWSProvider"),
+    "gcp": _lazy_import(".gcp_provider.GCPProvider"),
+    "azure": _lazy_import(".azure_provider.AzureProvider"),
+    "runpod": _lazy_import(".runpod_provider.RunPodProvider"),
+    "vastai": _lazy_import(".vastai_provider.VastAIProvider"),
+    "lambda": _lazy_import(".lambda_labs_provider.LambdaLabsProvider"),
+    "coreweave": _lazy_import(".coreweave_provider.CoreWeaveProvider"),
+    "tensordock": _lazy_import(".tensordock_provider.TensorDockProvider"),
+    "huggingface": _lazy_import(".huggingface_provider.HuggingFaceProvider"),
+    "baseten": _lazy_import(".baseten_provider.BasetenProvider"),
+    "oracle": _lazy_import(".oracle_provider.OracleProvider"),
+    "crusoe": _lazy_import(".crusoe_provider.CrusoeProvider"),
+    "hyperstack": _lazy_import(".hyperstack_provider.HyperstackProvider"),
     "digitalocean": _lazy_import(".digitalocean_provider.DigitalOceanProvider"),
-    "alibaba":      _lazy_import(".alibaba_provider.AlibabaProvider"),
-    "ovhcloud":     _lazy_import(".ovhcloud_provider.OVHcloudProvider"),
-    "fluidstack":   _lazy_import(".fluidstack_provider.FluidStackProvider"),
-    "hetzner":      _lazy_import(".hetzner_provider.HetznerProvider"),
-    "siliconflow":  _lazy_import(".siliconflow_provider.SiliconFlowProvider"),
-    "inferx":       _lazy_import(".inferx_provider.InferXProvider"),
-    "latitude":     _lazy_import(".latitude_provider.LatitudeProvider"),
-    "demo":         _lazy_import(".demo_mode.DemoModeProvider"),
+    "alibaba": _lazy_import(".alibaba_provider.AlibabaProvider"),
+    "ovhcloud": _lazy_import(".ovhcloud_provider.OVHcloudProvider"),
+    "fluidstack": _lazy_import(".fluidstack_provider.FluidStackProvider"),
+    "hetzner": _lazy_import(".hetzner_provider.HetznerProvider"),
+    "siliconflow": _lazy_import(".siliconflow_provider.SiliconFlowProvider"),
+    "inferx": _lazy_import(".inferx_provider.InferXProvider"),
+    "latitude": _lazy_import(".latitude_provider.LatitudeProvider"),
+    "demo": _lazy_import(".demo_mode.DemoModeProvider"),
 }
 
 

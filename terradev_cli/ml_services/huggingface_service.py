@@ -16,6 +16,7 @@ from datetime import datetime
 @dataclass
 class HuggingFaceConfig:
     """Hugging Face configuration"""
+
     api_key: str
     namespace: Optional[str] = None
     organization: Optional[str] = None
@@ -24,32 +25,34 @@ class HuggingFaceConfig:
 
 class HuggingFaceService:
     """Hugging Face integration service for models, datasets, and inference"""
-    
+
     def __init__(self, config: HuggingFaceConfig):
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
         self.api_base = "https://api.endpoints.huggingface.cloud/v2"
         self.hub_api = "https://huggingface.co/api"
-        
+
     async def __aenter__(self):
         headers = {"Authorization": f"Bearer {self.config.api_key}"}
         self.session = aiohttp.ClientSession(headers=headers)
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
-    
+
     async def test_connection(self) -> Dict[str, Any]:
         """Test Hugging Face connection and get user info"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             # Test Hub API access
             url = f"{self.hub_api}/whoami"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with self.session.get(
+                url, timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
                 if response.status == 200:
                     user_data = await response.json()
                     return {
@@ -57,109 +60,122 @@ class HuggingFaceService:
                         "namespace": self.config.namespace or user_data.get("name"),
                         "organization": self.config.organization,
                         "endpoint_url": self.config.endpoint_url,
-                        "user": user_data
+                        "user": user_data,
                     }
                 else:
                     error_text = await response.text()
                     return {
                         "status": "failed",
-                        "error": f"API request failed: {response.status} - {error_text}"
+                        "error": f"API request failed: {response.status} - {error_text}",
                     }
-                    
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
-    async def list_models(self, author: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+            return {"status": "failed", "error": str(e)}
+
+    async def list_models(
+        self, author: Optional[str] = None, limit: int = 50
+    ) -> List[Dict[str, Any]]:
         """List Hugging Face models"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             params = {"limit": limit}
             if author:
                 params["author"] = author
             elif self.config.organization:
                 params["author"] = self.config.organization
-            
+
             url = f"{self.hub_api}/models"
-            async with self.session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            async with self.session.get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 if response.status == 200:
                     data = await response.json()
                     return data
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to list models: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to list models: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to list models: {e}")
-    
-    async def list_datasets(self, author: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+
+    async def list_datasets(
+        self, author: Optional[str] = None, limit: int = 50
+    ) -> List[Dict[str, Any]]:
         """List Hugging Face datasets"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             params = {"limit": limit}
             if author:
                 params["author"] = author
             elif self.config.organization:
                 params["author"] = self.config.organization
-            
+
             url = f"{self.hub_api}/datasets"
-            async with self.session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            async with self.session.get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 if response.status == 200:
                     data = await response.json()
                     return data
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to list datasets: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to list datasets: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to list datasets: {e}")
-    
+
     async def get_model_info(self, model_id: str) -> Dict[str, Any]:
         """Get detailed information about a model"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             url = f"{self.hub_api}/models/{model_id}"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            async with self.session.get(
+                url, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 if response.status == 200:
                     return await response.json()
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to get model info: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to get model info: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to get model info for {model_id}: {e}")
-    
+
     async def create_inference_endpoint(
         self,
         model_id: str,
         endpoint_name: str,
         instance_type: str = "gpu-medium-a10g",
-        scaling_config: Optional[Dict[str, Any]] = None
+        scaling_config: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Create a Hugging Face inference endpoint"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             namespace = self.config.namespace or self.config.organization
             if not namespace:
                 raise Exception("Namespace or organization must be configured")
-            
+
             # Default scaling config
             scaling = scaling_config or {"minReplica": 1, "maxReplica": 1}
-            
+
             payload = {
                 "name": endpoint_name,
                 "type": "protected",
@@ -167,174 +183,191 @@ class HuggingFaceService:
                     "accelerator": "gpu",
                     "instanceType": instance_type,
                     "instanceSize": "x1",
-                    "scaling": scaling
+                    "scaling": scaling,
                 },
                 "model": {
                     "framework": "pytorch",
                     "image": {"huggingface": {}},
                     "repository": model_id,
                 },
-                "provider": {
-                    "region": "us-east-1",
-                    "vendor": "aws"
-                }
+                "provider": {"region": "us-east-1", "vendor": "aws"},
             }
-            
+
             url = f"{self.api_base}/endpoint/{namespace}"
-            async with self.session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=60)) as response:
+            async with self.session.post(
+                url, json=payload, timeout=aiohttp.ClientTimeout(total=60)
+            ) as response:
                 if response.status == 200 or response.status == 201:
                     return await response.json()
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to create endpoint: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to create endpoint: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to create inference endpoint: {e}")
-    
+
     async def list_inference_endpoints(self) -> List[Dict[str, Any]]:
         """List all inference endpoints"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             namespace = self.config.namespace or self.config.organization
             if not namespace:
                 raise Exception("Namespace or organization must be configured")
-            
+
             url = f"{self.api_base}/endpoint/{namespace}"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            async with self.session.get(
+                url, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 if response.status == 200:
                     return await response.json()
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to list endpoints: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to list endpoints: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to list inference endpoints: {e}")
-    
+
     async def get_inference_endpoint(self, endpoint_name: str) -> Dict[str, Any]:
         """Get information about a specific inference endpoint"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             namespace = self.config.namespace or self.config.organization
             if not namespace:
                 raise Exception("Namespace or organization must be configured")
-            
+
             url = f"{self.api_base}/endpoint/{namespace}/{endpoint_name}"
-            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            async with self.session.get(
+                url, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 if response.status == 200:
                     return await response.json()
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to get endpoint: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to get endpoint: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to get inference endpoint {endpoint_name}: {e}")
-    
+
     async def delete_inference_endpoint(self, endpoint_name: str) -> Dict[str, Any]:
         """Delete an inference endpoint"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             namespace = self.config.namespace or self.config.organization
             if not namespace:
                 raise Exception("Namespace or organization must be configured")
-            
+
             url = f"{self.api_base}/endpoint/{namespace}/{endpoint_name}"
-            async with self.session.delete(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    error_text = await response.text()
-                    raise Exception(f"Failed to delete endpoint: {response.status} - {error_text}")
-                    
-        except Exception as e:
-            raise Exception(f"Failed to delete inference endpoint {endpoint_name}: {e}")
-    
-    async def run_inference(self, endpoint_name: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        """Run inference on an endpoint"""
-        try:
-            endpoint_info = await self.get_inference_endpoint(endpoint_name)
-            endpoint_url = endpoint_info.get("url")
-            
-            if not endpoint_url:
-                raise Exception(f"Endpoint {endpoint_name} does not have a URL")
-            
-            if not self.session:
-                self.session = aiohttp.ClientSession()
-            
-            payload = {"inputs": inputs}
-            async with self.session.post(
-                endpoint_url,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=60)
+            async with self.session.delete(
+                url, timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
                 if response.status == 200:
                     return await response.json()
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Inference failed: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to delete endpoint: {response.status} - {error_text}"
+                    )
+
+        except Exception as e:
+            raise Exception(f"Failed to delete inference endpoint {endpoint_name}: {e}")
+
+    async def run_inference(
+        self, endpoint_name: str, inputs: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Run inference on an endpoint"""
+        try:
+            endpoint_info = await self.get_inference_endpoint(endpoint_name)
+            endpoint_url = endpoint_info.get("url")
+
+            if not endpoint_url:
+                raise Exception(f"Endpoint {endpoint_name} does not have a URL")
+
+            if not self.session:
+                self.session = aiohttp.ClientSession()
+
+            payload = {"inputs": inputs}
+            async with self.session.post(
+                endpoint_url, json=payload, timeout=aiohttp.ClientTimeout(total=60)
+            ) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    error_text = await response.text()
+                    raise Exception(
+                        f"Inference failed: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to run inference on {endpoint_name}: {e}")
-    
+
     def get_huggingface_config(self) -> Dict[str, str]:
         """Get Hugging Face configuration for environment variables"""
-        config = {
-            "HF_TOKEN": self.config.api_key
-        }
-        
+        config = {"HF_TOKEN": self.config.api_key}
+
         if self.config.namespace:
             config["HF_NAMESPACE"] = self.config.namespace
-            
+
         if self.config.organization:
             config["HF_ORGANIZATION"] = self.config.organization
-            
+
         if self.config.endpoint_url:
             config["HF_ENDPOINT_URL"] = self.config.endpoint_url
-            
+
         return config
-    
+
     def generate_setup_script(self) -> str:
         """Generate a shell snippet that sets up Hugging Face on a remote instance"""
         config = self.get_huggingface_config()
         script_lines = ["# Hugging Face Setup Script (generated by Terradev)"]
-        
+
         for key, value in config.items():
             script_lines.append(f"export {key}='{value}'")
-        
-        script_lines.extend([
-            "",
-            "# Install Hugging Face libraries",
-            "pip install transformers datasets accelerate",
-            "",
-            "# Test Hugging Face connection",
-            "python -c \"from huggingface_hub import HfApi; api = HfApi(); print('Hugging Face configured successfully')\"",
-            "",
-            "# Example usage in training script:",
-            "# from transformers import AutoTokenizer, AutoModelForCausalLM",
-            "# tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-2-7b-hf')",
-            "# model = AutoModelForCausalLM.from_pretrained('meta-llama/Llama-2-7b-hf')"
-        ])
-        
+
+        script_lines.extend(
+            [
+                "",
+                "# Install Hugging Face libraries",
+                "pip install transformers datasets accelerate",
+                "",
+                "# Test Hugging Face connection",
+                "python -c \"from huggingface_hub import HfApi; api = HfApi(); print('Hugging Face configured successfully')\"",
+                "",
+                "# Example usage in training script:",
+                "# from transformers import AutoTokenizer, AutoModelForCausalLM",
+                "# tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-2-7b-hf')",
+                "# model = AutoModelForCausalLM.from_pretrained('meta-llama/Llama-2-7b-hf')",
+            ]
+        )
+
         return "\n".join(script_lines)
 
 
-def create_huggingface_service_from_credentials(credentials: Dict[str, str]) -> HuggingFaceService:
+def create_huggingface_service_from_credentials(
+    credentials: Dict[str, str]
+) -> HuggingFaceService:
     """Create HuggingFaceService from credential dictionary"""
     config = HuggingFaceConfig(
         api_key=credentials["api_key"],
         namespace=credentials.get("namespace"),
         organization=credentials.get("organization"),
-        endpoint_url=credentials.get("endpoint_url")
+        endpoint_url=credentials.get("endpoint_url"),
     )
-    
+
     return HuggingFaceService(config)
 
 

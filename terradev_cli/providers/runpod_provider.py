@@ -40,18 +40,20 @@ class RunPodProvider(BaseProvider):
         # BYOAPI REQUIREMENT: No static fallback data - must have API key
         if not self.api_key:
             return []
-            
+
         # CRITICAL: Check rate limiting before API call
         if not await self._check_rate_limit():
-            return [{
-                "provider": "runpod",
-                "gpu_type": gpu_type,
-                "available": False,
-                "reason": "Rate limit exceeded",
-                "action_required": "Wait before making more requests",
-                "rate_limited": True,
-            }]
-            
+            return [
+                {
+                    "provider": "runpod",
+                    "gpu_type": gpu_type,
+                    "available": False,
+                    "reason": "Rate limit exceeded",
+                    "action_required": "Wait before making more requests",
+                    "rate_limited": True,
+                }
+            ]
+
         # Try live API only - no static fallback
         try:
             live = await self._get_live_pricing(gpu_type)
@@ -82,7 +84,8 @@ class RunPodProvider(BaseProvider):
         }
         """
         data = await self._make_request(
-            "POST", self.API_BASE,
+            "POST",
+            self.API_BASE,
             json={"query": query},
         )
         quotes = []
@@ -90,69 +93,80 @@ class RunPodProvider(BaseProvider):
             name = gpu.get("displayName", "")
             if gpu_type.lower() in name.lower():
                 if gpu.get("communityPrice"):
-                    quotes.append({
-                        "instance_type": f"runpod-community-{gpu['id']}",
-                        "gpu_type": gpu_type,
-                        "price_per_hour": gpu["communityPrice"],
-                        "region": "us-east",
-                        "available": True,
-                        "provider": "runpod",
-                        "vcpus": 16,
-                        "memory_gb": gpu.get("memoryInGb", 0),
-                        "gpu_count": 1,
-                        "spot": True,
-                        "cloud_type": "community",
-                        "performance_warning": "Community Cloud performance varies by host configuration",
-                        "cold_start_sla": "Not guaranteed during peak hours",
-                        "isolation": "container-only",
-                    })
+                    quotes.append(
+                        {
+                            "instance_type": f"runpod-community-{gpu['id']}",
+                            "gpu_type": gpu_type,
+                            "price_per_hour": gpu["communityPrice"],
+                            "region": "us-east",
+                            "available": True,
+                            "provider": "runpod",
+                            "vcpus": 16,
+                            "memory_gb": gpu.get("memoryInGb", 0),
+                            "gpu_count": 1,
+                            "spot": True,
+                            "cloud_type": "community",
+                            "performance_warning": "Community Cloud performance varies by host configuration",
+                            "cold_start_sla": "Not guaranteed during peak hours",
+                            "isolation": "container-only",
+                        }
+                    )
                 if gpu.get("securePrice"):
-                    quotes.append({
-                        "instance_type": f"runpod-secure-{gpu['id']}",
-                        "gpu_type": gpu_type,
-                        "price_per_hour": gpu["securePrice"],
-                        "region": "us-east",
-                        "available": True,
-                        "provider": "runpod",
-                        "vcpus": 16,
-                        "memory_gb": gpu.get("memoryInGb", 0),
-                        "gpu_count": 1,
-                        "spot": False,
-                        "cloud_type": "secure",
-                        "performance_guaranteed": True,
-                        "cold_start_sla": "< 3 seconds",
-                        "isolation": "vm-level",
-                    })
+                    quotes.append(
+                        {
+                            "instance_type": f"runpod-secure-{gpu['id']}",
+                            "gpu_type": gpu_type,
+                            "price_per_hour": gpu["securePrice"],
+                            "region": "us-east",
+                            "available": True,
+                            "provider": "runpod",
+                            "vcpus": 16,
+                            "memory_gb": gpu.get("memoryInGb", 0),
+                            "gpu_count": 1,
+                            "spot": False,
+                            "cloud_type": "secure",
+                            "performance_guaranteed": True,
+                            "cold_start_sla": "< 3 seconds",
+                            "isolation": "vm-level",
+                        }
+                    )
         return sorted(quotes, key=lambda q: q["price_per_hour"])
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str, attach_volume: bool = True, volume_size_gb: int = 100
+        self,
+        instance_type: str,
+        region: str,
+        gpu_type: str,
+        attach_volume: bool = True,
+        volume_size_gb: int = 100,
     ) -> Dict[str, Any]:
         """Provision RunPod instance with optional volume attachment"""
         if not self.api_key:
             raise Exception("RunPod API key not configured")
-        
+
         # CRITICAL: Check rate limiting
         if not await self._check_rate_limit():
-            raise Exception("Rate limit exceeded - please wait before making more requests")
+            raise Exception(
+                "Rate limit exceeded - please wait before making more requests"
+            )
 
         try:
             # Extract GPU ID from instance type (format: runpod-secure-A100 or runpod-community-H100)
             if "-" not in instance_type:
                 raise Exception(f"Invalid instance type format: {instance_type}")
-            
+
             # Split on last hyphen to separate cloud_type from gpu_id
             parts = instance_type.rsplit("-", 1)
             if len(parts) != 2:
                 raise Exception(f"Invalid instance type format: {instance_type}")
-            
+
             cloud_type, gpu_id = parts
             if cloud_type not in ["runpod-community", "runpod-secure"]:
                 raise Exception(f"Unsupported cloud type: {cloud_type}")
-            
+
             # Determine cloud type for API
             is_secure = cloud_type == "runpod-secure"
-            
+
             # Create pod specification
             pod_spec = {
                 "name": f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -168,20 +182,22 @@ class RunPodProvider(BaseProvider):
                 ],
                 "ports": ["http", "https"],
             }
-            
+
             # CRITICAL: Add volume if requested
             volume_id = None
             if attach_volume:
-                volume_id = await self._create_and_attach_volume(pod_spec["name"], volume_size_gb)
+                volume_id = await self._create_and_attach_volume(
+                    pod_spec["name"], volume_size_gb
+                )
                 if volume_id:
                     pod_spec["volumeInGb"] = volume_size_gb
                     pod_spec["volumeMountPath"] = "/workspace"
                 else:
                     logger.warning(f"Failed to create volume for {pod_spec['name']}")
-            
+
             # Deploy the pod
             deployment = await self._deploy_pod(pod_spec)
-            
+
             return {
                 "instance_id": deployment.get("id", pod_spec["name"]),
                 "instance_type": instance_type,
@@ -201,16 +217,20 @@ class RunPodProvider(BaseProvider):
                     "ports": pod_spec["ports"],
                 },
             }
-            
+
         except Exception as e:
             raise Exception(f"RunPod provision failed: {e}")
 
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("RunPod API key not configured")
-        query = 'query Pod($podId: String!) { pod(input: {podId: $podId}) { id name desiredStatus gpuCount } }'
+        query = "query Pod($podId: String!) { pod(input: {podId: $podId}) { id name desiredStatus gpuCount } }"
         try:
-            data = await self._make_request("POST", self.API_BASE, json={"query": query, "variables": {"podId": instance_id}})
+            data = await self._make_request(
+                "POST",
+                self.API_BASE,
+                json={"query": query, "variables": {"podId": instance_id}},
+            )
             pod = data.get("data", {}).get("pod", {})
             return {
                 "instance_id": instance_id,
@@ -223,36 +243,56 @@ class RunPodProvider(BaseProvider):
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("RunPod API key not configured")
-        mutation = 'mutation StopPod($podId: String!) { podStop(input: {podId: $podId}) { id desiredStatus } }'
-        await self._make_request("POST", self.API_BASE, json={"query": mutation, "variables": {"podId": instance_id}})
+        mutation = "mutation StopPod($podId: String!) { podStop(input: {podId: $podId}) { id desiredStatus } }"
+        await self._make_request(
+            "POST",
+            self.API_BASE,
+            json={"query": mutation, "variables": {"podId": instance_id}},
+        )
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
 
     async def start_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("RunPod API key not configured")
-        mutation = 'mutation ResumePod($podId: String!) { podResume(input: {podId: $podId, gpuCount: 1}) { id desiredStatus } }'
-        await self._make_request("POST", self.API_BASE, json={"query": mutation, "variables": {"podId": instance_id}})
+        mutation = "mutation ResumePod($podId: String!) { podResume(input: {podId: $podId, gpuCount: 1}) { id desiredStatus } }"
+        await self._make_request(
+            "POST",
+            self.API_BASE,
+            json={"query": mutation, "variables": {"podId": instance_id}},
+        )
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
 
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("RunPod API key not configured")
-        mutation = 'mutation TerminatePod($podId: String!) { podTerminate(input: {podId: $podId}) }'
-        await self._make_request("POST", self.API_BASE, json={"query": mutation, "variables": {"podId": instance_id}})
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        mutation = "mutation TerminatePod($podId: String!) { podTerminate(input: {podId: $podId}) }"
+        await self._make_request(
+            "POST",
+            self.API_BASE,
+            json={"query": mutation, "variables": {"podId": instance_id}},
+        )
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key:
             return []
         query = "query { myself { pods { id name desiredStatus gpuCount machine { gpuDisplayName } } } }"
         try:
-            data = await self._make_request("POST", self.API_BASE, json={"query": query})
+            data = await self._make_request(
+                "POST", self.API_BASE, json={"query": query}
+            )
             pods = data.get("data", {}).get("myself", {}).get("pods", [])
             return [
                 {
                     "instance_id": p["id"],
                     "status": (p.get("desiredStatus") or "unknown").lower(),
-                    "instance_type": p.get("machine", {}).get("gpuDisplayName", "unknown"),
+                    "instance_type": p.get("machine", {}).get(
+                        "gpuDisplayName", "unknown"
+                    ),
                     "region": "us-east",
                     "provider": "runpod",
                 }
@@ -295,12 +335,22 @@ class RunPodProvider(BaseProvider):
             # Fallback: SSH exec if pod has SSH enabled
             try:
                 import subprocess
+
                 result = subprocess.run(
-                    ["ssh", "-o", "StrictHostKeyChecking=accept-new",
-                     "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                     "-o", "ConnectTimeout=10",
-                     f"root@{instance_id}.runpod.io", command],
-                    capture_output=True, text=True, timeout=300,
+                    [
+                        "ssh",
+                        "-o",
+                        "StrictHostKeyChecking=accept-new",
+                        "-o",
+                        f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                        "-o",
+                        "ConnectTimeout=10",
+                        f"root@{instance_id}.runpod.io",
+                        command,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
                 )
                 return {
                     "instance_id": instance_id,
@@ -321,24 +371,26 @@ class RunPodProvider(BaseProvider):
 
     def _get_auth_headers(self) -> Dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
-    
+
     async def _check_rate_limit(self) -> bool:
         """CRITICAL: Check rate limiting for API calls"""
         current_time = datetime.now().timestamp()
-        
+
         # Reset window if needed
         if current_time - self.last_request_time > self.rate_limit_window:
             self.request_count = 0
             self.last_request_time = current_time
-        
+
         # Check if we're within limits
         if self.request_count >= self.max_requests_per_window:
             return False
-        
+
         self.request_count += 1
         return True
-    
-    async def _create_and_attach_volume(self, pod_name: str, size_gb: int) -> Optional[str]:
+
+    async def _create_and_attach_volume(
+        self, pod_name: str, size_gb: int
+    ) -> Optional[str]:
         """CRITICAL: Create and attach persistent volume for data persistence"""
         try:
             # Create volume
@@ -351,7 +403,7 @@ class RunPodProvider(BaseProvider):
                 }
             }
             """
-            
+
             volume_variables = {
                 "input": {
                     "name": f"{pod_name}-volume",
@@ -360,23 +412,28 @@ class RunPodProvider(BaseProvider):
                     "type": "NETWORK_STORAGE",
                 }
             }
-            
+
             volume_data = await self._make_request(
-                "POST", self.API_BASE,
-                json={"query": volume_mutation, "variables": volume_variables}
+                "POST",
+                self.API_BASE,
+                json={"query": volume_mutation, "variables": volume_variables},
             )
-            
-            volume_id = volume_data.get("data", {}).get("networkStorageCreate", {}).get("id")
+
+            volume_id = (
+                volume_data.get("data", {}).get("networkStorageCreate", {}).get("id")
+            )
             if volume_id:
-                logger.info(f"Created volume {volume_id} ({size_gb}GB) for pod {pod_name}")
+                logger.info(
+                    f"Created volume {volume_id} ({size_gb}GB) for pod {pod_name}"
+                )
                 return volume_id
-            
+
             return None
-            
+
         except Exception as e:
             logger.debug(f"Failed to create volume for {pod_name}: {e}")
             return None
-    
+
     async def _deploy_pod(self, pod_spec: Dict[str, Any]) -> Dict[str, Any]:
         """Deploy pod with the given specification"""
         mutation = """
@@ -390,12 +447,11 @@ class RunPodProvider(BaseProvider):
             }
         }
         """
-        
+
         variables = {"input": pod_spec}
-        
+
         data = await self._make_request(
-            "POST", self.API_BASE,
-            json={"query": mutation, "variables": variables}
+            "POST", self.API_BASE, json={"query": mutation, "variables": variables}
         )
-        
+
         return data.get("data", {}).get("podFindAndDeployOnDemand", {})

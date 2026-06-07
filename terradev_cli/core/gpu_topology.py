@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 # Rust GPU topology integration
 try:
     from terradev_gpu_topology import PyGPUNICOptimizer, PyGPUDevice, PyNICDevice
+
     USE_RUST_GPU_TOPOLOGY = True
     logger.info("Using Rust GPU topology for 10x faster pairing")
 except ImportError:
@@ -42,17 +43,20 @@ except ImportError:
 # Data models
 # ---------------------------------------------------------------------------
 
+
 class PCIeLocality(Enum):
     """PCIe locality levels (best -> worst)"""
-    PIX = "PIX"    # Same PCIe switch -- optimal
-    PXB = "PXB"    # Same root complex, different switch -- acceptable
-    PHB = "PHB"    # Same NUMA node, different root complex
-    SYS = "SYS"    # Cross-socket / cross-NUMA -- worst case
+
+    PIX = "PIX"  # Same PCIe switch -- optimal
+    PXB = "PXB"  # Same root complex, different switch -- acceptable
+    PHB = "PHB"  # Same NUMA node, different root complex
+    SYS = "SYS"  # Cross-socket / cross-NUMA -- worst case
 
 
 @dataclass
 class GPUDevice:
     """Represents a GPU with full topology metadata"""
+
     index: int
     name: str
     pci_bus_id: str
@@ -62,8 +66,8 @@ class GPUDevice:
     vram_total_mb: int = 0
     vram_used_mb: int = 0
     utilization_pct: int = 0
-    xcd_count: int = 0              # intra-GPU NUMA domains (MI300X=8, H200=1)
-    gpu_arch: str = ""              # e.g. "mi300x", "h100", "h200"
+    xcd_count: int = 0  # intra-GPU NUMA domains (MI300X=8, H200=1)
+    gpu_arch: str = ""  # e.g. "mi300x", "h100", "h200"
 
 
 class IntraGPUNUMALocality(Enum):
@@ -75,10 +79,11 @@ class IntraGPUNUMALocality(Enum):
 
     NVIDIA H200 has unified HBM3e but distinct memory controller domains.
     """
-    SAME_XCD = "same_xcd"       # Same XCD / L2 domain — optimal (92% L2 hit)
-    ADJACENT_XCD = "adj_xcd"    # Adjacent XCD pair sharing interconnect
-    REMOTE_XCD = "remote_xcd"   # Cross-XCD — worst intra-GPU locality (43% L2 hit)
-    UNIFIED = "unified"         # No intra-GPU NUMA (single die / unified L2)
+
+    SAME_XCD = "same_xcd"  # Same XCD / L2 domain — optimal (92% L2 hit)
+    ADJACENT_XCD = "adj_xcd"  # Adjacent XCD pair sharing interconnect
+    REMOTE_XCD = "remote_xcd"  # Cross-XCD — worst intra-GPU locality (43% L2 hit)
+    UNIFIED = "unified"  # No intra-GPU NUMA (single die / unified L2)
 
 
 @dataclass
@@ -88,11 +93,12 @@ class XCDDomain:
     MI300X: 8 XCDs, each with 16 CUs, 4 MB L2, sharing 16 GB HBM3
     H200:   1 unified die (no intra-GPU NUMA), 80 SM, 50 MB L2
     """
+
     xcd_id: int
     gpu_index: int
-    compute_units: int = 0      # CUs (AMD) or SMs (NVIDIA)
+    compute_units: int = 0  # CUs (AMD) or SMs (NVIDIA)
     l2_cache_mb: float = 0.0
-    hbm_slice_gb: float = 0.0   # HBM3 slice attached to this XCD
+    hbm_slice_gb: float = 0.0  # HBM3 slice attached to this XCD
     adjacent_xcds: List[int] = field(default_factory=list)
 
 
@@ -105,13 +111,14 @@ class IntraGPUTopology:
         GPU Architectural NUMA" (Nov 2025)
       - AMD AITER library for XCD-aware attention kernels
     """
+
     gpu_index: int
-    gpu_arch: str                           # "mi300x", "h200", "h100", etc.
+    gpu_arch: str  # "mi300x", "h200", "h100", etc.
     xcd_count: int
     xcds: List[XCDDomain] = field(default_factory=list)
     total_l2_mb: float = 0.0
     total_hbm_gb: float = 0.0
-    has_intra_numa: bool = False            # True if XCD count > 1
+    has_intra_numa: bool = False  # True if XCD count > 1
 
     def classify_xcd_locality(self, xcd_a: int, xcd_b: int) -> IntraGPUNUMALocality:
         """Classify intra-GPU locality between two XCDs."""
@@ -137,8 +144,14 @@ _GPU_ARCH_DB: Dict[str, Dict[str, Any]] = {
         "total_hbm_gb": 192.0,
         "total_l2_mb": 32.0,
         "adjacency": {
-            0: [1, 4], 1: [0, 2, 5], 2: [1, 3, 6], 3: [2, 7],
-            4: [0, 5], 5: [1, 4, 6], 6: [2, 5, 7], 7: [3, 6],
+            0: [1, 4],
+            1: [0, 2, 5],
+            2: [1, 3, 6],
+            3: [2, 7],
+            4: [0, 5],
+            5: [1, 4, 6],
+            6: [2, 5, 7],
+            7: [3, 6],
         },
     },
     "mi300a": {
@@ -149,8 +162,12 @@ _GPU_ARCH_DB: Dict[str, Dict[str, Any]] = {
         "total_hbm_gb": 128.0,
         "total_l2_mb": 24.0,
         "adjacency": {
-            0: [1, 3], 1: [0, 2, 4], 2: [1, 5],
-            3: [0, 4], 4: [1, 3, 5], 5: [2, 4],
+            0: [1, 3],
+            1: [0, 2, 4],
+            2: [1, 5],
+            3: [0, 4],
+            4: [1, 3, 5],
+            5: [2, 4],
         },
     },
     "h200": {
@@ -197,21 +214,26 @@ def build_intra_gpu_topology(gpu: GPUDevice) -> IntraGPUTopology:
 
     if not arch_info:
         return IntraGPUTopology(
-            gpu_index=gpu.index, gpu_arch=arch, xcd_count=1, has_intra_numa=False,
+            gpu_index=gpu.index,
+            gpu_arch=arch,
+            xcd_count=1,
+            has_intra_numa=False,
         )
 
     xcd_count = arch_info["xcd_count"]
     adjacency = arch_info.get("adjacency", {})
     xcds = []
     for i in range(xcd_count):
-        xcds.append(XCDDomain(
-            xcd_id=i,
-            gpu_index=gpu.index,
-            compute_units=arch_info["cus_per_xcd"],
-            l2_cache_mb=arch_info["l2_per_xcd_mb"],
-            hbm_slice_gb=arch_info["hbm_per_xcd_gb"],
-            adjacent_xcds=adjacency.get(i, []),
-        ))
+        xcds.append(
+            XCDDomain(
+                xcd_id=i,
+                gpu_index=gpu.index,
+                compute_units=arch_info["cus_per_xcd"],
+                l2_cache_mb=arch_info["l2_per_xcd_mb"],
+                hbm_slice_gb=arch_info["hbm_per_xcd_gb"],
+                adjacent_xcds=adjacency.get(i, []),
+            )
+        )
 
     return IntraGPUTopology(
         gpu_index=gpu.index,
@@ -243,9 +265,7 @@ def generate_xcd_aware_env(topo: IntraGPUTopology) -> Dict[str, str]:
         env["AITER_KV_CACHE_XCD_PIN"] = "1"  # pin KV cache slices to XCDs
         # NCCL intra-GPU P2P: prefer adjacent XCDs
         env["NCCL_INTRA_GPU_NUMA"] = "1"
-        env["HIP_VISIBLE_DEVICES_XCD_MASK"] = ",".join(
-            str(x.xcd_id) for x in topo.xcds
-        )
+        env["HIP_VISIBLE_DEVICES_XCD_MASK"] = ",".join(str(x.xcd_id) for x in topo.xcds)
         # CK (Composable Kernel) tuning for MI300X
         env["CK_BLOCK_MAPPING_POLICY"] = "xcd_aware"
 
@@ -255,6 +275,7 @@ def generate_xcd_aware_env(topo: IntraGPUTopology) -> Dict[str, str]:
 @dataclass
 class NICDevice:
     """Represents a NIC (physical or VF) with topology metadata"""
+
     name: str
     pci_bus_id: str
     numa_node: int
@@ -271,6 +292,7 @@ class NICDevice:
 @dataclass
 class GPUNICPair:
     """An optimally paired GPU and NIC"""
+
     gpu: GPUDevice
     nic: NICDevice
     locality: PCIeLocality
@@ -280,6 +302,7 @@ class GPUNICPair:
 @dataclass
 class NodeTopology:
     """Full topology map for a single node"""
+
     hostname: str
     numa_nodes: int
     gpus: List[GPUDevice] = field(default_factory=list)
@@ -291,6 +314,7 @@ class NodeTopology:
 # ---------------------------------------------------------------------------
 # 1. NUMA-aware GPU-NIC pairing
 # ---------------------------------------------------------------------------
+
 
 class NUMADetector:
     """Detect NUMA topology on a Linux node"""
@@ -340,6 +364,7 @@ class NUMADetector:
 # ---------------------------------------------------------------------------
 # 2. PCIe switch topology detection
 # ---------------------------------------------------------------------------
+
 
 class PCIeTopologyDetector:
     """Detect PCIe switch hierarchy using sysfs"""
@@ -394,7 +419,9 @@ class PCIeTopologyDetector:
                     "--query-gpu=index,name,pci.bus_id,memory.total,memory.used,utilization.gpu",
                     "--format=csv,noheader,nounits",
                 ],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode != 0:
                 return gpus
@@ -431,6 +458,7 @@ class PCIeTopologyDetector:
 # ---------------------------------------------------------------------------
 # 3. SR-IOV VF allocation
 # ---------------------------------------------------------------------------
+
 
 class SRIOVManager:
     """Manage SR-IOV Virtual Functions on RDMA NICs"""
@@ -554,13 +582,15 @@ class SRIOVManager:
             "kind": "NetworkAttachmentDefinition",
             "metadata": {"name": name, "namespace": namespace},
             "spec": {
-                "config": json.dumps({
-                    "cniVersion": "0.3.1",
-                    "type": "sriov",
-                    "name": name,
-                    "ipam": {},
-                    "rdma": True,
-                })
+                "config": json.dumps(
+                    {
+                        "cniVersion": "0.3.1",
+                        "type": "sriov",
+                        "name": name,
+                        "ipam": {},
+                        "rdma": True,
+                    }
+                )
             },
         }
 
@@ -568,6 +598,7 @@ class SRIOVManager:
 # ---------------------------------------------------------------------------
 # 4. RDMA configuration
 # ---------------------------------------------------------------------------
+
 
 class RDMAConfigurator:
     """Configure RDMA for GPU-NIC pairs"""
@@ -579,7 +610,9 @@ class RDMAConfigurator:
         try:
             result = subprocess.run(
                 ["rdma", "link", "show", "-j"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 devices = json.loads(result.stdout)
@@ -635,9 +668,7 @@ class RDMAConfigurator:
                         "volumes": [
                             {
                                 "name": "device-plugin",
-                                "hostPath": {
-                                    "path": "/var/lib/kubelet/device-plugins"
-                                },
+                                "hostPath": {"path": "/var/lib/kubelet/device-plugins"},
                             }
                         ],
                     },
@@ -646,7 +677,9 @@ class RDMAConfigurator:
         }
 
     @staticmethod
-    def generate_nccl_env(pair: GPUNICPair, gpu: Optional[GPUDevice] = None) -> Dict[str, str]:
+    def generate_nccl_env(
+        pair: GPUNICPair, gpu: Optional[GPUDevice] = None
+    ) -> Dict[str, str]:
         """Generate NCCL environment variables for optimal GPU-NIC pairing.
 
         If gpu is provided, also generates XCD-aware env vars for MI300X.
@@ -664,7 +697,10 @@ class RDMAConfigurator:
         }
         if pair.locality == PCIeLocality.PIX:
             import tempfile
-            env["NCCL_TOPO_DUMP_FILE"] = tempfile.mktemp(prefix="nccl_topo_", suffix=".xml")
+
+            env["NCCL_TOPO_DUMP_FILE"] = tempfile.mktemp(
+                prefix="nccl_topo_", suffix=".xml"
+            )
 
         # XCD-aware env vars for intra-GPU NUMA
         if gpu:
@@ -678,6 +714,7 @@ class RDMAConfigurator:
 # ---------------------------------------------------------------------------
 # 5. Kubelet Topology Manager configuration
 # ---------------------------------------------------------------------------
+
 
 class TopologyManagerConfigurator:
     """Generate kubelet Topology Manager configuration"""
@@ -738,12 +775,21 @@ class TopologyManagerConfigurator:
         try:
             result = subprocess.run(
                 [
-                    "kubectl", "patch", "configmap", "kubelet-config",
-                    "-n", "kube-system",
-                    "--type", "merge",
-                    "-p", json.dumps({"data": {"kubelet": patch}}),
+                    "kubectl",
+                    "patch",
+                    "configmap",
+                    "kubelet-config",
+                    "-n",
+                    "kube-system",
+                    "--type",
+                    "merge",
+                    "-p",
+                    json.dumps({"data": {"kubelet": patch}}),
                 ],
-                capture_output=True, text=True, timeout=15, env=env,
+                capture_output=True,
+                text=True,
+                timeout=15,
+                env=env,
             )
             if result.returncode == 0:
                 logger.info("Topology Manager config applied to kubelet-config")
@@ -759,6 +805,7 @@ class TopologyManagerConfigurator:
 # ---------------------------------------------------------------------------
 # 6. DRA / DRANET resource claim generation (K8s 1.31+)
 # ---------------------------------------------------------------------------
+
 
 class DRAGenerator:
     """Generate Dynamic Resource Allocation manifests for GPU-NIC pairing.
@@ -899,6 +946,7 @@ class DRAGenerator:
 # 7. GPU-NIC pairing optimization
 # ---------------------------------------------------------------------------
 
+
 class GPUNICOptimizer:
     """Optimal GPU-NIC pairing using topology-aware matching"""
 
@@ -949,9 +997,11 @@ class GPUNICOptimizer:
                 else:
                     rdma_path = "GPUDirect RDMA via SYS (cross-socket -- degraded)"
 
-            pairs.append(GPUNICPair(
-                gpu=gpu, nic=best_nic, locality=best_loc, rdma_path=rdma_path
-            ))
+            pairs.append(
+                GPUNICPair(
+                    gpu=gpu, nic=best_nic, locality=best_loc, rdma_path=rdma_path
+                )
+            )
             available_nics.remove(best_nic)
 
         return pairs
@@ -960,6 +1010,7 @@ class GPUNICOptimizer:
 # ---------------------------------------------------------------------------
 # Orchestrator: ties all layers together
 # ---------------------------------------------------------------------------
+
 
 class GPUTopologyOrchestrator:
     """High-level orchestrator that combines all topology layers.
@@ -997,7 +1048,9 @@ class GPUTopologyOrchestrator:
         for nic in nics:
             numa_map.setdefault(nic.numa_node, {"gpus": [], "nics": []})
             rdma_tag = " [RDMA]" if nic.rdma_capable else ""
-            sriov_tag = f" [SR-IOV: {nic.sriov_total_vfs} VFs]" if nic.sriov_capable else ""
+            sriov_tag = (
+                f" [SR-IOV: {nic.sriov_total_vfs} VFs]" if nic.sriov_capable else ""
+            )
             numa_map[nic.numa_node]["nics"].append(
                 f"{nic.name} @ {nic.pci_bus_id}{rdma_tag}{sriov_tag}"
             )
@@ -1005,22 +1058,26 @@ class GPUTopologyOrchestrator:
         # Pair summary
         pair_summary = []
         for p in pairs:
-            pair_summary.append({
-                "gpu": f"GPU {p.gpu.index} ({p.gpu.name})",
-                "nic": p.nic.name,
-                "locality": p.locality.value,
-                "rdma_path": p.rdma_path,
-                "optimal": p.locality in (PCIeLocality.PIX, PCIeLocality.PXB),
-            })
+            pair_summary.append(
+                {
+                    "gpu": f"GPU {p.gpu.index} ({p.gpu.name})",
+                    "nic": p.nic.name,
+                    "locality": p.locality.value,
+                    "rdma_path": p.rdma_path,
+                    "optimal": p.locality in (PCIeLocality.PIX, PCIeLocality.PXB),
+                }
+            )
 
-        cross_socket_count = sum(
-            1 for p in pairs if p.locality == PCIeLocality.SYS
-        )
+        cross_socket_count = sum(1 for p in pairs if p.locality == PCIeLocality.SYS)
 
         return {
-            "hostname": subprocess.run(
-                ["hostname"], capture_output=True, text=True
-            ).stdout.strip() if True else "unknown",
+            "hostname": (
+                subprocess.run(
+                    ["hostname"], capture_output=True, text=True
+                ).stdout.strip()
+                if True
+                else "unknown"
+            ),
             "numa_nodes": numa_count,
             "gpu_count": len(gpus),
             "nic_count": len(nics),
@@ -1097,7 +1154,9 @@ class GPUTopologyOrchestrator:
             )
 
         if not recs:
-            recs.append("Topology looks healthy. All GPU-NIC pairs are optimally aligned.")
+            recs.append(
+                "Topology looks healthy. All GPU-NIC pairs are optimally aligned."
+            )
 
         return recs
 
@@ -1115,9 +1174,7 @@ class GPUTopologyOrchestrator:
 
         # Kubelet Topology Manager config
         manifests["kubelet_config"] = (
-            TopologyManagerConfigurator.generate_kubelet_config(
-                policy=topology_policy
-            )
+            TopologyManagerConfigurator.generate_kubelet_config(policy=topology_policy)
         )
 
         if use_sriov:
@@ -1131,10 +1188,8 @@ class GPUTopologyOrchestrator:
                     )
                 )
             # Network attachment
-            manifests["network_attachment"] = (
-                SRIOVManager.generate_network_attachment(
-                    "gpu-rdma-net", "sriov_rdma_vf", namespace
-                )
+            manifests["network_attachment"] = SRIOVManager.generate_network_attachment(
+                "gpu-rdma-net", "sriov_rdma_vf", namespace
             )
 
         # RDMA device plugin
@@ -1190,7 +1245,9 @@ class GPUTopologyOrchestrator:
         print(f"  NICs:            {report['nic_count']}")
         print(f"  RDMA NICs:       {report['rdma_nics']}")
         print(f"  SR-IOV NICs:     {report['sriov_nics']}")
-        print(f"  GPUDirect RDMA:  {'Enabled' if report['gpudirect_rdma'] else 'Disabled'}")
+        print(
+            f"  GPUDirect RDMA:  {'Enabled' if report['gpudirect_rdma'] else 'Disabled'}"
+        )
         print(f"  RDMA Devices:    {report['rdma_devices']}")
 
         # NUMA map

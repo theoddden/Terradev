@@ -33,12 +33,14 @@ logger = logging.getLogger(__name__)
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
+
 @dataclass
 class DriftRetrainConfig:
     """All knobs for the drift→retrain→swap cycle."""
+
     # Identity
-    model_id: str = ""                          # e.g. "llama-70b-prod"
-    cycle_id: str = ""                          # auto-generated if empty
+    model_id: str = ""  # e.g. "llama-70b-prod"
+    cycle_id: str = ""  # auto-generated if empty
 
     # Phoenix source
     phoenix_endpoint: str = "http://localhost:6006"
@@ -47,38 +49,40 @@ class DriftRetrainConfig:
 
     # Drift detection
     baseline_score: float = 0.90
-    degradation_threshold: float = 0.85         # trigger when score drops below
-    monitoring_window_seconds: int = 3600       # look-back window for scoring
-    min_samples: int = 50                       # minimum spans before judging
+    degradation_threshold: float = 0.85  # trigger when score drops below
+    monitoring_window_seconds: int = 3600  # look-back window for scoring
+    min_samples: int = 50  # minimum spans before judging
 
     # Training
-    method: str = "lora"                        # lora | full (only lora for now)
+    method: str = "lora"  # lora | full (only lora for now)
     lora_r: int = 16
     lora_alpha: int = 32
     learning_rate: float = 1e-4
     epochs: int = 3
-    holdout_ratio: float = 0.2                  # fraction of data reserved for eval
+    holdout_ratio: float = 0.2  # fraction of data reserved for eval
 
     # Evaluation gate
-    eval_threshold: float = 0.85                # adapter must score above this
-    eval_metric: str = "accuracy"               # accuracy | bleu | rouge-l
+    eval_threshold: float = 0.85  # adapter must score above this
+    eval_metric: str = "accuracy"  # accuracy | bleu | rouge-l
 
     # Deployment
-    vllm_endpoint: str = ""                     # e.g. "http://10.0.0.1:8000"
+    vllm_endpoint: str = ""  # e.g. "http://10.0.0.1:8000"
     vllm_api_key: Optional[str] = None
-    deploy_strategy: str = "canary"             # canary | direct
-    auto_swap: bool = False                     # auto-promote if eval passes
+    deploy_strategy: str = "canary"  # canary | direct
+    auto_swap: bool = False  # auto-promote if eval passes
 
     # Storage
-    adapter_output_dir: str = ""                # default: ~/.terradev/adapters/{cycle_id}
-    manifest_dir: str = ""                      # default: ~/.terradev/retrain_manifests/
+    adapter_output_dir: str = ""  # default: ~/.terradev/adapters/{cycle_id}
+    manifest_dir: str = ""  # default: ~/.terradev/retrain_manifests/
 
 
 # ─── Manifest (audit trail) ──────────────────────────────────────────────────
 
+
 @dataclass
 class RetrainManifest:
     """Immutable record of one retrain cycle — written to disk as JSON."""
+
     cycle_id: str = ""
     model_id: str = ""
     trigger: str = "drift"
@@ -101,7 +105,9 @@ class RetrainManifest:
     deploy_strategy: str = ""
     swapped_at: str = ""
     # Status
-    status: str = "pending"                     # pending | training | evaluating | deployed | failed | discarded
+    status: str = (
+        "pending"  # pending | training | evaluating | deployed | failed | discarded
+    )
     error: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -109,6 +115,7 @@ class RetrainManifest:
 
 
 # ─── Service ──────────────────────────────────────────────────────────────────
+
 
 class DriftRetrainService:
     """Orchestrates the drift→retrain→eval→swap cycle.
@@ -178,8 +185,14 @@ class DriftRetrainService:
         for span in all_spans:
             attrs = span.get("attributes", {})
             # Phoenix stores eval scores under various attribute keys
-            for key in ("eval.score", "quality_score", "score", "eval.quality",
-                        "output.value.score", "metadata.score"):
+            for key in (
+                "eval.score",
+                "quality_score",
+                "score",
+                "eval.quality",
+                "output.value.score",
+                "metadata.score",
+            ):
                 val = attrs.get(key)
                 if val is not None:
                     try:
@@ -210,8 +223,8 @@ class DriftRetrainService:
             "threshold": self.config.degradation_threshold,
             "detail": (
                 f"Score {avg_score:.4f} < threshold {self.config.degradation_threshold}"
-                if drifted else
-                f"Score {avg_score:.4f} >= threshold {self.config.degradation_threshold}"
+                if drifted
+                else f"Score {avg_score:.4f} >= threshold {self.config.degradation_threshold}"
             ),
         }
 
@@ -248,21 +261,29 @@ class DriftRetrainService:
             attrs = span.get("attributes", {})
             # Common Phoenix attribute patterns for LLM spans
             input_text = (
-                attrs.get("input.value") or
-                attrs.get("llm.input_messages", [{}])[0].get("content", "") if isinstance(attrs.get("llm.input_messages"), list) else
-                attrs.get("input", "")
+                attrs.get("input.value")
+                or attrs.get("llm.input_messages", [{}])[0].get("content", "")
+                if isinstance(attrs.get("llm.input_messages"), list)
+                else attrs.get("input", "")
             )
             output_text = (
-                attrs.get("output.value") or
-                attrs.get("llm.output_messages", [{}])[0].get("content", "") if isinstance(attrs.get("llm.output_messages"), list) else
-                attrs.get("output", "")
+                attrs.get("output.value")
+                or attrs.get("llm.output_messages", [{}])[0].get("content", "")
+                if isinstance(attrs.get("llm.output_messages"), list)
+                else attrs.get("output", "")
             )
             if input_text and output_text:
-                pairs.append({"instruction": str(input_text), "response": str(output_text)})
+                pairs.append(
+                    {"instruction": str(input_text), "response": str(output_text)}
+                )
 
         if not pairs:
-            return {"train": [], "holdout": [], "total": 0,
-                    "error": "No instruction/response pairs extracted from spans"}
+            return {
+                "train": [],
+                "holdout": [],
+                "total": 0,
+                "error": "No instruction/response pairs extracted from spans",
+            }
 
         # Split into train / holdout
         holdout_count = max(1, int(len(pairs) * self.config.holdout_ratio))
@@ -302,13 +323,20 @@ class DriftRetrainService:
             framework="torchrun",
             script="train.py",
             script_args=[
-                "--model_name_or_path", self.config.model_id,
-                "--train_data", train_data_path,
-                "--output_dir", self.config.adapter_output_dir,
-                "--lora_r", str(self.config.lora_r),
-                "--lora_alpha", str(self.config.lora_alpha),
-                "--learning_rate", str(self.config.learning_rate),
-                "--num_train_epochs", str(self.config.epochs),
+                "--model_name_or_path",
+                self.config.model_id,
+                "--train_data",
+                train_data_path,
+                "--output_dir",
+                self.config.adapter_output_dir,
+                "--lora_r",
+                str(self.config.lora_r),
+                "--lora_alpha",
+                str(self.config.lora_alpha),
+                "--learning_rate",
+                str(self.config.learning_rate),
+                "--num_train_epochs",
+                str(self.config.epochs),
                 "--bf16",
                 "--use_lora",
             ],
@@ -341,8 +369,12 @@ class DriftRetrainService:
             holdout = json.load(f)
 
         if not holdout:
-            return {"score": 0.0, "passed": False, "samples": 0,
-                    "error": "Empty holdout set"}
+            return {
+                "score": 0.0,
+                "passed": False,
+                "samples": 0,
+                "error": "Empty holdout set",
+            }
 
         # If vllm_endpoint is configured, run live inference eval
         if self.config.vllm_endpoint:
@@ -383,7 +415,9 @@ class DriftRetrainService:
                 try:
                     payload = {
                         "model": adapter_name,
-                        "messages": [{"role": "user", "content": sample["instruction"]}],
+                        "messages": [
+                            {"role": "user", "content": sample["instruction"]}
+                        ],
                         "max_tokens": 512,
                         "temperature": 0.0,
                     }
@@ -394,12 +428,16 @@ class DriftRetrainService:
                     ) as resp:
                         if resp.status == 200:
                             data = await resp.json()
-                            generated = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                            generated = (
+                                data.get("choices", [{}])[0]
+                                .get("message", {})
+                                .get("content", "")
+                            )
                             # Simple exact-match or substring scoring
                             expected = sample.get("response", "")
                             if expected and (
-                                expected.strip().lower() in generated.strip().lower() or
-                                generated.strip().lower() in expected.strip().lower()
+                                expected.strip().lower() in generated.strip().lower()
+                                or generated.strip().lower() in expected.strip().lower()
                             ):
                                 correct += 1
                             total += 1
@@ -441,8 +479,12 @@ class DriftRetrainService:
 
         # Parse endpoint
         from urllib.parse import urlparse
-        p = urlparse(self.config.vllm_endpoint if '://' in self.config.vllm_endpoint
-                     else f'http://{self.config.vllm_endpoint}')
+
+        p = urlparse(
+            self.config.vllm_endpoint
+            if "://" in self.config.vllm_endpoint
+            else f"http://{self.config.vllm_endpoint}"
+        )
         host = p.hostname or "localhost"
         port = p.port or 8000
 
@@ -452,12 +494,14 @@ class DriftRetrainService:
             path=self.config.adapter_output_dir,
         )
 
-        svc = VLLMService(VLLMConfig(
-            model_name="",
-            host=host,
-            port=port,
-            api_key=self.config.vllm_api_key,
-        ))
+        svc = VLLMService(
+            VLLMConfig(
+                model_name="",
+                host=host,
+                port=port,
+                api_key=self.config.vllm_api_key,
+            )
+        )
 
         # Load new adapter
         result = await svc.lora_load(adapter)
@@ -526,7 +570,9 @@ class DriftRetrainService:
             return result
 
         # Stage 3: Launch training
-        logger.info(f"[{self.config.cycle_id}] Stage 3/5: Launching LoRA fine-tuning...")
+        logger.info(
+            f"[{self.config.cycle_id}] Stage 3/5: Launching LoRA fine-tuning..."
+        )
         train_result = self.launch_training(data["train_path"])
         result["stages"]["training"] = {
             "job_id": train_result.get("job_id"),
@@ -559,10 +605,14 @@ class DriftRetrainService:
 
         # Stage 5: Deploy
         if self.config.auto_swap:
-            logger.info(f"[{self.config.cycle_id}] Stage 5/5: Deploying adapter (hot-swap)...")
+            logger.info(
+                f"[{self.config.cycle_id}] Stage 5/5: Deploying adapter (hot-swap)..."
+            )
             deploy = await self.deploy_adapter()
             result["stages"]["deployment"] = deploy
-            result["outcome"] = "deployed" if deploy["status"] == "deployed" else "deploy_failed"
+            result["outcome"] = (
+                "deployed" if deploy["status"] == "deployed" else "deploy_failed"
+            )
         else:
             result["stages"]["deployment"] = {"status": "awaiting_approval"}
             result["outcome"] = "eval_passed_awaiting_deploy"

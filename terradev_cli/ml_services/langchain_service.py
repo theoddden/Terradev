@@ -17,6 +17,7 @@ import base64
 @dataclass
 class LangChainConfig:
     """LangChain configuration"""
+
     api_key: str
     langsmith_api_key: Optional[str] = None
     langsmith_endpoint: Optional[str] = None
@@ -31,47 +32,55 @@ class LangChainConfig:
 
 class LangChainService:
     """LangChain integration service for LLM workflows and chains"""
-    
+
     def __init__(self, config: LangChainConfig):
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
-        self.langsmith_api_base = config.langsmith_endpoint or "https://api.smith.langchain.com"
-        
+        self.langsmith_api_base = (
+            config.langsmith_endpoint or "https://api.smith.langchain.com"
+        )
+
     async def __aenter__(self):
         headers = {"Authorization": f"Bearer {self.config.api_key}"}
         self.session = aiohttp.ClientSession(headers=headers)
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
-    
+
     async def test_connection(self) -> Dict[str, Any]:
         """Test LangChain and LangSmith connection"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             # Test LangSmith connection
             if self.config.langsmith_api_key:
-                langsmith_headers = {"Authorization": f"Bearer {self.config.langsmith_api_key}"}
+                langsmith_headers = {
+                    "Authorization": f"Bearer {self.config.langsmith_api_key}"
+                }
                 langsmith_session = aiohttp.ClientSession(headers=langsmith_headers)
-                
+
                 url = f"{self.langsmith_api_base}/v1/organizations"
-                async with langsmith_session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                async with langsmith_session.get(
+                    url, timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
                     if response.status == 200:
                         langsmith_data = await response.json()
                         langsmith_status = "connected"
                     else:
                         langsmith_status = "failed"
-                        langsmith_data = {"error": f"LangSmith API request failed: {response.status}"}
-                
+                        langsmith_data = {
+                            "error": f"LangSmith API request failed: {response.status}"
+                        }
+
                 await langsmith_session.close()
             else:
                 langsmith_status = "not_configured"
                 langsmith_data = {"message": "LangSmith API key not provided"}
-            
+
             return {
                 "status": langsmith_status,
                 "langsmith": langsmith_data,
@@ -79,186 +88,194 @@ class LangChainService:
                 "dashboard_enabled": self.config.dashboard_enabled,
                 "tracing_enabled": self.config.tracing_enabled,
                 "evaluation_enabled": self.config.evaluation_enabled,
-                "workflow_enabled": self.config.workflow_enabled
+                "workflow_enabled": self.config.workflow_enabled,
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def create_workflow(self, workflow_config: Dict[str, Any]) -> Dict[str, Any]:
         """Create a LangChain workflow"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             # This would integrate with LangChain's workflow APIs
             # For now, we'll create a mock workflow configuration
-            workflow_id = f"terradev-workflow-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            
+            workflow_id = (
+                f"terradev-workflow-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            )
+
             return {
                 "status": "created",
                 "workflow_id": workflow_id,
                 "config": workflow_config,
                 "name": workflow_config.get("name", "Terradev Workflow"),
-                "description": workflow_config.get("description", "Workflow created via Terradev CLI")
+                "description": workflow_config.get(
+                    "description", "Workflow created via Terradev CLI"
+                ),
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
-    async def create_langgraph_workflow(self, graph_config: Dict[str, Any]) -> Dict[str, Any]:
+            return {"status": "failed", "error": str(e)}
+
+    async def create_langgraph_workflow(
+        self, graph_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create a LangGraph workflow with monitoring"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             # This would integrate with LangGraph's workflow APIs
             # For now, we'll create a mock LangGraph configuration
-            workflow_id = f"terradev-langgraph-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            
+            workflow_id = (
+                f"terradev-langgraph-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            )
+
             return {
                 "status": "created",
                 "workflow_id": workflow_id,
                 "graph_config": graph_config,
                 "name": graph_config.get("name", "Terradev LangGraph"),
-                "description": graph_config.get("description", "LangGraph created via Terradev CLI"),
+                "description": graph_config.get(
+                    "description", "LangGraph created via Terradev CLI"
+                ),
                 "nodes": graph_config.get("nodes", []),
-                "edges": graph_config.get("edges", [])
+                "edges": graph_config.get("edges", []),
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
-    async def create_sglang_pipeline(self, pipeline_config: Dict[str, Any]) -> Dict[str, Any]:
+            return {"status": "failed", "error": str(e)}
+
+    async def create_sglang_pipeline(
+        self, pipeline_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create an SGLang pipeline for model serving"""
         try:
             if not self.session:
                 headers = {"Authorization": f"Bearer {self.config.api_key}"}
                 self.session = aiohttp.ClientSession(headers=headers)
-            
+
             # This would integrate with SGLang's serving APIs
             # For now, we'll create a mock SGLang configuration
             pipeline_id = f"terradev-sglang-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            
+
             return {
                 "status": "created",
                 "pipeline_id": pipeline_id,
                 "config": pipeline_config,
                 "name": pipeline_config.get("name", "Terradev SGLang Pipeline"),
-                "description": pipeline_config.get("description", "SGLang pipeline created via Terradev CLI"),
+                "description": pipeline_config.get(
+                    "description", "SGLang pipeline created via Terradev CLI"
+                ),
                 "model_path": pipeline_config.get("model_path", ""),
-                "serving_config": pipeline_config.get("serving_config", {})
+                "serving_config": pipeline_config.get("serving_config", {}),
             }
-            
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def get_langsmith_projects(self) -> List[Dict[str, Any]]:
         """Get LangSmith projects"""
         try:
             if not self.config.langsmith_api_key:
                 return []
-            
+
             headers = {"Authorization": f"Bearer {self.config.langsmith_api_key}"}
             langsmith_session = aiohttp.ClientSession(headers=headers)
-            
+
             url = f"{self.langsmith_api_base}/v1/organizations"
-            async with langsmith_session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            async with langsmith_session.get(
+                url, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 if response.status == 200:
                     data = await response.json()
                     return data.get("organizations", [])
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to get LangSmith projects: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to get LangSmith projects: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to get LangSmith projects: {e}")
-    
+
     async def get_langsmith_workspaces(self) -> List[Dict[str, Any]]:
         """Get LangSmith workspaces"""
         try:
             if not self.config.langsmith_api_key:
                 return []
-            
+
             headers = {"Authorization": f"Bearer {self.config.langsmith_api_key}"}
             langsmith_session = aiohttp.ClientSession(headers=headers)
-            
+
             url = f"{self.langsmith_api_base}/v1/workspaces"
-            async with langsmith_session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            async with langsmith_session.get(
+                url, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 if response.status == 200:
                     data = await response.json()
                     return data.get("workspaces", [])
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to get LangSmith workspaces: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to get LangSmith workspaces: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to get LangSmith workspaces: {e}")
-    
-    async def create_langsmith_project(self, name: str, description: str = "") -> Dict[str, Any]:
+
+    async def create_langsmith_project(
+        self, name: str, description: str = ""
+    ) -> Dict[str, Any]:
         """Create a LangSmith project"""
         try:
             if not self.config.langsmith_api_key:
-                return {
-                    "status": "failed",
-                    "error": "LangSmith API key not configured"
-                }
-            
+                return {"status": "failed", "error": "LangSmith API key not configured"}
+
             headers = {"Authorization": f"Bearer {self.config.langsmith_api_key}"}
             langsmith_session = aiohttp.ClientSession(headers=headers)
-            
+
             # Find workspace ID (use first available if not specified)
             workspaces = await self.get_langsmith_workspaces()
-            workspace_id = self.config.workspace_id or (workspaces[0]["id"] if workspaces else None)
-            
+            workspace_id = self.config.workspace_id or (
+                workspaces[0]["id"] if workspaces else None
+            )
+
             if not workspace_id:
-                return {
-                    "status": "failed",
-                    "error": "No workspace found"
-                }
-            
+                return {"status": "failed", "error": "No workspace found"}
+
             url = f"{self.langsmith_api_base}/v1/organizations/{workspace_id}/projects"
-            payload = {
-                "name": name,
-                "description": description
-            }
-            
-            async with langsmith_session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            payload = {"name": name, "description": description}
+
+            async with langsmith_session.post(
+                url, json=payload, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 if response.status == 200 or response.status == 201:
                     return await response.json()
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to create LangSmith project: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to create LangSmith project: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
-    async def get_langsmith_runs(self, project_name: str, limit: int = 100) -> List[Dict[str, Any]]:
+            return {"status": "failed", "error": str(e)}
+
+    async def get_langsmith_runs(
+        self, project_name: str, limit: int = 100
+    ) -> List[Dict[str, Any]]:
         """Get LangSmith runs from a project"""
         try:
             if not self.config.langsmith_api_key:
                 return []
-            
+
             headers = {"Authorization": f"Bearer {self.config.langsmith_api_key}"}
             langsmith_session = aiohttp.ClientSession(headers=headers)
-            
+
             # Find project ID
             projects = await self.get_langsmith_projects()
             project_id = None
@@ -266,93 +283,92 @@ class LangChainService:
                 if project.get("name") == project_name:
                     project_id = project["id"]
                     break
-            
+
             if not project_id:
                 return []
-            
+
             url = f"{self.langsmith_api_base}/v1/projects/{project_id}/runs"
             params = {"limit": limit}
-            
-            async with langsmith_session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as response:
+
+            async with langsmith_session.get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 if response.status == 200:
                     data = await response.json()
                     return data.get("runs", [])
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to get LangSmith runs: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to get LangSmith runs: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
             raise Exception(f"Failed to get LangSmith runs: {e}")
-    
-    async def create_trace(self, run_id: str, trace_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def create_trace(
+        self, run_id: str, trace_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create a trace in LangSmith"""
         try:
             if not self.config.langsmith_api_key:
-                return {
-                    "status": "failed",
-                    "error": "LangSmith API key not configured"
-                }
-            
+                return {"status": "failed", "error": "LangSmith API key not configured"}
+
             headers = {"Authorization": f"Bearer {self.config.langsmith_api_key}"}
             langsmith_session = aiohttp.ClientSession(headers=headers)
-            
+
             url = f"{self.langsmith_api_base}/v1/traces"
-            payload = {
-                "id": run_id,
-                "data": trace_data
-            }
-            
-            async with langsmith_session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            payload = {"id": run_id, "data": trace_data}
+
+            async with langsmith_session.post(
+                url, json=payload, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 if response.status == 200:
                     return await response.json()
                 else:
                     error_text = await response.text()
-                    raise Exception(f"Failed to create trace: {response.status} - {error_text}")
-                    
+                    raise Exception(
+                        f"Failed to create trace: {response.status} - {error_text}"
+                    )
+
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     def get_langchain_config(self) -> Dict[str, str]:
         """Get LangChain configuration for environment variables"""
-        config = {
-            "LANGCHAIN_API_KEY": self.config.api_key
-        }
-        
+        config = {"LANGCHAIN_API_KEY": self.config.api_key}
+
         if self.config.langsmith_api_key:
             config["LANGSMITH_API_KEY"] = self.config.langsmith_api_key
             config["LANGSMITH_TRACING"] = "true"
-        
+
         if self.config.langsmith_endpoint:
             config["LANGSMITH_ENDPOINT"] = self.config.langsmith_endpoint
-        
+
         if self.config.workspace_id:
             config["LANGSMITH_WORKSPACE_ID"] = self.config.workspace_id
-        
+
         if self.config.project_name:
             config["LANGSMITH_PROJECT"] = self.config.project_name
         else:
             config["LANGSMITH_PROJECT"] = "terradev"
-        
+
         if self.config.environment:
             config["LANGCHAIN_ENVIRONMENT"] = self.config.environment
-        
+
         if self.config.dashboard_enabled:
             config["LANGCHAIN_DASHBOARD_ENABLED"] = "true"
-        
+
         if self.config.tracing_enabled:
             config["LANGCHAIN_TRACING"] = "true"
-        
+
         if self.config.evaluation_enabled:
             config["LANGCHAIN_EVALUATION"] = "true"
-        
+
         if self.config.workflow_enabled:
             config["LANGCHAIN_WORKFLOW_ENABLED"] = "true"
-        
+
         return config
-    
+
     def generate_integration_script(self) -> str:
         """Generate LangChain integration script"""
         script_lines = [
@@ -409,13 +425,15 @@ class LangChainService:
             "# Compile and run",
             "workflow.invoke({})",
             "",
-            "print('LangChain integration complete! Check your LangSmith dashboard at: https://smith.langchain.com/' + os.environ.get('LANGSMITH_WORKSPACE_ID', 'default') + '/' + os.environ.get('LANGSMITH_PROJECT', 'terradev'))"
+            "print('LangChain integration complete! Check your LangSmith dashboard at: https://smith.langchain.com/' + os.environ.get('LANGSMITH_WORKSPACE_ID', 'default') + '/' + os.environ.get('LANGSMITH_PROJECT', 'terradev'))",
         ]
-        
+
         return "\n".join(script_lines)
 
 
-def create_langchain_service_from_credentials(credentials: Dict[str, str]) -> LangChainService:
+def create_langchain_service_from_credentials(
+    credentials: Dict[str, str]
+) -> LangChainService:
     """Create LangChainService from credential dictionary"""
     config = LangChainConfig(
         api_key=credentials["api_key"],
@@ -424,12 +442,14 @@ def create_langchain_service_from_credentials(credentials: Dict[str, str]) -> La
         workspace_id=credentials.get("workspace_id"),
         project_name=credentials.get("project_name"),
         environment=credentials.get("environment", "development"),
-        dashboard_enabled=credentials.get("dashboard_enabled", "false").lower() == "true",
+        dashboard_enabled=credentials.get("dashboard_enabled", "false").lower()
+        == "true",
         tracing_enabled=credentials.get("tracing_enabled", "false").lower() == "true",
-        evaluation_enabled=credentials.get("evaluation_enabled", "false").lower() == "true",
-        workflow_enabled=credentials.get("workflow_enabled", "false").lower() == "true"
+        evaluation_enabled=credentials.get("evaluation_enabled", "false").lower()
+        == "true",
+        workflow_enabled=credentials.get("workflow_enabled", "false").lower() == "true",
     )
-    
+
     return LangChainService(config)
 
 

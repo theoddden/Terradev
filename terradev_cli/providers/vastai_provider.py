@@ -31,7 +31,7 @@ class VastAIProvider(BaseProvider):
         # BYOAPI REQUIREMENT: No static fallback data - must have API key
         if not self.api_key:
             return []
-            
+
         # Try live API only - no static fallback
         try:
             live = await self._get_live_offers(gpu_type)
@@ -57,18 +57,20 @@ class VastAIProvider(BaseProvider):
         )
         quotes = []
         for offer in data.get("offers", [])[:5]:
-            quotes.append({
-                "instance_type": f"vastai-{offer.get('id', 'unknown')}",
-                "gpu_type": gpu_type,
-                "price_per_hour": offer.get("dph_total", 0),
-                "region": offer.get("geolocation", "unknown"),
-                "available": True,
-                "provider": "vastai",
-                "vcpus": offer.get("cpu_cores_effective", 0),
-                "memory_gb": offer.get("gpu_ram", 0) / 1024,
-                "gpu_count": offer.get("num_gpus", 1),
-                "spot": True,
-            })
+            quotes.append(
+                {
+                    "instance_type": f"vastai-{offer.get('id', 'unknown')}",
+                    "gpu_type": gpu_type,
+                    "price_per_hour": offer.get("dph_total", 0),
+                    "region": offer.get("geolocation", "unknown"),
+                    "available": True,
+                    "provider": "vastai",
+                    "vcpus": offer.get("cpu_cores_effective", 0),
+                    "memory_gb": offer.get("gpu_ram", 0) / 1024,
+                    "gpu_count": offer.get("num_gpus", 1),
+                    "spot": True,
+                }
+            )
         return sorted(quotes, key=lambda q: q["price_per_hour"])
 
     async def provision_instance(
@@ -99,8 +101,14 @@ class VastAIProvider(BaseProvider):
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("Vast.ai API key not configured")
-        data = await self._make_request("GET", f"{self.API_BASE}/instances/{instance_id}")
-        inst = data.get("instances", [{}])[0] if isinstance(data.get("instances"), list) else data
+        data = await self._make_request(
+            "GET", f"{self.API_BASE}/instances/{instance_id}"
+        )
+        inst = (
+            data.get("instances", [{}])[0]
+            if isinstance(data.get("instances"), list)
+            else data
+        )
         return {
             "instance_id": instance_id,
             "status": inst.get("actual_status", "unknown"),
@@ -110,26 +118,40 @@ class VastAIProvider(BaseProvider):
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("Vast.ai API key not configured")
-        await self._make_request("PUT", f"{self.API_BASE}/instances/{instance_id}/", json={"state": "stopped"})
+        await self._make_request(
+            "PUT",
+            f"{self.API_BASE}/instances/{instance_id}/",
+            json={"state": "stopped"},
+        )
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
 
     async def start_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("Vast.ai API key not configured")
-        await self._make_request("PUT", f"{self.API_BASE}/instances/{instance_id}/", json={"state": "running"})
+        await self._make_request(
+            "PUT",
+            f"{self.API_BASE}/instances/{instance_id}/",
+            json={"state": "running"},
+        )
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
 
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("Vast.ai API key not configured")
         await self._make_request("DELETE", f"{self.API_BASE}/instances/{instance_id}/")
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key:
             return []
         try:
-            data = await self._make_request("GET", f"{self.API_BASE}/instances?owner=me")
+            data = await self._make_request(
+                "GET", f"{self.API_BASE}/instances?owner=me"
+            )
             return [
                 {
                     "instance_id": str(i.get("id")),
@@ -150,20 +172,36 @@ class VastAIProvider(BaseProvider):
             raise Exception("Vast.ai API key not configured")
         # Vast.ai supports direct SSH — get instance SSH info first
         try:
-            data = await self._make_request("GET", f"{self.API_BASE}/instances/{instance_id}?owner=me")
-            inst = data.get("instances", [{}])[0] if isinstance(data.get("instances"), list) else data
+            data = await self._make_request(
+                "GET", f"{self.API_BASE}/instances/{instance_id}?owner=me"
+            )
+            inst = (
+                data.get("instances", [{}])[0]
+                if isinstance(data.get("instances"), list)
+                else data
+            )
             ssh_host = inst.get("ssh_host", "")
             ssh_port = inst.get("ssh_port", 22)
             if ssh_host:
                 import subprocess
+
                 ssh_cmd = [
-                    "ssh", "-o", "StrictHostKeyChecking=accept-new",
-                    "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                    "-o", "ConnectTimeout=10",
-                    "-p", str(ssh_port), f"root@{ssh_host}", command,
+                    "ssh",
+                    "-o",
+                    "StrictHostKeyChecking=accept-new",
+                    "-o",
+                    f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                    "-o",
+                    "ConnectTimeout=10",
+                    "-p",
+                    str(ssh_port),
+                    f"root@{ssh_host}",
+                    command,
                 ]
                 if async_exec:
-                    proc = subprocess.Popen(ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    proc = subprocess.Popen(
+                        ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    )
                     return {
                         "instance_id": instance_id,
                         "command": command,
@@ -172,7 +210,9 @@ class VastAIProvider(BaseProvider):
                         "output": f"Async SSH process started (PID: {proc.pid})",
                         "async": True,
                     }
-                result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=300)
+                result = subprocess.run(
+                    ssh_cmd, capture_output=True, text=True, timeout=300
+                )
                 return {
                     "instance_id": instance_id,
                     "command": command,
@@ -183,7 +223,8 @@ class VastAIProvider(BaseProvider):
                 }
             # Fallback: Vast.ai execute endpoint
             exec_data = await self._make_request(
-                "PUT", f"{self.API_BASE}/instances/{instance_id}/",
+                "PUT",
+                f"{self.API_BASE}/instances/{instance_id}/",
                 json={"command": command},
             )
             return {

@@ -28,10 +28,10 @@ from collections import defaultdict
 logger = logging.getLogger(__name__)
 
 # Priority levels for agentic request classification
-PRIORITY_CRITICAL = 0   # User-facing reactive agent, TTFT < 200ms
-PRIORITY_INTERACTIVE = 1 # Tool-calling agent mid-session, TTFT < 1s
+PRIORITY_CRITICAL = 0  # User-facing reactive agent, TTFT < 200ms
+PRIORITY_INTERACTIVE = 1  # Tool-calling agent mid-session, TTFT < 1s
 PRIORITY_BACKGROUND = 2  # Proactive agents (monitoring, indexing)
-PRIORITY_BATCH = 3       # Eval runs, training data generation
+PRIORITY_BATCH = 3  # Eval runs, training data generation
 
 PRIORITY_LABELS = {
     PRIORITY_CRITICAL: "critical",
@@ -50,6 +50,7 @@ _EMA_ALPHA = 0.3  # Exponential moving average decay for tool latency
 @dataclass
 class AgenticServingConfig:
     """Configuration for agentic inference serving."""
+
     # vLLM / SGLang engine settings
     engine: str = "vllm"  # "vllm" or "sglang"
     model: str = "meta-llama/Llama-3.1-8B-Instruct"
@@ -181,20 +182,24 @@ def parse_tool_calls(response_message: Dict[str, Any]) -> List[Dict[str, str]]:
     if tool_calls:
         for tc in tool_calls:
             fn = tc.get("function", {})
-            calls.append({
-                "name": fn.get("name", "_unknown"),
-                "call_id": tc.get("id", ""),
-                "arguments": fn.get("arguments", "{}"),
-            })
+            calls.append(
+                {
+                    "name": fn.get("name", "_unknown"),
+                    "call_id": tc.get("id", ""),
+                    "arguments": fn.get("arguments", "{}"),
+                }
+            )
         return calls
     # Legacy function_call
     fc = response_message.get("function_call")
     if fc:
-        calls.append({
-            "name": fc.get("name", "_unknown"),
-            "call_id": "",
-            "arguments": fc.get("arguments", "{}"),
-        })
+        calls.append(
+            {
+                "name": fc.get("name", "_unknown"),
+                "call_id": "",
+                "arguments": fc.get("arguments", "{}"),
+            }
+        )
     return calls
 
 
@@ -228,13 +233,19 @@ def build_request_metadata(
 def generate_vllm_args(config: AgenticServingConfig) -> List[str]:
     """Generate vLLM server launch arguments optimized for agentic workloads."""
     args = [
-        "--model", config.model,
-        "--tensor-parallel-size", str(config.tensor_parallel_size),
-        "--max-model-len", str(config.max_model_len),
-        "--gpu-memory-utilization", str(config.gpu_memory_utilization),
-        "--block-size", str(config.block_size),
+        "--model",
+        config.model,
+        "--tensor-parallel-size",
+        str(config.tensor_parallel_size),
+        "--max-model-len",
+        str(config.max_model_len),
+        "--gpu-memory-utilization",
+        str(config.gpu_memory_utilization),
+        "--block-size",
+        str(config.block_size),
         "--enable-auto-tool-choice",
-        "--tool-call-parser", "hermes",
+        "--tool-call-parser",
+        "hermes",
     ]
     if config.enable_prefix_caching:
         args.append("--enable-prefix-caching")
@@ -246,10 +257,14 @@ def generate_vllm_args(config: AgenticServingConfig) -> List[str]:
 def generate_sglang_args(config: AgenticServingConfig) -> List[str]:
     """Generate SGLang server launch arguments optimized for agentic workloads."""
     args = [
-        "--model-path", config.model,
-        "--tp", str(config.tensor_parallel_size),
-        "--context-length", str(config.max_model_len),
-        "--mem-fraction-static", str(config.gpu_memory_utilization),
+        "--model-path",
+        config.model,
+        "--tp",
+        str(config.tensor_parallel_size),
+        "--context-length",
+        str(config.max_model_len),
+        "--mem-fraction-static",
+        str(config.gpu_memory_utilization),
     ]
     if config.enable_prefix_caching:
         args.extend(["--enable-cache-report", "--chunked-prefill-size", "8192"])
@@ -282,7 +297,9 @@ def generate_lmcache_env(config: AgenticServingConfig) -> Dict[str, str]:
         return {}
     env = {
         "LMCACHE_ENABLED": "1",
-        "LMCACHE_LOCAL_DEVICE": config.lmcache_backend if config.lmcache_backend != "redis" else "cpu",
+        "LMCACHE_LOCAL_DEVICE": (
+            config.lmcache_backend if config.lmcache_backend != "redis" else "cpu"
+        ),
         "LMCACHE_CHUNK_SIZE": str(config.block_size),
     }
     if config.lmcache_backend == "cpu":
@@ -305,14 +322,20 @@ def generate_engine_env(config: AgenticServingConfig) -> Dict[str, str]:
     return env
 
 
-def generate_k8s_deployment(config: AgenticServingConfig, namespace: Optional[str] = None) -> str:
+def generate_k8s_deployment(
+    config: AgenticServingConfig, namespace: Optional[str] = None
+) -> str:
     """Generate K8s manifests for agentic-optimized inference deployment.
 
     Includes: vLLM/SGLang with prefix caching, LMCache sidecar config,
     priority-aware scheduling annotations, and optional PD disaggregation.
     """
     ns = namespace or config.namespace
-    engine_args = generate_vllm_args(config) if config.engine == "vllm" else generate_sglang_args(config)
+    engine_args = (
+        generate_vllm_args(config)
+        if config.engine == "vllm"
+        else generate_sglang_args(config)
+    )
     args_str = "\n".join(f'            - "{a}"' for a in engine_args)
     env_map = generate_engine_env(config)
     env_str = ""
@@ -473,7 +496,11 @@ spec:
 
 def generate_helm_values(config: AgenticServingConfig) -> Dict[str, Any]:
     """Generate Helm values for agentic inference deployment."""
-    engine_args = generate_vllm_args(config) if config.engine == "vllm" else generate_sglang_args(config)
+    engine_args = (
+        generate_vllm_args(config)
+        if config.engine == "vllm"
+        else generate_sglang_args(config)
+    )
     values: Dict[str, Any] = {
         "agenticInference": {
             "engine": config.engine,
@@ -486,7 +513,10 @@ def generate_helm_values(config: AgenticServingConfig) -> Dict[str, Any]:
                 "requests": {"cpu": "4", "memory": "16Gi"},
                 "limits": {"cpu": "16", "memory": "64Gi"},
             },
-            "prefixCaching": {"enabled": config.enable_prefix_caching, "blockSize": config.block_size},
+            "prefixCaching": {
+                "enabled": config.enable_prefix_caching,
+                "blockSize": config.block_size,
+            },
             "lmcache": generate_lmcache_config(config),
             "priorityScheduling": {"enabled": config.enable_priority_scheduling},
             "disaggregation": {
@@ -504,7 +534,9 @@ def generate_helm_values(config: AgenticServingConfig) -> Dict[str, Any]:
     return values
 
 
-def create_agentic_serving_from_credentials(credentials: Dict[str, str]) -> Tuple[AgenticServingConfig, ToolCallTracker]:
+def create_agentic_serving_from_credentials(
+    credentials: Dict[str, str]
+) -> Tuple[AgenticServingConfig, ToolCallTracker]:
     """Create AgenticServingConfig and ToolCallTracker from credential/config dict."""
     config = AgenticServingConfig(
         engine=credentials.get("engine", "vllm"),
@@ -512,11 +544,15 @@ def create_agentic_serving_from_credentials(credentials: Dict[str, str]) -> Tupl
         tensor_parallel_size=int(credentials.get("tensor_parallel_size", "1")),
         max_model_len=int(credentials.get("max_model_len", "32768")),
         gpu_memory_utilization=float(credentials.get("gpu_memory_utilization", "0.85")),
-        enable_prefix_caching=credentials.get("enable_prefix_caching", "true").lower() == "true",
+        enable_prefix_caching=credentials.get("enable_prefix_caching", "true").lower()
+        == "true",
         lmcache_enabled=credentials.get("lmcache_enabled", "true").lower() == "true",
         lmcache_backend=credentials.get("lmcache_backend", "cpu"),
         lmcache_redis_url=credentials.get("lmcache_redis_url"),
-        disaggregation_enabled=credentials.get("disaggregation_enabled", "false").lower() == "true",
+        disaggregation_enabled=credentials.get(
+            "disaggregation_enabled", "false"
+        ).lower()
+        == "true",
     )
     tracker = ToolCallTracker(config)
     return config, tracker

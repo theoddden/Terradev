@@ -29,10 +29,30 @@ OPTIONAL_CREDENTIALS = {
 def get_credential_prompts() -> List[Dict[str, str]]:
     """Return the list of credential prompts for interactive configure."""
     return [
-        {"key": "wandb_api_key", "prompt": "W&B API Key", "required": True, "hide": True},
-        {"key": "wandb_entity", "prompt": "W&B Entity (team/username, optional)", "required": False, "hide": False},
-        {"key": "wandb_project", "prompt": "W&B Project (optional, default: terradev)", "required": False, "hide": False},
-        {"key": "wandb_base_url", "prompt": "W&B Server URL (optional, for self-hosted)", "required": False, "hide": False},
+        {
+            "key": "wandb_api_key",
+            "prompt": "W&B API Key",
+            "required": True,
+            "hide": True,
+        },
+        {
+            "key": "wandb_entity",
+            "prompt": "W&B Entity (team/username, optional)",
+            "required": False,
+            "hide": False,
+        },
+        {
+            "key": "wandb_project",
+            "prompt": "W&B Project (optional, default: terradev)",
+            "required": False,
+            "hide": False,
+        },
+        {
+            "key": "wandb_base_url",
+            "prompt": "W&B Server URL (optional, for self-hosted)",
+            "required": False,
+            "hide": False,
+        },
     ]
 
 
@@ -108,7 +128,9 @@ def generate_setup_script(credentials: Dict[str, str]) -> str:
     lines.append("")
     lines.append("# Verify W&B connection (optional — requires wandb pip package)")
     lines.append("if command -v wandb &> /dev/null; then")
-    lines.append("    wandb login --relogin $WANDB_API_KEY 2>/dev/null && echo '✅ W&B connected'")
+    lines.append(
+        "    wandb login --relogin $WANDB_API_KEY 2>/dev/null && echo '✅ W&B connected'"
+    )
     lines.append("else")
     lines.append("    echo '💡 Install wandb: pip install wandb'")
     lines.append("fi")

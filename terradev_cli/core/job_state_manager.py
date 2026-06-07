@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 # Rust state machine integration
 try:
     from terradev_state_machine import JobStateMachine as RustJobStateMachine
+
     USE_RUST_STATE_MACHINE = True
     logger.info("Using Rust state machine for 10x faster transitions")
 except ImportError:
@@ -63,6 +64,7 @@ class CheckpointStatus(Enum):
 @dataclass
 class JobRecord:
     """A training job record."""
+
     id: str
     name: str
     framework: str
@@ -123,10 +125,16 @@ class JobRecord:
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
             "current_step": self.current_step,
             "total_steps": self.total_steps,
-            "progress_pct": round(self.current_step / self.total_steps * 100, 1) if self.total_steps else 0,
+            "progress_pct": (
+                round(self.current_step / self.total_steps * 100, 1)
+                if self.total_steps
+                else 0
+            ),
             "elapsed_hours": round(self.elapsed_hours, 2),
             "gpu_hours": round(self.gpu_hours, 2),
-            "eta_hours": round(self.eta_hours, 2) if self.eta_hours is not None else None,
+            "eta_hours": (
+                round(self.eta_hours, 2) if self.eta_hours is not None else None
+            ),
             "cost_usd": round(self.cost_usd, 4),
             "cost_per_gpu_hour": self.cost_per_gpu_hour,
             "efficiency_steps_per_gpuh": round(self.efficiency, 2),
@@ -138,6 +146,7 @@ class JobRecord:
 @dataclass
 class CheckpointRecord:
     """A checkpoint record."""
+
     id: str
     job_id: str
     step: int
@@ -204,9 +213,7 @@ class JobStateManager:
     """SQLite-backed job and checkpoint state manager."""
 
     def __init__(self, db_path: Optional[str] = None):
-        self.db_path = db_path or str(
-            Path.home() / ".terradev" / "jobs.db"
-        )
+        self.db_path = db_path or str(Path.home() / ".terradev" / "jobs.db")
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn: Optional[sqlite3.Connection] = None
         self._init_db()
@@ -225,24 +232,45 @@ class JobStateManager:
 
     # ── Job CRUD ──────────────────────────────────────────────────────────
 
-    def create_job(self, name: str, framework: str, config: Dict[str, Any],
-                   nodes: List[str], topology: Optional[Dict] = None,
-                   total_steps: int = 0) -> JobRecord:
+    def create_job(
+        self,
+        name: str,
+        framework: str,
+        config: Dict[str, Any],
+        nodes: List[str],
+        topology: Optional[Dict] = None,
+        total_steps: int = 0,
+    ) -> JobRecord:
         job_id = f"job-{uuid.uuid4().hex[:8]}"
         now = datetime.now()
         self._conn.execute(
             "INSERT INTO jobs (id, name, framework, status, config_json, "
             "topology_json, nodes_json, created_at, total_steps) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (job_id, name, framework, JobStatus.CREATED.value,
-             json.dumps(config), json.dumps(topology or {}),
-             json.dumps(nodes), now.isoformat(), total_steps)
+            (
+                job_id,
+                name,
+                framework,
+                JobStatus.CREATED.value,
+                json.dumps(config),
+                json.dumps(topology or {}),
+                json.dumps(nodes),
+                now.isoformat(),
+                total_steps,
+            ),
         )
         self._conn.commit()
-        return JobRecord(id=job_id, name=name, framework=framework,
-                         status=JobStatus.CREATED, config=config,
-                         topology=topology or {}, nodes=nodes,
-                         created_at=now, total_steps=total_steps)
+        return JobRecord(
+            id=job_id,
+            name=name,
+            framework=framework,
+            status=JobStatus.CREATED,
+            config=config,
+            topology=topology or {},
+            nodes=nodes,
+            created_at=now,
+            total_steps=total_steps,
+        )
 
     def get_job(self, job_id: str) -> Optional[JobRecord]:
         row = self._conn.execute(
@@ -250,12 +278,13 @@ class JobStateManager:
         ).fetchone()
         return self._row_to_job(row) if row else None
 
-    def list_jobs(self, status: Optional[str] = None,
-                  limit: int = 50) -> List[JobRecord]:
+    def list_jobs(
+        self, status: Optional[str] = None, limit: int = 50
+    ) -> List[JobRecord]:
         if status:
             rows = self._conn.execute(
                 "SELECT * FROM jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?",
-                (status, limit)
+                (status, limit),
             ).fetchall()
         else:
             rows = self._conn.execute(
@@ -263,8 +292,9 @@ class JobStateManager:
             ).fetchall()
         return [self._row_to_job(r) for r in rows]
 
-    def update_job_status(self, job_id: str, status: JobStatus,
-                          error_message: str = ""):
+    def update_job_status(
+        self, job_id: str, status: JobStatus, error_message: str = ""
+    ):
         updates = {"status": status.value}
         if status == JobStatus.RUNNING:
             updates["started_at"] = datetime.now().isoformat()
@@ -275,84 +305,109 @@ class JobStateManager:
 
         # SECURITY: Column name allowlist to prevent SQL injection
         ALLOWED_COLUMNS = {
-            "status", "current_step", "cost_usd", "started_at", "finished_at", 
-            "error_message", "provider", "instance_id", "gpu_type", "region"
+            "status",
+            "current_step",
+            "cost_usd",
+            "started_at",
+            "finished_at",
+            "error_message",
+            "provider",
+            "instance_id",
+            "gpu_type",
+            "region",
         }
         for k in updates:
             if k not in ALLOWED_COLUMNS:
                 raise ValueError(f"Invalid column name: {k}")
-        
+
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         self._conn.execute(
-            f"UPDATE jobs SET {set_clause} WHERE id = ?",
-            (*updates.values(), job_id)
+            f"UPDATE jobs SET {set_clause} WHERE id = ?", (*updates.values(), job_id)
         )
         self._conn.commit()
 
     def update_job_step(self, job_id: str, step: int, cost_usd: float = 0.0):
         self._conn.execute(
             "UPDATE jobs SET current_step = ?, cost_usd = cost_usd + ? WHERE id = ?",
-            (step, cost_usd, job_id)
+            (step, cost_usd, job_id),
         )
         self._conn.commit()
 
     def set_cost_rate(self, job_id: str, cost_per_gpu_hour: float):
         self._conn.execute(
             "UPDATE jobs SET cost_per_gpu_hour = ? WHERE id = ?",
-            (cost_per_gpu_hour, job_id)
+            (cost_per_gpu_hour, job_id),
         )
         self._conn.commit()
 
     def set_job_checkpoint(self, job_id: str, checkpoint_id: str):
         self._conn.execute(
             "UPDATE jobs SET last_checkpoint_id = ? WHERE id = ?",
-            (checkpoint_id, job_id)
+            (checkpoint_id, job_id),
         )
         self._conn.commit()
 
     # ── Checkpoint CRUD ───────────────────────────────────────────────────
 
-    def create_checkpoint(self, job_id: str, step: int, path: str,
-                          manifest: Optional[Dict] = None,
-                          size_bytes: int = 0) -> CheckpointRecord:
+    def create_checkpoint(
+        self,
+        job_id: str,
+        step: int,
+        path: str,
+        manifest: Optional[Dict] = None,
+        size_bytes: int = 0,
+    ) -> CheckpointRecord:
         ckpt_id = f"ckpt-{uuid.uuid4().hex[:8]}"
         now = datetime.now()
         self._conn.execute(
             "INSERT INTO checkpoints (id, job_id, step, path, manifest_json, "
             "size_bytes, created_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (ckpt_id, job_id, step, path, json.dumps(manifest or {}),
-             size_bytes, now.isoformat(), CheckpointStatus.WRITING.value)
+            (
+                ckpt_id,
+                job_id,
+                step,
+                path,
+                json.dumps(manifest or {}),
+                size_bytes,
+                now.isoformat(),
+                CheckpointStatus.WRITING.value,
+            ),
         )
         self._conn.commit()
-        return CheckpointRecord(id=ckpt_id, job_id=job_id, step=step,
-                                path=path, manifest=manifest or {},
-                                size_bytes=size_bytes, created_at=now)
+        return CheckpointRecord(
+            id=ckpt_id,
+            job_id=job_id,
+            step=step,
+            path=path,
+            manifest=manifest or {},
+            size_bytes=size_bytes,
+            created_at=now,
+        )
 
     def commit_checkpoint(self, checkpoint_id: str):
         self._conn.execute(
             "UPDATE checkpoints SET status = ? WHERE id = ?",
-            (CheckpointStatus.COMMITTED.value, checkpoint_id)
+            (CheckpointStatus.COMMITTED.value, checkpoint_id),
         )
         self._conn.commit()
 
     def fail_checkpoint(self, checkpoint_id: str):
         self._conn.execute(
             "UPDATE checkpoints SET status = ? WHERE id = ?",
-            (CheckpointStatus.FAILED.value, checkpoint_id)
+            (CheckpointStatus.FAILED.value, checkpoint_id),
         )
         self._conn.commit()
 
     def promote_checkpoint(self, checkpoint_id: str):
         self._conn.execute(
             "UPDATE checkpoints SET status = ?, promoted = 1 WHERE id = ?",
-            (CheckpointStatus.PROMOTED.value, checkpoint_id)
+            (CheckpointStatus.PROMOTED.value, checkpoint_id),
         )
         self._conn.commit()
 
     def list_checkpoints(self, job_id: str) -> List[CheckpointRecord]:
         rows = self._conn.execute(
-            "SELECT * FROM checkpoints WHERE job_id = ? ORDER BY step DESC",
-            (job_id,)
+            "SELECT * FROM checkpoints WHERE job_id = ? ORDER BY step DESC", (job_id,)
         ).fetchall()
         return [self._row_to_checkpoint(r) for r in rows]
 
@@ -360,7 +415,7 @@ class JobStateManager:
         row = self._conn.execute(
             "SELECT * FROM checkpoints WHERE job_id = ? AND status = ? "
             "ORDER BY step DESC LIMIT 1",
-            (job_id, CheckpointStatus.COMMITTED.value)
+            (job_id, CheckpointStatus.COMMITTED.value),
         ).fetchone()
         return self._row_to_checkpoint(row) if row else None
 
@@ -369,7 +424,7 @@ class JobStateManager:
         rows = self._conn.execute(
             "SELECT id FROM checkpoints WHERE job_id = ? AND status = ? "
             "ORDER BY step DESC",
-            (job_id, CheckpointStatus.COMMITTED.value)
+            (job_id, CheckpointStatus.COMMITTED.value),
         ).fetchall()
         to_delete = [r[0] for r in rows[keep:]]
         if to_delete:
@@ -377,7 +432,7 @@ class JobStateManager:
             placeholders = ",".join("?" * len(to_delete))
             self._conn.execute(
                 f"UPDATE checkpoints SET status = ? WHERE id IN ({placeholders})",
-                (CheckpointStatus.DELETED.value, *to_delete)
+                (CheckpointStatus.DELETED.value, *to_delete),
             )
             self._conn.commit()
         return len(to_delete)
@@ -413,7 +468,9 @@ class JobStateManager:
 
     def _row_to_job(self, row) -> JobRecord:
         return JobRecord(
-            id=row[0], name=row[1], framework=row[2],
+            id=row[0],
+            name=row[1],
+            framework=row[2],
             status=JobStatus(row[3]),
             config=json.loads(row[4]) if row[4] else {},
             topology=json.loads(row[5]) if row[5] else {},
@@ -431,7 +488,10 @@ class JobStateManager:
 
     def _row_to_checkpoint(self, row) -> CheckpointRecord:
         return CheckpointRecord(
-            id=row[0], job_id=row[1], step=row[2], path=row[3],
+            id=row[0],
+            job_id=row[1],
+            step=row[2],
+            path=row[3],
             manifest=json.loads(row[4]) if row[4] else {},
             size_bytes=row[5] or 0,
             created_at=datetime.fromisoformat(row[6]) if row[6] else None,

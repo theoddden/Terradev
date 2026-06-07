@@ -13,45 +13,132 @@ from .base_signal import BaseSignal, SignalResult, SignalType
 
 # Precompiled keyword sets for O(1) lookup
 _CODE_KEYWORDS: Set[str] = {
-    "code", "debug", "function", "class", "implement", "refactor",
-    "bug", "error", "compile", "syntax", "algorithm", "api",
-    "endpoint", "database", "sql", "query", "script", "test",
-    "unittest", "deploy", "docker", "kubernetes", "terraform",
-    "git", "commit", "merge", "pull request", "ci/cd", "pipeline",
-    "python", "javascript", "typescript", "rust", "golang", "java",
-    "c++", "html", "css", "react", "node", "fastapi", "flask",
-    "django", "pytorch", "tensorflow", "numpy", "pandas",
+    "code",
+    "debug",
+    "function",
+    "class",
+    "implement",
+    "refactor",
+    "bug",
+    "error",
+    "compile",
+    "syntax",
+    "algorithm",
+    "api",
+    "endpoint",
+    "database",
+    "sql",
+    "query",
+    "script",
+    "test",
+    "unittest",
+    "deploy",
+    "docker",
+    "kubernetes",
+    "terraform",
+    "git",
+    "commit",
+    "merge",
+    "pull request",
+    "ci/cd",
+    "pipeline",
+    "python",
+    "javascript",
+    "typescript",
+    "rust",
+    "golang",
+    "java",
+    "c++",
+    "html",
+    "css",
+    "react",
+    "node",
+    "fastapi",
+    "flask",
+    "django",
+    "pytorch",
+    "tensorflow",
+    "numpy",
+    "pandas",
 }
 
 _MATH_KEYWORDS: Set[str] = {
-    "calculate", "equation", "integral", "derivative", "matrix",
-    "probability", "statistics", "regression", "optimization",
-    "proof", "theorem", "formula", "algebra", "calculus",
-    "linear", "polynomial", "eigenvalue", "gradient",
+    "calculate",
+    "equation",
+    "integral",
+    "derivative",
+    "matrix",
+    "probability",
+    "statistics",
+    "regression",
+    "optimization",
+    "proof",
+    "theorem",
+    "formula",
+    "algebra",
+    "calculus",
+    "linear",
+    "polynomial",
+    "eigenvalue",
+    "gradient",
 }
 
 _CREATIVE_KEYWORDS: Set[str] = {
-    "write", "story", "poem", "creative", "fiction", "essay",
-    "blog", "article", "narrative", "character", "dialogue",
-    "metaphor", "brainstorm", "imagine", "design",
+    "write",
+    "story",
+    "poem",
+    "creative",
+    "fiction",
+    "essay",
+    "blog",
+    "article",
+    "narrative",
+    "character",
+    "dialogue",
+    "metaphor",
+    "brainstorm",
+    "imagine",
+    "design",
 }
 
 _REASONING_KEYWORDS: Set[str] = {
-    "explain", "analyze", "compare", "evaluate", "reason",
-    "think step by step", "chain of thought", "let's think",
-    "why", "how does", "what if", "trade-off", "pros and cons",
+    "explain",
+    "analyze",
+    "compare",
+    "evaluate",
+    "reason",
+    "think step by step",
+    "chain of thought",
+    "let's think",
+    "why",
+    "how does",
+    "what if",
+    "trade-off",
+    "pros and cons",
 }
 
 _VISION_KEYWORDS: Set[str] = {
-    "image", "picture", "photo", "screenshot", "diagram",
-    "chart", "graph", "visual", "look at", "describe this image",
-    "what's in this", "ocr", "scan",
+    "image",
+    "picture",
+    "photo",
+    "screenshot",
+    "diagram",
+    "chart",
+    "graph",
+    "visual",
+    "look at",
+    "describe this image",
+    "what's in this",
+    "ocr",
+    "scan",
 }
 
 # Patterns that indicate specific routing needs
-_CODE_BLOCK_PATTERN = re.compile(r'```[\s\S]*?```')
-_URL_PATTERN = re.compile(r'https?://\S+')
-_FILE_PATH_PATTERN = re.compile(r'(?:/[\w.-]+)+(?:\.\w+)?|[\w.-]+\.(?:py|js|ts|go|rs|java|cpp|h|yaml|json|toml|sql)')
+_CODE_BLOCK_PATTERN = re.compile(r"```[\s\S]*?```")
+_URL_PATTERN = re.compile(r"https?://\S+")
+_FILE_PATH_PATTERN = re.compile(
+    r"(?:/[\w.-]+)+(?:\.\w+)?|[\w.-]+\.(?:py|js|ts|go|rs|java|cpp|h|yaml|json|toml|sql)"
+)
 
 
 class KeywordSignal(BaseSignal):
@@ -66,8 +153,12 @@ class KeywordSignal(BaseSignal):
       - "dominant_category": str — the strongest keyword match
     """
 
-    def __init__(self, custom_keywords: Dict[str, Set[str]] = None, enabled: bool = True):
-        super().__init__(name="keyword", signal_type=SignalType.KEYWORD, enabled=enabled)
+    def __init__(
+        self, custom_keywords: Dict[str, Set[str]] = None, enabled: bool = True
+    ):
+        super().__init__(
+            name="keyword", signal_type=SignalType.KEYWORD, enabled=enabled
+        )
         self.keyword_sets = {
             "code": _CODE_KEYWORDS,
             "math": _MATH_KEYWORDS,
@@ -80,7 +171,7 @@ class KeywordSignal(BaseSignal):
 
     def extract(self, query: Dict[str, Any]) -> SignalResult:
         content = self._get_content(query).lower()
-        words = set(re.findall(r'\b\w+(?:[/+.-]\w+)*\b', content))
+        words = set(re.findall(r"\b\w+(?:[/+.-]\w+)*\b", content))
 
         # Count matches per category
         scores: Dict[str, int] = {}

@@ -16,6 +16,7 @@ import uuid
 from pathlib import Path
 
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from .config import TerradevConfig
     from .auth import AuthManager
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Rust governance integration
 try:
     from terradev_governance import GovernanceEngine
+
     USE_RUST_GOVERNANCE = True
     logger.info("Using Rust governance for 5-10x faster policy evaluation")
 except ImportError:
@@ -166,13 +168,34 @@ class DataGovernanceManager:
     def _initialize_opa_policies(self):
         """Initialize OPA policies for data governance"""
         # Derive allowed regions/providers from config if available, else use defaults
-        allowed_regions = ["us-east-1", "us-west-2", "eu-west-1", "us-central1", "eastus"]
-        allowed_providers = ["aws", "gcp", "azure", "runpod", "vastai", "lambda_labs",
-                             "coreweave", "tensordock", "huggingface", "baseten", "oracle"]
+        allowed_regions = [
+            "us-east-1",
+            "us-west-2",
+            "eu-west-1",
+            "us-central1",
+            "eastus",
+        ]
+        allowed_providers = [
+            "aws",
+            "gcp",
+            "azure",
+            "runpod",
+            "vastai",
+            "lambda_labs",
+            "coreweave",
+            "tensordock",
+            "huggingface",
+            "baseten",
+            "oracle",
+        ]
         if self.config:
             try:
-                allowed_regions = getattr(self.config, 'preferred_regions', allowed_regions)
-                allowed_providers = getattr(self.config, 'default_providers', allowed_providers)
+                allowed_regions = getattr(
+                    self.config, "preferred_regions", allowed_regions
+                )
+                allowed_providers = getattr(
+                    self.config, "default_providers", allowed_providers
+                )
             except Exception:
                 pass
 
@@ -192,15 +215,20 @@ class DataGovernanceManager:
             "residency_constraints": {
                 "policy_id": "data.residency.constraints",
                 "description": "Enforces data residency requirements",
-                "residency_rules": {"US": ["us-east-1", "us-west-2", "us-central1"],
-                                     "EU": ["eu-west-1", "europe-west1"]},
+                "residency_rules": {
+                    "US": ["us-east-1", "us-west-2", "us-central1"],
+                    "EU": ["eu-west-1", "europe-west1"],
+                },
                 "exceptions": ["emergency_relocation"],
             },
             "data_classification": {
                 "policy_id": "data.classification.restrictions",
                 "description": "Restricts movement based on data sensitivity",
-                "classification_rules": {"public": "any", "confidential": "same_provider",
-                                          "restricted": "same_region"},
+                "classification_rules": {
+                    "public": "any",
+                    "confidential": "same_provider",
+                    "restricted": "same_region",
+                },
                 "exceptions": [],
             },
         }

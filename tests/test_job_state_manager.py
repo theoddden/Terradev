@@ -125,7 +125,9 @@ class TestStepCostTracking:
 class TestComputedProperties:
     def test_gpu_count_default(self):
         job = JobRecord(
-            id="j1", name="test", framework="torchrun",
+            id="j1",
+            name="test",
+            framework="torchrun",
             status=JobStatus.RUNNING,
             nodes=["10.0.0.1", "10.0.0.2"],
             config={"gpus_per_node": 8},
@@ -134,7 +136,9 @@ class TestComputedProperties:
 
     def test_gpu_count_single_node(self):
         job = JobRecord(
-            id="j1", name="test", framework="torchrun",
+            id="j1",
+            name="test",
+            framework="torchrun",
             status=JobStatus.RUNNING,
             nodes=[],
             config={},
@@ -144,7 +148,9 @@ class TestComputedProperties:
 
     def test_elapsed_hours(self):
         job = JobRecord(
-            id="j1", name="test", framework="torchrun",
+            id="j1",
+            name="test",
+            framework="torchrun",
             status=JobStatus.RUNNING,
             started_at=datetime.now() - timedelta(hours=2),
         )
@@ -152,14 +158,18 @@ class TestComputedProperties:
 
     def test_elapsed_hours_no_start(self):
         job = JobRecord(
-            id="j1", name="test", framework="torchrun",
+            id="j1",
+            name="test",
+            framework="torchrun",
             status=JobStatus.CREATED,
         )
         assert job.elapsed_hours == 0.0
 
     def test_gpu_hours(self):
         job = JobRecord(
-            id="j1", name="test", framework="torchrun",
+            id="j1",
+            name="test",
+            framework="torchrun",
             status=JobStatus.RUNNING,
             nodes=["10.0.0.1"],
             config={"gpus_per_node": 4},
@@ -170,7 +180,9 @@ class TestComputedProperties:
 
     def test_eta_hours(self):
         job = JobRecord(
-            id="j1", name="test", framework="torchrun",
+            id="j1",
+            name="test",
+            framework="torchrun",
             status=JobStatus.RUNNING,
             started_at=datetime.now() - timedelta(hours=1),
             current_step=500,
@@ -184,7 +196,9 @@ class TestComputedProperties:
 
     def test_eta_hours_no_progress(self):
         job = JobRecord(
-            id="j1", name="test", framework="torchrun",
+            id="j1",
+            name="test",
+            framework="torchrun",
             status=JobStatus.RUNNING,
             started_at=datetime.now(),
             current_step=0,
@@ -194,7 +208,9 @@ class TestComputedProperties:
 
     def test_efficiency(self):
         job = JobRecord(
-            id="j1", name="test", framework="torchrun",
+            id="j1",
+            name="test",
+            framework="torchrun",
             status=JobStatus.RUNNING,
             nodes=["10.0.0.1"],
             config={"gpus_per_node": 8},
@@ -206,7 +222,9 @@ class TestComputedProperties:
 
     def test_to_dict_keys(self):
         job = JobRecord(
-            id="j1", name="test", framework="torchrun",
+            id="j1",
+            name="test",
+            framework="torchrun",
             status=JobStatus.RUNNING,
             started_at=datetime.now(),
             current_step=50,

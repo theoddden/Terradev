@@ -16,6 +16,7 @@ from pathlib import Path
 @dataclass
 class DVCConfig:
     """DVC configuration"""
+
     repo_path: str
     remote_storage: Optional[str] = None
     remote_type: Optional[str] = None  # s3, gs, azure, ssh, etc.
@@ -27,34 +28,31 @@ class DVCConfig:
 
 class DVCService:
     """DVC integration service for data versioning and storage"""
-    
+
     def __init__(self, config: DVCConfig):
         self.config = config
         self.repo_path = Path(config.repo_path)
-        
+
     async def __aenter__(self):
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass
-        
+
     async def test_connection(self) -> Dict[str, Any]:
         """Test DVC installation and repository status"""
         try:
             # Check if DVC is installed
             result = subprocess.run(
-                ["dvc", "version"],
-                capture_output=True,
-                text=True,
-                timeout=10
+                ["dvc", "version"], capture_output=True, text=True, timeout=10
             )
-            
+
             if result.returncode != 0:
                 return {
                     "status": "failed",
-                    "error": "DVC not installed. Run: pip install dvc"
+                    "error": "DVC not installed. Run: pip install dvc",
                 }
-            
+
             # Check if we're in a DVC repository
             result = subprocess.run(
                 ["dvc", "status"],
@@ -63,75 +61,78 @@ class DVCService:
                 timeout=10,
                 cwd=str(self.repo_path),
             )
-            
+
             if result.returncode == 0:
                 return {
                     "status": "connected",
                     "dvc_version": result.stdout.split()[2],
                     "repo_path": str(self.repo_path),
-                    "remote_storage": self.config.remote_storage
+                    "remote_storage": self.config.remote_storage,
                 }
             else:
                 return {
                     "status": "not_initialized",
-                    "error": "Not a DVC repository. Run 'dvc init' first."
+                    "error": "Not a DVC repository. Run 'dvc init' first.",
                 }
-                
+
         except FileNotFoundError:
             return {
                 "status": "failed",
-                "error": "DVC not installed. Run: pip install dvc"
+                "error": "DVC not installed. Run: pip install dvc",
             }
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def init_repo(self, force: bool = False) -> Dict[str, Any]:
         """Initialize a DVC repository"""
         try:
             cmd = ["dvc", "init"]
             if force:
                 cmd.append("--force")
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=str(self.repo_path))
-            
+
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30, cwd=str(self.repo_path)
+            )
+
             if result.returncode == 0:
                 return {
                     "status": "initialized",
                     "repo_path": str(self.repo_path),
-                    "output": result.stdout
+                    "output": result.stdout,
                 }
             else:
                 raise Exception(f"Failed to initialize DVC repo: {result.stderr}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to initialize DVC repository: {e}")
-    
-    async def add_remote(self, name: str, url: str, remote_type: str = None) -> Dict[str, Any]:
+
+    async def add_remote(
+        self, name: str, url: str, remote_type: str = None
+    ) -> Dict[str, Any]:
         """Add a remote storage location"""
         try:
             cmd = ["dvc", "remote", "add", "-d", name, url]
             if remote_type:
                 cmd.extend(["--type", remote_type])
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=str(self.repo_path))
-            
+
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30, cwd=str(self.repo_path)
+            )
+
             if result.returncode == 0:
                 return {
                     "status": "added",
                     "name": name,
                     "url": url,
                     "type": remote_type,
-                    "output": result.stdout
+                    "output": result.stdout,
                 }
             else:
                 raise Exception(f"Failed to add remote: {result.stderr}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to add remote {name}: {e}")
-    
+
     async def list_remotes(self) -> List[Dict[str, Any]]:
         """List all configured remotes"""
         try:
@@ -142,24 +143,21 @@ class DVCService:
                 timeout=10,
                 cwd=str(self.repo_path),
             )
-            
+
             if result.returncode == 0:
                 remotes = []
-                for line in result.stdout.strip().split('\n'):
+                for line in result.stdout.strip().split("\n"):
                     if line.strip():
                         parts = line.split()
                         if len(parts) >= 2:
-                            remotes.append({
-                                "name": parts[0],
-                                "url": parts[1]
-                            })
+                            remotes.append({"name": parts[0], "url": parts[1]})
                 return remotes
             else:
                 return []
-                
+
         except Exception as e:
             raise Exception(f"Failed to list remotes: {e}")
-    
+
     async def add_data(self, data_path: str) -> Dict[str, Any]:
         """Add data file/directory to DVC tracking"""
         try:
@@ -170,61 +168,73 @@ class DVCService:
                 timeout=60,
                 cwd=str(self.repo_path),
             )
-            
+
             if result.returncode == 0:
                 return {
                     "status": "added",
                     "data_path": data_path,
-                    "output": result.stdout
+                    "output": result.stdout,
                 }
             else:
                 raise Exception(f"Failed to add data {data_path}: {result.stderr}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to add data {data_path}: {e}")
-    
+
     async def push_data(self, targets: Optional[List[str]] = None) -> Dict[str, Any]:
         """Push data to remote storage"""
         try:
             cmd = ["dvc", "push"]
             if targets:
                 cmd.extend(targets)
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=str(self.repo_path))
-            
+
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=str(self.repo_path),
+            )
+
             if result.returncode == 0:
                 return {
                     "status": "pushed",
                     "targets": targets or "all",
-                    "output": result.stdout
+                    "output": result.stdout,
                 }
             else:
                 raise Exception(f"Failed to push data: {result.stderr}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to push data: {e}")
-    
+
     async def pull_data(self, targets: Optional[List[str]] = None) -> Dict[str, Any]:
         """Pull data from remote storage"""
         try:
             cmd = ["dvc", "pull"]
             if targets:
                 cmd.extend(targets)
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=str(self.repo_path))
-            
+
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=str(self.repo_path),
+            )
+
             if result.returncode == 0:
                 return {
                     "status": "pulled",
                     "targets": targets or "all",
-                    "output": result.stdout
+                    "output": result.stdout,
                 }
             else:
                 raise Exception(f"Failed to pull data: {result.stderr}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to pull data: {e}")
-    
+
     async def get_status(self) -> Dict[str, Any]:
         """Get DVC repository status"""
         try:
@@ -235,53 +245,52 @@ class DVCService:
                 timeout=30,
                 cwd=str(self.repo_path),
             )
-            
+
             if result.returncode == 0:
                 # Parse status output
-                status_lines = result.stdout.strip().split('\n')
-                status_info = {
-                    "status": "ok",
-                    "details": status_lines
-                }
-                
+                status_lines = result.stdout.strip().split("\n")
+                status_info = {"status": "ok", "details": status_lines}
+
                 # Check for changes
                 if "different" in result.stdout or "new" in result.stdout:
                     status_info["has_changes"] = True
                 else:
                     status_info["has_changes"] = False
-                
+
                 return status_info
             else:
                 raise Exception(f"Failed to get status: {result.stderr}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to get status: {e}")
-    
+
     async def list_tracked_files(self) -> List[Dict[str, Any]]:
         """List all DVC tracked files"""
         try:
             # Read .dvc files to get tracked data
             dvc_files = list(self.repo_path.glob("**/*.dvc"))
             tracked_files = []
-            
+
             for dvc_file in dvc_files:
                 try:
-                    with open(dvc_file, 'r') as f:
+                    with open(dvc_file, "r") as f:
                         dvc_content = json.load(f)
-                    
-                    tracked_files.append({
-                        "dvc_file": str(dvc_file.relative_to(self.repo_path)),
-                        "outs": dvc_content.get("outs", []),
-                        "md5": dvc_content.get("md5", "")
-                    })
+
+                    tracked_files.append(
+                        {
+                            "dvc_file": str(dvc_file.relative_to(self.repo_path)),
+                            "outs": dvc_content.get("outs", []),
+                            "md5": dvc_content.get("md5", ""),
+                        }
+                    )
                 except Exception:
                     continue
-            
+
             return tracked_files
-            
+
         except Exception as e:
             raise Exception(f"Failed to list tracked files: {e}")
-    
+
     async def cleanup_cache(self) -> Dict[str, Any]:
         """Clean up DVC cache"""
         try:
@@ -292,10 +301,10 @@ class DVCService:
                 timeout=10,
                 cwd=str(self.repo_path),
             )
-            
+
             if result.returncode == 0:
                 cache_dir = result.stdout.strip()
-                
+
                 # Run cleanup
                 result = subprocess.run(
                     ["dvc", "gc"],
@@ -304,24 +313,26 @@ class DVCService:
                     timeout=60,
                     cwd=str(self.repo_path),
                 )
-                
+
                 if result.returncode == 0:
                     return {
                         "status": "cleaned",
                         "cache_dir": cache_dir,
-                        "output": result.stdout
+                        "output": result.stdout,
                     }
                 else:
                     raise Exception(f"Failed to cleanup cache: {result.stderr}")
             else:
                 raise Exception(f"Failed to get cache directory: {result.stderr}")
-                
+
         except Exception as e:
             raise Exception(f"Failed to cleanup cache: {e}")
-    
+
     # ── Terradev-specific: checkpoint integration ──────────────────
 
-    async def dvc_diff(self, rev_a: str = "HEAD", rev_b: Optional[str] = None) -> Dict[str, Any]:
+    async def dvc_diff(
+        self, rev_a: str = "HEAD", rev_b: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Show what changed between two DVC revisions (e.g. training checkpoints).
 
         If rev_b is None, diffs rev_a against the current workspace.
@@ -390,7 +401,11 @@ class DVCService:
         results["steps"].append({"action": "dvc_add", **add_result})
 
         # Step 2: DVC push
-        push_targets = [f"{checkpoint_path}.dvc"] if not checkpoint_path.endswith(".dvc") else [checkpoint_path]
+        push_targets = (
+            [f"{checkpoint_path}.dvc"]
+            if not checkpoint_path.endswith(".dvc")
+            else [checkpoint_path]
+        )
         try:
             # If a specific remote is requested, configure it for this push
             push_cmd = ["dvc", "push"]
@@ -406,12 +421,18 @@ class DVCService:
                 cwd=str(self.repo_path),
             )
             if push_proc.returncode == 0:
-                push_info = {"status": "pushed", "targets": push_targets, "output": push_proc.stdout}
+                push_info = {
+                    "status": "pushed",
+                    "targets": push_targets,
+                    "output": push_proc.stdout,
+                }
             else:
                 push_info = {"status": "push_failed", "error": push_proc.stderr}
             results["steps"].append({"action": "dvc_push", **push_info})
         except Exception as e:
-            results["steps"].append({"action": "dvc_push", "status": "error", "error": str(e)})
+            results["steps"].append(
+                {"action": "dvc_push", "status": "error", "error": str(e)}
+            )
 
         # Step 3: Git commit (optional)
         if commit_message:
@@ -432,33 +453,52 @@ class DVCService:
                     cwd=str(self.repo_path),
                 )
                 if git_commit.returncode == 0:
-                    results["steps"].append({"action": "git_commit", "status": "committed", "message": commit_message})
+                    results["steps"].append(
+                        {
+                            "action": "git_commit",
+                            "status": "committed",
+                            "message": commit_message,
+                        }
+                    )
                 else:
-                    results["steps"].append({"action": "git_commit", "status": "failed", "error": git_commit.stderr})
+                    results["steps"].append(
+                        {
+                            "action": "git_commit",
+                            "status": "failed",
+                            "error": git_commit.stderr,
+                        }
+                    )
             except Exception as e:
-                results["steps"].append({"action": "git_commit", "status": "error", "error": str(e)})
+                results["steps"].append(
+                    {"action": "git_commit", "status": "error", "error": str(e)}
+                )
 
         # Summarize
-        all_ok = all(s.get("status") not in ("push_failed", "failed", "error") for s in results["steps"])
+        all_ok = all(
+            s.get("status") not in ("push_failed", "failed", "error")
+            for s in results["steps"]
+        )
         results["status"] = "completed" if all_ok else "partial_failure"
         return results
 
     def get_environment_config(self) -> Dict[str, str]:
         """Get environment variables for DVC"""
         config = {}
-        
+
         if self.config.aws_access_key_id:
             config["AWS_ACCESS_KEY_ID"] = self.config.aws_access_key_id
-            
+
         if self.config.aws_secret_access_key:
             config["AWS_SECRET_ACCESS_KEY"] = self.config.aws_secret_access_key
-            
+
         if self.config.gcp_credentials_path:
             config["GOOGLE_APPLICATION_CREDENTIALS"] = self.config.gcp_credentials_path
-            
+
         if self.config.azure_connection_string:
-            config["AZURE_STORAGE_CONNECTION_STRING"] = self.config.azure_connection_string
-            
+            config["AZURE_STORAGE_CONNECTION_STRING"] = (
+                self.config.azure_connection_string
+            )
+
         return config
 
 
@@ -471,9 +511,9 @@ def create_dvc_service_from_credentials(credentials: Dict[str, str]) -> DVCServi
         aws_access_key_id=credentials.get("aws_access_key_id"),
         aws_secret_access_key=credentials.get("aws_secret_access_key"),
         gcp_credentials_path=credentials.get("gcp_credentials_path"),
-        azure_connection_string=credentials.get("azure_connection_string")
+        azure_connection_string=credentials.get("azure_connection_string"),
     )
-    
+
     return DVCService(config)
 
 

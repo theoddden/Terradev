@@ -5,6 +5,4 @@ Parallel provisioning and orchestration for optimized compute costs
 
 __version__ = "5.0.1"
 __author__ = "Terradev Team"
-__description__ = (
-    "Open Source BYOAPI Multi-Cloud GPU Infrastructure Platform"
-)
+__description__ = "Open Source BYOAPI Multi-Cloud GPU Infrastructure Platform"

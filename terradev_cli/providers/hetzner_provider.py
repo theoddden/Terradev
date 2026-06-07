@@ -81,6 +81,7 @@ class HetznerProvider(BaseProvider):
         """Return aiohttp.BasicAuth for Robot API."""
         if self.robot_user and self.robot_password:
             import aiohttp
+
             return aiohttp.BasicAuth(self.robot_user, self.robot_password)
         return None
 
@@ -105,17 +106,26 @@ class HetznerProvider(BaseProvider):
                 robot_quotes = await self._get_robot_gpu_products(gpu_type)
                 # CRITICAL: Add traffic allowance monitoring
                 for quote in robot_quotes:
-                    traffic_info = await self.traffic_monitor.get_traffic_allowance(quote["instance_type"])
-                    quote.update({
-                        "traffic_allowance_gb": traffic_info["allowance_gb"],
-                        "traffic_used_gb": traffic_info["used_gb"],
-                        "traffic_remaining_gb": traffic_info["remaining_gb"],
-                        "overage_cost_per_gb": 0.01,  # Hetzner overage cost
-                        "overage_warning": traffic_info["remaining_gb"] < 100,  # Warn if < 100GB left
-                        "gpu_enterprise_suitable": await self._check_gpu_enterprise_suitability(gpu_type),
-                        "order_fulfillment_days": await self._get_order_fulfillment_time(quote["instance_type"]),
-                        "public_ip_billing": "included_in_price",
-                    })
+                    traffic_info = await self.traffic_monitor.get_traffic_allowance(
+                        quote["instance_type"]
+                    )
+                    quote.update(
+                        {
+                            "traffic_allowance_gb": traffic_info["allowance_gb"],
+                            "traffic_used_gb": traffic_info["used_gb"],
+                            "traffic_remaining_gb": traffic_info["remaining_gb"],
+                            "overage_cost_per_gb": 0.01,  # Hetzner overage cost
+                            "overage_warning": traffic_info["remaining_gb"]
+                            < 100,  # Warn if < 100GB left
+                            "gpu_enterprise_suitable": await self._check_gpu_enterprise_suitability(
+                                gpu_type
+                            ),
+                            "order_fulfillment_days": await self._get_order_fulfillment_time(
+                                quote["instance_type"]
+                            ),
+                            "public_ip_billing": "included_in_price",
+                        }
+                    )
                 quotes.extend(robot_quotes)
             except Exception as e:
                 logger.debug(f"Hetzner Robot API error: {e}")
@@ -168,8 +178,7 @@ class HetznerProvider(BaseProvider):
 
             # Check location availability
             available_locations = [
-                p.get("location", {}).get("name", "")
-                for p in st.get("prices", [])
+                p.get("location", {}).get("name", "") for p in st.get("prices", [])
             ]
             if region and region not in available_locations:
                 continue
@@ -224,10 +233,14 @@ class HetznerProvider(BaseProvider):
 
         quotes = []
         gpu_upper = gpu_type.upper()
-        for product in (data if isinstance(data, list) else data.get("product", [])):
+        for product in data if isinstance(data, list) else data.get("product", []):
             p = product.get("product", product)
             name = p.get("name", "").upper()
-            desc = ", ".join(p.get("description", [])) if isinstance(p.get("description"), list) else str(p.get("description", ""))
+            desc = (
+                ", ".join(p.get("description", []))
+                if isinstance(p.get("description"), list)
+                else str(p.get("description", ""))
+            )
             if "GPU" not in name and "GEX" not in name and "GPU" not in desc.upper():
                 continue
             if gpu_upper not in name and gpu_upper not in desc.upper():
@@ -293,13 +306,13 @@ class HetznerProvider(BaseProvider):
             "labels": {"terradev": "true", "gpu_type": gpu_type.lower()},
         }
 
-        data = await self._make_request(
-            "POST", f"{self.CLOUD_API}/servers", json=body
-        )
+        data = await self._make_request("POST", f"{self.CLOUD_API}/servers", json=body)
 
         server = data.get("server", {})
         return {
-            "instance_id": str(server.get("id", f"hetzner-{datetime.now().strftime('%Y%m%d%H%M%S')}")),
+            "instance_id": str(
+                server.get("id", f"hetzner-{datetime.now().strftime('%Y%m%d%H%M%S')}")
+            ),
             "instance_type": instance_type,
             "region": region,
             "gpu_type": gpu_type,
@@ -317,7 +330,9 @@ class HetznerProvider(BaseProvider):
 
         auth = self._get_robot_auth()
         if not auth:
-            raise Exception("Hetzner Robot credentials not configured for dedicated GPU")
+            raise Exception(
+                "Hetzner Robot credentials not configured for dedicated GPU"
+            )
 
         if not self.session:
             self.session = aiohttp.ClientSession()
@@ -341,7 +356,11 @@ class HetznerProvider(BaseProvider):
 
         transaction = data.get("transaction", data)
         return {
-            "instance_id": str(transaction.get("id", f"hetzner-ded-{datetime.now().strftime('%Y%m%d%H%M%S')}")),
+            "instance_id": str(
+                transaction.get(
+                    "id", f"hetzner-ded-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                )
+            ),
             "instance_type": instance_type,
             "region": region,
             "gpu_type": gpu_type,
@@ -365,7 +384,9 @@ class HetznerProvider(BaseProvider):
             "instance_id": instance_id,
             "status": server.get("status", "unknown"),
             "instance_type": server.get("server_type", {}).get("name", "unknown"),
-            "region": server.get("datacenter", {}).get("location", {}).get("name", "unknown"),
+            "region": server.get("datacenter", {})
+            .get("location", {})
+            .get("name", "unknown"),
             "provider": "hetzner",
             "public_ip": server.get("public_net", {}).get("ipv4", {}).get("ip"),
         }
@@ -389,10 +410,12 @@ class HetznerProvider(BaseProvider):
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_token:
             raise Exception("Hetzner Cloud API token not configured")
-        await self._make_request(
-            "DELETE", f"{self.CLOUD_API}/servers/{instance_id}"
-        )
-        return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
+        await self._make_request("DELETE", f"{self.CLOUD_API}/servers/{instance_id}")
+        return {
+            "instance_id": instance_id,
+            "action": "terminate",
+            "status": "terminating",
+        }
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_token:
@@ -406,7 +429,9 @@ class HetznerProvider(BaseProvider):
                     "instance_id": str(s.get("id", "unknown")),
                     "status": s.get("status", "unknown"),
                     "instance_type": s.get("server_type", {}).get("name", "unknown"),
-                    "region": s.get("datacenter", {}).get("location", {}).get("name", "unknown"),
+                    "region": s.get("datacenter", {})
+                    .get("location", {})
+                    .get("name", "unknown"),
                     "provider": "hetzner",
                     "public_ip": s.get("public_net", {}).get("ipv4", {}).get("ip"),
                 }
@@ -435,15 +460,23 @@ class HetznerProvider(BaseProvider):
                 }
 
             import subprocess
+
             ssh_cmd = [
-                "ssh", "-o", "StrictHostKeyChecking=accept-new",
-                "-o", f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                "-o", "ConnectTimeout=10",
-                f"root@{public_ip}", command,
+                "ssh",
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                "-o",
+                "ConnectTimeout=10",
+                f"root@{public_ip}",
+                command,
             ]
 
             if async_exec:
-                proc = subprocess.Popen(ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                proc = subprocess.Popen(
+                    ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
                 return {
                     "instance_id": instance_id,
                     "command": command,
@@ -453,7 +486,9 @@ class HetznerProvider(BaseProvider):
                     "async": True,
                 }
 
-            result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                ssh_cmd, capture_output=True, text=True, timeout=300
+            )
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -487,7 +522,7 @@ class HetznerProvider(BaseProvider):
         """List SSH keys."""
         data = await self._make_request("GET", f"{self.CLOUD_API}/ssh_keys")
         return data.get("ssh_keys", [])
-    
+
     async def _check_gpu_enterprise_suitability(self, gpu_type: str) -> Dict[str, Any]:
         """CRITICAL: Check if GPU is suitable for enterprise workloads"""
         gpu_suitability = {
@@ -500,19 +535,27 @@ class HetznerProvider(BaseProvider):
                     "Not optimized for ML training",
                     "Consumer warranty and support",
                 ],
-                "recommended_for": ["Development", "Testing", "Light inference", "Small batch processing"],
+                "recommended_for": [
+                    "Development",
+                    "Testing",
+                    "Light inference",
+                    "Small batch processing",
+                ],
                 "alternatives": ["AWS G4dn", "Azure NCasT4_v3", "GCP T4"],
             },
         }
-        
-        return gpu_suitability.get(gpu_type, {
-            "enterprise_suitable": False,
-            "reason": "Unknown GPU type - verify enterprise requirements",
-            "limitations": ["Unknown enterprise suitability"],
-            "recommended_for": [],
-            "alternatives": [],
-        })
-    
+
+        return gpu_suitability.get(
+            gpu_type,
+            {
+                "enterprise_suitable": False,
+                "reason": "Unknown GPU type - verify enterprise requirements",
+                "limitations": ["Unknown enterprise suitability"],
+                "recommended_for": [],
+                "alternatives": [],
+            },
+        )
+
     async def _get_order_fulfillment_time(self, server_type: str) -> Dict[str, Any]:
         """CRITICAL: Get order fulfillment time for dedicated servers"""
         # Hetzner dedicated servers can have significant fulfillment delays
@@ -526,36 +569,39 @@ class HetznerProvider(BaseProvider):
                 "expedite_available": False,
             },
         }
-        
-        return fulfillment_times.get(server_type, {
-            "typical_days": 14,
-            "max_days": 30,
-            "current_delay": "Standard dedicated server provisioning",
-            "reason": "Dedicated hardware requires provisioning",
-            "recommendation": "Plan for 2-4 week fulfillment time",
-            "expedite_available": False,
-        })
+
+        return fulfillment_times.get(
+            server_type,
+            {
+                "typical_days": 14,
+                "max_days": 30,
+                "current_delay": "Standard dedicated server provisioning",
+                "reason": "Dedicated hardware requires provisioning",
+                "recommendation": "Plan for 2-4 week fulfillment time",
+                "expedite_available": False,
+            },
+        )
 
 
 class HetznerTrafficMonitor:
     """Monitor Hetzner traffic allowances to prevent overage charges"""
-    
+
     def __init__(self):
         self.traffic_allowances = {
             "gex44": 20480,  # 20TB monthly for dedicated GPU servers
         }
-        
+
     async def get_traffic_allowance(self, server_id: str) -> Dict[str, Any]:
         """Get traffic allowance and usage for a server"""
         # In a real implementation, this would query Hetzner Robot API
         # For now, return estimated values
-        
+
         allowance_gb = self.traffic_allowances.get("gex44", 20480)
-        
+
         # Simulate usage calculation (would be real API call)
         used_gb = 1024  # Example: 1TB used
         remaining_gb = allowance_gb - used_gb
-        
+
         return {
             "allowance_gb": allowance_gb,
             "used_gb": used_gb,
@@ -567,24 +613,28 @@ class HetznerTrafficMonitor:
             "warning_threshold": 0.9,  # Warn at 90% usage
             "critical_threshold": 0.95,  # Critical at 95% usage
         }
-    
-    async def check_overage_risk(self, server_id: str, projected_usage_gb: float) -> Dict[str, Any]:
+
+    async def check_overage_risk(
+        self, server_id: str, projected_usage_gb: float
+    ) -> Dict[str, Any]:
         """Check if projected usage will cause overage charges"""
         traffic_info = await self.get_traffic_allowance(server_id)
-        
+
         projected_total = traffic_info["used_gb"] + projected_usage_gb
         overage_gb = max(0, projected_total - traffic_info["allowance_gb"])
         overage_cost = overage_gb * traffic_info["overage_cost_per_gb"]
-        
+
         return {
             "projected_total_gb": projected_total,
             "overage_gb": overage_gb,
             "overage_cost_eur": overage_cost,
             "overage_cost_usd": overage_cost * 1.1,  # Approximate USD conversion
-            "risk_level": "high" if overage_gb > 100 else "medium" if overage_gb > 0 else "low",
+            "risk_level": (
+                "high" if overage_gb > 100 else "medium" if overage_gb > 0 else "low"
+            ),
             "recommendation": self._get_overage_recommendation(overage_gb),
         }
-    
+
     def _get_overage_recommendation(self, overage_gb: float) -> str:
         """Get recommendation based on overage amount"""
         if overage_gb == 0:

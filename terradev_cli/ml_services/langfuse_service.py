@@ -35,9 +35,10 @@ _RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
 @dataclass
 class LangfuseConfig:
     """Langfuse configuration"""
+
     base_url: str = "https://cloud.langfuse.com"
-    public_key: str = ""          # pk-lf-...
-    secret_key: str = ""          # sk-lf-...
+    public_key: str = ""  # pk-lf-...
+    secret_key: str = ""  # sk-lf-...
     project_name: str = "default"
     # K8s deployment
     image: str = "langfuse/langfuse:latest"
@@ -70,9 +71,14 @@ class LangfuseService:
         return self.session
 
     async def _request(
-        self, method: str, path: str, *,
-        params: Optional[Dict] = None, json_body: Optional[Any] = None,
-        timeout: float = 30, retries: int = _MAX_RETRIES,
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Optional[Dict] = None,
+        json_body: Optional[Any] = None,
+        timeout: float = 30,
+        retries: int = _MAX_RETRIES,
     ) -> Any:
         session = self._ensure_session()
         url = f"{self.config.base_url}{path}"
@@ -80,14 +86,26 @@ class LangfuseService:
         for attempt in range(retries):
             try:
                 async with session.request(
-                    method, url, params=params, json=json_body,
+                    method,
+                    url,
+                    params=params,
+                    json=json_body,
                     timeout=aiohttp.ClientTimeout(total=timeout),
                 ) as resp:
                     if resp.status in (200, 201):
                         return await resp.json()
                     if resp.status in _RETRYABLE_STATUSES and attempt < retries - 1:
-                        wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
-                        logger.warning("Langfuse %s %s → %d, retry in %.1fs", method, path, resp.status, wait)
+                        wait = min(
+                            _BACKOFF_BASE * (2**attempt) + random.uniform(0, 0.5),
+                            _BACKOFF_MAX,
+                        )
+                        logger.warning(
+                            "Langfuse %s %s → %d, retry in %.1fs",
+                            method,
+                            path,
+                            resp.status,
+                            wait,
+                        )
                         await asyncio.sleep(wait)
                         continue
                     error_text = await resp.text()
@@ -95,8 +113,17 @@ class LangfuseService:
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 last_exc = e
                 if attempt < retries - 1:
-                    wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
-                    logger.warning("Langfuse %s %s error: %s, retry in %.1fs", method, path, e, wait)
+                    wait = min(
+                        _BACKOFF_BASE * (2**attempt) + random.uniform(0, 0.5),
+                        _BACKOFF_MAX,
+                    )
+                    logger.warning(
+                        "Langfuse %s %s error: %s, retry in %.1fs",
+                        method,
+                        path,
+                        e,
+                        wait,
+                    )
                     await asyncio.sleep(wait)
                     continue
                 raise
@@ -120,7 +147,10 @@ class LangfuseService:
     # ── Traces ────────────────────────────────────────────────────────
 
     async def list_traces(
-        self, *, page: int = 1, limit: int = 50,
+        self,
+        *,
+        page: int = 1,
+        limit: int = 50,
         name: Optional[str] = None,
         user_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
@@ -147,7 +177,10 @@ class LangfuseService:
     # ── Observations (spans, generations, events) ─────────────────────
 
     async def list_observations(
-        self, *, page: int = 1, limit: int = 50,
+        self,
+        *,
+        page: int = 1,
+        limit: int = 50,
         trace_id: Optional[str] = None,
         name: Optional[str] = None,
         observation_type: Optional[str] = None,
@@ -169,7 +202,8 @@ class LangfuseService:
     # ── Scores (evaluation results) ──────────────────────────────────
 
     async def create_score(
-        self, *,
+        self,
+        *,
         trace_id: str,
         name: str,
         value: float,
@@ -194,7 +228,10 @@ class LangfuseService:
         return await self._request("POST", "/api/public/scores", json_body=body)
 
     async def list_scores(
-        self, *, page: int = 1, limit: int = 50,
+        self,
+        *,
+        page: int = 1,
+        limit: int = 50,
         trace_id: Optional[str] = None,
         name: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -210,13 +247,17 @@ class LangfuseService:
 
     async def list_datasets(self, *, page: int = 1, limit: int = 50) -> Dict[str, Any]:
         """List datasets."""
-        return await self._request("GET", "/api/public/datasets", params={"page": page, "limit": limit})
+        return await self._request(
+            "GET", "/api/public/datasets", params={"page": page, "limit": limit}
+        )
 
     async def get_dataset(self, dataset_name: str) -> Dict[str, Any]:
         """Get dataset by name."""
         return await self._request("GET", f"/api/public/datasets/{dataset_name}")
 
-    async def create_dataset(self, name: str, description: str = "", metadata: Optional[Dict] = None) -> Dict[str, Any]:
+    async def create_dataset(
+        self, name: str, description: str = "", metadata: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Create a new dataset."""
         body: Dict[str, Any] = {"name": name}
         if description:
@@ -226,7 +267,8 @@ class LangfuseService:
         return await self._request("POST", "/api/public/datasets", json_body=body)
 
     async def create_dataset_item(
-        self, *,
+        self,
+        *,
         dataset_name: str,
         input_data: Any,
         expected_output: Optional[Any] = None,
@@ -253,19 +295,26 @@ class LangfuseService:
 
     async def list_prompts(self, *, page: int = 1, limit: int = 50) -> Dict[str, Any]:
         """List prompt templates."""
-        return await self._request("GET", "/api/public/v2/prompts", params={"page": page, "limit": limit})
+        return await self._request(
+            "GET", "/api/public/v2/prompts", params={"page": page, "limit": limit}
+        )
 
-    async def get_prompt(self, name: str, version: Optional[int] = None) -> Dict[str, Any]:
+    async def get_prompt(
+        self, name: str, version: Optional[int] = None
+    ) -> Dict[str, Any]:
         """Get a specific prompt by name and optional version."""
         params: Dict[str, Any] = {}
         if version is not None:
             params["version"] = version
-        return await self._request("GET", f"/api/public/v2/prompts/{name}", params=params)
+        return await self._request(
+            "GET", f"/api/public/v2/prompts/{name}", params=params
+        )
 
     # ── Export training data from traces ──────────────────────────────
 
     async def export_training_data(
-        self, *,
+        self,
+        *,
         limit: int = 1000,
         name_filter: Optional[str] = None,
         min_score: Optional[float] = None,
@@ -287,7 +336,9 @@ class LangfuseService:
             for trace in traces:
                 # Check score filter if requested
                 if min_score is not None:
-                    scores_resp = await self.list_scores(trace_id=trace["id"], name=score_name)
+                    scores_resp = await self.list_scores(
+                        trace_id=trace["id"], name=score_name
+                    )
                     scores = scores_resp.get("data", [])
                     if scores:
                         avg = sum(s.get("value", 0) for s in scores) / len(scores)
@@ -301,12 +352,18 @@ class LangfuseService:
 
                 # Extract from nested structures
                 if isinstance(input_text, dict):
-                    input_text = input_text.get("content") or input_text.get("messages", [{}])[-1].get("content", "")
+                    input_text = input_text.get("content") or input_text.get(
+                        "messages", [{}]
+                    )[-1].get("content", "")
                 if isinstance(output_text, dict):
-                    output_text = output_text.get("content") or output_text.get("text", "")
+                    output_text = output_text.get("content") or output_text.get(
+                        "text", ""
+                    )
 
                 if input_text and output_text:
-                    pairs.append({"instruction": str(input_text), "response": str(output_text)})
+                    pairs.append(
+                        {"instruction": str(input_text), "response": str(output_text)}
+                    )
                     if len(pairs) >= limit:
                         break
 
@@ -320,7 +377,8 @@ class LangfuseService:
     # ── Quality metrics for drift detection ───────────────────────────
 
     async def get_quality_metrics(
-        self, *,
+        self,
+        *,
         score_name: str = "quality",
         limit: int = 200,
     ) -> Dict[str, Any]:
@@ -366,39 +424,47 @@ class LangfuseService:
         pg_env = ""
         if self.config.postgres_dsn:
             pg_env = (
-                f'\n            - name: DATABASE_URL\n'
+                f"\n            - name: DATABASE_URL\n"
                 f'              value: "{self.config.postgres_dsn}"'
             )
         else:
             pg_env = (
-                f'\n            - name: DATABASE_URL\n'
+                f"\n            - name: DATABASE_URL\n"
                 f'              value: "postgresql://langfuse:langfuse@langfuse-postgres:5432/langfuse"'
             )
-        sc = f"\n          storageClassName: {self.config.storage_class}" if self.config.storage_class else ""
+        sc = (
+            f"\n          storageClassName: {self.config.storage_class}"
+            if self.config.storage_class
+            else ""
+        )
         return (
-            f'---\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: {namespace}\n'
-            f'---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n'
-            f'  name: langfuse-server\n  namespace: {namespace}\n  labels:\n    app: langfuse\n'
-            f'spec:\n  replicas: {self.config.replicas}\n  selector:\n    matchLabels:\n      app: langfuse\n'
-            f'  template:\n    metadata:\n      labels:\n        app: langfuse\n    spec:\n'
-            f'      containers:\n        - name: langfuse\n          image: {self.config.image}\n'
-            f'          ports:\n            - containerPort: 3000\n              name: http\n'
+            f"---\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: {namespace}\n"
+            f"---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n"
+            f"  name: langfuse-server\n  namespace: {namespace}\n  labels:\n    app: langfuse\n"
+            f"spec:\n  replicas: {self.config.replicas}\n  selector:\n    matchLabels:\n      app: langfuse\n"
+            f"  template:\n    metadata:\n      labels:\n        app: langfuse\n    spec:\n"
+            f"      containers:\n        - name: langfuse\n          image: {self.config.image}\n"
+            f"          ports:\n            - containerPort: 3000\n              name: http\n"
             f'          env:\n            - name: NEXTAUTH_URL\n              value: "http://langfuse-svc.{namespace}:3000"\n'
             f'            - name: NEXTAUTH_SECRET\n              value: "changeme-generate-a-real-secret"{pg_env}\n'
             f'          resources:\n            requests:\n              cpu: "500m"\n              memory: "512Mi"\n'
             f'            limits:\n              cpu: "2"\n              memory: "2Gi"\n'
-            f'          readinessProbe:\n            httpGet:\n              path: /api/public/health\n'
-            f'              port: http\n            initialDelaySeconds: 15\n            periodSeconds: 15\n'
-            f'---\napiVersion: v1\nkind: Service\nmetadata:\n'
-            f'  name: langfuse-svc\n  namespace: {namespace}\nspec:\n'
-            f'  selector:\n    app: langfuse\n  ports:\n    - port: 3000\n'
-            f'      targetPort: http\n      name: http\n  type: ClusterIP\n'
+            f"          readinessProbe:\n            httpGet:\n              path: /api/public/health\n"
+            f"              port: http\n            initialDelaySeconds: 15\n            periodSeconds: 15\n"
+            f"---\napiVersion: v1\nkind: Service\nmetadata:\n"
+            f"  name: langfuse-svc\n  namespace: {namespace}\nspec:\n"
+            f"  selector:\n    app: langfuse\n  ports:\n    - port: 3000\n"
+            f"      targetPort: http\n      name: http\n  type: ClusterIP\n"
         )
 
 
-def create_langfuse_service_from_credentials(credentials: Dict[str, str]) -> LangfuseService:
+def create_langfuse_service_from_credentials(
+    credentials: Dict[str, str]
+) -> LangfuseService:
     config = LangfuseConfig(
-        base_url=credentials.get("base_url", credentials.get("host", "https://cloud.langfuse.com")),
+        base_url=credentials.get(
+            "base_url", credentials.get("host", "https://cloud.langfuse.com")
+        ),
         public_key=credentials.get("public_key", ""),
         secret_key=credentials.get("secret_key", ""),
         project_name=credentials.get("project_name", "default"),

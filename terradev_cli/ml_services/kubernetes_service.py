@@ -17,6 +17,7 @@ from pathlib import Path
 @dataclass
 class KubernetesConfig:
     """Kubernetes configuration (canonical — imported by kubernetes_enhanced.py)"""
+
     kubeconfig_path: Optional[str] = None
     cluster_name: Optional[str] = None
     namespace: str = "default"
@@ -37,19 +38,19 @@ class KubernetesConfig:
 
 class KubernetesService:
     """Kubernetes integration service for cluster management"""
-    
+
     def __init__(self, config: KubernetesConfig):
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
-        
+
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
-    
+
     async def test_connection(self) -> Dict[str, Any]:
         """Test Kubernetes connection and get cluster info"""
         try:
@@ -57,29 +58,29 @@ class KubernetesService:
             env = os.environ.copy()
             if self.config.kubeconfig_path:
                 env["KUBECONFIG"] = self.config.kubeconfig_path
-            
+
             # Test kubectl connection
             result = subprocess.run(
                 ["kubectl", "cluster-info"],
                 capture_output=True,
                 text=True,
                 timeout=15,
-                env=env
+                env=env,
             )
-            
+
             if result.returncode == 0:
                 # Get cluster details
                 cluster_info = result.stdout.strip()
-                
+
                 # Get node information
                 nodes_result = subprocess.run(
                     ["kubectl", "get", "nodes", "-o", "json"],
                     capture_output=True,
                     text=True,
                     timeout=15,
-                    env=env
+                    env=env,
                 )
-                
+
                 nodes_info = []
                 if nodes_result.returncode == 0:
                     try:
@@ -87,160 +88,180 @@ class KubernetesService:
                         nodes_info = [
                             {
                                 "name": node["metadata"]["name"],
-                                "status": node["status"]["conditions"][-1]["type"] if node["status"].get("conditions") else "Unknown",
-                                "version": node["status"].get("nodeInfo", {}).get("kubeletVersion", "Unknown"),
-                                "os": node["status"].get("nodeInfo", {}).get("osImage", "Unknown")
+                                "status": (
+                                    node["status"]["conditions"][-1]["type"]
+                                    if node["status"].get("conditions")
+                                    else "Unknown"
+                                ),
+                                "version": node["status"]
+                                .get("nodeInfo", {})
+                                .get("kubeletVersion", "Unknown"),
+                                "os": node["status"]
+                                .get("nodeInfo", {})
+                                .get("osImage", "Unknown"),
                             }
                             for node in nodes_data.get("items", [])
                         ]
                     except json.JSONDecodeError:
                         pass
-                
+
                 return {
                     "status": "connected",
                     "cluster_name": self.config.cluster_name or "unknown",
                     "namespace": self.config.namespace,
                     "cluster_info": cluster_info,
                     "nodes": nodes_info,
-                    "karpenter_enabled": self.config.karpenter_enabled
+                    "karpenter_enabled": self.config.karpenter_enabled,
                 }
             else:
                 return {
                     "status": "failed",
-                    "error": f"kubectl command failed: {result.stderr}"
+                    "error": f"kubectl command failed: {result.stderr}",
                 }
-                
+
         except FileNotFoundError:
             return {
                 "status": "failed",
-                "error": "kubectl not found. Please install kubectl: https://kubernetes.io/docs/tasks/tools/"
+                "error": "kubectl not found. Please install kubectl: https://kubernetes.io/docs/tasks/tools/",
             }
         except subprocess.TimeoutExpired:
             return {
                 "status": "failed",
-                "error": "kubectl command timed out. Check your cluster connection."
+                "error": "kubectl command timed out. Check your cluster connection.",
             }
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def get_gpu_nodes(self) -> List[Dict[str, Any]]:
         """Get GPU-enabled nodes in the cluster"""
         try:
             env = os.environ.copy()
             if self.config.kubeconfig_path:
                 env["KUBECONFIG"] = self.config.kubeconfig_path
-            
+
             result = subprocess.run(
                 ["kubectl", "get", "nodes", "-o", "json"],
                 capture_output=True,
                 text=True,
                 timeout=15,
-                env=env
+                env=env,
             )
-            
+
             if result.returncode != 0:
                 raise Exception(f"Failed to get nodes: {result.stderr}")
-            
+
             nodes_data = json.loads(result.stdout)
             gpu_nodes = []
-            
+
             for node in nodes_data.get("items", []):
                 # Check for GPU labels or taints
                 labels = node.get("metadata", {}).get("labels", {})
                 taints = node.get("spec", {}).get("taints", [])
-                
+
                 has_gpu = (
-                    "accelerator" in labels.get("node.kubernetes.io/instance-type", "").lower() or
-                    "nvidia.com/gpu" in node.get("status", {}).get("capacity", {}) or
-                    any("gpu" in str(taint).lower() for taint in taints)
+                    "accelerator"
+                    in labels.get("node.kubernetes.io/instance-type", "").lower()
+                    or "nvidia.com/gpu" in node.get("status", {}).get("capacity", {})
+                    or any("gpu" in str(taint).lower() for taint in taints)
                 )
-                
+
                 if has_gpu:
-                    gpu_nodes.append({
-                        "name": node["metadata"]["name"],
-                        "status": node["status"].get("conditions", [{}])[-1].get("type", "Unknown"),
-                        "gpu_capacity": node.get("status", {}).get("capacity", {}).get("nvidia.com/gpu", "0"),
-                        "instance_type": labels.get("node.kubernetes.io/instance-type", "Unknown"),
-                        "labels": labels,
-                        "taints": taints
-                    })
-            
+                    gpu_nodes.append(
+                        {
+                            "name": node["metadata"]["name"],
+                            "status": node["status"]
+                            .get("conditions", [{}])[-1]
+                            .get("type", "Unknown"),
+                            "gpu_capacity": node.get("status", {})
+                            .get("capacity", {})
+                            .get("nvidia.com/gpu", "0"),
+                            "instance_type": labels.get(
+                                "node.kubernetes.io/instance-type", "Unknown"
+                            ),
+                            "labels": labels,
+                            "taints": taints,
+                        }
+                    )
+
             return gpu_nodes
-            
+
         except Exception as e:
             raise Exception(f"Failed to get GPU nodes: {e}")
-    
+
     async def install_karpenter(self) -> Dict[str, Any]:
         """Install Karpenter for automatic node provisioning"""
         if not self.config.karpenter_enabled:
             return {
                 "status": "failed",
-                "error": "Karpenter is not enabled in configuration"
+                "error": "Karpenter is not enabled in configuration",
             }
-        
+
         try:
             env = os.environ.copy()
             if self.config.kubeconfig_path:
                 env["KUBECONFIG"] = self.config.kubeconfig_path
-            
+
             # Create namespace
-            namespace_cmd = ["kubectl", "create", "namespace", "karpenter", "--dry-run=client", "-o", "yaml"]
-            result = subprocess.run(namespace_cmd, capture_output=True, text=True, timeout=10, env=env)
-            
+            namespace_cmd = [
+                "kubectl",
+                "create",
+                "namespace",
+                "karpenter",
+                "--dry-run=client",
+                "-o",
+                "yaml",
+            ]
+            result = subprocess.run(
+                namespace_cmd, capture_output=True, text=True, timeout=10, env=env
+            )
+
             if result.returncode == 0:
                 apply_result = subprocess.run(
                     ["kubectl", "apply", "-f", "-"],
                     input=result.stdout,
                     text=True,
                     timeout=10,
-                    env=env
+                    env=env,
                 )
-            
+
             # Install Karpenter via Helm (simplified version)
             helm_cmd = [
-                "helm", "upgrade", "--install", "karpenter",
+                "helm",
+                "upgrade",
+                "--install",
+                "karpenter",
                 "oci://public.ecr.aws/karpenter/karpenter",
                 f"--version={self.config.karpenter_version}",
                 "--namespace=karpenter",
                 f"--set=settings.clusterName={self.config.cluster_name or 'default'}",
                 f"--set=settings.interruptionQueue={self.config.cluster_name or 'default'}",
-                "--wait"
+                "--wait",
             ]
-            
+
             result = subprocess.run(
-                helm_cmd,
-                capture_output=True,
-                text=True,
-                timeout=300,
-                env=env
+                helm_cmd, capture_output=True, text=True, timeout=300, env=env
             )
-            
+
             if result.returncode == 0:
                 return {
                     "status": "installed",
                     "version": self.config.karpenter_version,
-                    "output": result.stdout
+                    "output": result.stdout,
                 }
             else:
                 raise Exception(f"Helm installation failed: {result.stderr}")
-                
+
         except FileNotFoundError as e:
             if "helm" in str(e):
                 return {
                     "status": "failed",
-                    "error": "Helm not found. Please install Helm: https://helm.sh/docs/intro/install/"
+                    "error": "Helm not found. Please install Helm: https://helm.sh/docs/intro/install/",
                 }
             else:
                 raise Exception(f"Command not found: {e}")
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     def _gpu_instance_families(self, gpu_type: str) -> list:
         """Map GPU type to AWS instance families for Karpenter"""
         families = {
@@ -248,13 +269,15 @@ class KubernetesService:
             "A100": ["p4d", "p4de"],
             "A10G": ["g5"],
             "L40S": ["g6"],
-            "L4":   ["g6"],
-            "T4":   ["g4dn"],
+            "L4": ["g6"],
+            "T4": ["g4dn"],
             "V100": ["p3"],
         }
         return families.get(gpu_type.upper(), ["p5", "p4d", "g5", "g4dn"])
 
-    async def create_karpenter_provisioner(self, gpu_type: str, limits: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_karpenter_provisioner(
+        self, gpu_type: str, limits: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create topology-optimised Karpenter provisioner for GPU nodes.
 
         Automatically configures:
@@ -344,7 +367,7 @@ spec:
                 input=provisioner_yaml,
                 text=True,
                 timeout=30,
-                env=env
+                env=env,
             )
 
             if result.returncode == 0:
@@ -358,75 +381,79 @@ spec:
                         "gpudirect_rdma": True,
                         "instance_families": instance_families,
                     },
-                    "output": result.stdout
+                    "output": result.stdout,
                 }
             else:
                 raise Exception(f"Failed to create provisioner: {result.stderr}")
 
         except Exception as e:
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
-    
+            return {"status": "failed", "error": str(e)}
+
     async def get_cluster_resources(self) -> Dict[str, Any]:
         """Get cluster resource information"""
         try:
             env = os.environ.copy()
             if self.config.kubeconfig_path:
                 env["KUBECONFIG"] = self.config.kubeconfig_path
-            
+
             # Get nodes with resource info
             result = subprocess.run(
                 ["kubectl", "top", "nodes", "--no-headers"],
                 capture_output=True,
                 text=True,
                 timeout=15,
-                env=env
+                env=env,
             )
-            
-            resources = {
-                "total_cpu": 0,
-                "total_memory": 0,
-                "total_gpu": 0,
-                "nodes": []
-            }
-            
+
+            resources = {"total_cpu": 0, "total_memory": 0, "total_gpu": 0, "nodes": []}
+
             if result.returncode == 0:
-                for line in result.stdout.strip().split('\n'):
+                for line in result.stdout.strip().split("\n"):
                     if line.strip():
                         parts = line.split()
                         if len(parts) >= 3:
                             node_name = parts[0]
-                            cpu_cores = parts[1].replace('m', '')
-                            memory = parts[2].replace('Mi', '')
-                            
+                            cpu_cores = parts[1].replace("m", "")
+                            memory = parts[2].replace("Mi", "")
+
                             try:
-                                cpu_int = int(cpu_cores) / 1000 if 'm' in parts[1] else int(cpu_cores)
+                                cpu_int = (
+                                    int(cpu_cores) / 1000
+                                    if "m" in parts[1]
+                                    else int(cpu_cores)
+                                )
                                 mem_gb = int(memory) / 1024
-                                
-                                resources["nodes"].append({
-                                    "name": node_name,
-                                    "cpu_cores": cpu_int,
-                                    "memory_gb": mem_gb
-                                })
-                                
+
+                                resources["nodes"].append(
+                                    {
+                                        "name": node_name,
+                                        "cpu_cores": cpu_int,
+                                        "memory_gb": mem_gb,
+                                    }
+                                )
+
                                 resources["total_cpu"] += cpu_int
                                 resources["total_memory"] += mem_gb
                             except ValueError:
                                 continue
-            
+
             # Get GPU resources
             gpu_result = subprocess.run(
-                ["kubectl", "get", "nodes", "-o", "jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.status.capacity.nvidia.com/gpu}{\"\\n\"}{end}'"],
+                [
+                    "kubectl",
+                    "get",
+                    "nodes",
+                    "-o",
+                    'jsonpath=\'{range .items[*]}{.metadata.name}{" "}{.status.capacity.nvidia.com/gpu}{"\\n"}{end}\'',
+                ],
                 capture_output=True,
                 text=True,
                 timeout=15,
-                env=env
+                env=env,
             )
-            
+
             if gpu_result.returncode == 0:
-                for line in gpu_result.stdout.strip().split('\n'):
+                for line in gpu_result.stdout.strip().split("\n"):
                     if line.strip():
                         parts = line.split()
                         if len(parts) >= 2:
@@ -435,43 +462,46 @@ spec:
                                 resources["total_gpu"] += gpu_count
                             except ValueError:
                                 continue
-            
+
             return resources
-            
+
         except Exception as e:
             raise Exception(f"Failed to get cluster resources: {e}")
-    
+
     def get_kubernetes_config(self) -> Dict[str, str]:
         """Get Kubernetes configuration for environment variables"""
         config = {}
-        
+
         if self.config.kubeconfig_path:
             config["KUBECONFIG"] = self.config.kubeconfig_path
-            
+
         if self.config.cluster_name:
             config["KUBERNETES_CLUSTER_NAME"] = self.config.cluster_name
-            
+
         if self.config.namespace:
             config["KUBERNETES_NAMESPACE"] = self.config.namespace
-            
+
         if self.config.aws_region:
             config["AWS_DEFAULT_REGION"] = self.config.aws_region
-            
+
         return config
 
 
-def create_kubernetes_service_from_credentials(credentials: Dict[str, str]) -> KubernetesService:
+def create_kubernetes_service_from_credentials(
+    credentials: Dict[str, str]
+) -> KubernetesService:
     """Create KubernetesService from credential dictionary"""
     config = KubernetesConfig(
         kubeconfig_path=credentials.get("kubeconfig_path"),
         cluster_name=credentials.get("cluster_name"),
         namespace=credentials.get("namespace", "default"),
-        karpenter_enabled=credentials.get("karpenter_enabled", "false").lower() == "true",
+        karpenter_enabled=credentials.get("karpenter_enabled", "false").lower()
+        == "true",
         karpenter_version=credentials.get("karpenter_version", "v1.10.0"),
         aws_region=credentials.get("aws_region", "us-east-1"),
-        aws_account_id=credentials.get("aws_account_id")
+        aws_account_id=credentials.get("aws_account_id"),
     )
-    
+
     return KubernetesService(config)
 
 

@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Rust GPU discovery integration
 try:
     from terradev_gpu_discovery import GPUDiscovery
+
     USE_RUST_GPU_DISCOVERY = True
     logger.info("Using Rust GPU discovery for 5-10x faster introspection")
 except ImportError:
@@ -26,7 +27,7 @@ except ImportError:
 
 class GPUDiscoveryWrapper:
     """GPU discovery wrapper with Rust backend or Python fallback"""
-    
+
     def __init__(self, cache_ttl_secs: int = 5):
         if USE_RUST_GPU_DISCOVERY:
             self._discovery = GPUDiscovery(cache_ttl_secs=cache_ttl_secs)
@@ -34,7 +35,7 @@ class GPUDiscoveryWrapper:
             self._cache_ttl = cache_ttl_secs
             self._cached_state = None
             self._cache_time = None
-    
+
     def discover_gpus(self) -> Dict:
         """Discover all GPUs"""
         if USE_RUST_GPU_DISCOVERY:
@@ -43,7 +44,7 @@ class GPUDiscoveryWrapper:
             # Python fallback - would use nvidia-smi parsing
             # For now, return empty dict
             return {"total_count": 0, "gpus": []}
-    
+
     def get_gpu_by_index(self, index: int) -> Optional[Dict]:
         """Get specific GPU by index"""
         if USE_RUST_GPU_DISCOVERY:

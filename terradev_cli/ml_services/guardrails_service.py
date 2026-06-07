@@ -34,6 +34,7 @@ _RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
 @dataclass
 class GuardrailsConfig:
     """NeMo Guardrails configuration"""
+
     # Server connection
     server_url: str = "http://localhost:8090"
     config_dir: str = "./guardrails"
@@ -93,9 +94,14 @@ class GuardrailsService:
         return self.session
 
     async def _request(
-        self, method: str, path: str, *,
-        params: Optional[Dict] = None, json_body: Optional[Any] = None,
-        timeout: float = 60, retries: int = _MAX_RETRIES,
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Optional[Dict] = None,
+        json_body: Optional[Any] = None,
+        timeout: float = 60,
+        retries: int = _MAX_RETRIES,
     ) -> Any:
         session = self._ensure_session()
         url = f"{self.config.server_url}{path}"
@@ -103,14 +109,26 @@ class GuardrailsService:
         for attempt in range(retries):
             try:
                 async with session.request(
-                    method, url, params=params, json=json_body,
+                    method,
+                    url,
+                    params=params,
+                    json=json_body,
                     timeout=aiohttp.ClientTimeout(total=timeout),
                 ) as resp:
                     if resp.status == 200:
                         return await resp.json()
                     if resp.status in _RETRYABLE_STATUSES and attempt < retries - 1:
-                        wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
-                        logger.warning("Guardrails %s %s → %d, retry in %.1fs", method, path, resp.status, wait)
+                        wait = min(
+                            _BACKOFF_BASE * (2**attempt) + random.uniform(0, 0.5),
+                            _BACKOFF_MAX,
+                        )
+                        logger.warning(
+                            "Guardrails %s %s → %d, retry in %.1fs",
+                            method,
+                            path,
+                            resp.status,
+                            wait,
+                        )
                         await asyncio.sleep(wait)
                         continue
                     error_text = await resp.text()
@@ -118,8 +136,17 @@ class GuardrailsService:
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 last_exc = e
                 if attempt < retries - 1:
-                    wait = min(_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5), _BACKOFF_MAX)
-                    logger.warning("Guardrails %s %s error: %s, retry in %.1fs", method, path, e, wait)
+                    wait = min(
+                        _BACKOFF_BASE * (2**attempt) + random.uniform(0, 0.5),
+                        _BACKOFF_MAX,
+                    )
+                    logger.warning(
+                        "Guardrails %s %s error: %s, retry in %.1fs",
+                        method,
+                        path,
+                        e,
+                        wait,
+                    )
                     await asyncio.sleep(wait)
                     continue
                 raise
@@ -135,7 +162,9 @@ class GuardrailsService:
             return {"status": "failed", "error": str(e)}
 
     async def chat_completion(
-        self, messages: List[Dict[str, str]], *,
+        self,
+        messages: List[Dict[str, str]],
+        *,
         config_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Send a chat completion through guardrails.
@@ -146,12 +175,15 @@ class GuardrailsService:
         """
         cid = config_id or self.config.default_config_id
         return await self._request(
-            "POST", "/v1/chat/completions",
+            "POST",
+            "/v1/chat/completions",
             json_body={"config_id": cid, "messages": messages},
         )
 
     async def test_rail(
-        self, test_message: str, *,
+        self,
+        test_message: str,
+        *,
         config_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Send a test message through guardrails and return the result."""
@@ -194,10 +226,7 @@ class GuardrailsService:
             files[f"{cid}/config.yml"] += "      - check jailbreak\n"
         if self.config.enable_pii:
             files[f"{cid}/config.yml"] += "      - mask sensitive data\n"
-        files[f"{cid}/config.yml"] += (
-            f"  output:\n"
-            f"    flows:\n"
-        )
+        files[f"{cid}/config.yml"] += f"  output:\n" f"    flows:\n"
         if self.config.enable_topical:
             files[f"{cid}/config.yml"] += "      - check topical\n"
         if self.config.enable_factcheck:
@@ -208,53 +237,53 @@ class GuardrailsService:
         # rails/topical.co — Colang 2.x topical guardrail
         if self.config.enable_topical:
             files[f"{cid}/rails/topical.co"] = (
-                '# Colang 2.x — Topical guardrail\n'
-                'define flow check topical\n'
+                "# Colang 2.x — Topical guardrail\n"
+                "define flow check topical\n"
                 '  """Ensure responses stay on-topic."""\n'
-                '  $is_on_topic = execute check_topic_relevance\n'
-                '  if not $is_on_topic\n'
+                "  $is_on_topic = execute check_topic_relevance\n"
+                "  if not $is_on_topic\n"
                 '    bot say "I can only help with topics related to this service."\n'
-                '    stop\n'
+                "    stop\n"
             )
 
         # rails/jailbreak.co — Colang 2.x jailbreak detection
         if self.config.enable_jailbreak:
             files[f"{cid}/rails/jailbreak.co"] = (
-                '# Colang 2.x — Jailbreak detection\n'
-                'define flow check jailbreak\n'
+                "# Colang 2.x — Jailbreak detection\n"
+                "define flow check jailbreak\n"
                 '  """Detect and block jailbreak attempts."""\n'
-                '  $is_jailbreak = execute check_jailbreak_attempt\n'
-                '  if $is_jailbreak\n'
+                "  $is_jailbreak = execute check_jailbreak_attempt\n"
+                "  if $is_jailbreak\n"
                 '    bot say "I cannot process that request."\n'
-                '    stop\n'
+                "    stop\n"
             )
 
         # rails/pii.co — Colang 2.x PII masking
         if self.config.enable_pii:
             files[f"{cid}/rails/pii.co"] = (
-                '# Colang 2.x — PII masking\n'
-                'define flow mask sensitive data\n'
+                "# Colang 2.x — PII masking\n"
+                "define flow mask sensitive data\n"
                 '  """Mask PII in user input before processing."""\n'
-                '  $sanitized = execute mask_pii(text=$user_message)\n'
-                '  $user_message = $sanitized\n'
-                '\n'
-                'define flow mask sensitive data on output\n'
+                "  $sanitized = execute mask_pii(text=$user_message)\n"
+                "  $user_message = $sanitized\n"
+                "\n"
+                "define flow mask sensitive data on output\n"
                 '  """Mask PII in bot output before returning."""\n'
-                '  $sanitized = execute mask_pii(text=$bot_message)\n'
-                '  $bot_message = $sanitized\n'
+                "  $sanitized = execute mask_pii(text=$bot_message)\n"
+                "  $bot_message = $sanitized\n"
             )
 
         # rails/factcheck.co — Colang 2.x fact-checking
         if self.config.enable_factcheck:
             files[f"{cid}/rails/factcheck.co"] = (
-                '# Colang 2.x — Fact-checking\n'
-                'define flow check facts\n'
+                "# Colang 2.x — Fact-checking\n"
+                "define flow check facts\n"
                 '  """Verify factual accuracy of bot responses."""\n'
-                '  $is_accurate = execute check_factual_accuracy(text=$bot_message)\n'
-                '  if not $is_accurate\n'
-                '    bot say "I\'m not confident in the accuracy of that response. '
+                "  $is_accurate = execute check_factual_accuracy(text=$bot_message)\n"
+                "  if not $is_accurate\n"
+                "    bot say \"I'm not confident in the accuracy of that response. "
                 'Let me provide a more careful answer."\n'
-                '    stop\n'
+                "    stop\n"
             )
 
         return files
@@ -271,31 +300,31 @@ class GuardrailsService:
         redis_env = ""
         if self.config.memory_backend == "redis" and self.config.redis_url:
             redis_env = (
-                f'\n            - name: REDIS_URL\n'
+                f"\n            - name: REDIS_URL\n"
                 f'              value: "{self.config.redis_url}"'
             )
         return (
-            f'---\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: {namespace}\n'
-            f'---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n'
-            f'  name: guardrails-server\n  namespace: {namespace}\n'
-            f'  labels:\n    app: guardrails\nspec:\n  replicas: {self.config.replicas}\n'
-            f'  selector:\n    matchLabels:\n      app: guardrails\n'
-            f'  template:\n    metadata:\n      labels:\n        app: guardrails\n'
-            f'    spec:\n      containers:\n        - name: guardrails\n'
-            f'          image: {self.config.image}\n'
+            f"---\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: {namespace}\n"
+            f"---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n"
+            f"  name: guardrails-server\n  namespace: {namespace}\n"
+            f"  labels:\n    app: guardrails\nspec:\n  replicas: {self.config.replicas}\n"
+            f"  selector:\n    matchLabels:\n      app: guardrails\n"
+            f"  template:\n    metadata:\n      labels:\n        app: guardrails\n"
+            f"    spec:\n      containers:\n        - name: guardrails\n"
+            f"          image: {self.config.image}\n"
             f'          command: ["nemoguardrails", "server", "--config", "/config", "--port", "{self.config.port}"]\n'
-            f'          ports:\n            - containerPort: {self.config.port}\n              name: http\n'
+            f"          ports:\n            - containerPort: {self.config.port}\n              name: http\n"
             f'          env:\n            - name: GUARDRAILS_CONFIG_DIR\n              value: "/config"{redis_env}\n'
             f'          resources:\n            requests:\n              cpu: "500m"\n              memory: "1Gi"\n'
             f'            limits:\n              cpu: "2"\n              memory: "4Gi"\n'
-            f'          volumeMounts:\n            - name: config\n              mountPath: /config\n'
-            f'          readinessProbe:\n            httpGet:\n              path: /v1/rails/configs\n'
-            f'              port: http\n            initialDelaySeconds: 15\n            periodSeconds: 10\n'
-            f'      volumes:\n        - name: config\n          configMap:\n            name: guardrails-config\n'
-            f'---\napiVersion: v1\nkind: Service\nmetadata:\n'
-            f'  name: guardrails-svc\n  namespace: {namespace}\nspec:\n'
-            f'  selector:\n    app: guardrails\n  ports:\n    - port: {self.config.port}\n'
-            f'      targetPort: http\n      name: http\n  type: ClusterIP\n'
+            f"          volumeMounts:\n            - name: config\n              mountPath: /config\n"
+            f"          readinessProbe:\n            httpGet:\n              path: /v1/rails/configs\n"
+            f"              port: http\n            initialDelaySeconds: 15\n            periodSeconds: 10\n"
+            f"      volumes:\n        - name: config\n          configMap:\n            name: guardrails-config\n"
+            f"---\napiVersion: v1\nkind: Service\nmetadata:\n"
+            f"  name: guardrails-svc\n  namespace: {namespace}\nspec:\n"
+            f"  selector:\n    app: guardrails\n  ports:\n    - port: {self.config.port}\n"
+            f"      targetPort: http\n      name: http\n  type: ClusterIP\n"
         )
 
     def generate_sidecar_container(self) -> Dict[str, Any]:
@@ -304,9 +333,12 @@ class GuardrailsService:
             "name": "guardrails-sidecar",
             "image": self.config.image,
             "command": [
-                "nemoguardrails", "server",
-                "--config", "/config",
-                "--port", str(self.config.port),
+                "nemoguardrails",
+                "server",
+                "--config",
+                "/config",
+                "--port",
+                str(self.config.port),
             ],
             "ports": [{"containerPort": self.config.port, "name": "guardrails"}],
             "env": [
@@ -349,7 +381,9 @@ class GuardrailsService:
         }
 
 
-def create_guardrails_service_from_credentials(credentials: Dict[str, str]) -> GuardrailsService:
+def create_guardrails_service_from_credentials(
+    credentials: Dict[str, str]
+) -> GuardrailsService:
     config = GuardrailsConfig(
         server_url=credentials.get("server_url", "http://localhost:8090"),
         config_dir=credentials.get("config_dir", "./guardrails"),

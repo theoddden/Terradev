@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 # Rust command executor integration
 try:
     from terradev_command_executor import CommandExecutor
+
     USE_RUST_EXECUTOR = True
     logger.info("Using Rust command executor for 100x concurrency")
 except ImportError:
@@ -29,7 +30,7 @@ async def execute_command(
     command: str,
     args: List[str],
     cwd: Optional[str] = None,
-    env: Optional[Dict[str, str]] = None
+    env: Optional[Dict[str, str]] = None,
 ) -> Dict:
     """Execute a single command"""
     if USE_RUST_EXECUTOR:
@@ -39,23 +40,24 @@ async def execute_command(
             "stdout": result.stdout,
             "stderr": result.stderr,
             "returncode": result.returncode,
-            "success": result.returncode == 0
+            "success": result.returncode == 0,
         }
     else:
         # Python fallback with asyncio
         proc = await asyncio.create_subprocess_exec(
-            command, *args,
+            command,
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=cwd,
-            env=env
+            env=env,
         )
         stdout, stderr = await proc.communicate()
         return {
             "stdout": stdout.decode(),
             "stderr": stderr.decode(),
             "returncode": proc.returncode,
-            "success": proc.returncode == 0
+            "success": proc.returncode == 0,
         }
 
 
@@ -72,7 +74,7 @@ async def execute_parallel(
                 "stdout": r.stdout,
                 "stderr": r.stderr,
                 "returncode": r.returncode,
-                "success": r.returncode == 0
+                "success": r.returncode == 0,
             }
             for r in results
         ]
