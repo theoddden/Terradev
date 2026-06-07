@@ -159,16 +159,19 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install package + test deps
+      shell: pwsh
       run: |
-        pip install -e ".[dev]" 2>/dev/null || pip install -e .
+        pip install -e ".[dev]" 2>$null; if ($LASTEXITCODE -ne 0) { pip install -e . }
         pip install pytest pytest-asyncio pytest-cov
 
     - name: CLI smoke test
+      shell: pwsh
       run: |
         terradev --version
         terradev --help
 
     - name: Run unit tests (Windows)
+      shell: pwsh
       run: pytest tests/ -v --tb=short --ignore=tests/test_mcp_handlers.py --ignore=tests/test_integration.py
 
   # === Unit Tests (macOS) ===
