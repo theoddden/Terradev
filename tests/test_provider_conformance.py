@@ -24,6 +24,7 @@ from terradev_cli.providers import (
     CoreWeaveProvider,
     CrusoeProvider,
     DigitalOceanProvider,
+    E2ENetworksProvider,
     FluidStackProvider,
     GCPProvider,
     HetznerProvider,
@@ -38,6 +39,7 @@ from terradev_cli.providers import (
     SiliconFlowProvider,
     TensorDockProvider,
     VastAIProvider,
+    YottaLabsProvider,
 )
 
 ALL_PROVIDERS = [
@@ -48,6 +50,7 @@ ALL_PROVIDERS = [
     CoreWeaveProvider,
     CrusoeProvider,
     DigitalOceanProvider,
+    E2ENetworksProvider,
     FluidStackProvider,
     GCPProvider,
     HetznerProvider,
@@ -62,6 +65,7 @@ ALL_PROVIDERS = [
     SiliconFlowProvider,
     TensorDockProvider,
     VastAIProvider,
+    YottaLabsProvider,
 ]
 
 
@@ -224,8 +228,8 @@ for provider_class in ALL_PROVIDERS:
 async def test_all_providers_registered():
     """Verify all providers are registered and importable"""
     assert (
-        len(ALL_PROVIDERS) >= 20
-    ), f"Expected at least 20 providers, got {len(ALL_PROVIDERS)}"
+        len(ALL_PROVIDERS) >= 22
+    ), f"Expected at least 22 providers, got {len(ALL_PROVIDERS)}"
 
     # Verify each provider has required methods
     mock_creds = {

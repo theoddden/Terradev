@@ -52,6 +52,8 @@ _PROVIDER_LOADERS = {
     "inferx": _lazy_import(".inferx_provider.InferXProvider"),
     "latitude": _lazy_import(".latitude_provider.LatitudeProvider"),
     "demo": _lazy_import(".demo_mode.DemoModeProvider"),
+    "yottalabs": _lazy_import(".yottalabs_provider.YottaLabsProvider"),
+    "e2enetworks": _lazy_import(".e2e_networks_provider.E2ENetworksProvider"),
 }
 
 

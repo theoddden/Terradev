@@ -21,6 +21,8 @@ from .runpod_provider import RunPodProvider
 from .siliconflow_provider import SiliconFlowProvider
 from .tensordock_provider import TensorDockProvider
 from .vastai_provider import VastAIProvider
+from .yottalabs_provider import YottaLabsProvider
+from .e2e_networks_provider import E2ENetworksProvider
 
 __all__ = [
     "AlibabaProvider",
@@ -44,4 +46,6 @@ __all__ = [
     "SiliconFlowProvider",
     "TensorDockProvider",
     "VastAIProvider",
+    "YottaLabsProvider",
+    "E2ENetworksProvider",
 ]
