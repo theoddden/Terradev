@@ -200,3 +200,8 @@ terradev_cli = [
     "config/*.json",
     "core/semantic_signals/*.yaml",
 ]
+
+[tool.black]
+target-version = ["py39", "py310", "py311", "py312"]
+line-length = 120
+skip-string-normalization = true
