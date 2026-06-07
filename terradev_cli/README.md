@@ -1,4 +1,4 @@
-# Terradev CLI v5.1.7
+# Terradev CLI v5.2.1
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -10,13 +10,22 @@ pypi.org/project/terradev-cli/
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
 
+**NOTES ON 5.2.1**
+
+Added two new BYOAPI providers: **Yotta Labs (Shakti Cloud)** and **E2E Networks** — India's leading GPU clouds. Yotta Labs uses a pod-based compute model (similar to RunPod), and E2E Networks is a traditional VM-style hyperscaler that is NSE-listed and MeitY empanelled. Both are BYOAPI: your key, stored locally, never touches a Terradev server.
+
+```bash
+terradev configure --provider yottalabs
+terradev configure --provider e2enetworks
+```
+
 **NOTES ON 5.0.0**
 
 We removed the paywall, open-sourced Terradev, and added Rust accelerators for safe and snappy delivery...
 
 With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. You or the agent can issue commands freely... the orchestrator ensures they're safe to execute.
 
-218 tools not including subcommand/flags require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 21+ cloud providers, that compounds across every tool call in the chain.
+218 tools not including subcommand/flags require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 23 cloud providers, that compounds across every tool call in the chain.
 
 ## BYOAPI Configuration
 
@@ -58,7 +67,7 @@ terradev --help
 ```
 
 ### Step 2: Configure Your First Cloud Provider
-Terradev supports 21+ GPU cloud providers. Start with one, RunPod is the fastest to set up:
+Terradev supports 23 GPU cloud providers. Start with one, RunPod is the fastest to set up:
 
 ```bash
 terradev setup runpod --quick
