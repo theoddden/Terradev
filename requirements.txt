@@ -1,8 +1,8 @@
 # Terradev Python Dependencies
 
 # Cloud SDKs
-boto3==1.29.57
-botocore==1.32.57
+boto3==1.28.57
+botocore==1.31.57
 google-cloud-billing==1.10.0
 azure-mgmt-billing==6.0.0
 aiohttp==3.9.1
