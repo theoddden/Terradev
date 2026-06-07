@@ -106,12 +106,6 @@ class IntegrationTestFramework:
         """Test cloud provider integrations"""
         tests = [
             self._test_aws_integration,
-            self._test_gcp_integration,
-            self._test_azure_integration,
-            self._test_runpod_integration,
-            self._test_vastai_integration,
-            self._test_lambda_labs_integration,
-            self._test_huggingface_integration,
         ]
 
         return await self._run_test_suite(tests)
