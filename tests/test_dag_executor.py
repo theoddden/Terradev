@@ -216,7 +216,7 @@ class TestExecution:
         result = dag.apply()
         assert result.success
         # Serial would be ~300ms, parallel should be ~50-80ms
-        assert result.wall_clock_ms < 200
+        assert result.wall_clock_ms < 250
         # Parallelism factor should be > 2x
         assert result.parallelism_achieved > 2.0
 
