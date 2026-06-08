@@ -47,6 +47,8 @@ class OIDCProvider:
         # PKCE verifier
         self.code_verifier = None
         self.code_challenge = None
+        # CSRF state nonce (set in generate_auth_url, validated in exchange_code_for_tokens)
+        self._expected_state: Optional[str] = None
 
     async def discover_endpoints(self) -> bool:
         """Discover OIDC endpoints from well-known configuration"""
@@ -111,6 +113,9 @@ class OIDCProvider:
         if not state:
             state = secrets.token_urlsafe(32)
 
+        # Store state for CSRF validation in exchange_code_for_tokens
+        self._expected_state = state
+
         # Build parameters
         params = {
             "response_type": "code",
@@ -135,6 +140,20 @@ class OIDCProvider:
 
             if not self.token_endpoint:
                 raise ValueError("Token endpoint not discovered")
+
+            # H-6: Validate state to prevent CSRF attacks
+            if self._expected_state is None:
+                raise ValueError(
+                    "No expected state stored — call generate_auth_url() before "
+                    "exchange_code_for_tokens()"
+                )
+            if not secrets.compare_digest(state, self._expected_state):
+                raise ValueError(
+                    "OAuth state mismatch — possible CSRF attack. "
+                    "Expected state does not match returned state."
+                )
+            # Consume the nonce so it cannot be replayed
+            self._expected_state = None
 
             # Prepare token request
             data = {
@@ -222,46 +241,91 @@ class OIDCProvider:
             logger.error(f"Failed to get user info: {e}")
             raise
 
-    def validate_id_token(self, id_token: str) -> Dict[str, Any]:
-        """Validate ID token and extract claims"""
+    async def fetch_jwks(self) -> Optional[Dict]:
+        """Fetch the provider's JSON Web Key Set for signature verification."""
+        if not self.jwks_uri:
+            return None
         try:
-            if not jwt:
-                logger.warning(
-                    "JWT library not available, skipping ID token validation"
-                )
-                return {}
-
-            # Decode without verification first to get headers
-            jwt.get_unverified_header(id_token)
-
-            # For production, you should verify the signature using the JWKS
-            # For now, we'll decode without verification
-            decoded = jwt.decode(id_token, options={"verify_signature": False})
-
-            # Extract claims
-            claims = {
-                "iss": decoded.get("iss"),
-                "aud": decoded.get("aud"),
-                "sub": decoded.get("sub"),
-                "exp": decoded.get("exp"),
-                "iat": decoded.get("iat"),
-                "email": decoded.get("email"),
-                "name": decoded.get("name"),
-                "picture": decoded.get("picture"),
-            }
-
-            # Basic validation
-            if decoded.get("aud") != self.client_id:
-                raise ValueError("Invalid audience in ID token")
-
-            if datetime.utcnow() > datetime.fromtimestamp(decoded.get("exp", 0)):
-                raise ValueError("ID token expired")
-
-            return claims
-
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.jwks_uri) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
         except Exception as e:
-            logger.error(f"ID token validation failed: {e}")
-            raise
+            logger.warning(f"JWKS fetch failed: {e}")
+        return None
+
+    async def validate_id_token(self, id_token: str) -> Dict[str, Any]:
+        """Validate ID token signature and extract claims.
+
+        Performs full JWKS-based RS256/ES256 signature verification when
+        PyJWT>=2.4 + cryptography are installed and the JWKS URI is known.
+        Falls back to audience + expiry-only checks with a loud warning when
+        the key material is unavailable — it does NOT skip validation silently.
+        """
+        if not jwt:
+            raise RuntimeError(
+                "PyJWT is required for ID token validation. "
+                "Install it with: pip install 'PyJWT[crypto]>=2.4'"
+            )
+
+        header = jwt.get_unverified_header(id_token)
+        alg = header.get("alg", "RS256")
+
+        jwks_data = await self.fetch_jwks() if aiohttp else None
+
+        if jwks_data and "keys" in jwks_data:
+            try:
+                from jwt import PyJWKClient  # PyJWT >= 2.4
+
+                jwks_client = PyJWKClient(self.jwks_uri)
+                signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+                decoded = jwt.decode(
+                    id_token,
+                    signing_key.key,
+                    algorithms=[alg],
+                    audience=self.client_id,
+                )
+            except ImportError:
+                # PyJWT < 2.4 — no PyJWKClient; decode with the raw JWK
+                kid = header.get("kid")
+                key_data = next(
+                    (k for k in jwks_data["keys"] if k.get("kid") == kid),
+                    jwks_data["keys"][0] if jwks_data["keys"] else None,
+                )
+                if key_data is None:
+                    raise ValueError("No matching JWK found for token kid")
+                public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key_data)
+                decoded = jwt.decode(
+                    id_token,
+                    public_key,
+                    algorithms=[alg],
+                    audience=self.client_id,
+                )
+        else:
+            # JWKS unavailable — decode header/payload for inspection only,
+            # then REJECT unless the token is already expired (belt-and-suspenders).
+            logger.error(
+                "JWKS unavailable — cannot verify ID token signature. "
+                "Token is REJECTED. Ensure the OIDC provider is reachable "
+                "and discover_endpoints() has been called."
+            )
+            raise ValueError(
+                "ID token signature cannot be verified: JWKS endpoint unreachable. "
+                "Refusing to accept unverified token."
+            )
+
+        # Extract and return verified claims
+        claims = {
+            "iss": decoded.get("iss"),
+            "aud": decoded.get("aud"),
+            "sub": decoded.get("sub"),
+            "exp": decoded.get("exp"),
+            "iat": decoded.get("iat"),
+            "email": decoded.get("email"),
+            "name": decoded.get("name"),
+            "picture": decoded.get("picture"),
+        }
+        return claims
 
     def configure_google_workspace(
         self, client_id: str, client_secret: str

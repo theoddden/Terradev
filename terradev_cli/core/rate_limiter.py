@@ -223,40 +223,57 @@ class RateLimiter:
         metrics = self.provider_metrics[provider]
         start_time = time.time()
 
-        @backoff.on_exception(
-            backoff.expo,
-            (aiohttp.ClientError, asyncio.TimeoutError),
-            max_tries=limit.retry_attempts,
-            base=limit.backoff_factor,
-            max_value=60.0,
-        )
-        async def _execute_with_retry():
-            # Acquire rate limit permit
+        async def _core_attempt() -> Any:
+            """Single attempt: acquire permit, run func with timeout."""
             if not await self.acquire(provider):
                 raise aiohttp.ClientError(f"Rate limit exceeded for {provider}")
-
-            # Execute the function with timeout
             try:
                 async with asyncio.timeout(limit.timeout):
                     result = await func(*args, **kwargs)
-
-                    # Update success metrics
-                    metrics.successful_requests += 1
-                    response_time = time.time() - start_time
-                    metrics.average_response_time = (
-                        metrics.average_response_time
-                        * (metrics.successful_requests - 1)
-                        + response_time
-                    ) / metrics.successful_requests
-
-                    return result
-
+                metrics.successful_requests += 1
+                response_time = time.time() - start_time
+                metrics.average_response_time = (
+                    metrics.average_response_time
+                    * (metrics.successful_requests - 1)
+                    + response_time
+                ) / metrics.successful_requests
+                return result
             except asyncio.TimeoutError:
                 logger.warning(f"Timeout for {provider} after {limit.timeout}s")
                 raise
             except Exception:
                 metrics.failed_requests += 1
                 raise
+
+        if backoff is not None:
+            @backoff.on_exception(
+                backoff.expo,
+                (aiohttp.ClientError, asyncio.TimeoutError),
+                max_tries=limit.retry_attempts,
+                base=limit.backoff_factor,
+                max_value=60.0,
+            )
+            async def _execute_with_retry():
+                return await _core_attempt()
+        else:
+            async def _execute_with_retry():
+                """Manual exponential backoff fallback when the backoff library is absent."""
+                delay = 1.0
+                last_exc: Exception = RuntimeError("No attempts made")
+                for attempt in range(max(1, limit.retry_attempts)):
+                    try:
+                        return await _core_attempt()
+                    except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+                        last_exc = exc
+                        if attempt < limit.retry_attempts - 1:
+                            sleep_for = min(delay, 60.0)
+                            logger.warning(
+                                f"Retry {attempt + 1}/{limit.retry_attempts} for "
+                                f"{provider} in {sleep_for:.1f}s: {exc}"
+                            )
+                            await asyncio.sleep(sleep_for)
+                            delay *= limit.backoff_factor
+                raise last_exc
 
         try:
             return await _execute_with_retry()

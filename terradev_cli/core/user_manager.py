@@ -50,8 +50,8 @@ class UserManager:
     """Enterprise user management system"""
 
     def __init__(self, config_path: Optional[str] = None):
-        self.config_path = config_path or (
-            Path.home() / ".terradev" / "user_management.json"
+        self.config_path: Path = (
+            Path(config_path) if config_path else Path.home() / ".terradev" / "user_management.json"
         )
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
 

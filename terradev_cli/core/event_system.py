@@ -4,12 +4,16 @@ Terradev Event System - Triggers, Environment Promotion, and Artifact Lineage
 Production-grade automation infrastructure for ML workflows
 """
 
-from typing import Dict, List, Any, Optional, Callable
+import threading
+from collections import deque
+from typing import Dict, Deque, List, Any, Optional, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 import uuid
 from datetime import datetime
 import logging
+
+_EVENT_HISTORY_MAX = 1000  # Maximum events retained in memory
 
 # Rust event bus integration
 try:
@@ -153,27 +157,29 @@ class EventBus:
     """Event bus for publishing and subscribing to events"""
 
     def __init__(self):
+        self._lock = threading.Lock()
         self.subscribers: Dict[EventType, List[Callable]] = {}
-        self.event_history: List[Event] = []
+        self.event_history: Deque[Event] = deque(maxlen=_EVENT_HISTORY_MAX)
         self.logger = logging.getLogger(__name__)
 
     def subscribe(self, event_type: EventType, callback: Callable[[Event], None]):
         """Subscribe to event type"""
-        if event_type not in self.subscribers:
-            self.subscribers[event_type] = []
-        self.subscribers[event_type].append(callback)
+        with self._lock:
+            if event_type not in self.subscribers:
+                self.subscribers[event_type] = []
+            self.subscribers[event_type].append(callback)
 
     def publish(self, event: Event):
         """Publish event to all subscribers"""
-        self.event_history.append(event)
+        with self._lock:
+            self.event_history.append(event)  # deque auto-evicts oldest when full
+            callbacks = list(self.subscribers.get(event.type, []))
         self.logger.info(f"Published event: {event.type.value} from {event.source}")
-
-        if event.type in self.subscribers:
-            for callback in self.subscribers[event.type]:
-                try:
-                    callback(event)
-                except Exception as e:
-                    self.logger.error(f"Error in event callback: {e}")
+        for callback in callbacks:
+            try:
+                callback(event)
+            except Exception as e:
+                self.logger.error(f"Error in event callback: {e}")
 
     def get_events(
         self,
@@ -182,7 +188,8 @@ class EventBus:
         limit: int = 100,
     ) -> List[Event]:
         """Get events with optional filtering"""
-        events = self.event_history
+        with self._lock:
+            events: List[Event] = list(self.event_history)
 
         if event_type:
             events = [e for e in events if e.type == event_type]
@@ -199,6 +206,7 @@ class TriggerManager:
     def __init__(self, event_bus: EventBus):
         self.event_bus = event_bus
         self.triggers: Dict[str, Trigger] = {}
+        self._lock = threading.Lock()
         self.logger = logging.getLogger(__name__)
 
         # Subscribe to all event types
@@ -212,15 +220,16 @@ class TriggerManager:
         trigger = Trigger(
             name=name, type=trigger_type, target_pipeline=target_pipeline, **kwargs
         )
-
-        self.triggers[trigger.id] = trigger
+        with self._lock:
+            self.triggers[trigger.id] = trigger
         self.logger.info(f"Created trigger: {name} ({trigger_type.value})")
-
         return trigger
 
     def _handle_event(self, event: Event):
         """Handle incoming events and check triggers"""
-        for trigger in self.triggers.values():
+        with self._lock:
+            triggers = list(self.triggers.values())
+        for trigger in triggers:
             if not trigger.enabled:
                 continue
 
@@ -256,8 +265,9 @@ class TriggerManager:
 
     def _execute_trigger(self, trigger: Trigger, event: Event):
         """Execute trigger (launch pipeline)"""
-        trigger.last_triggered = datetime.now()
-        trigger.trigger_count += 1
+        with self._lock:
+            trigger.last_triggered = datetime.now()
+            trigger.trigger_count += 1
 
         self.logger.info(f"Trigger '{trigger.name}' fired by event {event.type.value}")
 
@@ -284,6 +294,7 @@ class LineageService:
 
     def __init__(self):
         self.artifacts: Dict[str, Artifact] = {}
+        self._lock = threading.Lock()
         self.logger = logging.getLogger(__name__)
 
     def register_artifact(
@@ -298,26 +309,27 @@ class LineageService:
         artifact = Artifact(
             type=artifact_type, name=name, uri=uri, environment=environment, **kwargs
         )
-
-        self.artifacts[artifact.id] = artifact
+        with self._lock:
+            self.artifacts[artifact.id] = artifact
         self.logger.info(
             f"Registered artifact: {artifact_type.value} {name} in {environment.value}"
         )
-
         return artifact
 
     def add_relationship(self, parent_id: str, child_id: str):
         """Add parent-child relationship between artifacts"""
-        if parent_id in self.artifacts and child_id in self.artifacts:
-            self.artifacts[parent_id].child_ids.append(child_id)
-            self.artifacts[child_id].parent_ids.append(parent_id)
+        with self._lock:
+            if parent_id in self.artifacts and child_id in self.artifacts:
+                self.artifacts[parent_id].child_ids.append(child_id)
+                self.artifacts[child_id].parent_ids.append(parent_id)
 
     def get_lineage(
         self, artifact_id: str, direction: str = "both"
     ) -> Dict[str, List[Artifact]]:
         """Get lineage graph for artifact"""
-        if artifact_id not in self.artifacts:
-            return {}
+        with self._lock:
+            if artifact_id not in self.artifacts:
+                return {}
 
         result = {"parents": [], "children": []}
 
@@ -378,6 +390,7 @@ class EnvironmentManager:
         self.lineage_service = lineage_service
         self.event_bus = event_bus
         self.promotions: Dict[str, Promotion] = {}
+        self._lock = threading.Lock()
         self.logger = logging.getLogger(__name__)
 
     def request_promotion(
@@ -395,7 +408,8 @@ class EnvironmentManager:
             requested_by=requested_by,
         )
 
-        self.promotions[promotion.id] = promotion
+        with self._lock:
+            self.promotions[promotion.id] = promotion
         self.logger.info(
             f"Promotion requested: {from_env.value} -> {to_env.value} for artifact {artifact_id}"
         )
@@ -464,7 +478,8 @@ class EnvironmentManager:
         self, artifact_id: Optional[str] = None
     ) -> List[Promotion]:
         """Get promotion history"""
-        promotions = list(self.promotions.values())
+        with self._lock:
+            promotions = list(self.promotions.values())
 
         if artifact_id:
             promotions = [p for p in promotions if p.artifact_id == artifact_id]

@@ -12676,6 +12676,32 @@ async def handle_get_prompt(request: GetPromptRequest) -> GetPromptResult:
 
 TERRADEV_MCP_BEARER_TOKEN = os.getenv("TERRADEV_MCP_BEARER_TOKEN", "")
 
+# Comma-separated list of exact allowed redirect URIs for OAuth.
+# Example: "https://claude.ai/oauth/callback,http://localhost:3000/callback"
+# If unset, only localhost/127.0.0.1 URIs are permitted (safe local-dev default).
+_ALLOWED_REDIRECT_URIS_RAW = os.getenv("TERRADEV_MCP_ALLOWED_REDIRECT_URIS", "")
+_ALLOWED_REDIRECT_URIS: set = (
+    {u.strip() for u in _ALLOWED_REDIRECT_URIS_RAW.split(",") if u.strip()}
+    if _ALLOWED_REDIRECT_URIS_RAW
+    else set()
+)
+
+
+def _is_redirect_uri_allowed(uri: str) -> bool:
+    """Return True only if uri is on the explicit allowlist, or is a localhost
+    URI when no explicit allowlist is configured."""
+    if not uri:
+        return False
+    if _ALLOWED_REDIRECT_URIS:
+        return uri in _ALLOWED_REDIRECT_URIS
+    # No allowlist configured — permit localhost / 127.0.0.1 only
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(uri)
+        return parsed.hostname in ("localhost", "127.0.0.1", "::1")
+    except Exception:
+        return False
+
 # In-memory stores (single-instance server)
 _auth_codes: Dict[str, Dict[str, Any]] = (
     {}
@@ -12739,6 +12765,14 @@ async def oauth_authorize(request: Request) -> Response:
     logger.info(
         "OAuth authorize: client_id=%s... redirect=%s", client_id[:16], redirect_uri
     )
+
+    # Validate redirect_uri against allowlist before doing anything else (open-redirect prevention)
+    if not _is_redirect_uri_allowed(redirect_uri):
+        logger.warning("OAuth authorize rejected: redirect_uri not in allowlist: %s", redirect_uri)
+        return JSONResponse(
+            {"error": "invalid_request", "error_description": "redirect_uri not allowed"},
+            status_code=400,
+        )
 
     # Validate client_id matches our configured token
     if TERRADEV_MCP_BEARER_TOKEN and client_id != TERRADEV_MCP_BEARER_TOKEN:

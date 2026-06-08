@@ -6,6 +6,7 @@ Handles secure credential storage and management
 
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Dict, Optional
 from cryptography.fernet import Fernet
@@ -116,11 +117,22 @@ class AuthManager:
             "version": "2.0",
         }
 
-        with open(auth_file_path, "w") as f:
-            json.dump(data, f, indent=2)
-
-        # Set secure permissions
-        os.chmod(auth_file_path, 0o600)
+        # Atomic write: write to a temp file in the same directory, then
+        # rename into place. On POSIX, os.replace() is atomic, so a crash
+        # mid-write cannot corrupt the existing credentials file.
+        dir_path = auth_file_path.parent
+        fd, tmp_path = tempfile.mkstemp(dir=dir_path, prefix=".auth_tmp_")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(data, f, indent=2)
+            os.chmod(tmp_path, 0o600)
+            os.replace(tmp_path, auth_file_path)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
     def set_credentials(
         self, provider: str, api_key: str, secret_key: Optional[str] = None
