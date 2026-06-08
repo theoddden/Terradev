@@ -237,7 +237,6 @@ GPU_ALIASES: Dict[str, str] = {
     "NVIDIA_L4_24G": "L4-24GB",
     "L4": "L4-24GB",
     "L4-24GB": "L4-24GB",
-    "l4": "L4-24GB",
 
     # ── Legacy / Consumer ─────────────────────────────────────────────────
     "RTX3080": "RTX-3080-10GB",

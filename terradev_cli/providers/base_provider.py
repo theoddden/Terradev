@@ -173,7 +173,7 @@ class BaseProvider(ABC):
     # These allow existing code to continue working while providers migrate
     # to the new typed APIs incrementally.
 
-    async def get_instance_quotes(
+    async def get_instance_quotes(  # noqa: F811
         self, gpu_type: str, region: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
@@ -212,7 +212,7 @@ class BaseProvider(ABC):
             for q in quotes
         ]
 
-    async def provision_instance(
+    async def provision_instance(  # noqa: F811
         self, instance_type: str, region: str, gpu_type: str
     ) -> Dict[str, Any]:
         """
@@ -247,7 +247,7 @@ class BaseProvider(ABC):
             **result.raw,
         }
 
-    async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
+    async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:  # noqa: F811
         """
         Backwards-compat shim for old Dict-based signature.
 
