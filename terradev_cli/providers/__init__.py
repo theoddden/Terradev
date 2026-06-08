@@ -1,51 +1,57 @@
 # terradev_cli.providers
+#
+# This module exports typed domain contracts and the provider factory.
+# Individual provider classes are loaded lazily via ProviderFactory to avoid
+# import errors when optional dependencies (boto3, google-cloud-*, etc.) are missing.
 
-from .alibaba_provider import AlibabaProvider
-from .aws_provider import AWSProvider
-from .azure_provider import AzureProvider
-from .baseten_provider import BasetenProvider
-from .coreweave_provider import CoreWeaveProvider
-from .crusoe_provider import CrusoeProvider
-from .digitalocean_provider import DigitalOceanProvider
-from .fluidstack_provider import FluidStackProvider
-from .gcp_provider import GCPProvider
-from .hetzner_provider import HetznerProvider
-from .huggingface_provider import HuggingFaceProvider
-from .hyperstack_provider import HyperstackProvider
-from .inferx_provider import InferXProvider
-from .lambda_labs_provider import LambdaLabsProvider
-from .latitude_provider import LatitudeProvider
-from .oracle_provider import OracleProvider
-from .ovhcloud_provider import OVHcloudProvider
-from .runpod_provider import RunPodProvider
-from .siliconflow_provider import SiliconFlowProvider
-from .tensordock_provider import TensorDockProvider
-from .vastai_provider import VastAIProvider
-from .yottalabs_provider import YottaLabsProvider
-from .e2e_networks_provider import E2ENetworksProvider
+from .types import (
+    GPUDescriptor,
+    GPUVendor,
+    InstanceStatus,
+    Quote,
+    QuoteRequest,
+    ProvisionRequest,
+    ProvisionResult,
+    InstanceInfo,
+    ProviderEvent,
+    CredentialField,
+    ProviderCapabilities,
+    HealthStatus,
+    ProviderHealth,
+)
+
+from .base_provider import BaseProvider
+from .provider_factory import ProviderFactory
+from .registry import ProviderRegistry
+from .gpu_catalog import (
+    normalize,
+    get_canonical_name,
+    list_all_canonical_gpus,
+    list_providers_for_gpu,
+)
 
 __all__ = [
-    "AlibabaProvider",
-    "AWSProvider",
-    "AzureProvider",
-    "BasetenProvider",
-    "CoreWeaveProvider",
-    "CrusoeProvider",
-    "DigitalOceanProvider",
-    "FluidStackProvider",
-    "GCPProvider",
-    "HetznerProvider",
-    "HuggingFaceProvider",
-    "HyperstackProvider",
-    "InferXProvider",
-    "LambdaLabsProvider",
-    "LatitudeProvider",
-    "OracleProvider",
-    "OVHcloudProvider",
-    "RunPodProvider",
-    "SiliconFlowProvider",
-    "TensorDockProvider",
-    "VastAIProvider",
-    "YottaLabsProvider",
-    "E2ENetworksProvider",
+    # Types
+    "GPUDescriptor",
+    "GPUVendor",
+    "InstanceStatus",
+    "Quote",
+    "QuoteRequest",
+    "ProvisionRequest",
+    "ProvisionResult",
+    "InstanceInfo",
+    "ProviderEvent",
+    "CredentialField",
+    "ProviderCapabilities",
+    "HealthStatus",
+    "ProviderHealth",
+    # Core classes
+    "BaseProvider",
+    "ProviderFactory",
+    "ProviderRegistry",
+    # GPU catalog functions
+    "normalize",
+    "get_canonical_name",
+    "list_all_canonical_gpus",
+    "list_providers_for_gpu",
 ]

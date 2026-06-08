@@ -17,6 +17,8 @@ from .config import TerradevConfig
 from .auth import AuthManager
 from ..providers.provider_factory import ProviderFactory
 from ..providers.base_provider import BaseProvider
+from ..providers.registry import ProviderRegistry
+from ..providers.gpu_catalog import normalize
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -94,6 +96,7 @@ class TerradevEngine:
         self.config = config
         self.auth = auth
         self.provider_factory = ProviderFactory()
+        self.provider_registry = ProviderRegistry(factory=self.provider_factory)
 
         # Use real existing modules instead of non-existent ones
         try:

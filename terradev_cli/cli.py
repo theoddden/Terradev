@@ -2366,31 +2366,53 @@ def provision(
             )
             print("Proceeding with cloud providers...")
 
-    # ── Step 1: Fetch quotes from ALL providers in parallel ──
+    # ── Step 1: Fetch quotes from providers using ProviderRegistry for pre-filtering ──
     print(f"Provisioning {count}x {gpu_type} (parallel={parallel})")
-    print("Querying all providers for real-time pricing...")
+    print("Querying providers for real-time pricing...")
 
     async def _fetch_all():
+        from terradev_cli.providers.registry import ProviderRegistry
+        from terradev_cli.providers.provider_factory import ProviderFactory
+
+        factory = ProviderFactory()
+        registry = ProviderRegistry(factory=factory)
+
+        # Normalize GPU type to canonical name
+        from terradev_cli.providers.gpu_catalog import get_canonical_name
+        gpu_canonical = get_canonical_name(gpu_type) or gpu_type
+
+        # Get ranked providers (pre-filtered by health and capabilities)
+        ranked = registry.ranked_providers(
+            gpu_canonical=gpu_canonical,
+            spot=use_spot if use_spot is not None else False,
+            max_providers=10,
+        )
+
+        # Map ranked provider names to quote functions
+        provider_map = {
+            "runpod": api.get_runpod_quotes,
+            "vastai": api.get_vastai_quotes,
+            "aws": api.get_aws_quotes,
+            "gcp": api.get_gcp_quotes,
+            "azure": api.get_azure_quotes,
+            "tensordock": api.get_tensordock_quotes,
+            "lambda": api.get_lambda_quotes,
+            "coreweave": api.get_coreweave_quotes,
+            "oracle": api.get_oracle_quotes,
+            "crusoe": api.get_crusoe_quotes,
+        }
+
         tasks = []
-        provider_list = [
-            ("runpod", api.get_runpod_quotes),
-            ("vastai", api.get_vastai_quotes),
-            ("aws", api.get_aws_quotes),
-            ("gcp", api.get_gcp_quotes),
-            ("azure", api.get_azure_quotes),
-            ("tensordock", api.get_tensordock_quotes),
-            ("lambda", api.get_lambda_quotes),
-            ("coreweave", api.get_coreweave_quotes),
-            ("oracle", api.get_oracle_quotes),
-            ("crusoe", api.get_crusoe_quotes),
-        ]
-        for pname, fn in provider_list:
+        for pname in ranked:
+            fn = provider_map.get(pname)
             if fn is None:
                 continue
             if not providers or pname in providers:
                 tasks.append(fn(gpu_type))
+
         if not tasks:
             return []
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
         out = []
         for r in results:
@@ -2599,9 +2621,34 @@ def provision(
 
     async def _provision_all():
         from providers.provider_factory import ProviderFactory
+        from core.rate_limiter import get_rate_limiter
 
         factory = ProviderFactory()
+        rate_limiter = get_rate_limiter()
         sem = asyncio.Semaphore(parallel)
+
+        # Background verification task with exponential backoff
+        async def _verify_instance_bg(provider, instance_id, pname):
+            """Background task to verify instance status with exponential backoff"""
+            delay = 5.0  # start with 5s
+            max_delay = 60.0  # cap at 60s
+            max_attempts = 20  # ~5 min total max
+
+            for attempt in range(max_attempts):
+                await asyncio.sleep(delay)
+                try:
+                    status_resp = await provider.get_instance_status(instance_id)
+                    actual = status_resp.get("status", "unknown").lower()
+                    if actual in ("running", "active", "ready"):
+                        return True, actual
+                    if actual in ("error", "failed", "terminated", "deleted"):
+                        return False, actual
+                    # Exponential backoff
+                    delay = min(delay * 1.5, max_delay)
+                except Exception:
+                    # Provider error, continue trying
+                    delay = min(delay * 1.5, max_delay)
+            return None, "timeout"
 
         async def _do_one(q):
             async with sem:
@@ -2612,55 +2659,39 @@ def provision(
                     provider = factory.create_provider(pname, creds)
                     spot_flag = q.get("availability") == "spot"
                     itype = f"{pname}-{'spot' if spot_flag else 'ondemand'}-{gpu_type.lower()}"
-                    result = await provider.provision_instance(
-                        itype,
-                        q.get("region", "us-east-1"),
-                        gpu_type,
+
+                    # Wrap provision with rate limiter
+                    async def _provision_with_rate_limit():
+                        return await provider.provision_instance(
+                            itype,
+                            q.get("region", "us-east-1"),
+                            gpu_type,
+                        )
+
+                    result = await rate_limiter.execute_with_rate_limit(
+                        pname, _provision_with_rate_limit
                     )
                     elapsed = (time.monotonic() - t0) * 1000
                     iid = result.get(
                         "instance_id",
                         f"{pname}_{int(time.time())}_{uuid.uuid4().hex[:6]}",
                     )
-                    # Verify instance actually started (provider 200 != GPU running)
-                    # Some providers (Vast.ai, TensorDock, Lambda) take 45-90s to boot
-                    verified = None
-                    actual = "unknown"
-                    _poll_intervals = [10, 15, 20, 25, 30]  # total ~100s max wait
-                    try:
-                        for _wait in _poll_intervals:
-                            await asyncio.sleep(_wait)
-                            status_resp = await provider.get_instance_status(iid)
-                            actual = status_resp.get("status", "unknown").lower()
-                            if actual in ("running", "active", "ready"):
-                                verified = True
-                                break
-                            if actual in ("error", "failed", "terminated", "deleted"):
-                                verified = False
-                                break
-                            # still booting (pending/starting/provisioning)  keep polling
-                        else:
-                            verified = None  # timed out  still not running after ~100s
-                    except Exception:
-                        verified = None  # verification inconclusive
+
+                    # Start background verification (doesn't block semaphore)
+                    verify_task = asyncio.create_task(
+                        _verify_instance_bg(provider, iid, pname)
+                    )
+
+                    # Return immediately with pending status, verification happens in background
                     return {
-                        "status": (
-                            "active"
-                            if verified is True
-                            else "failed" if verified is False else "pending"
-                        ),
+                        "status": "pending",  # verification running in background
                         "instance_id": iid,
                         "provider": q["provider"],
                         "region": q.get("region", ""),
                         "price": result.get("price_per_hour", q["price"]),
                         "spot": q.get("availability") == "spot",
                         "elapsed_ms": round(elapsed, 1),
-                        "error": (
-                            f"Instance entered {actual} state"
-                            if verified is False
-                            else None
-                        ),
-                        "verified": verified,
+                        "verify_task": verify_task,  # track for later if needed
                     }
                 except Exception as e:
                     elapsed = (time.monotonic() - t0) * 1000

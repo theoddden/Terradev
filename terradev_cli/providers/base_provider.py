@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
 Base Provider - Abstract base class for cloud providers
+
+Provides both new typed APIs (get_quotes, provision, get_instance) and
+backwards-compatible Dict-based shims for existing provider implementations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Callable, Awaitable
+from dataclasses import asdict
+import asyncio
 import aiohttp
+import time
 
 # Rust connection pool integration
 try:
@@ -15,9 +21,43 @@ try:
 except ImportError:
     USE_RUST_POOL = False
 
+# Import new typed contracts
+from .types import (
+    GPUDescriptor,
+    GPUVendor,
+    InstanceStatus,
+    Quote,
+    QuoteRequest,
+    ProvisionRequest,
+    ProvisionResult,
+    InstanceInfo,
+    ProviderEvent,
+    HealthStatus,
+)
+from .gpu_catalog import normalize
+
 
 class BaseProvider(ABC):
     """Abstract base class for cloud providers"""
+
+    # Shared TCP connector for connection pooling across all providers
+    _shared_connector: Optional[aiohttp.TCPConnector] = None
+    _connector_lock = asyncio.Lock()
+
+    @classmethod
+    async def _get_shared_connector(cls) -> aiohttp.TCPConnector:
+        """Get or create shared TCP connector with connection pooling"""
+        if cls._shared_connector is None or cls._shared_connector.closed:
+            async with cls._connector_lock:
+                if cls._shared_connector is None or cls._shared_connector.closed:
+                    cls._shared_connector = aiohttp.TCPConnector(
+                        limit=100,  # max concurrent connections
+                        limit_per_host=20,  # max connections per host
+                        ttl_dns_cache=300,  # DNS cache TTL
+                        use_dns_cache=True,
+                        enable_cleanup_closed=True,
+                    )
+        return cls._shared_connector
 
     def __init__(self, credentials: Dict[str, str]):
         self.credentials = credentials
@@ -27,7 +67,8 @@ class BaseProvider(ABC):
 
     async def __aenter__(self):
         """Async context manager entry"""
-        self.session = aiohttp.ClientSession()
+        connector = await self._get_shared_connector()
+        self.session = aiohttp.ClientSession(connector=connector)
         self._owns_session = True
         return self
 
@@ -96,6 +137,230 @@ class BaseProvider(ABC):
         """Execute command on instance"""
         pass
 
+    # ── New Typed APIs (to be implemented by providers) ─────────────────────
+
+    @abstractmethod
+    async def get_quotes(self, request: QuoteRequest) -> List[Quote]:
+        """
+        Get instance quotes for GPU type (new typed API).
+
+        Providers should implement this method. The old get_instance_quotes()
+        method below is a backwards-compat shim that calls this.
+        """
+        pass
+
+    @abstractmethod
+    async def provision(self, request: ProvisionRequest) -> ProvisionResult:
+        """
+        Provision an instance (new typed API).
+
+        Providers should implement this method. The old provision_instance()
+        method below is a backwards-compat shim that calls this.
+        """
+        pass
+
+    @abstractmethod
+    async def get_instance(self, instance_id: str) -> InstanceInfo:
+        """
+        Get instance status (new typed API).
+
+        Providers should implement this method. The old get_instance_status()
+        method below is a backwards-compat shim that calls this.
+        """
+        pass
+
+    # ── Backwards-Compatibility Shims ───────────────────────────────────────
+    # These allow existing code to continue working while providers migrate
+    # to the new typed APIs incrementally.
+
+    async def get_instance_quotes(
+        self, gpu_type: str, region: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Backwards-compat shim for old Dict-based signature.
+
+        Delegates to get_quotes() and converts Quote objects to Dict.
+        """
+        # Normalize GPU type using catalog
+        gpu_desc = normalize(gpu_type)
+        if gpu_desc is None:
+            # Fallback: create minimal descriptor from string
+            gpu_desc = GPUDescriptor(
+                name=gpu_type,
+                vendor=GPUVendor.NVIDIA,
+                vram_gb=0,
+            )
+
+        request = QuoteRequest(gpu=gpu_desc, region=region)
+        quotes = await self.get_quotes(request)
+
+        # Convert Quote objects to Dict for backwards compat
+        return [
+            {
+                "provider": q.provider,
+                "instance_type": q.provider_instance_type,
+                "gpu_type": q.gpu.name,
+                "price_per_hour": q.price_hr,
+                "region": q.region,
+                "available": q.availability == "available",
+                "spot": q.spot,
+                "vcpus": q.vcpus,
+                "memory_gb": q.gpu.vram_gb,
+                "gpu_count": q.gpu.count,
+                **q.raw,
+            }
+            for q in quotes
+        ]
+
+    async def provision_instance(
+        self, instance_type: str, region: str, gpu_type: str
+    ) -> Dict[str, Any]:
+        """
+        Backwards-compat shim for old Dict-based signature.
+
+        Delegates to provision() and converts ProvisionResult to Dict.
+        """
+        gpu_desc = normalize(gpu_type)
+        if gpu_desc is None:
+            gpu_desc = GPUDescriptor(
+                name=gpu_type,
+                vendor=GPUVendor.NVIDIA,
+                vram_gb=0,
+            )
+
+        request = ProvisionRequest(
+            gpu=gpu_desc,
+            region=region,
+        )
+        result = await self.provision(request)
+
+        return {
+            "instance_id": result.instance_id,
+            "provider": result.provider,
+            "region": result.region,
+            "gpu_type": result.gpu.name,
+            "price_per_hour": result.price_hr,
+            "spot": result.spot,
+            "status": result.status.value,
+            "ip": result.ip,
+            "ssh_user": result.ssh_user,
+            **result.raw,
+        }
+
+    async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
+        """
+        Backwards-compat shim for old Dict-based signature.
+
+        Delegates to get_instance() and converts InstanceInfo to Dict.
+        """
+        info = await self.get_instance(instance_id)
+
+        return {
+            "instance_id": info.instance_id,
+            "provider": info.provider,
+            "status": info.status.value,
+            "gpu_type": info.gpu.name if info.gpu else None,
+            "ip": info.ip,
+            "price_per_hour": info.price_hr,
+            "spot": info.spot,
+            "uptime_s": info.uptime_s,
+            "region": info.region,
+            "ssh_user": info.ssh_user,
+            **info.raw,
+        }
+
+    # ── Optional Health & Event Methods (default implementations) ──────────
+
+    async def check_health(self) -> HealthStatus:
+        """
+        Default health check: lightweight API call.
+
+        Providers can override with custom health endpoints.
+        """
+        try:
+            start = time.time()
+            await self.list_instances()
+            latency_ms = (time.time() - start) * 1000
+            return HealthStatus(
+                healthy=True,
+                latency_ms=latency_ms,
+                timestamp=time.time(),
+            )
+        except Exception as e:
+            return HealthStatus(
+                healthy=False,
+                reason=str(e),
+                timestamp=time.time(),
+            )
+
+    async def subscribe_events(
+        self,
+        instance_ids: List[str],
+        callback: Callable[[ProviderEvent], Awaitable[None]],
+        poll_interval_s: int = 30,
+    ) -> asyncio.Task:
+        """
+        Default polling-based event detection.
+
+        Providers with native webhooks (RunPod, AWS CloudWatch) can override
+        this with streaming implementations.
+
+        Inspired by HarmonAIze macro-level pub/sub abstraction.
+        """
+        async def _poll_loop():
+            last_states: Dict[str, InstanceStatus] = {}
+
+            while True:
+                for iid in instance_ids:
+                    try:
+                        info = await self.get_instance(iid)
+                        last_status = last_states.get(iid)
+
+                        # Detect state changes
+                        if last_status != info.status:
+                            if info.status == InstanceStatus.PREEMPTED:
+                                await callback(
+                                    ProviderEvent(
+                                        provider=self.name,
+                                        instance_id=iid,
+                                        event_type="preempted",
+                                        payload={"status": info.status.value},
+                                        timestamp=time.time(),
+                                    )
+                                )
+                            elif info.status == InstanceStatus.RUNNING and last_status in (
+                                InstanceStatus.PENDING,
+                                InstanceStatus.STARTING,
+                            ):
+                                await callback(
+                                    ProviderEvent(
+                                        provider=self.name,
+                                        instance_id=iid,
+                                        event_type="recovered",
+                                        payload={"status": info.status.value},
+                                        timestamp=time.time(),
+                                    )
+                                )
+                            elif info.status == InstanceStatus.FAILED:
+                                await callback(
+                                    ProviderEvent(
+                                        provider=self.name,
+                                        instance_id=iid,
+                                        event_type="health_degraded",
+                                        payload={"status": info.status.value},
+                                        timestamp=time.time(),
+                                    )
+                                )
+
+                        last_states[iid] = info.status
+                    except Exception as e:
+                        # Log but don't break the loop
+                        pass
+
+                await asyncio.sleep(poll_interval_s)
+
+        return asyncio.create_task(_poll_loop())
+
     # Shared rate limiter instance across all providers
     _rate_limiter = None
 
@@ -114,7 +379,8 @@ class BaseProvider(ABC):
     async def _make_request(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
         """Make HTTP request with authentication and rate limiting"""
         if not self.session or self.session.closed:
-            self.session = aiohttp.ClientSession()
+            connector = await self._get_shared_connector()
+            self.session = aiohttp.ClientSession(connector=connector)
             self._owns_session = True
 
         # Acquire rate-limit permit for this provider (best-effort)
