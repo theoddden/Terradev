@@ -1985,6 +1985,292 @@ def setup(provider, quick):
     print(f"Done! Your {info['name']} is configured.")
 
 
+# Provider Profiles Commands
+@cli.group()
+def providers():
+    """Manage custom provider profiles for intelligent routing"""
+    pass
+
+
+@providers.command()
+@click.option(
+    "--path",
+    "-p",
+    type=click.Path(exists=True),
+    help="Path to YAML or JSON file containing provider profiles",
+)
+@click.option(
+    "--override",
+    is_flag=True,
+    help="Override existing profiles with same name (default: skip existing)",
+)
+def load_profiles(path, override):
+    """Load custom provider profiles from a YAML or JSON file.
+
+    Example:
+      terradev providers load-profiles ~/.terradev/custom_providers.yaml
+      terradev providers load-profiles profiles.json --override
+
+    Profile file format (YAML):
+      profiles:
+        my_provider:
+          api_style: rest
+          auth_type: bearer
+          egress_cost: 0.05
+          supports_spot: true
+    """
+    from terradev_cli.providers import load_profiles_from_file
+
+    if not path:
+        # Try default location
+        default_path = Path.home() / ".terradev" / "custom_providers.yaml"
+        if default_path.exists():
+            path = str(default_path)
+        else:
+            print("Error: No path specified and default file not found")
+            print(f"Expected: {default_path}")
+            print("Use --path to specify a profile file")
+            return
+
+    try:
+        load_profiles_from_file(path, override=override)
+        print(f"✓ Loaded provider profiles from: {path}")
+        if override:
+            print("  (existing profiles were overridden)")
+        else:
+            print("  (existing profiles were preserved)")
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+    except ImportError as e:
+        print(f"Error: {e}")
+        print("Install PyYAML for YAML support: pip install pyyaml")
+    except Exception as e:
+        print(f"Error loading profiles: {e}")
+
+
+@providers.command()
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["table", "json", "yaml"]),
+    default="table",
+    help="Output format (default: table)",
+)
+def list_profiles(format):
+    """List all registered provider profiles (built-in and custom).
+
+    Example:
+      terradev providers list-profiles
+      terradev providers list-profiles --format json
+    """
+    from terradev_cli.providers import list_all_profiles
+
+    profiles = list_all_profiles()
+
+    if format == "json":
+        import json
+
+        output = {}
+        for name, profile in profiles.items():
+            output[name] = {
+                "api_style": profile.api_style,
+                "auth_type": profile.auth_type,
+                "egress_cost": profile.egress_cost,
+                "supports_spot": profile.supports_spot,
+                "compute_model": profile.compute_model,
+            }
+        print(json.dumps(output, indent=2))
+
+    elif format == "yaml":
+        try:
+            import yaml
+        except ImportError:
+            print("Error: PyYAML required for YAML output. Install with: pip install pyyaml")
+            return
+
+        output = {}
+        for name, profile in profiles.items():
+            output[name] = {
+                "api_style": profile.api_style,
+                "auth_type": profile.auth_type,
+                "egress_cost": profile.egress_cost,
+                "supports_spot": profile.supports_spot,
+                "compute_model": profile.compute_model,
+            }
+        print(yaml.dump(output, default_flow_style=False))
+
+    else:  # table format
+        print(f"Registered Provider Profiles ({len(profiles)} total)")
+        print("=" * 80)
+        print(f"{'Name':<20} {'API Style':<10} {'Auth':<12} {'Egress':<8} {'Spot':<6} {'Model':<8}")
+        print("-" * 80)
+        for name, profile in sorted(profiles.items()):
+            print(
+                f"{name:<20} {profile.api_style:<10} {profile.auth_type:<12} "
+                f"${profile.egress_cost:<7.2f} {'Yes' if profile.supports_spot else 'No':<6} "
+                f"{profile.compute_model:<8}"
+            )
+
+
+@providers.command()
+@click.argument("name", help="Provider profile name to show")
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["table", "json", "yaml"]),
+    default="table",
+    help="Output format (default: table)",
+)
+def show_profile(name, format):
+    """Show details for a specific provider profile.
+
+    Example:
+      terradev providers show-profile runpod
+      terradev providers show-profile my_custom_provider --format json
+    """
+    from terradev_cli.providers import get_profile
+
+    profile = get_profile(name)
+
+    if format == "json":
+        import json
+
+        output = {
+            "name": profile.name,
+            "api_style": profile.api_style,
+            "auth_type": profile.auth_type,
+            "egress_cost": profile.egress_cost,
+            "supports_spot": profile.supports_spot,
+            "compute_model": profile.compute_model,
+            "isolation_level": profile.isolation_level,
+            "requires_instance_type_mapping": profile.requires_instance_type_mapping,
+            "quote_method": profile.quote_method,
+            "rate_limit_per_minute": profile.rate_limit_per_minute,
+        }
+        print(json.dumps(output, indent=2))
+
+    elif format == "yaml":
+        try:
+            import yaml
+        except ImportError:
+            print("Error: PyYAML required for YAML output. Install with: pip install pyyaml")
+            return
+
+        output = {
+            "name": profile.name,
+            "api_style": profile.api_style,
+            "auth_type": profile.auth_type,
+            "egress_cost": profile.egress_cost,
+            "supports_spot": profile.supports_spot,
+            "compute_model": profile.compute_model,
+            "isolation_level": profile.isolation_level,
+        }
+        print(yaml.dump(output, default_flow_style=False))
+
+    else:  # table format
+        print(f"Provider Profile: {profile.name}")
+        print("=" * 50)
+        print(f"API Style:        {profile.api_style}")
+        print(f"Auth Type:        {profile.auth_type}")
+        print(f"Egress Cost:      ${profile.egress_cost:.2f}/GB")
+        print(f"Supports Spot:    {'Yes' if profile.supports_spot else 'No'}")
+        print(f"Compute Model:    {profile.compute_model}")
+        print(f"Isolation Level:  {profile.isolation_level}")
+        print(f"Quote Method:     {profile.quote_method}")
+        print(f"Rate Limit:       {profile.rate_limit_per_minute or 'None'} req/min")
+        if profile.has_fallback_routing:
+            print(f"Fallback Routing: {', '.join(profile.fallback_providers)}")
+
+
+@providers.command()
+@click.argument("name", help="Provider profile name to remove")
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Remove without confirmation",
+)
+def remove_profile(name, force):
+    """Remove a custom provider profile from the registry.
+
+    Example:
+      terradev providers remove-profile my_custom_provider
+      terradev providers remove-profile my_custom_provider --force
+    """
+    from terradev_cli.providers import unregister_profile
+
+    if not force:
+        click.confirm(f"Remove provider profile '{name}'?", abort=True)
+
+    if unregister_profile(name):
+        print(f"✓ Removed provider profile: {name}")
+    else:
+        print(f"Profile '{name}' not found (may be a built-in profile)")
+
+
+@providers.command()
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    help="Output file path (default: stdout)",
+)
+def export_example(output):
+    """Export an example provider profiles YAML file.
+
+    Example:
+      terradev providers export-example
+      terradev providers export-example -o ~/.terradev/custom_providers.yaml
+    """
+    example_yaml = """# Custom Provider Profiles Example
+# Copy this file to ~/.terradev/custom_providers.yaml and add your custom providers
+# Then load with: terradev providers load-profiles ~/.terradev/custom_providers.yaml
+
+profiles:
+  # Example: Internal GPU cluster
+  my_internal_cluster:
+    api_style: rest
+    auth_type: bearer
+    egress_cost: 0.0
+    supports_spot: false
+    compute_model: vm
+    isolation_level: vm
+    supports_stop_start: true
+    region_specific_availability: true
+
+  # Example: Custom cloud provider
+  my_cloud_provider:
+    api_style: rest
+    auth_type: x_api_key
+    egress_cost: 0.02
+    supports_spot: true
+    spot_interruption_notice_minutes: 5
+    rate_limit_per_minute: 60
+    compute_model: vm
+    isolation_level: vm
+    supports_stop_start: true
+    provision_requires_location_id: true
+
+  # Example: GPU marketplace with SSH quirks
+  my_gpu_marketplace:
+    api_style: rest
+    auth_type: bearer
+    egress_cost: 0.01
+    supports_spot: true
+    ssh_port_fixed: false  # Dynamic SSH ports
+    compute_model: vm
+    isolation_level: vm
+    supports_stop_start: true
+"""
+
+    if output:
+        with open(output, "w") as f:
+            f.write(example_yaml)
+        print(f"✓ Exported example profiles to: {output}")
+    else:
+        print(example_yaml)
+
+
 @cli.command()
 @click.option(
     "--gpu-type",

@@ -23,7 +23,14 @@ from .types import (
 from .base_provider import BaseProvider
 from .provider_factory import ProviderFactory
 from .registry import ProviderRegistry
-from .provider_profiles import get_profile, list_all_profiles
+from .provider_profiles import (
+    get_profile,
+    list_all_profiles,
+    register_profile,
+    register_profiles_from_dict,
+    load_profiles_from_file,
+    unregister_profile,
+)
 from .gpu_catalog import (
     normalize,
     get_canonical_name,
@@ -59,4 +66,8 @@ __all__ = [
     # Provider profiles
     "get_profile",
     "list_all_profiles",
+    "register_profile",
+    "register_profiles_from_dict",
+    "load_profiles_from_file",
+    "unregister_profile",
 ]

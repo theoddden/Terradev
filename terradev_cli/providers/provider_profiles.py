@@ -429,3 +429,113 @@ def _default_profile(provider_name: str) -> ProviderProfile:
 def list_all_profiles() -> dict[str, ProviderProfile]:
     """Get all provider profiles."""
     return PROVIDER_PROFILES.copy()
+
+
+def register_profile(profile: ProviderProfile, override: bool = False) -> None:
+    """
+    Register a custom provider profile.
+
+    Args:
+        profile: ProviderProfile instance to register
+        override: If True, replace existing profile with same name. If False, raise error.
+
+    Raises:
+        ValueError: If profile with same name exists and override=False
+    """
+    name = profile.name.lower()
+    if name in PROVIDER_PROFILES and not override:
+        raise ValueError(f"Profile '{name}' already exists. Use override=True to replace.")
+    PROVIDER_PROFILES[name] = profile
+
+
+def register_profiles_from_dict(profiles_dict: dict, override: bool = False) -> None:
+    """
+    Register multiple provider profiles from a dictionary.
+
+    Args:
+        profiles_dict: Dict of {name: profile_dict} where profile_dict contains ProviderProfile fields
+        override: If True, replace existing profiles. If False, skip existing.
+
+    Example:
+        profiles_dict = {
+            "my_provider": {
+                "name": "my_provider",
+                "api_style": "rest",
+                "auth_type": "bearer",
+                "egress_cost": 0.05,
+                "supports_spot": True,
+            }
+        }
+        register_profiles_from_dict(profiles_dict)
+    """
+    for name, profile_data in profiles_dict.items():
+        if isinstance(profile_data, dict):
+            profile = ProviderProfile(name=name, **profile_data)
+            register_profile(profile, override=override)
+        elif isinstance(profile_data, ProviderProfile):
+            register_profile(profile_data, override=override)
+
+
+def load_profiles_from_file(path: str, override: bool = False) -> None:
+    """
+    Load provider profiles from a YAML or JSON file.
+
+    Args:
+        path: Path to config file (.yaml, .yml, or .json)
+        override: If True, replace existing profiles. If False, skip existing.
+
+    Example YAML:
+        profiles:
+          my_provider:
+            api_style: rest
+            auth_type: bearer
+            egress_cost: 0.05
+            supports_spot: true
+    """
+    import os
+    from pathlib import Path
+
+    path_obj = Path(path)
+    if not path_obj.exists():
+        raise FileNotFoundError(f"Profile file not found: {path}")
+
+    ext = path_obj.suffix.lower()
+
+    if ext in (".yaml", ".yml"):
+        try:
+            import yaml
+        except ImportError:
+            raise ImportError("PyYAML required to load YAML profiles. Install with: pip install pyyaml")
+
+        with open(path_obj) as f:
+            data = yaml.safe_load(f)
+    elif ext == ".json":
+        import json
+        with open(path_obj) as f:
+            data = json.load(f)
+    else:
+        raise ValueError(f"Unsupported file format: {ext}. Use .yaml, .yml, or .json")
+
+    # Extract profiles dict (support both direct dict and nested under 'profiles' key)
+    if isinstance(data, dict):
+        profiles_data = data.get("profiles", data)
+        register_profiles_from_dict(profiles_data, override=override)
+    else:
+        raise ValueError(f"Invalid profile file format: {path}")
+
+
+def unregister_profile(provider_name: str) -> bool:
+    """
+    Remove a provider profile from the registry.
+
+    Args:
+        provider_name: Name of provider to unregister
+
+    Returns:
+        True if profile was removed, False if it didn't exist
+    """
+    name = provider_name.lower()
+    if name in PROVIDER_PROFILES:
+        del PROVIDER_PROFILES[name]
+        return True
+    return False
