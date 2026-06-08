@@ -1,4 +1,4 @@
-# Terradev CLI v5.2.1
+# Terradev CLI v5.3.0
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -9,6 +9,20 @@
 pypi.org/project/terradev-cli/
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
+
+**NOTES ON 5.3.0**
+
+Added **transport-agnostic Prefill/Decode (P/D) disaggregation layer** and **multi-agent KV cache sharing planner**:
+
+- **Transport-agnostic P/D layer** (`core/pd_transport.py`): KV cache transfer is abstracted across NIXL/NVLink (600 GB/s), NIXL/InfiniBand (200–400 GB/s), CXL 3.0 (planned migration), RoCE RDMA, and TCP fallback. The `TransportSelector` probes at provision time and selects the best available transport. Documented NIXL→CXL migration path (Phase 1 co-existence → Phase 2 CXL-primary → Phase 3 fabric switch).
+
+- **Multi-agent KV sharing planner** (`core/kv_sharing.py`): Computes fleet VRAM requirements with KV cache sharing topologies (broadcast/star/chain/none). For 20 agents with 70% shared context (broadcast), VRAM reduces by 66% → 3× more agents per GPU, 3× fewer GPUs needed, ~$14/hr savings on H100 fleet. Includes `EvictionCostModel` to quantify re-prefill penalty when VRAM is under-provisioned.
+
+- **CLI integration**: `terradev provision` now supports `--agents`, `--context`, `--sharing-topology`, `--dtype` flags. When `--agents` is passed, the KV planner outputs the heterogeneous fleet spec with cost savings:
+  ```bash
+  terradev provision -g H100 --agents 20 --context 32k --model-name llama-70b
+  terradev provision -g H100 --agents 20 --context 32k --sharing-topology broadcast --dry-run
+  ```
 
 **NOTES ON 5.2.1**
 
