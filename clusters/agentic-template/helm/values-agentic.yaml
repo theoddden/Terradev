@@ -1,0 +1,222 @@
+# Agentic Fleet Helm Values
+#
+# Three-tier heterogeneous GPU fleet for multi-agent LLM workloads.
+# Grounded in arXiv:2605.26297 — decode dominates (91-98%), KV cache hit
+# rates 84-99%, context footprint 37K-166K tokens.
+#
+# Usage:
+#   helm install agent-fleet ./charts/agentic-fleet -f values-agentic.yaml
+#
+# Tiers:
+#   reasoning  — H100 SXM, KV cache preservation, long context
+#   decode     — A100 80GB, memory-bandwidth-optimised token streaming
+#   cpu_tools  — High-vCPU, Bash/WebFetch/file-op tool execution
+
+global:
+  model: "meta-llama/Llama-3.1-70B-Instruct"
+  fleet_id: ""            # set by terradev agent deploy
+  n_agents: 16
+  image:
+    repository: vllm/vllm-openai
+    tag: latest
+    pullPolicy: IfNotPresent
+
+# ── Reasoning tier ────────────────────────────────────────────────────────────
+# KV preservation is the primary objective.
+# Research: context averages 37K-80K tokens; we provision for 120K (P95 tail).
+# Failed agents accumulate MORE context — provision for the tail, not the mean.
+reasoning:
+  enabled: true
+  replicaCount: 2
+  gpu:
+    type: "H100_SXM"
+    countPerPod: 1
+  resources:
+    limits:
+      nvidia.com/gpu: "1"
+      memory: "200Gi"
+      cpu: "16"
+    requests:
+      nvidia.com/gpu: "1"
+      memory: "180Gi"
+      cpu: "12"
+  vllm:
+    tensorParallelSize: 1
+    maxModelLen: 120000      # 120K context budget (arXiv P95 tail)
+    gpuMemoryUtilization: 0.90
+    enablePrefixCaching: true  # CRITICAL: 84-99% KV hit rate requires this
+    kvConnector: "offloading"  # CPU offload when under pressure (avoid eviction)
+    speculativeConfig:
+      method: "mtp"
+    enableSleepMode: true
+    maxNumSeqs: 8            # concurrency per instance
+    serveOnPort: 8000
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 8
+    metrics:
+      # Scale on TTFT degradation, NOT GPU utilization (bursty workload)
+      - type: External
+        external:
+          metric:
+            name: vllm_request_ttft_seconds_p95
+          target:
+            type: Value
+            value: "2"    # 2 seconds TTFT threshold
+    scaleInCooldown: 300     # 5 min — protect KV cache from eviction during scale-in
+    scaleOutCooldown: 30
+  nodeSelector:
+    terradev.ai/tier: reasoning
+    cloud.google.com/gke-accelerator: nvidia-h100-sxm
+
+# ── Decode tier ───────────────────────────────────────────────────────────────
+# Memory-bandwidth-optimised for token streaming.
+# A100 SXM 80GB: 2 TB/s HBM2e — sweet spot for 70B decode at batch=8.
+# Research: decode = 91-98% of LLM time → optimise for throughput here.
+decode:
+  enabled: true
+  replicaCount: 4           # default for 16 agents; adjusted by agentic_provisioner.py
+  gpu:
+    type: "A100_SXM_80"
+    countPerPod: 2           # TP=2 for 70B model (140GB weights need 2 × 80GB)
+  resources:
+    limits:
+      nvidia.com/gpu: "2"
+      memory: "400Gi"
+      cpu: "16"
+    requests:
+      nvidia.com/gpu: "2"
+      memory: "350Gi"
+      cpu: "12"
+  vllm:
+    tensorParallelSize: 2
+    maxModelLen: 120000
+    gpuMemoryUtilization: 0.90
+    enablePrefixCaching: true
+    kvConnector: "offloading"
+    speculativeConfig:
+      method: "mtp"
+    enableSleepMode: true
+    maxNumSeqs: 16           # higher concurrency — decode tier handles bulk of traffic
+    serveOnPort: 8001
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 32
+    metrics:
+      # Scale on decode queue depth (backlog of pending tool-call continuations)
+      - type: External
+        external:
+          metric:
+            name: vllm_num_requests_waiting
+          target:
+            type: Value
+            value: "6"    # >6 waiting requests → scale out
+    scaleInCooldown: 90
+    scaleOutCooldown: 15
+  nodeSelector:
+    terradev.ai/tier: decode
+    cloud.google.com/gke-accelerator: nvidia-a100-80gb
+
+# ── CPU tools tier ────────────────────────────────────────────────────────────
+# For Bash, Read/Edit/Grep, WebFetch/WebSearch tool execution.
+# Research: tools = 2-29% of runtime. GAIA (retrieval) hits 25-29%.
+# High vCPU count (48) enables parallel tool call fan-out across agent steps.
+cpuTools:
+  enabled: true
+  replicaCount: 2
+  resources:
+    limits:
+      memory: "96Gi"
+      cpu: "48"
+    requests:
+      memory: "64Gi"
+      cpu: "32"
+  image:
+    repository: terradev/agent-tool-runner
+    tag: latest
+  env:
+    MAX_CONCURRENT_TOOLS: "64"
+    BASH_TIMEOUT_S: "30"
+    WEBFETCH_TIMEOUT_S: "15"
+    TOOL_QUEUE_DEPTH_WARN: "8"
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 16
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 70
+      # Also scale on p95 tool latency
+      - type: External
+        external:
+          metric:
+            name: agent_tool_execution_latency_p95_ms
+          target:
+            type: Value
+            value: "400"   # 400ms p95 threshold
+    scaleInCooldown: 30
+    scaleOutCooldown: 10
+  nodeSelector:
+    terradev.ai/tier: cpu-tools
+
+# ── Inference router (optional) ───────────────────────────────────────────────
+# Routes agent requests: KV prefix-aware routing to the instance most likely
+# to have the context cached (avoids redundant prefill recompute).
+# Uses existing InferenceRouter.PrefixCacheIndex from inference_router.py.
+router:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: terradev/inference-router
+    tag: latest
+  config:
+    # Route reasoning requests to reasoning tier
+    reasoningEndpoint: "http://reasoning-svc:8000"
+    # Route decode requests to decode tier
+    decodeEndpoint: "http://decode-svc:8001"
+    # KV prefix cache index: route by prompt prefix hash
+    prefixCacheEnabled: true
+    prefixCacheMaxEntries: 10000
+    prefixTokens: 64
+    # Sticky routing: same agent_id → same pod (preserves KV residency)
+    stickyRouting: true
+    stickyHeader: "X-Agent-Id"
+
+# ── Monitoring ────────────────────────────────────────────────────────────────
+# Prometheus metrics for autoscaling signal derivation.
+# Key metrics: vllm_kv_cache_usage_perc, vllm_num_requests_waiting,
+#   vllm_request_ttft_seconds (histogram), agent_tool_execution_latency_ms
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    serviceMonitor: true
+    scrapeInterval: 10s
+  grafana:
+    enabled: true
+    dashboards:
+      agentFleet: true        # KV hit rate, TTFT, queue depth, tier cost
+  dcgm:
+    enabled: true             # GPU memory utilization, bandwidth saturation
+  alerts:
+    kvHitRateBelow: 0.80      # arXiv threshold for healthy caching
+    ttftP95AboveMs: 2000      # reasoning tier TTFT threshold
+    decodeQueueDepthAbove: 8  # decode backlog alert
+    toolLatencyP95AboveMs: 500
+
+# ── Networking ────────────────────────────────────────────────────────────────
+networking:
+  placementGroup: cluster    # co-locate all tiers in same AZ for low latency
+  interTierLatencyTargetMs: 2
+  bandwidthGbps: 25
+  rdmaEnabled: false          # enable for 70B+ models requiring KV RDMA transfer
+  networkPolicies:
+    enabled: true
+    # Only reasoning and decode tiers can talk to each other
+    # CPU tools tier can only reach external APIs and result consumers

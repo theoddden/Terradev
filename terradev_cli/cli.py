@@ -13976,5 +13976,420 @@ def local_pool(fmt, remove):
     )
 
 
+# ── Agent Fleet Command Group ─────────────────────────────────────────────────
+# terradev agent <subcommand>
+# Research basis: arXiv:2605.26297 "Agentic AI Workload Characteristics"
+#   - Decode dominates: 91-98% of LLM time
+#   - KV cache hit rates: 84.6-99.5% (eviction = expensive recompute)
+#   - Context footprint: 37K-166K tokens (P95 tail: 120K)
+#   - Tool calls: 2-29% of runtime
+
+
+@cli.group()
+def agent():
+    """Provision and manage heterogeneous agent fleets.
+
+    Multi-tier GPU provisioning purpose-built for multi-agent LLM workloads.
+    Automatically maps agent count to hardware tiers based on empirical
+    workload research (decode-dominated, KV cache preservation critical).
+
+    \b
+    Tiers provisioned:
+      reasoning  — H100 SXM: long-context KV preservation (P95: 120K tokens)
+      decode     — A100 80GB: memory-bandwidth-optimised token streaming
+      cpu_tools  — 48-vCPU: Bash/WebFetch/file-op tool execution
+
+    \b
+    Examples:
+      terradev agent plan   --agents 16 --model meta-llama/Llama-3.1-70B-Instruct
+      terradev agent deploy --agents 16 --model meta-llama/Llama-3.1-70B-Instruct
+      terradev agent deploy --topology ./agent-fleet.yaml
+      terradev agent status --fleet-id ag_abc123
+      terradev agent scale  --fleet-id ag_abc123 --tier decode --count 8
+      terradev agent cost   --fleet-id ag_abc123
+      terradev agent list
+      terradev agent teardown --fleet-id ag_abc123
+    """
+    pass
+
+
+@agent.command(name="plan")
+@click.option("--agents", "-n", type=int, required=True, help="Number of concurrent agent loops to provision for")
+@click.option("--model", "-m", default="meta-llama/Llama-3.1-70B-Instruct", help="Model to serve across the fleet")
+@click.option("--reasoning", type=click.Choice(["instant", "thinking"]), default="instant", help="Reasoning mode: instant (faster) or thinking (extended CoT, 45-67% more output tokens)")
+@click.option("--planner-gpu", default=None, help="Override reasoning tier GPU type (e.g. H100_SXM)")
+@click.option("--planner-count", type=int, default=None, help="Override reasoning tier instance count")
+@click.option("--worker-gpu", default=None, help="Override decode tier GPU type (e.g. A100_SXM_80)")
+@click.option("--worker-count", type=int, default=None, help="Override decode tier instance count")
+@click.option("--cpu-cores", type=int, default=48, help="vCPU count for CPU tools tier instances")
+@click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table", help="Output format")
+def agent_plan(agents, model, reasoning, planner_gpu, planner_count, worker_gpu, worker_count, cpu_cores, fmt):
+    """Plan a heterogeneous agent fleet without provisioning.
+
+    Shows the recommended tier configuration, hardware selection rationale,
+    KV cache budget, and cost estimate based on arXiv:2605.26297 research.
+
+    \b
+    Examples:
+      terradev agent plan --agents 16 --model meta-llama/Llama-3.1-70B-Instruct
+      terradev agent plan --agents 32 --model meta-llama/Llama-3.1-8B-Instruct --format json
+      terradev agent plan --agents 8 --planner-gpu H100_SXM --worker-gpu A100_SXM_80
+    """
+    import json as _json
+    from terradev_cli.core.agentic_topology import AgentTopologyPlanner
+
+    planner = AgentTopologyPlanner()
+
+    if planner_gpu and worker_gpu:
+        spec = planner.from_explicit(
+            n_agents=agents, model=model,
+            planner_gpu=planner_gpu, planner_count=planner_count or max(1, agents // 10),
+            worker_gpu=worker_gpu, worker_count=worker_count or agents,
+            cpu_cores=cpu_cores, reasoning=reasoning,
+        )
+    else:
+        spec = planner.infer_from_agent_count(n_agents=agents, model=model, reasoning=reasoning)
+        if planner_count:
+            spec.tiers["reasoning"].count = planner_count
+        if worker_count:
+            spec.tiers["decode"].count = worker_count
+
+    if fmt == "json":
+        cost = planner.estimate_cost(spec)
+        output = spec.to_dict()
+        output["cost"] = {
+            "reasoning_hr": cost.reasoning_hr,
+            "decode_hr": cost.decode_hr,
+            "cpu_hr": cost.cpu_hr,
+            "total_hr": cost.total_hr,
+            "daily": cost.daily,
+            "monthly": cost.monthly,
+            "cost_per_agent_hr": cost.cost_per_agent_hr,
+        }
+        click.echo(_json.dumps(output, indent=2))
+    else:
+        planner.print_plan(spec)
+        click.echo(f"\nTo provision this fleet:")
+        click.echo(f"  terradev agent deploy --agents {agents} --model {model}")
+        click.echo(f"\nTo provision with explicit overrides:")
+        r = spec.tiers["reasoning"]
+        d = spec.tiers["decode"]
+        click.echo(
+            f"  terradev agent deploy --agents {agents} --model {model} "
+            f"--planner-gpu {r.gpu_type} --planner-count {r.count} "
+            f"--worker-gpu {d.gpu_type} --worker-count {d.count}"
+        )
+
+
+@agent.command(name="deploy")
+@click.option("--agents", "-n", type=int, default=None, help="Number of concurrent agent loops")
+@click.option("--model", "-m", default="meta-llama/Llama-3.1-70B-Instruct", help="Model to serve")
+@click.option("--reasoning", type=click.Choice(["instant", "thinking"]), default="instant")
+@click.option("--topology", type=click.Path(exists=True), default=None, help="Path to agent-fleet.yaml spec file")
+@click.option("--planner-gpu", default=None, help="Reasoning tier GPU type")
+@click.option("--planner-count", type=int, default=None, help="Reasoning tier instance count")
+@click.option("--worker-gpu", default=None, help="Decode tier GPU type")
+@click.option("--worker-count", type=int, default=None, help="Decode tier instance count")
+@click.option("--cpu-cores", type=int, default=48, help="vCPU count for CPU tools tier")
+@click.option("--providers", "-p", multiple=True, help="Cloud providers to use (e.g. runpod vastai)")
+@click.option("--max-price", type=float, default=None, help="Max price per GPU/hr in USD")
+@click.option("--dry-run", is_flag=True, help="Show allocation plan without provisioning")
+@click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
+def agent_deploy(agents, model, reasoning, topology, planner_gpu, planner_count, worker_gpu, worker_count, cpu_cores, providers, max_price, dry_run, fmt):
+    """Provision a heterogeneous agent fleet across all tiers simultaneously.
+
+    Provisions reasoning (H100), decode (A100), and CPU tools tiers in parallel
+    using the existing DAGExecutor wave-parallel orchestration.
+
+    \b
+    Examples:
+      terradev agent deploy --agents 16 --model meta-llama/Llama-3.1-70B-Instruct
+      terradev agent deploy --agents 32 --dry-run
+      terradev agent deploy --topology ./agent-fleet.yaml
+      terradev agent deploy --agents 8 --planner-gpu H100_SXM --worker-gpu A100_SXM_80
+    """
+    import asyncio
+    import json as _json
+    from terradev_cli.core.agentic_topology import AgentTopologyPlanner
+    from terradev_cli.core.agentic_provisioner import AgenticProvisioner
+
+    if topology:
+        import yaml
+        with open(topology) as f:
+            spec_data = yaml.safe_load(f)
+        agents = agents or spec_data.get("n_agents", 16)
+        model = spec_data.get("model", model)
+
+    if not agents:
+        click.echo("Error: --agents or --topology required", err=True)
+        raise SystemExit(1)
+
+    planner = AgentTopologyPlanner()
+    if planner_gpu and worker_gpu:
+        spec = planner.from_explicit(
+            n_agents=agents, model=model,
+            planner_gpu=planner_gpu, planner_count=planner_count or max(1, agents // 10),
+            worker_gpu=worker_gpu, worker_count=worker_count or agents,
+            cpu_cores=cpu_cores, reasoning=reasoning,
+        )
+    else:
+        spec = planner.infer_from_agent_count(n_agents=agents, model=model, reasoning=reasoning)
+        if planner_count:
+            spec.tiers["reasoning"].count = planner_count
+        if worker_count:
+            spec.tiers["decode"].count = worker_count
+
+    if not dry_run:
+        planner.print_plan(spec)
+        click.echo(f"\nProvisioning fleet {spec.fleet_id}...")
+    else:
+        click.echo("[DRY RUN] Fleet plan — no instances will be provisioned:\n")
+        planner.print_plan(spec)
+
+    provisioner = AgenticProvisioner()
+    result = asyncio.run(provisioner.provision_fleet(
+        spec=spec,
+        dry_run=dry_run,
+        providers=list(providers) if providers else None,
+        max_price_hr=max_price,
+    ))
+
+    if fmt == "json":
+        output = {
+            "fleet_id": result.fleet_id,
+            "success": result.success,
+            "dry_run": dry_run,
+            "wall_ms": round(result.total_wall_ms, 1),
+            "cost_estimate": {
+                "total_hr": result.cost_estimate.total_hr,
+                "daily": result.cost_estimate.daily,
+                "monthly": result.cost_estimate.monthly,
+            },
+            "tiers": {k: v.count for k, v in spec.tiers.items()},
+            "state_path": result.state_path,
+            "errors": result.errors,
+        }
+        click.echo(_json.dumps(output, indent=2))
+        return
+
+    if result.success:
+        status_tag = "[DRY RUN]" if dry_run else "PROVISIONED"
+        click.echo(f"\n{status_tag}  Fleet: {result.fleet_id}")
+        click.echo(f"  Model:   {spec.model}")
+        click.echo(f"  Agents:  {spec.n_agents} concurrent loops")
+        click.echo(f"  Cost:    ${result.cost_estimate.total_hr:.2f}/hr  (${result.cost_estimate.monthly:.2f}/mo)")
+        click.echo(f"  Tiers:   {spec.tiers['reasoning'].count}× reasoning | {spec.tiers['decode'].count}× decode | {spec.tiers['cpu_tools'].count}× cpu_tools")
+        if not dry_run:
+            click.echo(f"  State:   {result.state_path}")
+        click.echo()
+        click.echo(f"  terradev agent status --fleet-id {result.fleet_id}")
+        click.echo(f"  terradev agent cost   --fleet-id {result.fleet_id}")
+        click.echo(f"  terradev agent scale  --fleet-id {result.fleet_id} --tier decode --count <N>")
+    else:
+        click.echo(f"\nProvisioning errors:", err=True)
+        for e in result.errors:
+            click.echo(f"  {e}", err=True)
+
+
+@agent.command(name="status")
+@click.option("--fleet-id", required=True, help="Fleet ID returned by 'terradev agent deploy'")
+@click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
+def agent_status(fleet_id, fmt):
+    """Show live status of a fleet — tier health, KV hit rate, queue depth, cost.
+
+    Key metrics explained:
+      kv_hit_rate  — target >0.85. Below 0.80 = cache thrashing (expensive recompute).
+      ttft_p95_ms  — reasoning tier target <2000ms. Above = scale out reasoning.
+      queue_depth  — decode tier pending requests. Above 6 = scale out decode.
+
+    (Metrics from arXiv:2605.26297 empirical benchmarking)
+    """
+    import asyncio
+    import json as _json
+    from terradev_cli.core.agentic_provisioner import AgenticProvisioner
+
+    provisioner = AgenticProvisioner()
+    status = asyncio.run(provisioner.fleet_status(fleet_id))
+
+    if status is None:
+        click.echo(f"Fleet {fleet_id} not found.", err=True)
+        raise SystemExit(1)
+
+    if fmt == "json":
+        output = {
+            "fleet_id": status.fleet_id,
+            "model": status.model,
+            "n_agents": status.n_agents,
+            "kv_cache_pressure": status.kv_cache_pressure,
+            "total_cost_hr": status.total_cost_hr,
+            "uptime_s": status.uptime_s,
+            "warnings": status.warnings,
+            "tiers": {
+                name: {
+                    "instances": t.instances,
+                    "healthy": t.healthy,
+                    "failed": t.failed,
+                    "kv_hit_rate": t.kv_hit_rate,
+                    "decode_queue_depth": t.decode_queue_depth,
+                    "ttft_p95_ms": t.ttft_p95_ms,
+                    "cost_hr": t.cost_hr,
+                }
+                for name, t in status.tiers.items()
+            },
+        }
+        click.echo(_json.dumps(output, indent=2))
+        return
+
+    pressure_icon = {"healthy": "OK", "warning": "WARN", "critical": "CRIT"}.get(status.kv_cache_pressure, "?")
+    click.echo(f"\nFLEET STATUS  [{fleet_id}]")
+    click.echo(f"Model: {status.model}  |  {status.n_agents} agents  |  KV cache: {pressure_icon}  |  ${status.total_cost_hr:.2f}/hr")
+    click.echo(f"Uptime: {status.uptime_s / 3600:.1f}h")
+    click.echo()
+    click.echo(f"{'TIER':<16} {'INSTANCES':>9} {'HEALTHY':>7} {'FAILED':>6}  {'KV HIT':>7}  {'TTFT P95':>9}  {'QUEUE':>5}  {'$/HR':>6}")
+    click.echo("-" * 80)
+    for tname, t in status.tiers.items():
+        kv_str = f"{t.kv_hit_rate:.0%}" if t.kv_hit_rate > 0 else "n/a"
+        ttft_str = f"{t.ttft_p95_ms:.0f}ms" if t.ttft_p95_ms > 0 else "n/a"
+        q_str = str(t.decode_queue_depth) if t.gpu_type else "n/a"
+        kv_warn = " !" if t.kv_hit_rate > 0 and t.kv_hit_rate < 0.80 else ""
+        click.echo(
+            f"{tname:<16} {t.instances:>9} {t.healthy:>7} {t.failed:>6}  {kv_str:>6}{kv_warn}  "
+            f"{ttft_str:>9}  {q_str:>5}  ${t.cost_hr:>5.2f}"
+        )
+    if status.warnings:
+        click.echo()
+        for w in status.warnings:
+            click.echo(f"  WARN: {w}")
+
+
+@agent.command(name="scale")
+@click.option("--fleet-id", required=True, help="Fleet ID")
+@click.option("--tier", required=True, type=click.Choice(["reasoning", "decode", "cpu_tools"]), help="Tier to scale")
+@click.option("--count", required=True, type=int, help="New instance count for this tier")
+@click.option("--providers", "-p", multiple=True, help="Providers to use for scale-out instances")
+def agent_scale(fleet_id, tier, count, providers):
+    """Scale a single fleet tier up or down without affecting other tiers.
+
+    KV cache state on existing instances is PRESERVED during scale operations.
+    New instances are added to the pool; the router distributes new requests to them.
+
+    \b
+    Examples:
+      terradev agent scale --fleet-id ag_abc123 --tier decode --count 8
+      terradev agent scale --fleet-id ag_abc123 --tier reasoning --count 3
+      terradev agent scale --fleet-id ag_abc123 --tier cpu_tools --count 4
+    """
+    import asyncio
+    import json as _json
+    from terradev_cli.core.agentic_provisioner import AgenticProvisioner
+
+    provisioner = AgenticProvisioner()
+    result = asyncio.run(provisioner.scale_tier(
+        fleet_id=fleet_id,
+        tier=tier,
+        new_count=count,
+        providers=list(providers) if providers else None,
+    ))
+    click.echo(_json.dumps(result, indent=2))
+
+
+@agent.command(name="cost")
+@click.option("--fleet-id", required=True, help="Fleet ID")
+@click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
+def agent_cost(fleet_id, fmt):
+    """Show real-time cost breakdown for a fleet by tier.
+
+    \b
+    Example:
+      terradev agent cost --fleet-id ag_abc123
+    """
+    import json as _json
+    from terradev_cli.core.agentic_provisioner import AgenticProvisioner
+
+    provisioner = AgenticProvisioner()
+    cost = provisioner.fleet_cost(fleet_id)
+
+    if cost is None:
+        click.echo(f"Fleet {fleet_id} not found.", err=True)
+        raise SystemExit(1)
+
+    if fmt == "json":
+        click.echo(_json.dumps(cost, indent=2))
+        return
+
+    click.echo(f"\nFLEET COST  [{fleet_id}]")
+    click.echo(f"  Uptime:       {cost['uptime_hr']:.2f}h")
+    click.echo(f"  Rate:         ${cost['cost_per_hr']:.2f}/hr")
+    click.echo(f"  Accrued:      ${cost['accrued_cost']:.2f}")
+    click.echo(f"  Projected/day: ${cost['projected_daily']:.2f}")
+    click.echo(f"  Projected/mo:  ${cost['projected_monthly']:.2f}")
+    click.echo(f"  Per-agent/hr:  ${cost['cost_per_agent_hr']:.4f}")
+    click.echo()
+    click.echo(f"  BREAKDOWN:")
+    click.echo(f"    reasoning  ${cost['breakdown']['reasoning']:.2f}/hr")
+    click.echo(f"    decode     ${cost['breakdown']['decode']:.2f}/hr")
+    click.echo(f"    cpu_tools  ${cost['breakdown']['cpu_tools']:.2f}/hr")
+
+
+@agent.command(name="list")
+@click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
+def agent_list(fmt):
+    """List all known agent fleets.
+
+    \b
+    Example:
+      terradev agent list
+    """
+    import json as _json
+    from terradev_cli.core.agentic_provisioner import AgenticProvisioner
+
+    provisioner = AgenticProvisioner()
+    fleets = provisioner.list_fleets()
+
+    if fmt == "json":
+        click.echo(_json.dumps(fleets, indent=2, default=str))
+        return
+
+    if not fleets:
+        click.echo("No agent fleets found. Deploy one with: terradev agent deploy --agents 16")
+        return
+
+    click.echo(f"\nAGENT FLEETS ({len(fleets)})\n")
+    click.echo(f"{'FLEET ID':<28} {'MODEL':<36} {'AGENTS':>6} {'$/HR':>7}  STATUS")
+    click.echo("-" * 85)
+    for f in fleets:
+        import datetime
+        created = datetime.datetime.fromtimestamp(f["created_at"]).strftime("%Y-%m-%d %H:%M")
+        status_str = "OK" if f["success"] else "ERR"
+        click.echo(
+            f"{f['fleet_id']:<28} {f['model'][:35]:<36} "
+            f"{f['n_agents']:>6} ${f['cost_hr']:>6.2f}  {status_str}  {created}"
+        )
+
+
+@agent.command(name="teardown")
+@click.option("--fleet-id", required=True, help="Fleet ID to destroy")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompt")
+def agent_teardown(fleet_id, yes):
+    """Terminate all fleet instances and remove fleet state.
+
+    \b
+    Example:
+      terradev agent teardown --fleet-id ag_abc123
+      terradev agent teardown --fleet-id ag_abc123 --yes
+    """
+    import asyncio
+    import json as _json
+    from terradev_cli.core.agentic_provisioner import AgenticProvisioner
+
+    if not yes:
+        click.confirm(f"Destroy fleet {fleet_id} and all its instances?", abort=True)
+
+    provisioner = AgenticProvisioner()
+    result = asyncio.run(provisioner.teardown_fleet(fleet_id))
+    click.echo(_json.dumps(result, indent=2))
+
+
 if __name__ == "__main__":
     cli()
+

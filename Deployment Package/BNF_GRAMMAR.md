@@ -1,5 +1,5 @@
 # Terradev CLI BNF Grammar
-# Complete syntax specification for all commands and options — v3.6.2
+# Complete syntax specification for all commands and options — v6.0.0
 
 <terradev-cli> ::= <global-options> <command>
 
@@ -90,6 +90,7 @@
     | <triggers-commands>
     | <environments-commands>
     | <lineage-commands>
+    | <agent-commands>
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -1051,6 +1052,53 @@
 <lineage-input-type>  ::= dataset | model | config | checkpoint
 <lineage-output-type> ::= model | checkpoint | metrics | evaluation
 <lineage-direction>   ::= up | down | both
+
+
+# ════════════════════════════════════════════════════════════════════
+# AGENT FLEET COMMAND GROUP  (v6.0.0)
+# ════════════════════════════════════════════════════════════════════
+
+<agent-commands> ::= agent <agent-subcommand>
+
+<agent-subcommand> ::=
+    | plan      <agent-plan-options>
+    | deploy    <agent-deploy-options>
+    | status    --fleet-id <string>
+    | scale     <agent-scale-options>
+    | cost      --fleet-id <string>
+    | list
+    | teardown  --fleet-id <string> [--force]
+
+<agent-plan-options> ::=
+    --agents <integer>
+    [--model <string>]
+    [--reasoning <agent-reasoning-mode>]
+    [--planner-gpu <gpu-type>]
+    [--worker-gpu <gpu-type>]
+    [--planner-count <integer>]
+    [--worker-count <integer>]
+    [--output <path>]
+
+<agent-deploy-options> ::=
+    --agents <integer>
+    [--model <string>]
+    [--reasoning <agent-reasoning-mode>]
+    [--planner-gpu <gpu-type>]
+    [--worker-gpu <gpu-type>]
+    [--planner-count <integer>]
+    [--worker-count <integer>]
+    [--providers <provider>]...
+    [--max-price <float>]
+    [--dry-run]
+
+<agent-scale-options> ::=
+    --fleet-id <string>
+    --tier <agent-tier>
+    --count <integer>
+    [--providers <provider>]...
+
+<agent-reasoning-mode> ::= instant | deep | mixed
+<agent-tier>           ::= reasoning | decode | cpu_tools
 
 
 # ════════════════════════════════════════════════════════════════════

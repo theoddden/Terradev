@@ -335,14 +335,82 @@ environment_manager
 
 ---
 
+## Agentic Fleet Provisioning (v6.0.0)
+
+Purpose-built heterogeneous GPU fleet management for multi-agent LLM workloads.
+Research basis: arXiv:2605.26297 "Agentic AI Workload Characteristics" (2026).
+
+**Key empirical findings driving the design:**
+- Decode dominates: 91–98% of LLM execution time is decode, not prefill
+- KV cache hit rates: 84.6–99.5% when context stays resident — eviction = recompute
+- Context footprint: avg 37K–80K tokens, P95 tail up to 166K tokens
+- Tool execution: 2–29% of total runtime (retrieval workloads: 25–29%)
+
+```
+terradev agent deploy --agents 16 --model meta-llama/Llama-3.1-70B-Instruct
+       │
+       ├── AgentTopologyPlanner.infer_from_agent_count(n=16, model)
+       │     ├── Parse model size (70B)
+       │     ├── Select reasoning GPU: H100 SXM (KV cache preservation)
+       │     ├── Select decode GPU: A100 SXM 80GB × 2 (TP=2, bandwidth-optimised)
+       │     ├── CPU tools: 48-vCPU instances (Bash/WebFetch/file ops)
+       │     └── AgentFleetSpec  [fleet_id, tiers, networking, autoscaling, cost]
+       │
+       ├── AgenticProvisioner.provision_fleet(spec)
+       │     ├── Wave 0: quote_reasoning ‖ quote_decode ‖ quote_cpu
+       │     ├── Wave 1: provision_reasoning ‖ provision_decode ‖ provision_cpu
+       │     │           (via ParallelProvisioner across configured clouds)
+       │     ├── Wave 2: configure_networking (placement group, VPC peering)
+       │     ├── Wave 3: deploy_reasoning_inference ‖ deploy_decode_inference
+       │     │           (vLLM: --enable-prefix-caching, --kv-connector=offloading)
+       │     └── Wave 4: register_fleet → ~/.terradev/fleets/<fleet_id>.json
+       │
+       └── InferenceRouter (KV prefix-aware routing)
+             ├── PrefixCacheIndex: route by prompt prefix hash
+             ├── Sticky routing: X-Agent-Id header → same pod
+             └── Preserves KV residency across agent turns
+```
+
+**Three-tier hardware model:**
+
+| Tier | Hardware | Optimised For | Autoscale Signal |
+|------|----------|---------------|------------------|
+| reasoning | H100 SXM 80GB | KV cache preservation, long context | TTFT p95 > 2000ms |
+| decode | A100 SXM 80GB × 2 (TP=2) | Memory bandwidth, token throughput | Decode queue depth > 6 |
+| cpu_tools | 48-vCPU (no GPU) | Bash, WebFetch, Read/Edit/Grep | Tool latency p95 > 400ms |
+
+**Why NOT GPU utilization for autoscaling:**
+Agentic workloads are inherently bursty — GPU utilization oscillates between 0% (tool
+execution) and 100% (decode burst) within a single agent turn. TTFT and queue depth
+are stable signals that reflect actual user-visible latency.
+
+**CLI commands:**
+```
+terradev agent plan     --agents 16 --model ...     # size fleet, show cost
+terradev agent deploy   --agents 16 --model ...     # provision all tiers
+terradev agent status   --fleet-id ag_xxx           # KV hit rate, TTFT, queue
+terradev agent scale    --fleet-id ag_xxx --tier decode --count 8
+terradev agent cost     --fleet-id ag_xxx           # per-tier spend breakdown
+terradev agent list                                 # all known fleets
+terradev agent teardown --fleet-id ag_xxx           # destroy + remove state
+```
+
+**MCP tools (6 new in v6.0.0):**
+`agent_topology_plan`, `agent_fleet_provision`, `agent_fleet_status`,
+`agent_fleet_scale`, `agent_fleet_cost`, `agent_fleet_teardown`
+
+---
+
 ## File Map
 
 ```
 terradev_cli/
-  cli.py                        Main CLI (~11,600 lines, Click)
+  cli.py                        Main CLI (~14,400 lines, Click)
   cli_karpenter.py              Karpenter subcommand group
   cli_hf_spaces.py              HuggingFace Spaces subcommand group
   core/
+    agentic_topology.py         AgentFleetSpec, AgentTopologyPlanner (v6.0.0)
+    agentic_provisioner.py      AgenticProvisioner, fleet state mgmt (v6.0.0)
     training_orchestrator.py    DeepSpeed/torchrun/FlashOptim
     provision_orchestrator.py   Parallel provision + NUMA
     evaluation_orchestrator.py  Model/endpoint evaluation
@@ -350,6 +418,10 @@ terradev_cli/
     cost_tracker.py             Spend tracking
     price_intelligence.py       Spot market analytics + ML
     trace_viewer.py             Phoenix span tree renderer
+    dag_executor.py             Wave-parallel DAG execution (Rust-backed)
+    parallel_provisioner.py     Multi-cloud parallel provisioning
+    warm_pool_manager.py        Pre-warming strategies for bursty workloads
+    inference_router.py         KV prefix-aware routing + auto-failover
   ml_services/
     __init__.py
     vllm_service.py             vLLM config + LoRA + sleep
@@ -364,10 +436,13 @@ terradev_cli/
     kubernetes_service.py
     kubernetes_enhanced.py      GPU operator, MIG, monitoring
 clusters/
+  agentic-template/             Heterogeneous agent fleet (v6.0.0)
+    helm/values-agentic.yaml    Three-tier Helm values
+    k8s/fleet-manifests.yaml    Deployments, HPAs, NetworkPolicies, Karpenter
   moe-template/                 MoE K8s + Helm (all opts auto-applied)
   rag-template/                 Qdrant + Phoenix + Guardrails
   glm-5/                        GLM-5 production templates
-rust/                           NVML bindings, DAG orchestrator
+rust/                           NVML bindings, DAG orchestrator, MCP codec
 terradev-mcp/
-  terradev_mcp.py               218-tool MCP server (~6,700 lines)
+  terradev_mcp.py               304-tool MCP server (~8,700 lines)
 ```
