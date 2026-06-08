@@ -10,6 +10,7 @@ Rust implementation provides:
 """
 
 import logging
+import threading
 import uuid
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
@@ -35,6 +36,7 @@ class DistributedLockManager:
             self._rust_lock = PyDistributedLock()
         else:
             self._locks: Dict[str, Tuple[str, datetime]] = {}
+            self._lock = threading.Lock()
 
     async def acquire(
         self, key: str, holder: str, ttl_seconds: int = 3600
@@ -45,15 +47,16 @@ class DistributedLockManager:
             return grant.lease_id
         else:
             # Python fallback with in-memory dict
-            if key in self._locks:
-                holder, expiry = self._locks[key]
-                if datetime.now() < expiry:
-                    return None
-            lease_id = str(uuid.uuid4())
-            self._locks[key] = (
-                lease_id,
-                datetime.now() + timedelta(seconds=ttl_seconds),
-            )
+            with self._lock:
+                if key in self._locks:
+                    _stored_lease, expiry = self._locks[key]
+                    if datetime.now() < expiry:
+                        return None
+                lease_id = str(uuid.uuid4())
+                self._locks[key] = (
+                    lease_id,
+                    datetime.now() + timedelta(seconds=ttl_seconds),
+                )
             return lease_id
 
     async def release(self, key: str, holder: str, lease_id: str) -> bool:
@@ -62,11 +65,12 @@ class DistributedLockManager:
             return await self._rust_lock.release(key, holder, lease_id)
         else:
             # Python fallback
-            if key in self._locks:
-                stored_lease, _ = self._locks[key]
-                if stored_lease == lease_id:
-                    del self._locks[key]
-                    return True
+            with self._lock:
+                if key in self._locks:
+                    stored_lease, _ = self._locks[key]
+                    if stored_lease == lease_id:
+                        del self._locks[key]
+                        return True
             return False
 
     async def renew(
@@ -77,12 +81,13 @@ class DistributedLockManager:
             return await self._rust_lock.renew(key, holder, lease_id, ttl_seconds)
         else:
             # Python fallback
-            if key in self._locks:
-                stored_lease, _ = self._locks[key]
-                if stored_lease == lease_id:
-                    self._locks[key] = (
-                        lease_id,
-                        datetime.now() + timedelta(seconds=ttl_seconds),
-                    )
-                    return True
+            with self._lock:
+                if key in self._locks:
+                    stored_lease, _ = self._locks[key]
+                    if stored_lease == lease_id:
+                        self._locks[key] = (
+                            lease_id,
+                            datetime.now() + timedelta(seconds=ttl_seconds),
+                        )
+                        return True
             return False

@@ -4,9 +4,17 @@ Terradev Data Governance Module
 Handles explicit consent, comprehensive logging, and OPA policy enforcement for data movement
 """
 
+import json
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Optional
+from collections import deque
+from typing import Deque, Dict, List, Any, Optional
+
+_MAX_MOVEMENT_LOGS = 10_000
+_MAX_OPA_EVALUATIONS = 10_000
+_MAX_CONSENT_REQUESTS = 5_000
+_AUDIT_MAX_BYTES = 50 * 1024 * 1024  # 50 MB before rotation
+_AUDIT_BACKUP_COUNT = 5
 from dataclasses import dataclass, asdict
 from enum import Enum
 import hashlib
@@ -143,8 +151,8 @@ class DataGovernanceManager:
         self.auth = auth
         self.consent_requests: Dict[str, ConsentRequest] = {}
         self.consent_responses: Dict[str, ConsentResponse] = {}
-        self.movement_logs: List[DataMovementLog] = []
-        self.opa_evaluations: List[OPAPolicyEvaluation] = []
+        self.movement_logs: Deque[DataMovementLog] = deque(maxlen=_MAX_MOVEMENT_LOGS)
+        self.opa_evaluations: Deque[OPAPolicyEvaluation] = deque(maxlen=_MAX_OPA_EVALUATIONS)
 
         # Governance settings
         self.consent_required = True
@@ -156,6 +164,8 @@ class DataGovernanceManager:
         self._log_dir = Path.home() / ".terradev" / "governance"
         self._log_dir.mkdir(parents=True, exist_ok=True)
         self._audit_file = self._log_dir / "audit_log.jsonl"
+        self._audit_max_bytes = _AUDIT_MAX_BYTES
+        self._audit_backup_count = _AUDIT_BACKUP_COUNT
 
         # Initialize OPA policies
         self._initialize_opa_policies()
@@ -269,6 +279,10 @@ class DataGovernanceManager:
             },
         )
 
+        # H-C: Evict oldest consent requests when cap is reached
+        if len(self.consent_requests) >= _MAX_CONSENT_REQUESTS:
+            oldest_key = next(iter(self.consent_requests))
+            del self.consent_requests[oldest_key]
         self.consent_requests[request_id] = consent_request
 
         # Log consent request
@@ -737,45 +751,62 @@ class DataGovernanceManager:
             f"Consent notification sent to user {consent_request.user_id} for request {consent_request.request_id}"
         )
 
+    def _write_audit_entry(self, entry: Dict[str, Any]) -> None:
+        """Write a single JSONL audit entry with log rotation."""
+        if not self.logging_enabled:
+            return
+        try:
+            if (
+                self._audit_file.exists()
+                and self._audit_file.stat().st_size >= self._audit_max_bytes
+            ):
+                # Rotate: shift backup files down, rename current → .1
+                for i in range(self._audit_backup_count - 1, 0, -1):
+                    src = self._audit_file.with_suffix(f".jsonl.{i}")
+                    dst = self._audit_file.with_suffix(f".jsonl.{i + 1}")
+                    if src.exists():
+                        src.rename(dst)
+                self._audit_file.rename(self._audit_file.with_suffix(".jsonl.1"))
+            with open(self._audit_file, "a") as af:
+                af.write(json.dumps(entry, default=str) + "\n")
+        except Exception as exc:
+            logger.warning(f"Audit log write failed: {exc}")
+
     async def _log_consent_request(self, consent_request: ConsentRequest):
         """Log consent request"""
-        if self.logging_enabled:
-            {
-                "type": "consent_request",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "data": asdict(consent_request),
-            }
-            logger.info(f"Consent request logged: {consent_request.request_id}")
+        self._write_audit_entry({
+            "type": "consent_request",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "data": asdict(consent_request),
+        })
+        logger.info(f"Consent request logged: {consent_request.request_id}")
 
     async def _log_consent_response(self, consent_response: ConsentResponse):
         """Log consent response"""
-        if self.logging_enabled:
-            {
-                "type": "consent_response",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "data": asdict(consent_response),
-            }
-            logger.info(f"Consent response logged: {consent_response.request_id}")
+        self._write_audit_entry({
+            "type": "consent_response",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "data": asdict(consent_response),
+        })
+        logger.info(f"Consent response logged: {consent_response.request_id}")
 
     async def _log_opa_evaluation(self, evaluation: OPAPolicyEvaluation):
         """Log OPA policy evaluation"""
-        if self.logging_enabled:
-            {
-                "type": "opa_evaluation",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "data": asdict(evaluation),
-            }
-            logger.info(f"OPA evaluation logged: {evaluation.policy_id}")
+        self._write_audit_entry({
+            "type": "opa_evaluation",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "data": asdict(evaluation),
+        })
+        logger.info(f"OPA evaluation logged: {evaluation.policy_id}")
 
     async def _log_data_movement(self, movement_log: DataMovementLog):
         """Log data movement"""
-        if self.logging_enabled:
-            {
-                "type": "data_movement",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "data": asdict(movement_log),
-            }
-            logger.info(f"Data movement logged: {movement_log.movement_id}")
+        self._write_audit_entry({
+            "type": "data_movement",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "data": asdict(movement_log),
+        })
+        logger.info(f"Data movement logged: {movement_log.movement_id}")
 
     async def _evaluate_single_policy(
         self, policy_config: Dict[str, Any], input_data: Dict[str, Any]

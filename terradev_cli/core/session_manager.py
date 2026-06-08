@@ -7,6 +7,7 @@ Reduces connection overhead and improves scalability
 import asyncio
 import aiohttp
 import logging
+import threading
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -164,13 +165,16 @@ class SessionManager:
 
 # Global session manager instance
 _global_session_manager: Optional[SessionManager] = None
+_global_session_manager_lock = threading.Lock()
 
 
 def get_session_manager() -> SessionManager:
     """Get the global session manager instance"""
     global _global_session_manager
     if _global_session_manager is None:
-        _global_session_manager = SessionManager()
+        with _global_session_manager_lock:
+            if _global_session_manager is None:  # double-checked locking
+                _global_session_manager = SessionManager()
     return _global_session_manager
 
 

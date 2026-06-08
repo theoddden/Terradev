@@ -913,10 +913,17 @@ dashboardProviders:
             )
 
         if self.config.grafana_enabled:
+            import os as _os
             config["GRAFANA_ENABLED"] = "true"
             config["GRAFANA_URL"] = "http://grafana.monitoring.svc.cluster.local:80"
             config["GRAFANA_USERNAME"] = "admin"
-            config["GRAFANA_PASSWORD"] = "prom-operator"
+            _grafana_pw = _os.getenv("GRAFANA_ADMIN_PASSWORD", "")
+            if _grafana_pw:
+                config["GRAFANA_PASSWORD"] = _grafana_pw
+            else:
+                # M-B: Do not ship a known-weak default — require an explicit password.
+                # Set GRAFANA_ADMIN_PASSWORD in the environment before deploying.
+                pass
 
         return config
 

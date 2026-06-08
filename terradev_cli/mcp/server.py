@@ -7535,7 +7535,27 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "ray_submit_job":
                 script = arguments["script"]
-                cmd = ["ray", "job", "submit", "--", "python", script]
+                # M-A: Validate the script path to prevent path injection.
+                # Only accept .py files that resolve within the user home or CWD.
+                import pathlib as _pl
+                _script_path = _pl.Path(script).resolve()
+                _allowed_roots = (_pl.Path.home(), _pl.Path.cwd())
+                if not str(_script_path).endswith(".py"):
+                    return CallToolResult(
+                        content=[TextContent(type="text", text="❌ script must be a .py file.")],
+                        isError=True,
+                    )
+                if not any(
+                    _script_path.is_relative_to(r) for r in _allowed_roots
+                ):
+                    return CallToolResult(
+                        content=[TextContent(
+                            type="text",
+                            text=f"❌ script path must be inside home or working directory: {script!r}",
+                        )],
+                        isError=True,
+                    )
+                cmd = ["ray", "job", "submit", "--", "python", str(_script_path)]
                 if arguments.get("job_name"):
                     cmd = [
                         "ray",
@@ -7545,7 +7565,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         arguments["job_name"],
                         "--",
                         "python",
-                        script,
+                        str(_script_path),
                     ]
                 try:
                     result = await asyncio.create_subprocess_exec(

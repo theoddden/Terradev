@@ -12,6 +12,7 @@ Implements GitOps patterns for Kubernetes infrastructure management:
 Based on production lessons: "GitOps isn't optional, it's survival"
 """
 
+import re
 import yaml
 import subprocess
 import logging
@@ -19,6 +20,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
+
+_SAFE_REPO_NAME_RE = re.compile(r'^[a-zA-Z0-9_\-\.]{1,128}$')
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +83,14 @@ class GitOpsManager:
     def __init__(self, config: GitOpsConfig):
         self.config = config
         self.repo_structure = GitRepoStructure()
+        # H-B: Sanitize repository name — reject anything that could escape the
+        # ~/.terradev/gitops/ directory via path traversal (e.g. "../../.ssh").
+        if not _SAFE_REPO_NAME_RE.match(config.repository):
+            raise ValueError(
+                f"GitOps repository name {config.repository!r} is invalid. "
+                "Only alphanumerics, hyphens, underscores, and dots are allowed "
+                "(max 128 chars)."
+            )
         self.work_dir = Path.home() / ".terradev" / "gitops" / config.repository
 
     async def init_repository(self) -> bool:
@@ -222,7 +233,12 @@ class GitOpsManager:
                             },
                             {
                                 "name": "configs.credentialTemplates.git-creds.password",
-                                "value": self.config.git_token or "",
+                                # H-A: Do NOT embed the literal token in the YAML — it would
+                                # be committed to git.  Reference a Kubernetes Secret instead;
+                                # the caller must create the secret out-of-band:
+                                #   kubectl create secret generic argocd-git-creds \
+                                #     --from-literal=password=<TOKEN> -n <namespace>
+                                "value": "<from-secret:argocd-git-creds:password>",
                             },
                         ]
                     },
