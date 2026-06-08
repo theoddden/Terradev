@@ -13682,6 +13682,7 @@ cli.add_command(record)
 cli.add_command(triggers)
 cli.add_command(environments)
 cli.add_command(lineage)
+cli.add_command(agent)
 
 # Register Karpenter and HF Spaces command groups
 from terradev_cli.cli_karpenter import register_karpenter_commands
