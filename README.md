@@ -1,4 +1,4 @@
-# Terradev CLI v5.3.2
+# Terradev CLI v5.3.3
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -9,6 +9,27 @@
 pypi.org/project/terradev-cli/
 
 Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
+
+**NOTES ON 5.3.3**
+
+Added **provider profile system** for intelligent quirk-aware routing across 23 cloud providers:
+
+- **ProviderProfile schema** (`providers/types.py`): Encodes provider-specific behaviors including API style (REST/GraphQL/JSON:API), authentication type (Bearer/Basic/HMAC/X-Api-Key), rate limits, spot instance support, egress costs, fallback routing, capacity checks, container image pinning, and spot interruption handling.
+
+- **Built-in profiles** (`providers/provider_profiles.py`): Pre-configured profiles for all 23 providers (RunPod, Vast.ai, Lambda Labs, AWS, GCP, Azure, Oracle, Crusoe, CoreWeave, DigitalOcean, Yotta Labs, E2E Networks, FluidStack, Alibaba, OVHcloud, Hetzner, SiliconFlow, TensorDock, Baseten, HuggingFace, Hyperstack, InferX, Latitude).
+
+- **Dynamic registration**: Users can register custom provider profiles programmatically or load from YAML/JSON files for internal clusters or proprietary cloud providers.
+
+- **Profile-aware routing** (`providers/registry.py`): `ProviderRegistry.ranked_providers()` now incorporates provider profiles into scoring, using egress costs, fallback routing preferences, and spot preemption rates for intelligent provider selection.
+
+- **CLI commands** (`terradev providers`): New command group for managing custom provider profiles:
+  ```bash
+  terradev providers load-profiles ~/.terradev/custom_providers.yaml
+  terradev providers list-profiles
+  terradev providers show-profile runpod
+  terradev providers remove-profile my_custom_provider
+  terradev providers export-example -o ~/.terradev/custom_providers.yaml
+  ```
 
 **NOTES ON 5.3.0**
 
@@ -516,115 +537,6 @@ echo "3. Test failover: terradev inferx failover --endpoint burst-llm-api --test
 echo "4. Update adapters: terradev lora update -n customer-enterprise-a -p ./new-adapters/"
 ```
 
-## Bare Metal GPU Access with IPMI Management (Latitude.sh)
-
-Most GPU clouds give you a virtual machine. You get a slice of hardware, shared kernel paths, and a hypervisor layer between your workload and the GPU. For most ML workloads this is fine. For compliance-sensitive deployments — HIPAA, FedRAMP, financial services, defense contractors — it isn't. Virtualization introduces attestation gaps that auditors reject.
-
-Latitude.sh is the only provider in Terradev's fleet that offers both **bare metal** and **virtual machine** GPU instances from the same API. Bare metal gives you the physical server — dedicated hardware, no virtualization overhead, and IPMI out-of-band management.
-
-```bash
-# See both bare metal and VM options side by side
-terradev quote -g H100 --provider latitude
-
-# Provision dedicated bare metal with IPMI access
-terradev provision --provider latitude --gpu H100 --instance-type bare-metal
-
-# Provision a VM (faster spin-up, slightly lower cost)
-terradev provision --provider latitude --gpu H100 --instance-type vm
-```
-
-### IPMI: Why It Matters for Enterprise
-
-IPMI (Intelligent Platform Management Interface) gives you out-of-band server management independent of the OS and GPU stack. If a training job deadlocks the kernel, you don't wait for a cloud provider ticket — you power-cycle via IPMI directly. Security teams can verify hardware attestation. Compliance frameworks that require dedicated hardware and physical access controls are satisfied.
-
-```bash
-# Instance status includes IPMI access endpoint when bare metal
-terradev status --live --provider latitude
-
-# Output includes:
-# ipmi_access: true
-# ipmi_endpoint: 10.x.x.x
-# isolation: bare_metal
-```
----
-
-## Local GPU Discovery and Hybrid Compute Pools
-
-Every other GPU orchestration platform assumes you're renting compute. Terradev doesn't.
-
-If you have a GPU in your local machine — a gaming rig, a workstation, a university compute node you have SSH access to — Terradev can discover it, register it into your compute pool, and incorporate it into provisioning decisions alongside cloud providers.
-
-```bash
-# Scan local machine for GPUs
-terradev local scan
-
-# Output:
-# Found 1 local GPU:
-#   [0] NVIDIA RTX 4090  24GB  Driver 545.29  Util: 3%  Temp: 42C
-#
-# Register in pool? [y/N]:
-
-# Register local GPU into your pool
-terradev local register --name "workstation-4090"
-
-# Scan a remote machine you have SSH access to
-terradev local scan --host 192.168.1.50 --user ubuntu --key ~/.ssh/id_rsa
-
-# View your full compute pool (local + cloud)
-terradev local pool
-```
-
-Pool output:
-```
-COMPUTE POOL (4 resources)
-workstation-4090    RTX 4090    24GB    local        $0.00/hr   Free
-runpod-h100-001     H100        80GB    runpod       $2.49/hr   Running
-vastai-a100-002     A100        40GB    vastai        $1.82/hr   Running
-lambda-a10g-003     A10G        24GB    lambda_labs  $0.60/hr   Idle
-```
-
-### Why This Matters
-
-The `terradev quote` command normally shows cloud provider pricing. With local GPUs registered, the pool includes your own hardware — priced at $0/hr. For a university researcher with a 3090 workstation running overnight jobs, or a startup with a rack of 4090s before they've moved to cloud: Terradev routes workloads to the cheapest available compute, and $0/hr always wins.
-
-```bash
-# Get quotes including local pool
-terradev quote -g RTX4090 --include-local
-
-# Output:
-# GPU       PROVIDER                 $/HR    AVAILABLE
-# RTX 4090  local (workstation-4090) $0.00   Yes
-# RTX 4090  vastai                   $0.34   Yes
-# RTX 4090  runpod                   $0.39   Yes
-
-# Provision to cheapest available — prefers local automatically
-terradev provision -g RTX4090 --prefer-local
-
-# Launch training on local GPU with cloud overflow
-terradev train --script train.py --pool workstation-4090 --overflow-to-cloud
-```
-
-### How Discovery Works
-
-The local scanner uses direct NVML bindings (Rust backend, 5–10x faster than `nvidia-smi` parsing) to introspect every GPU on the target machine:
-
-- GPU model, memory, PCIe bus ID, NUMA affinity
-- Current utilization, memory usage, temperature, clock speeds
-- Driver version, CUDA version, compute capability
-- Multi-GPU topology (NVLink, PCIe switch topology)
-
-Falls back to `nvidia-smi` parsing automatically if the Rust NVML extension isn't available.
-
-```bash
-# Detailed hardware report for local GPU
-terradev local scan --detailed
-
-# Output includes:
-# GPU 0: RTX 4090  VRAM 24GB  PCIe x16  NUMA node 0
-#   NVLink: none (single GPU)
-#   Compute: 8.9  Driver: 545.29  CUDA: 12.3
-#   P-state: P0  Temp: 42C  Power: 45W / 450W TDP
-```
 ---
 
 ## Quick Reference
