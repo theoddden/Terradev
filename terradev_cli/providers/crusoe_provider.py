@@ -5,9 +5,15 @@ BYOAPI: Uses the end-client's Crusoe API access key + secret key
 API: https://api.crusoecloud.com/v1alpha5
 """
 
+import base64
+import hashlib
+import hmac
 import os
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from urllib.parse import urlparse
+
+import aiohttp
 
 from .base_provider import BaseProvider
 
@@ -76,23 +82,72 @@ class CrusoeProvider(BaseProvider):
     # ── Authentication ────────────────────────────────────────────────
 
     async def _ensure_auth(self):
-        """Obtain a bearer token from Crusoe using access_key + secret_key.
-
-        Crusoe authenticates via an Authorization header built from the
-        access key and secret key.  The simplest approach is HTTP Basic
-        auth (access_key:secret_key) exchanged for a short-lived bearer
-        token, but the v1alpha5 API also accepts the key-pair directly
-        as a Bearer header in the format ``Bearer <access_key>:<secret_key>``.
-        We use the direct header approach to avoid an extra token-exchange
-        round-trip.
-        """
-        if self.access_key and self.secret_key:
-            self._bearer_token = f"{self.access_key}:{self.secret_key}"
+        """No-op: Crusoe uses per-request HMAC-SHA256 signing (see _make_request)."""
+        pass
 
     def _get_auth_headers(self) -> Dict[str, str]:
-        if self.access_key and self.secret_key:
-            return {"Authorization": f"Bearer {self.access_key}:{self.secret_key}"}
+        # Auth is injected per-request via _make_request override (HMAC-SHA256 signed).
         return {}
+
+    # ── Per-request HMAC-SHA256 signing ──────────────────────────────
+
+    async def _make_request(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
+        """Override base _make_request to inject Crusoe HMAC-SHA256 signed headers.
+
+        Signature scheme (v1.0):
+          payload = path + "\n" + canonicalized_query + "\n" + METHOD + "\n" + timestamp + "\n"
+          sig     = base64url(hex(hmac_sha256(payload, urlsafe_b64decode(secret_key))))
+          header  = "Bearer 1.0:{access_key_id}:{sig}"
+        See: https://docs.crusoecloud.com/reference/api/
+        """
+        if not self.session or self.session.closed:
+            self.session = aiohttp.ClientSession()
+            self._owns_session = True
+
+        headers = kwargs.pop("headers", {})
+        headers.update(self._build_signed_headers(method, url))
+        headers.setdefault("Content-Type", "application/json")
+
+        async with self.session.request(method, url, headers=headers, **kwargs) as response:
+            if response.status >= 400:
+                error_text = await response.text()
+                raise Exception(f"HTTP {response.status}: {error_text}")
+            return await response.json()
+
+    def _build_signed_headers(self, method: str, url: str) -> Dict[str, str]:
+        """Build X-Crusoe-Timestamp and Authorization headers for a single request."""
+        if not self.access_key or not self.secret_key:
+            return {}
+
+        parsed = urlparse(url)
+        path = parsed.path
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
+        # Canonicalize query params: sort lexicographically, join with &
+        if parsed.query:
+            pairs = sorted(
+                part for part in parsed.query.split("&") if part
+            )
+            query_str = "&".join(pairs)
+        else:
+            query_str = ""
+
+        payload = f"{path}\n{query_str}\n{method.upper()}\n{timestamp}\n"
+
+        # Decode URL-safe base64 secret key (add padding if needed)
+        sk = self.secret_key
+        padding = (4 - len(sk) % 4) % 4
+        secret_bytes = base64.urlsafe_b64decode(sk + "=" * padding)
+
+        # HMAC-SHA256 → hex-encode → URL-safe base64 (no padding)
+        mac = hmac.new(secret_bytes, payload.encode("utf-8"), hashlib.sha256)
+        hex_digest = mac.hexdigest()
+        sig_b64 = base64.urlsafe_b64encode(hex_digest.encode("utf-8")).rstrip(b"=").decode()
+
+        return {
+            "X-Crusoe-Timestamp": timestamp,
+            "Authorization": f"Bearer 1.0:{self.access_key}:{sig_b64}",
+        }
 
     # ── Capacity / Quotes ─────────────────────────────────────────────
 

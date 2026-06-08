@@ -271,9 +271,11 @@ class OracleProvider(BaseProvider):
             }
 
     def _get_auth_headers(self) -> Dict[str, str]:
-        # OCI uses request signing, not simple bearer tokens
-        # For full implementation, use oci-python-sdk's Signer
-        # This provides basic API key auth for compatible endpoints
-        if self.api_key:
-            return {"Authorization": f"Bearer {self.api_key}"}
+        # KNOWN LIMITATION: Oracle Cloud Infrastructure requires RSA HTTP request
+        # signing (OCI Signature v1), NOT a simple Bearer token. Live API calls
+        # (provision, status, stop, terminate) will return HTTP 401 without a
+        # proper RSA-signed request. For production use, replace this provider
+        # with one that uses oci-python-sdk's oci.auth.signers.Signer.
+        # get_instance_quotes() falls back to static pricing, so quoting works.
+        # See: https://docs.oracle.com/en-us/iaas/Content/API/Concepts/usingapi.htm
         return {}

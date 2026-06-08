@@ -9,6 +9,7 @@ CRITICAL FIXES v4.0.0:
 - Container image pinning strategy
 """
 
+import base64
 import os
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -363,7 +364,12 @@ class LambdaLabsProvider(BaseProvider):
             }
 
     def _get_auth_headers(self) -> Dict[str, str]:
-        return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        # Lambda Labs uses HTTP Basic auth: api_key as username, empty password
+        # Per official docs: curl -u $LAMBDA_API_KEY: https://cloud.lambdalabs.com/api/v1/...
+        if self.api_key:
+            token = base64.b64encode(f"{self.api_key}:".encode()).decode()
+            return {"Authorization": f"Basic {token}"}
+        return {}
 
     async def _check_capacity_availability(self, instance_type: str) -> Dict[str, Any]:
         """CRITICAL: Check real-time capacity availability for Lambda instances"""
