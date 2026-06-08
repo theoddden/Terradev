@@ -13682,7 +13682,6 @@ cli.add_command(record)
 cli.add_command(triggers)
 cli.add_command(environments)
 cli.add_command(lineage)
-cli.add_command(agent)
 
 # Register Karpenter and HF Spaces command groups
 from terradev_cli.cli_karpenter import register_karpenter_commands
@@ -14532,6 +14531,10 @@ def agent_teardown(fleet_id, yes):
     provisioner = AgenticProvisioner()
     result = asyncio.run(provisioner.teardown_fleet(fleet_id))
     click.echo(_json.dumps(result, indent=2))
+
+
+# Register agent command group (defined above)
+cli.add_command(agent)
 
 
 if __name__ == "__main__":
