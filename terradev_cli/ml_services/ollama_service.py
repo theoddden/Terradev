@@ -5,10 +5,23 @@ Local LLM deployment and management
 """
 
 import json
+import re
 import aiohttp
 import subprocess
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+
+# R3-A: Allowlist for model names that get interpolated into shell scripts.
+# Matches HuggingFace IDs ("org/model-name"), Ollama tags ("llama3.2:13b"),
+# and version suffixes. Rejects shell metacharacters and newlines.
+_MODEL_NAME_RE = re.compile(r'^[A-Za-z0-9_.:/\-]{1,256}$')
+
+
+def _validate_model_name(name: str) -> None:
+    if not isinstance(name, str) or not _MODEL_NAME_RE.match(name):
+        raise ValueError(
+            f"Unsafe model name {name!r}: only [A-Za-z0-9_.:/-] (max 256) allowed."
+        )
 
 
 @dataclass
@@ -130,6 +143,7 @@ ollama --version
     ) -> Dict[str, Any]:
         """Pull a model on remote instance"""
         try:
+            _validate_model_name(model_name)
             pull_script = f"""
 #!/bin/bash
 # Pull model: {model_name}
@@ -360,6 +374,7 @@ ollama list | grep {model_name}
     ) -> Dict[str, Any]:
         """Delete a model on remote instance"""
         try:
+            _validate_model_name(model)
             delete_script = f"""
 #!/bin/bash
 # Delete model: {model}
@@ -443,6 +458,7 @@ ollama list
         ssh_key: Optional[str] = None,
     ) -> str:
         """Generate deployment script for Ollama"""
+        _validate_model_name(model)
         script = f"""
 #!/bin/bash
 # Ollama Deployment Script for Terradev

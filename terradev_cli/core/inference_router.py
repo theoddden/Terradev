@@ -813,6 +813,9 @@ class InferenceRouter:
     ) -> Optional[float]:
         """Measure latency to a target via async ping (ms)"""
         try:
+            # R3-B: Defense-in-depth — refuse targets that look like flags.
+            if not target or target.startswith("-"):
+                return None
             proc = await asyncio.create_subprocess_exec(
                 "ping",
                 "-c",

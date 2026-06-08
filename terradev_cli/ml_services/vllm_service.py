@@ -500,6 +500,13 @@ python3 -c "import vllm; print('vLLM installed successfully')"
     ) -> Dict[str, Any]:
         """Start vLLM server on remote instance"""
         try:
+            # R3-A: Reject model names that could escape the heredoc / inject shell.
+            import re as _re
+            if not _re.match(r'^[A-Za-z0-9_.:/\-]{1,256}$', self.config.model_name or ""):
+                return {
+                    "status": "failed",
+                    "error": f"Unsafe model_name {self.config.model_name!r}: only [A-Za-z0-9_.:/-] allowed.",
+                }
             # Build vLLM server command
             server_cmd = [
                 "vllm",
