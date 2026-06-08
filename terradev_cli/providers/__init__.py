@@ -23,6 +23,7 @@ from .types import (
 from .base_provider import BaseProvider
 from .provider_factory import ProviderFactory
 from .registry import ProviderRegistry
+from .provider_profiles import get_profile, list_all_profiles
 from .gpu_catalog import (
     normalize,
     get_canonical_name,
@@ -45,6 +46,7 @@ __all__ = [
     "ProviderCapabilities",
     "HealthStatus",
     "ProviderHealth",
+    "ProviderProfile",
     # Core classes
     "BaseProvider",
     "ProviderFactory",
@@ -54,4 +56,7 @@ __all__ = [
     "get_canonical_name",
     "list_all_canonical_gpus",
     "list_providers_for_gpu",
+    # Provider profiles
+    "get_profile",
+    "list_all_profiles",
 ]

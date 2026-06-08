@@ -20,6 +20,7 @@ from collections import defaultdict
 
 from .types import ProviderHealth, HealthStatus
 from .provider_factory import ProviderFactory
+from .provider_profiles import get_profile
 
 logger = logging.getLogger(__name__)
 
@@ -170,8 +171,9 @@ class ProviderRegistry:
 
         Ranking criteria (in order):
         1. Health (circuit breaker status)
-        2. Spot preemption score (if spot=True)
-        3. Average latency
+        2. Provider profile quirks (egress costs, fallback routing, etc.)
+        3. Spot preemption score (if spot=True)
+        4. Average latency
 
         Args:
             gpu_canonical: Canonical GPU name (e.g., "H100-80GB")
@@ -193,12 +195,18 @@ class ProviderRegistry:
         for provider in healthy_providers:
             health = self._health[provider]
             health.provider = provider
+            
+            # Get provider profile for quirk-aware scoring
+            profile = get_profile(provider)
 
             # Base score from health (success rate)
             if health.total_provisions > 0:
                 success_rate = 1.0 - (health.total_failures / health.total_provisions)
             else:
                 success_rate = 1.0  # no history, assume healthy
+
+            # Egress cost penalty (lower egress = better for data-heavy workloads)
+            egress_penalty = profile.egress_cost * 0.1  # scale factor
 
             # Spot preemption penalty
             if spot:
@@ -211,7 +219,7 @@ class ProviderRegistry:
             latency_penalty = min(health.avg_latency_ms / 500.0, 1.0) * self.LATENCY_WEIGHT
 
             # Combined score (higher = better)
-            combined_score = success_rate - spot_penalty - latency_penalty
+            combined_score = success_rate - egress_penalty - spot_penalty - latency_penalty
 
             scored.append((provider, combined_score))
 

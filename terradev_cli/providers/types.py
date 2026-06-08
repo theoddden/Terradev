@@ -187,3 +187,72 @@ class ProviderHealth:
     spot_preemption_rate: float = 0.0  # from SpotHedge-style tracking
     total_provisions: int = 0
     total_failures: int = 0
+
+
+@dataclass
+class ProviderProfile:
+    """
+    Encodes provider-specific quirks and behaviors for intelligent routing.
+
+    Used by ProviderRegistry to make intelligent decisions about:
+    - Which providers to query (pre-filtering)
+    - How to handle failures (fallback routing)
+    - How to optimize for specific workloads (egress costs, spot reliability)
+    """
+    name: str
+    api_style: str  # "rest", "graphql", "jsonapi", "k8s"
+    auth_type: str  # "bearer", "basic", "hmac_sha256", "x_api_key", "service_account"
+
+    # API quirks
+    requires_instance_type_mapping: bool = False
+    quote_method: str = "get"  # "get", "post_filter", "graphql"
+    provision_requires_location_id: bool = False
+    provision_requires_namespace: bool = False
+
+    # Capacity and availability
+    has_capacity_check: bool = False
+    has_fallback_routing: bool = False
+    fallback_providers: List[str] = field(default_factory=list)
+
+    # Storage and persistence
+    volume_required_for_persistence: bool = False
+    volume_cost_separate: bool = False
+    data_loss_on_restart: bool = False
+
+    # Networking
+    egress_cost: float = 0.0  # $/GB
+    ssh_port_fixed: bool = True
+    ssh_default_port: int = 22
+
+    # Spot and preemption
+    supports_spot: bool = True
+    spot_interruption_notice_minutes: int = 0
+    spot_preemption_webhook: bool = False
+
+    # Rate limiting
+    rate_limit_per_minute: int = 0  # 0 = no limit
+
+    # Compute model
+    compute_model: str = "vm"  # "vm", "pod", "k8s"
+    isolation_level: str = "vm"  # "vm", "container", "k8s_pod"
+
+    # Dependencies
+    requires_boto3: bool = False
+    requires_gcp_sdk: bool = False
+
+    # Special features
+    has_multi_tier_cloud: bool = False  # e.g., RunPod Community vs Secure
+    has_capacity_reservations: bool = False
+    has_legacy_billing: bool = False
+
+    # Container quirks
+    container_conflict_risk: bool = False
+    container_image_pinning_required: bool = False
+
+    # Lifecycle quirks
+    supports_stop_start: bool = True
+    supports_terminate_only: bool = False
+
+    # Region quirks
+    region_specific_availability: bool = False
+    requires_zone_probing: bool = False

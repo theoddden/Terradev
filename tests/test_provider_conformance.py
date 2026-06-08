@@ -15,32 +15,31 @@ Run with: pytest tests/test_provider_conformance.py -v
 import pytest
 from unittest.mock import AsyncMock, patch
 
-# Import all providers
-from terradev_cli.providers import (
-    AlibabaProvider,
-    AWSProvider,
-    AzureProvider,
-    BasetenProvider,
-    CoreWeaveProvider,
-    CrusoeProvider,
-    DigitalOceanProvider,
-    E2ENetworksProvider,
-    FluidStackProvider,
-    GCPProvider,
-    HetznerProvider,
-    HuggingFaceProvider,
-    HyperstackProvider,
-    InferXProvider,
-    LambdaLabsProvider,
-    LatitudeProvider,
-    OracleProvider,
-    OVHcloudProvider,
-    RunPodProvider,
-    SiliconFlowProvider,
-    TensorDockProvider,
-    VastAIProvider,
-    YottaLabsProvider,
-)
+# Import all providers from their individual modules
+# (providers are not exported from __init__.py to avoid import errors when optional deps are missing)
+from terradev_cli.providers.alibaba_provider import AlibabaProvider
+from terradev_cli.providers.aws_provider import AWSProvider
+from terradev_cli.providers.azure_provider import AzureProvider
+from terradev_cli.providers.baseten_provider import BasetenProvider
+from terradev_cli.providers.coreweave_provider import CoreWeaveProvider
+from terradev_cli.providers.crusoe_provider import CrusoeProvider
+from terradev_cli.providers.digitalocean_provider import DigitalOceanProvider
+from terradev_cli.providers.e2e_networks_provider import E2ENetworksProvider
+from terradev_cli.providers.fluidstack_provider import FluidStackProvider
+from terradev_cli.providers.gcp_provider import GCPProvider
+from terradev_cli.providers.hetzner_provider import HetznerProvider
+from terradev_cli.providers.huggingface_provider import HuggingFaceProvider
+from terradev_cli.providers.hyperstack_provider import HyperstackProvider
+from terradev_cli.providers.inferx_provider import InferXProvider
+from terradev_cli.providers.lambda_labs_provider import LambdaLabsProvider
+from terradev_cli.providers.latitude_provider import LatitudeProvider
+from terradev_cli.providers.oracle_provider import OracleProvider
+from terradev_cli.providers.ovhcloud_provider import OVHcloudProvider
+from terradev_cli.providers.runpod_provider import RunPodProvider
+from terradev_cli.providers.siliconflow_provider import SiliconFlowProvider
+from terradev_cli.providers.tensordock_provider import TensorDockProvider
+from terradev_cli.providers.vastai_provider import VastAIProvider
+from terradev_cli.providers.yottalabs_provider import YottaLabsProvider
 
 ALL_PROVIDERS = [
     AlibabaProvider,
