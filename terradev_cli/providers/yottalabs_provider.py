@@ -29,37 +29,55 @@ class YottaLabsProvider(BaseProvider):
     DEFAULT_IMAGE = "yottalabsai/pytorch:2.9.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04"
 
     # Map Terradev canonical GPU names → Yotta Labs gpuType strings
+    # Source: https://docs.yottalabs.ai/api-and-sdk/api-guides (GPU Types Reference)
     GPU_TYPE_MAP = {
-        "H100":        "NVIDIA_H100_SXM5_80G",
-        "H100-80GB":   "NVIDIA_H100_SXM5_80G",
-        "H100-SXM":    "NVIDIA_H100_SXM5_80G",
+        "H100":        "NVIDIA_H100_80G",
+        "H100-80GB":   "NVIDIA_H100_80G",
+        "H100-SXM":    "NVIDIA_H100_80G",
+        "H100-PCIe":   "NVIDIA_H100_PCIe_80G",
         "H200":        "NVIDIA_H200_141G",
-        "A100":        "NVIDIA_A100_SXM4_80G",
-        "A100-80GB":   "NVIDIA_A100_SXM4_80G",
-        "A100-40GB":   "NVIDIA_A100_PCIE_40G",
+        "B200":        "NVIDIA_B200_180G",
+        "B300":        "NVIDIA_B300_262G",
+        "A100":        "NVIDIA_A100_80G",
+        "A100-80GB":   "NVIDIA_A100_80G",
+        "A100-PCIe":   "NVIDIA_A100_PCIe_80G",
+        "A100-40GB":   "NVIDIA_A100_PCIe_40G",
         "RTX4090":     "NVIDIA_RTX_4090_24G",
+        "RTX5090":     "NVIDIA_RTX_5090_32G",
         "RTX3090":     "NVIDIA_RTX_3090_24G",
-        "RTX3080":     "NVIDIA_RTX_3080_10G",
         "L40S":        "NVIDIA_L40S_48G",
         "L40":         "NVIDIA_L40_48G",
         "A6000":       "NVIDIA_RTX_A6000_48G",
+        "RTX6000Ada":  "NVIDIA_RTX_6000_Ada_48G",
+        "RTXPro6000":  "NVIDIA_RTX_PRO_6000_96G",
+        "MI300X":      "AMD_MI300X_192G",
         "T4":          "NVIDIA_T4_16G",
         "V100":        "NVIDIA_V100_16G",
     }
 
     # Reference pricing (USD/hr per GPU) — live API takes precedence
+    # Keys must exactly match the gpuType strings from GPU_TYPE_MAP / Yotta API reference
     GPU_PRICING = {
-        "NVIDIA_H100_SXM5_80G":    {"price": 2.99, "mem_gb": 80,  "vcpus": 16, "ram_gb": 64},
+        "NVIDIA_H100_80G":          {"price": 2.99, "mem_gb": 80,  "vcpus": 16, "ram_gb": 64},
+        "NVIDIA_H100_PCIe_80G":     {"price": 2.49, "mem_gb": 80,  "vcpus": 16, "ram_gb": 64},
         "NVIDIA_H200_141G":         {"price": 4.49, "mem_gb": 141, "vcpus": 16, "ram_gb": 64},
-        "NVIDIA_A100_SXM4_80G":    {"price": 1.89, "mem_gb": 80,  "vcpus": 16, "ram_gb": 64},
-        "NVIDIA_A100_PCIE_40G":    {"price": 1.29, "mem_gb": 40,  "vcpus": 12, "ram_gb": 48},
-        "NVIDIA_RTX_4090_24G":     {"price": 0.69, "mem_gb": 24,  "vcpus": 8,  "ram_gb": 32},
-        "NVIDIA_RTX_3090_24G":     {"price": 0.29, "mem_gb": 24,  "vcpus": 8,  "ram_gb": 32},
-        "NVIDIA_L40S_48G":         {"price": 1.19, "mem_gb": 48,  "vcpus": 16, "ram_gb": 64},
-        "NVIDIA_L40_48G":          {"price": 0.99, "mem_gb": 48,  "vcpus": 12, "ram_gb": 48},
-        "NVIDIA_RTX_A6000_48G":    {"price": 0.79, "mem_gb": 48,  "vcpus": 12, "ram_gb": 48},
-        "NVIDIA_T4_16G":           {"price": 0.35, "mem_gb": 16,  "vcpus": 4,  "ram_gb": 16},
-        "NVIDIA_V100_16G":         {"price": 0.55, "mem_gb": 16,  "vcpus": 8,  "ram_gb": 32},
+        "NVIDIA_B200_180G":         {"price": 6.99, "mem_gb": 180, "vcpus": 24, "ram_gb": 128},
+        "NVIDIA_B300_262G":         {"price": 8.99, "mem_gb": 262, "vcpus": 32, "ram_gb": 192},
+        "NVIDIA_A100_80G":          {"price": 1.89, "mem_gb": 80,  "vcpus": 16, "ram_gb": 64},
+        "NVIDIA_A100_PCIe_80G":     {"price": 1.79, "mem_gb": 80,  "vcpus": 16, "ram_gb": 64},
+        "NVIDIA_A100_PCIe_40G":     {"price": 1.29, "mem_gb": 40,  "vcpus": 12, "ram_gb": 48},
+        "NVIDIA_A100_40G":          {"price": 1.29, "mem_gb": 40,  "vcpus": 12, "ram_gb": 48},
+        "NVIDIA_RTX_4090_24G":      {"price": 0.69, "mem_gb": 24,  "vcpus": 8,  "ram_gb": 32},
+        "NVIDIA_RTX_5090_32G":      {"price": 0.99, "mem_gb": 32,  "vcpus": 8,  "ram_gb": 32},
+        "NVIDIA_RTX_3090_24G":      {"price": 0.29, "mem_gb": 24,  "vcpus": 8,  "ram_gb": 32},
+        "NVIDIA_L40S_48G":          {"price": 1.19, "mem_gb": 48,  "vcpus": 16, "ram_gb": 64},
+        "NVIDIA_L40_48G":           {"price": 0.99, "mem_gb": 48,  "vcpus": 12, "ram_gb": 48},
+        "NVIDIA_RTX_A6000_48G":     {"price": 0.79, "mem_gb": 48,  "vcpus": 12, "ram_gb": 48},
+        "NVIDIA_RTX_6000_Ada_48G":  {"price": 0.89, "mem_gb": 48,  "vcpus": 12, "ram_gb": 48},
+        "NVIDIA_RTX_PRO_6000_96G":  {"price": 1.49, "mem_gb": 96,  "vcpus": 16, "ram_gb": 64},
+        "AMD_MI300X_192G":          {"price": 3.49, "mem_gb": 192, "vcpus": 24, "ram_gb": 128},
+        "NVIDIA_T4_16G":            {"price": 0.35, "mem_gb": 16,  "vcpus": 4,  "ram_gb": 16},
+        "NVIDIA_V100_16G":          {"price": 0.55, "mem_gb": 16,  "vcpus": 8,  "ram_gb": 32},
     }
 
     def __init__(self, credentials: Dict[str, str]):

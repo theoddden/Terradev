@@ -76,10 +76,12 @@ class E2ENetworksProvider(BaseProvider):
     # ── URL helpers ───────────────────────────────────────────────────
 
     def _nodes_url(self, path: str = "") -> str:
-        """Build a nodes endpoint URL, optionally scoped to project."""
-        if self.project_id:
-            return f"{self.API_BASE}/projects/{self.project_id}/nodes{path}"
+        """Build a nodes endpoint URL. Project scoping is done via ?project_id= query param."""
         return f"{self.API_BASE}/nodes{path}"
+
+    def _project_params(self) -> Dict[str, str]:
+        """Return project_id as a query-param dict if configured."""
+        return {"project_id": self.project_id} if self.project_id else {}
 
     # ── Capacity / Quotes ─────────────────────────────────────────────
 
@@ -240,24 +242,31 @@ class E2ENetworksProvider(BaseProvider):
             "india_based": True,
         }
 
-    async def _node_action(self, instance_id: str, action: str) -> Dict[str, Any]:
-        """Send a lifecycle action to a node (start/stop/reboot)."""
-        body = {"action": action}
+    async def _node_action(self, instance_id: str, action_type: str) -> Dict[str, Any]:
+        """Send a lifecycle action to a node.
+
+        Endpoint: PUT /api/v1/nodes/{node_id}/actions/
+        Body: {"type": <action_type>}
+        Supported types: power_off, power_on, reboot, reinstall, rename, ...
+        See: https://docs.e2enetworks.com/api/myaccount/compute/nodes/actions/node-action/
+        """
+        body = {"type": action_type}
         data = await self._make_request(
-            "POST", self._nodes_url(f"/{instance_id}/action/"), json=body
+            "PUT", self._nodes_url(f"/{instance_id}/actions/"),
+            json=body, params=self._project_params()
         )
         return data if isinstance(data, dict) else {}
 
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("E2E Networks API key not configured")
-        await self._node_action(instance_id, "stop")
+        await self._node_action(instance_id, "power_off")
         return {"instance_id": instance_id, "action": "stop", "status": "stopping"}
 
     async def start_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("E2E Networks API key not configured")
-        await self._node_action(instance_id, "start")
+        await self._node_action(instance_id, "power_on")
         return {"instance_id": instance_id, "action": "start", "status": "starting"}
 
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
@@ -368,3 +377,4 @@ class E2ENetworksProvider(BaseProvider):
             raise Exception("E2E Networks API key not configured")
         await self._node_action(instance_id, "reboot")
         return {"instance_id": instance_id, "action": "reboot", "status": "rebooting"}
+
