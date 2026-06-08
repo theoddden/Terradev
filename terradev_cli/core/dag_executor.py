@@ -197,9 +197,6 @@ class DAGExecutor:
         def dfs(name: str, path: List[str]):
             color[name] = GRAY
             path.append(name)
-            for dep_name, dep_node in self._nodes.items():
-                # Check reverse: who depends on `name`
-                pass
             # Check forward: what does `name` depend on
             for dep in self._nodes[name].dependencies:
                 if color[dep] == GRAY:
@@ -327,7 +324,6 @@ class DAGExecutor:
 
                 for node_name in wave.nodes:
                     node = self._nodes[node_name]
-                    node.status = "running"
 
                     # Build dependency context for this node
                     dep_ctx = {dep: context.get(dep) for dep in node.dependencies}
@@ -340,20 +336,14 @@ class DAGExecutor:
                 # Collect wave results
                 for future in as_completed(futures):
                     node_name = futures[future]
-                    node = self._nodes[node_name]
 
                     try:
                         output, latency = future.result()
-                        node.output = output
-                        node.latency_ms = latency
-                        node.status = "done"
                         context[node_name] = output
                         result.outputs[node_name] = output
                         result.node_latencies[node_name] = latency
                         result.node_statuses[node_name] = "done"
                     except Exception as e:
-                        node.status = "failed"
-                        node.error = str(e)
                         result.errors[node_name] = str(e)
                         result.node_statuses[node_name] = "failed"
                         logger.error(

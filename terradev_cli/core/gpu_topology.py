@@ -696,11 +696,12 @@ class RDMAConfigurator:
             "NCCL_NET_GDR_READ": "1",
         }
         if pair.locality == PCIeLocality.PIX:
+            import os
             import tempfile
 
-            env["NCCL_TOPO_DUMP_FILE"] = tempfile.mktemp(
-                prefix="nccl_topo_", suffix=".xml"
-            )
+            _nccl_fd, _nccl_path = tempfile.mkstemp(prefix="nccl_topo_", suffix=".xml")
+            os.close(_nccl_fd)
+            env["NCCL_TOPO_DUMP_FILE"] = _nccl_path
 
         # XCD-aware env vars for intra-GPU NUMA
         if gpu:

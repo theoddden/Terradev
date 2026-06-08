@@ -105,10 +105,10 @@ alerting:
             # Write Prometheus values
             import tempfile
 
-            prometheus_file = tempfile.mktemp(
+            _pf_fd, prometheus_file = tempfile.mkstemp(
                 prefix="prometheus-karpenter_", suffix=".yaml"
             )
-            with open(prometheus_file, "w") as f:
+            with os.fdopen(_pf_fd, "w") as f:
                 f.write(prometheus_values)
 
             prometheus_cmd = [
@@ -176,8 +176,8 @@ dashboardProviders:
             # Write Grafana values
             import tempfile
 
-            grafana_file = tempfile.mktemp(prefix="grafana-karpenter_", suffix=".yaml")
-            with open(grafana_file, "w") as f:
+            _gf_fd, grafana_file = tempfile.mkstemp(prefix="grafana-karpenter_", suffix=".yaml")
+            with os.fdopen(_gf_fd, "w") as f:
                 f.write(grafana_values)
 
             grafana_cmd = [

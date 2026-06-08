@@ -22,7 +22,6 @@ Based on DistServe and vLLM team research (2025)
 
 import asyncio
 import aiohttp
-import pickle
 import gzip
 import logging
 import time
@@ -80,7 +79,7 @@ class CheckpointConfig:
     """Configuration for KV cache checkpointing"""
 
     enable_checkpointing: bool = True
-    checkpoint_dir: str = None  # Will use tempfile if not provided
+    checkpoint_dir: Optional[str] = None  # Will use tempfile if not provided
     max_checkpoint_age_hours: int = 24
     max_storage_gb: int = 1000
     compression_enabled: bool = True
@@ -427,8 +426,26 @@ class KVCacheCheckpointManager:
 
     async def _serialize_kv_cache(self, kv_cache_data: Any) -> Tuple[bytes, int]:
         """Serialize KV cache data"""
-        # Convert to bytes
-        data_bytes = pickle.dumps(kv_cache_data)
+        # Use msgpack (safe) instead of pickle (RCE risk on remote storage restore).
+        # For tensor data that msgpack cannot represent, convert to list first.
+        try:
+            import msgpack
+            serializable = kv_cache_data
+            if hasattr(kv_cache_data, "tolist"):
+                serializable = kv_cache_data.tolist()
+            data_bytes = msgpack.packb(serializable, use_bin_type=True)
+        except Exception:
+            # Fallback: use torch.load path via buffer (weights_only safe)
+            import io
+            try:
+                import torch
+                buf = io.BytesIO()
+                torch.save(kv_cache_data, buf)
+                data_bytes = buf.getvalue()
+            except Exception:
+                raise RuntimeError(
+                    "Cannot serialize KV cache: install msgpack or torch"
+                )
 
         # Compress if enabled
         if self.config.compression_enabled:
@@ -461,10 +478,23 @@ class KVCacheCheckpointManager:
         if self.config.compression_enabled:
             data_bytes = gzip.decompress(data_bytes)
 
-        # Deserialize with pickle but only after decryption validation
-        # SECURITY: Data is Fernet-decrypted first, but pickle still has risks.
-        # Consider using msgpack or torch.load(weights_only=True) for future improvements.
-        return pickle.loads(data_bytes)
+        # Deserialize using msgpack (safe) or torch.load(weights_only=True).
+        # SECURITY: pickle is NOT used — it allows arbitrary code execution
+        # on attacker-controlled data from remote storage backends (S3/GCS/Azure).
+        try:
+            import msgpack
+            return msgpack.unpackb(data_bytes, raw=False, strict_map_key=False)
+        except Exception:
+            # Fallback: torch.load with weights_only=True (no arbitrary code execution)
+            import io
+            try:
+                import torch
+                buf = io.BytesIO(data_bytes)
+                return torch.load(buf, weights_only=True)
+            except Exception:
+                raise RuntimeError(
+                    "Cannot deserialize KV cache: install msgpack or torch"
+                )
 
     async def _save_to_storage(self, checkpoint_id: str, data: bytes) -> str:
         """Save checkpoint to storage"""

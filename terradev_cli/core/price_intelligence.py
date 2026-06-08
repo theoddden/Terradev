@@ -181,8 +181,11 @@ def _ensure_price_schema(conn: sqlite3.Connection):
         ("latency_ms", "REAL"),
         ("error", "TEXT"),
     ]
+    import re as _re
     for col_name, col_def in _new_cols:
         if col_name not in existing_cols:
+            if not _re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', col_name):
+                raise ValueError(f"Invalid column name in migration: {col_name!r}")
             conn.execute(f"ALTER TABLE provider_events ADD COLUMN {col_name} {col_def}")
     conn.commit()
 

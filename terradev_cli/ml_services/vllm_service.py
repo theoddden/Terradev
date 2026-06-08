@@ -106,7 +106,7 @@ class VLLMConfig:
     lmcache_redis_password: Optional[str] = None
     lmcache_s3_bucket: Optional[str] = None
     lmcache_s3_region: str = "us-east-1"
-    lmcache_disk_path: str = None  # Will use tempfile if not provided
+    lmcache_disk_path: Optional[str] = None  # Will use tempfile if not provided
 
     @classmethod
     def create_auto_optimized(

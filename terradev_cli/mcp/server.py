@@ -337,13 +337,25 @@ async def execute_terradev_command(args: List[str]) -> Dict[str, Any]:
         }
 
 
-async def execute_shell_command(cmd: str, timeout: int = 120) -> Dict[str, Any]:
-    """Execute a raw shell command (e.g. SSH) and return stdout/stderr/success.
+_SHELL_CMD_ALLOWLIST: set = set()  # Populated by internal callers with hardcoded strings only
 
-    SECURITY WARNING: This function uses shell=True and is vulnerable to injection.
-    Only use with hardcoded commands or fully sanitized inputs. For user/AI-provided
-    commands, use execute_safe_command instead.
+
+async def _UNSAFE_execute_shell_command(
+    cmd: str, timeout: int = 120, _allow_caller: str = ""
+) -> Dict[str, Any]:
+    """INTERNAL USE ONLY — Execute a raw shell command using shell=True.
+
+    SECURITY: This function is vulnerable to shell injection. It MUST NOT be called
+    with any user-supplied or AI-agent-supplied input. Pass _allow_caller with the
+    exact hardcoded string you are running to make the intent explicit at the call site.
+    For all commands with dynamic inputs, use execute_safe_command() instead.
     """
+    if not _allow_caller:
+        raise RuntimeError(
+            "_UNSAFE_execute_shell_command called without _allow_caller token — "
+            "this indicates a new call site was added without security review. "
+            "Use execute_safe_command() for any dynamic input."
+        )
     try:
         process = await asyncio.create_subprocess_shell(
             cmd,

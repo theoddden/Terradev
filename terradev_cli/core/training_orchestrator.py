@@ -19,6 +19,7 @@ import logging
 import os
 import subprocess
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from .dag_executor import DAGExecutor
@@ -382,11 +383,14 @@ def _reasoning_auto_config(
             result["reason"] = "skipped: no reasoning model detected"
             return result
 
-    # Rule 4: require sufficient VRAM (reasoning needs large KV cache)
-    if min_vram_mb < 40000 and config.workload_type != "reasoning":
+    # Rule 4: require sufficient VRAM (reasoning needs large KV cache).
+    # This check applies regardless of workload_type — even an explicit
+    # workload_type="reasoning" job cannot run on hardware with <40GB VRAM.
+    if min_vram_mb < 40000:
         result["enabled"] = False
         result["reason"] = (
-            f"skipped: smallest GPU has {min_vram_mb / 1000:.0f}GB VRAM (<40GB for reasoning)"
+            f"skipped: smallest GPU has {min_vram_mb / 1000:.0f}GB VRAM "
+            f"(reasoning profile requires >=40GB; use a larger GPU or reduce batch size)"
         )
         return result
 
@@ -432,8 +436,10 @@ def _run_on(
     # SECURITY: Validate command to prevent shell injection
     import re
 
-    # Allow alphanumeric, spaces, and basic shell-safe characters
-    if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t"\']+$', cmd):
+    # Allow alphanumeric, spaces, and basic shell-safe characters.
+    # SECURITY: quotes ('"') are deliberately excluded — they are shell metacharacters
+    # that can be used to escape a quoted context and inject arbitrary commands.
+    if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t|>&]+$', cmd):
         return -1, "", "Unsafe command characters detected"
 
     if host and host not in ("localhost", "127.0.0.1"):
@@ -660,19 +666,22 @@ def _build_artifacts(ctx: Dict[str, Any]) -> Dict[str, Any]:
     total_gpus = n_nodes * config.gpus_per_node
     master_addr = config.nodes[0] if config.nodes else "localhost"
 
-    # Hostfile (only needed for multi-node deepspeed)
+    # Hostfile (only needed for multi-node deepspeed).
+    # Written here — not deferred to _launch_native — so the file always exists
+    # by the time --hostfile is passed to deepspeed, even if the DAG fails later.
     hostfile_path = ""
+    hostfile_content = ""
     if n_nodes > 1:
         import tempfile
 
-        hostfile_path = tempfile.mktemp(
+        _hf_fd, hostfile_path = tempfile.mkstemp(
             prefix=".terradev_hostfile_", suffix=f"_{os.getpid()}"
         )
         hostfile_content = "\n".join(
             f"{node} slots={config.gpus_per_node}" for node in config.nodes
         )
-    else:
-        hostfile_content = ""
+        with os.fdopen(_hf_fd, "w") as _hf:
+            _hf.write(hostfile_content)
 
     # Build launch command
     if config.framework == "deepspeed":
@@ -727,12 +736,6 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(config, TrainingConfig) or "error" in artifacts:
         return {"status": "failed", "error": artifacts.get("error", "No config")}
 
-    # Write hostfile if needed
-    hf_path = artifacts.get("hostfile_path", "")
-    if hf_path and artifacts.get("hostfile_content"):
-        with open(hf_path, "w") as f:
-            f.write(artifacts["hostfile_content"])
-
     # Build environment
     env = os.environ.copy()
     env.update(artifacts.get("env", {}))
@@ -750,12 +753,22 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     cmd = " ".join(cmd_parts)
     if config.log_path:
-        # Validate log path to prevent path injection
-        if not re.match(r"^[a-zA-Z0-9_\-./]+$", config.log_path):
-            logger.error(f"Unsafe log path: {config.log_path}")
-            return {"status": "failed", "error": "Unsafe log path detected"}
-        os.makedirs(os.path.dirname(config.log_path) or ".", exist_ok=True)
-        cmd += f" 2>&1 | tee {config.log_path}"
+        # Validate log path: resolve to absolute path and assert it stays within
+        # an allowed directory root to prevent path traversal attacks.
+        _allowed_roots = (
+            Path.home(),
+            Path("/tmp"),
+            Path("/var/log"),
+        )
+        try:
+            resolved_log = Path(config.log_path).resolve()
+        except Exception:
+            return {"status": "failed", "error": "Invalid log path"}
+        if not any(resolved_log.is_relative_to(root) for root in _allowed_roots):
+            logger.error(f"Log path outside allowed roots: {resolved_log}")
+            return {"status": "failed", "error": "Log path outside allowed directory"}
+        os.makedirs(str(resolved_log.parent), exist_ok=True)
+        cmd += f" 2>&1 | tee {resolved_log}"
 
     # Pre-install FlashOptim if auto-enabled (non-blocking, fail-safe)
     flashoptim_info = artifacts.get("flashoptim", {})
@@ -783,19 +796,21 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
         try:
             import tempfile
 
-            sidecar_path = tempfile.mktemp(
+            _sp_fd, sidecar_path = tempfile.mkstemp(
                 prefix=".terradev_spot_sidecar_", suffix=".sh"
             )
-            sidecar_log = tempfile.mktemp(
+            os.close(_sp_fd)
+            _sl_fd, sidecar_log = tempfile.mkstemp(
                 prefix=".terradev_spot_sidecar_", suffix=".log"
             )
+            os.close(_sl_fd)
             node_list = config.nodes or [None]
             for node in node_list:
                 _run_on(
                     node,
-                    f"cat > {sidecar_path} << 'SIDECAR_EOF'\n{_SPOT_SIDECAR_SH}\nSIDECAR_EOF\n"
-                    f"chmod +x {sidecar_path} && "
-                    f"nohup {sidecar_path} {process.pid} > {sidecar_log} 2>&1 &",
+                    f"cat > '{sidecar_path}' << 'SIDECAR_EOF'\n{_SPOT_SIDECAR_SH}\nSIDECAR_EOF\n"
+                    f"chmod +x '{sidecar_path}' && "
+                    f"nohup '{sidecar_path}' {process.pid} > '{sidecar_log}' 2>&1 &",
                     config.ssh_user,
                     config.ssh_key or None,
                     timeout=15,

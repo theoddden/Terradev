@@ -23,16 +23,32 @@ class BaseProvider(ABC):
         self.credentials = credentials
         self.name = self.__class__.__name__.replace("Provider", "").lower()
         self.session: Optional[aiohttp.ClientSession] = None
+        self._owns_session: bool = False  # True when we lazily created the session
 
     async def __aenter__(self):
         """Async context manager entry"""
         self.session = aiohttp.ClientSession()
+        self._owns_session = True
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit"""
-        if self.session:
+        await self.aclose()
+
+    async def aclose(self):
+        """Close the underlying aiohttp session if we own it.
+
+        Call this explicitly when not using async-with context manager:
+            provider = RunPodProvider(creds)
+            try:
+                result = await provider.get_instance_quotes(...)
+            finally:
+                await provider.aclose()
+        """
+        if self.session and not self.session.closed:
             await self.session.close()
+        self.session = None
+        self._owns_session = False
 
     @abstractmethod
     async def get_instance_quotes(
@@ -97,8 +113,9 @@ class BaseProvider(ABC):
 
     async def _make_request(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
         """Make HTTP request with authentication and rate limiting"""
-        if not self.session:
+        if not self.session or self.session.closed:
             self.session = aiohttp.ClientSession()
+            self._owns_session = True
 
         # Acquire rate-limit permit for this provider (best-effort)
         rl = self._get_rate_limiter()
