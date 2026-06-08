@@ -139,35 +139,50 @@ class BaseProvider(ABC):
 
     # ── New Typed APIs (to be implemented by providers) ─────────────────────
 
-    @abstractmethod
     async def get_quotes(self, request: QuoteRequest) -> List[Quote]:
         """
         Get instance quotes for GPU type (new typed API).
 
         Providers should implement this method. The old get_instance_quotes()
         method below is a backwards-compat shim that calls this.
-        """
-        pass
 
-    @abstractmethod
+        Default implementation raises NotImplementedError - providers should
+        override this as they migrate to the new typed API.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not implement get_quotes(). "
+            "Please use get_instance_quotes() for now."
+        )
+
     async def provision(self, request: ProvisionRequest) -> ProvisionResult:
         """
         Provision an instance (new typed API).
 
         Providers should implement this method. The old provision_instance()
         method below is a backwards-compat shim that calls this.
-        """
-        pass
 
-    @abstractmethod
+        Default implementation raises NotImplementedError - providers should
+        override this as they migrate to the new typed API.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not implement provision(). "
+            "Please use provision_instance() for now."
+        )
+
     async def get_instance(self, instance_id: str) -> InstanceInfo:
         """
         Get instance status (new typed API).
 
         Providers should implement this method. The old get_instance_status()
         method below is a backwards-compat shim that calls this.
+
+        Default implementation raises NotImplementedError - providers should
+        override this as they migrate to the new typed API.
         """
-        pass
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not implement get_instance(). "
+            "Please use get_instance_status() for now."
+        )
 
     # ── Backwards-Compatibility Shims ───────────────────────────────────────
     # These allow existing code to continue working while providers migrate
