@@ -1,5 +1,5 @@
 # Terradev CLI BNF Grammar
-# Complete syntax specification for all commands and options — v6.0.0
+# Complete syntax specification for all commands and options — v5.3.0
 
 <terradev-cli> ::= <global-options> <command>
 

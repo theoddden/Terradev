@@ -45,7 +45,10 @@ import time
 import uuid
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import TYPE_CHECKING, Dict, List, Optional, Any
+
+if TYPE_CHECKING:
+    from terradev_cli.core.kv_sharing import KVSharingPlan
 
 from terradev_cli.core.dag_executor import DAGExecutor
 
@@ -187,6 +190,8 @@ class AgentFleetSpec:
     total_cost_hr_estimate: float         # sum of spot prices across all tiers
     kv_cache_budget_gb_total: float       # total KV headroom across reasoning tier
     reasoning: str                        # "thinking" | "instant" — affects token composition
+    context_k_tokens: int = 120            # context window per agent in K tokens
+    kv_sharing_plan: Optional[Any] = None  # KVSharingPlan if computed, else None
     created_at: float = field(default_factory=time.time)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -218,6 +223,8 @@ class AgentFleetSpec:
             },
             "total_cost_hr_estimate": round(self.total_cost_hr_estimate, 2),
             "kv_cache_budget_gb_total": round(self.kv_cache_budget_gb_total, 1),
+            "context_k_tokens": self.context_k_tokens,
+            "kv_sharing_plan": self.kv_sharing_plan.to_dict() if self.kv_sharing_plan else None,
         }
 
 
@@ -252,6 +259,10 @@ class AgentTopologyPlanner:
     # From research: decode accounts for 91-98% of LLM time at ideal cache hit rate.
     # We target 85% decode efficiency (5% below ideal to account for some thrashing).
     TARGET_DECODE_EFFICIENCY = 0.85
+
+    # Default context budget in K tokens (P95 from arXiv:2605.26297).
+    # Override with context_k parameter for known workloads.
+    DEFAULT_CONTEXT_K = 120
 
     # Reasoning tier handles orchestration and planning. Research shows 1 planner
     # can serve multiple workers sequentially since planners issue batch dispatches.
@@ -348,15 +359,60 @@ class AgentTopologyPlanner:
         model: str = "meta-llama/Llama-3.1-70B-Instruct",
         reasoning: str = "instant",
         providers: Optional[List[str]] = None,
+        context_k: int = 120,
+        sharing_topology: str = "broadcast",
+        shared_fraction: Optional[float] = None,
+        dtype: str = "fp16",
     ) -> AgentFleetSpec:
         """
         Produce a complete AgentFleetSpec from a single agent count.
 
-        This is the 'magic' entry point: terradev provision --mode agentic --agents N.
+        This is the 'magic' entry point: terradev provision --agents N --context K.
         All sizing is grounded in the arXiv empirical data above.
+
+        Parameters
+        ----------
+        context_k : int
+            Context window per agent in K tokens (default 120K = P95 from research).
+            Use the actual value from your workload: 8 for simple tasks, 32–128 for
+            code agents, up to 166K for the research P99 tail.
+        sharing_topology : str
+            "broadcast" | "star" | "chain" | "none"
+            How agents share prefill context. broadcast = all share system prompt + task.
+        shared_fraction : float, optional
+            Override the default sharing fraction for the topology.
+        dtype : str
+            KV cache dtype. "fp8" halves KV memory vs "fp16".
         """
         fleet_id = f"ag_{int(time.time())}_{uuid.uuid4().hex[:8]}"
         model_size_b = self._parse_model_size(model)
+
+        # Compute KV sharing plan to inform VRAM sizing
+        kv_plan = None
+        try:
+            from terradev_cli.core.kv_sharing import MultiAgentVRAMPlanner, SharingTopology
+            topology_map = {
+                "broadcast": SharingTopology.BROADCAST,
+                "star": SharingTopology.STAR,
+                "chain": SharingTopology.CHAIN,
+                "none": SharingTopology.NONE,
+            }
+            topo = topology_map.get(sharing_topology, SharingTopology.BROADCAST)
+            kv_plan = MultiAgentVRAMPlanner().compute(
+                n_agents=n_agents,
+                context_k=context_k,
+                model=model,
+                topology=topo,
+                shared_fraction=shared_fraction,
+                dtype=dtype,
+            )
+        except Exception as e:
+            logger.debug("KV sharing plan skipped: %s", e)
+
+        # Use context_k from KV plan if available, else P95 default
+        effective_context_k = context_k if context_k else self.DEFAULT_CONTEXT_K
+        # Update CONTEXT_P95_TOKENS to reflect the requested context
+        actual_context_tokens = effective_context_k * 1000
 
         # ── Reasoning tier ────────────────────────────────────────────────────
         reasoning_instances = max(1, math.ceil(n_agents / self.AGENTS_PER_REASONING_INSTANCE))
@@ -364,7 +420,7 @@ class AgentTopologyPlanner:
         r_gpu_count = r_tp   # one GPU per TP rank
         r_kv_budget = self._compute_kv_budget(r_gpu, r_gpu_count, model_size_b, r_tp)
         r_concurrency = max(1, int(r_kv_budget / (
-            self.CONTEXT_P95_TOKENS
+            actual_context_tokens
             * KV_BYTES_PER_TOKEN_PER_LAYER
             * KV_LAYERS.get(f"{model_size_b}b", 80)
             / 1e9
@@ -380,7 +436,7 @@ class AgentTopologyPlanner:
             role_profile="kv_preservation",
             tensor_parallel=r_tp,
             warm_slots=min(r_concurrency, 4),
-            context_budget_k_tokens=self.CONTEXT_P95_TOKENS // 1000,
+            context_budget_k_tokens=effective_context_k,
         )
 
         # ── Decode tier ───────────────────────────────────────────────────────
@@ -394,7 +450,7 @@ class AgentTopologyPlanner:
         d_gpu_count = d_tp
         d_kv_budget = self._compute_kv_budget(d_gpu, d_gpu_count, model_size_b, d_tp)
         d_concurrency = max(1, int(d_kv_budget / (
-            self.CONTEXT_P95_TOKENS
+            actual_context_tokens
             * KV_BYTES_PER_TOKEN_PER_LAYER
             * KV_LAYERS.get(f"{model_size_b}b", 80)
             / 1e9
@@ -410,7 +466,7 @@ class AgentTopologyPlanner:
             role_profile="decode_throughput",
             tensor_parallel=d_tp,
             warm_slots=min(d_concurrency, agents_per_decode),
-            context_budget_k_tokens=self.CONTEXT_P95_TOKENS // 1000,
+            context_budget_k_tokens=effective_context_k,
         )
 
         # ── CPU tools tier ────────────────────────────────────────────────────
@@ -473,6 +529,8 @@ class AgentTopologyPlanner:
             total_cost_hr_estimate=total_cost,
             kv_cache_budget_gb_total=kv_total,
             reasoning=reasoning,
+            context_k_tokens=effective_context_k,
+            kv_sharing_plan=kv_plan,
         )
 
     def from_explicit(

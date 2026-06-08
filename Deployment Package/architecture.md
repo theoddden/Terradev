@@ -162,9 +162,11 @@ terradev infer-deploy --model ./llama-2-7b
              └── vLLM Router (P/D disaggregation)
 ```
 
-**Disaggregated Prefill/Decode (advanced):**
+**Disaggregated Prefill/Decode — Transport-Agnostic Layer:**
 
 ```
+core/pd_transport.py — KVTransport abstraction
+
 Client request
        │
        ▼
@@ -172,13 +174,123 @@ vLLM Router (sticky routing by prefix hash)
        │
        ├──▶ Prefill pool (H100, compute-bound)
        │    Processes input prompt
-       │    KV cache → NIXL zero-copy RDMA transfer
-       │
+       │    KV cache block ──► TransportSelector.select(config)
+       │                             │
+       │              ┌──────────────┼──────────────┐
+       │              ▼              ▼              ▼
+       │         NIXLNVLink      NIXL/IB        TCP fallback
+       │         600 GB/s       200 GB/s        10 GB/s
+       │         (NVLink 4.0)   (HDR IB)        (always avail)
+       │              │              │              │
+       │              └──────────────┴──────────────┘
+       │                             │
        └──▶ Decode pool (H100, memory-bound)
-            Generates tokens
+            Receives KV block, generates tokens
             Subsequent requests with same prefix
             route here to reuse KV cache
 ```
+
+**Transport selection priority** (probed at provision time, ~2s):
+
+| Priority | Transport | Bandwidth | Latency | Requirement |
+|----------|-----------|-----------|---------|-------------|
+| 1 | NIXL/NVLink | 600 GB/s | 0.05ms | NVLink 4.0 fabric |
+| 2 | NIXL/InfiniBand | 200–400 GB/s | 0.2ms | HDR/NDR IB |
+| 3 | CXL 3.0 | 200 GB/s | 0.0001ms | **PLANNED** |
+| 4 | RoCE RDMA | 25 GB/s | 1ms | 200GbE NIC |
+| 5 | TCP fallback | 10 GB/s | 0.5ms | Always available |
+
+**NIXL → CXL Migration Path (planned):**
+
+```
+CURRENT (2025):  NIXL protocol — zero-copy RDMA via NVLink or InfiniBand.
+                 Prefill GPU serializes KV → RDMA transfer → Decode GPU.
+                 Production-ready in vLLM ≥0.6.x, SGLang ≥0.4.x.
+
+PHASE 1 (2026):  NIXL + CXL co-existence.
+                 When CXL 3.0 fabric detected (Intel Clearwater Forest /
+                 AMD Venice), route KV through CXL pool. Fall back to NIXL.
+                 Expected bandwidth: ~200 GB/s. Latency: ~100ns.
+
+PHASE 2 (2026–2027): CXL-primary.
+                 KV cache allocated in CXL shared DRAM pool, not GPU HBM.
+                 Prefill writes directly to CXL; decode reads in-place.
+                 No serialization, no transfer — pointer handoff only.
+                 GPU HBM used only for model weights + active compute.
+                 VRAM sizing changes: replace GPU_VRAM_GB with CXL_POOL_GB
+                 in AgentTopologyPlanner._compute_kv_budget().
+
+PHASE 3 (2027+): CXL fabric switch (Astera Labs Atlas, Microchip Igloo).
+                 N prefill + M decode nodes share one CXL memory pool.
+                 Multi-agent KV sharing becomes a memory management problem:
+                 shared prefix maps to one physical address, accessed by all.
+```
+
+---
+
+### Multi-Agent KV Cache Sharing (v5.3.0)
+
+**The problem:** Each agent independently stores its KV cache. For N agents
+with 70% shared context (system prompt + task), the shared portion is stored
+N times — pure waste that scales linearly with fleet size.
+
+**The math** (from `core/kv_sharing.py`):
+
+```
+20 agents × Llama-70B × 32K context (fp16):
+  KV per agent:      32K × 80 layers × 512 bytes/tok/layer ÷ 2 = 0.655 GB
+  Naive (N copies):  20 × 0.655 = 13.1 GB per GPU slot
+
+  With broadcast sharing (70% shared = 22.4K shared, 9.6K unique):
+    Shared KV (stored once):  22.4K × 0.0205 GB/K = 0.46 GB
+    Per-agent unique KV:       9.6K × 0.0205 GB/K = 0.197 GB each
+    Total fleet KV:           0.46 + 20 × 0.197   = 4.4 GB
+    Saving: 13.1 - 4.4 = 8.7 GB (66% reduction)
+    → 3× more agents per GPU
+    → 3× fewer GPUs needed
+    → ~$14/hr savings on a 20-agent H100 fleet
+
+Eviction cost without sharing (H100 SXM, 32K context):
+  Re-prefill time: 32,768 / 30,000 tokens/sec ≈ 1.1s per eviction
+  With 20 agents on 6 GPUs (6 fit per GPU = 36 slots): no evictions
+  With 20 agents on 2 GPUs (6 fit per GPU = 12 slots): ~8 overflow agents
+  → 8 × 3,600 / 30s turns × 1.1s = 1,056s/hr wasted ≈ 29% throughput lost
+```
+
+**CLI:**
+```
+terradev provision -g H100 --agents 20 --context 32k --model-name llama-70b
+terradev provision -g H100 --agents 20 --context 32k --sharing-topology broadcast --dry-run
+```
+
+**Output** (what no other CLI computes today):
+```
+KV Sharing Plan — 20 agents × llama-70b @ 32K ctx
+Topology: broadcast  |  Shared prefix: 22K tokens
+
+  VRAM without sharing: 13.1 GB (6 agents/GPU → 4 GPUs needed)
+  VRAM with sharing:     4.4 GB (18 agents/GPU → 2 GPUs needed)
+  Saving: 8.7 GB (66% reduction)
+
+  Cost/hr without sharing: $9.96
+  Cost/hr with sharing:    $4.98  (saves $4.98/hr = $119/day)
+  ✓ With sharing: re-prefill overhead negligible (<1%)
+
+  TIER             INSTANCES         GPU   TP   CONC  CONTEXT   $/HR
+  ────────────────────────────────────────────────────────────────────
+  reasoning                2     H100_SXM    1      4     32K  $ 4.98
+  decode                   2  A100_SXM_80    2      2     32K  $ 5.96
+  cpu_tools                3          CPU    1     10     n/a  $ 1.80
+  ────────────────────────────────────────────────────────────────────
+  TOTAL                                                        $12.74/hr
+```
+
+**New files:**
+- `core/pd_transport.py` — `KVTransport` ABC, `NIXLNVLinkTransport`, `NIXLIBTransport`,
+  `CXLTransport` (stub, Phase 1), `RDMARoCETransport`, `TCPFallbackTransport`,
+  `TransportSelector`, `transfer_time_ms()`
+- `core/kv_sharing.py` — `MultiAgentVRAMPlanner`, `KVSharingPlan`, `AgentKVBudget`,
+  `EvictionCostModel`, `SharingTopology` enum
 
 ### Kubernetes Layer
 
@@ -335,7 +447,7 @@ environment_manager
 
 ---
 
-## Agentic Fleet Provisioning (v6.0.0)
+## Agentic Fleet Provisioning (v5.3.0)
 
 Purpose-built heterogeneous GPU fleet management for multi-agent LLM workloads.
 Research basis: arXiv:2605.26297 "Agentic AI Workload Characteristics" (2026).
@@ -409,8 +521,10 @@ terradev_cli/
   cli_karpenter.py              Karpenter subcommand group
   cli_hf_spaces.py              HuggingFace Spaces subcommand group
   core/
-    agentic_topology.py         AgentFleetSpec, AgentTopologyPlanner (v6.0.0)
-    agentic_provisioner.py      AgenticProvisioner, fleet state mgmt (v6.0.0)
+    agentic_topology.py         AgentFleetSpec, AgentTopologyPlanner (v5.3.0)
+    agentic_provisioner.py      AgenticProvisioner, fleet state mgmt (v5.3.0)
+    pd_transport.py             Transport-agnostic P/D KV layer (v5.3.0)
+    kv_sharing.py               Multi-agent KV sharing VRAM planner (v5.3.0)
     training_orchestrator.py    DeepSpeed/torchrun/FlashOptim
     provision_orchestrator.py   Parallel provision + NUMA
     evaluation_orchestrator.py  Model/endpoint evaluation

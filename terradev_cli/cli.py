@@ -2048,6 +2048,31 @@ def setup(provider, quick):
     is_flag=True,
     help="Prefer local GPUs from your pool over cloud providers",
 )
+@click.option(
+    "--agents",
+    type=int,
+    default=None,
+    help="Number of concurrent agents. Triggers multi-agent KV VRAM planner.",
+)
+@click.option(
+    "--context",
+    "context_k",
+    type=str,
+    default=None,
+    help="Context window per agent (e.g. 32k, 128k). Used with --agents.",
+)
+@click.option(
+    "--sharing-topology",
+    type=click.Choice(["broadcast", "star", "chain", "none"]),
+    default="broadcast",
+    help="KV cache sharing topology between agents (default: broadcast).",
+)
+@click.option(
+    "--dtype",
+    type=click.Choice(["fp16", "fp8"]),
+    default="fp16",
+    help="KV cache dtype. fp8 halves KV VRAM requirement.",
+)
 def provision(
     gpu_type,
     count,
@@ -2065,6 +2090,10 @@ def provision(
     spot_strategy,
     backend,
     prefer_local,
+    agents,
+    context_k,
+    sharing_topology,
+    dtype,
 ):
     """Provision GPU instances across multiple clouds with auto-optimization.
 
@@ -2080,6 +2109,11 @@ def provision(
       terradev provision -g A100 --type inference        # Inference workload (auto-selects spot)
       terradev provision -g H100 -n 8 --parallel 12       # High-throughput training
       terradev provision -g RTX4090 --prefer-local        # Prefer local GPUs from your pool
+
+    Multi-Agent KV Sharing (pass --agents to enable):
+      terradev provision -g H100 --agents 20 --context 32k --model-name llama-70b
+      terradev provision -g H100 --agents 50 --context 128k --sharing-topology broadcast --dry-run
+      terradev provision -g A100 --agents 10 --context 8k --dtype fp8  # fp8 halves KV VRAM
 
     Spot vs On-Demand:
       - Spot: 60-80% savings, 2-minute termination notice, auto-checkpointing
@@ -2101,6 +2135,115 @@ def provision(
     """
     api = TerradevAPI()
     provision_start = time.time()
+
+    # ── Multi-Agent KV Sharing Planner ──────────────────────────────────────
+    # Triggered when --agents is passed. Computes the correct heterogeneous GPU
+    # configuration automatically: number of nodes, VRAM per node, which agents
+    # share prefill context, cost savings from KV cache sharing.
+    if agents is not None:
+        # Parse context string: "32k" → 32, "128k" → 128, "32" → 32
+        ctx_k = 120  # default: P95 from arXiv:2605.26297
+        if context_k is not None:
+            raw = context_k.lower().replace("k", "").replace("K", "")
+            try:
+                ctx_k = int(float(raw))
+            except ValueError:
+                print(f"ERROR: Invalid --context value '{context_k}'. Use e.g. 32k or 128.")
+                return 1
+
+        _model = model_name or "meta-llama/Llama-3.1-70B-Instruct"
+        print(f"\nMulti-Agent KV Cache Planner")
+        print(f"  Agents: {agents}  |  Context: {ctx_k}K tokens  |  Model: {_model}")
+        print(f"  Topology: {sharing_topology}  |  dtype: {dtype}")
+        print()
+
+        try:
+            from terradev_cli.core.kv_sharing import (
+                MultiAgentVRAMPlanner,
+                SharingTopology,
+            )
+            from terradev_cli.core.agentic_topology import AgentTopologyPlanner
+
+            _topo_map = {
+                "broadcast": SharingTopology.BROADCAST,
+                "star": SharingTopology.STAR,
+                "chain": SharingTopology.CHAIN,
+                "none": SharingTopology.NONE,
+            }
+
+            kv_plan = MultiAgentVRAMPlanner().compute(
+                n_agents=agents,
+                context_k=ctx_k,
+                model=_model,
+                topology=_topo_map.get(sharing_topology, SharingTopology.BROADCAST),
+                dtype=dtype,
+            )
+
+            for line in kv_plan.summary_lines():
+                print(f"  {line}")
+
+            print()
+            print("  Heterogeneous fleet spec:")
+            fleet_spec = AgentTopologyPlanner().infer_from_agent_count(
+                n_agents=agents,
+                model=_model,
+                context_k=ctx_k,
+                sharing_topology=sharing_topology,
+                dtype=dtype,
+            )
+
+            print(
+                f"  {'TIER':<16} {'INSTANCES':>9} {'GPU':>14} {'TP':>4} "
+                f"{'CONC':>6} {'CONTEXT':>8}  {'$/HR':>7}"
+            )
+            print("  " + "-" * 72)
+            from terradev_cli.core.agentic_topology import GPU_SPOT_PRICE_HR
+            for tier_name, role in fleet_spec.tiers.items():
+                gpu_str = role.gpu_type or "CPU"
+                ctx_str = f"{role.context_budget_k_tokens}K" if role.context_budget_k_tokens else "n/a"
+                tier_cost = (
+                    role.count * role.gpu_count_per_instance
+                    * GPU_SPOT_PRICE_HR.get(role.gpu_type or "", 0.60)
+                    if role.gpu_type else role.count * 0.60
+                )
+                print(
+                    f"  {tier_name:<16} {role.count:>9} {gpu_str:>14} "
+                    f"{role.tensor_parallel:>4} {role.concurrency_per_instance:>6} "
+                    f"{ctx_str:>8}  ${tier_cost:>6.2f}"
+                )
+            print("  " + "-" * 72)
+            print(
+                f"  {'TOTAL':<16} {'':>9} {'':>14} {'':>4} {'':>6} {'':>8}"
+                f"  ${fleet_spec.total_cost_hr_estimate:>6.2f}/hr"
+            )
+            print()
+            print(f"  KV budget (with sharing): {kv_plan.total_kv_with_sharing_gb:.1f} GB")
+            print(f"  KV budget (naive):        {kv_plan.total_kv_naive_gb:.1f} GB")
+            print(f"  GPU count (with sharing): {kv_plan.recommended_gpu_count} × {kv_plan.recommended_gpu_type}")
+            print(f"  GPU count (naive):        {kv_plan.recommended_gpu_count_naive} × {kv_plan.recommended_gpu_type}")
+            print(
+                f"  Sharing saves:            ${kv_plan.hourly_savings:.2f}/hr"
+                f" = ${kv_plan.hourly_savings * 24:.0f}/day"
+            )
+
+            if dry_run:
+                print()
+                print("  [dry-run] No instances launched.")
+                return 0
+
+            print()
+            print(f"  Deploying fleet: terradev agent deploy --agents {agents}"
+                  f" --model {_model} --context {ctx_k}k")
+            print("  (Use 'terradev agent deploy' for full fleet provisioning)")
+            return 0
+
+        except ImportError as exc:
+            print(f"  WARNING: KV planner unavailable ({exc}). Falling through to standard provision.")
+        except Exception as exc:
+            print(f"  ERROR in KV planner: {exc}")
+            import traceback
+            traceback.print_exc()
+            return 1
 
     if backend:
         print(f"Inference backend: {backend}")
