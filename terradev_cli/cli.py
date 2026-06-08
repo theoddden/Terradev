@@ -2113,7 +2113,7 @@ def list_profiles(format):
 
 
 @providers.command()
-@click.argument("name", help="Provider profile name to show")
+@click.argument("name")
 @click.option(
     "--format",
     "-f",
@@ -2183,7 +2183,7 @@ def show_profile(name, format):
 
 
 @providers.command()
-@click.argument("name", help="Provider profile name to remove")
+@click.argument("name")
 @click.option(
     "--force",
     "-f",
