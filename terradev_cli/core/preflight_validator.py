@@ -139,7 +139,8 @@ def _run_on(
     import re
 
     # Allow alphanumeric, spaces, and basic shell-safe characters
-    if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t|>&]+$', cmd):
+    # Explicitly exclude shell metacharacters (|, >, &) to prevent command chaining
+    if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t]+$', cmd):
         return -1, "", "Unsafe command characters detected"
 
     if host and host not in ("localhost", "127.0.0.1"):

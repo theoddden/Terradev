@@ -42,11 +42,15 @@ class BaseProvider(ABC):
 
     # Shared TCP connector for connection pooling across all providers
     _shared_connector: Optional[aiohttp.TCPConnector] = None
-    _connector_lock = asyncio.Lock()
+    _connector_lock: Optional[asyncio.Lock] = None
 
     @classmethod
     async def _get_shared_connector(cls) -> aiohttp.TCPConnector:
         """Get or create shared TCP connector with connection pooling"""
+        # Lazy-create lock to avoid Python 3.9 event loop binding bug
+        if cls._connector_lock is None:
+            cls._connector_lock = asyncio.Lock()
+
         if cls._shared_connector is None or cls._shared_connector.closed:
             async with cls._connector_lock:
                 if cls._shared_connector is None or cls._shared_connector.closed:
@@ -370,7 +374,7 @@ class BaseProvider(ABC):
                         last_states[iid] = info.status
                     except Exception as e:
                         # Log but don't break the loop
-                        pass
+                        logger.debug(f"poll_loop error for {iid}: {e}")
 
                 await asyncio.sleep(poll_interval_s)
 

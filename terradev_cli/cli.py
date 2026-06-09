@@ -14138,11 +14138,11 @@ def local_scan(host, user, key, detailed, register, name):
             except Exception:
                 return "", 1
         else:
-            # Local execution - still safe since query is hardcoded
-            cmd = f"nvidia-smi --query-gpu={query} --format=csv,noheader,nounits"
+            # Local execution - use list-args for injection safety
+            cmd = ["nvidia-smi", f"--query-gpu={query}", "--format=csv,noheader,nounits"]
             try:
                 result = subprocess.run(
-                    cmd, shell=True, capture_output=True, text=True, timeout=15
+                    cmd, capture_output=True, text=True, timeout=15
                 )
                 return result.stdout.strip(), result.returncode
             except Exception:
@@ -14318,11 +14318,11 @@ def local_register(name, host, user, key):
             click.echo(f"Error scanning {target}: {e}", err=True)
             return
     else:
-        # Local execution - safe since query is hardcoded
-        cmd = f"nvidia-smi --query-gpu={query} --format=csv,noheader,nounits"
+        # Local execution - use list-args for injection safety
+        cmd = ["nvidia-smi", f"--query-gpu={query}", "--format=csv,noheader,nounits"]
         try:
             result = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=15
+                cmd, capture_output=True, text=True, timeout=15
             )
             raw = result.stdout.strip()
         except Exception as e:

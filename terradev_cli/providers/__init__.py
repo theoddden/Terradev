@@ -18,6 +18,7 @@ from .types import (
     ProviderCapabilities,
     HealthStatus,
     ProviderHealth,
+    ProviderProfile,
 )
 
 from .base_provider import BaseProvider

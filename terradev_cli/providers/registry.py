@@ -15,6 +15,7 @@ Benefits:
 
 import time
 import logging
+import asyncio
 from typing import Dict, List, Optional
 from collections import defaultdict
 
@@ -48,7 +49,7 @@ class ProviderRegistry:
             lambda: ProviderHealth(provider="")
         )
         self._spot_preemptions: Dict[str, List[float]] = defaultdict(list)  # provider → timestamps
-        self._lock = None  # TODO: add threading lock if needed
+        self._lock: Optional[asyncio.Lock] = None
 
     def is_healthy(self, provider: str) -> bool:
         """
@@ -71,57 +72,72 @@ class ProviderRegistry:
 
         return True
 
-    def record_success(self, provider: str, latency_ms: float):
+    async def record_success(self, provider: str, latency_ms: float):
         """
         Record a successful operation for a provider.
 
         Resets consecutive failure counter and updates latency metrics.
         """
-        health = self._health[provider]
-        health.provider = provider
-        health.consecutive_failures = 0
-        health.last_success_ts = time.time()
-        health.total_provisions += 1
+        # Lazy-create lock to avoid Python 3.9 event loop binding bug
+        if self._lock is None:
+            self._lock = asyncio.Lock()
 
-        # Exponential moving average for latency
-        if health.avg_latency_ms == 0:
-            health.avg_latency_ms = latency_ms
-        else:
-            health.avg_latency_ms = 0.9 * health.avg_latency_ms + 0.1 * latency_ms
+        async with self._lock:
+            health = self._health[provider]
+            health.provider = provider
+            health.consecutive_failures = 0
+            health.last_success_ts = time.time()
+            health.total_provisions += 1
 
-    def record_failure(self, provider: str, error: str = ""):
+            # Exponential moving average for latency
+            if health.avg_latency_ms == 0:
+                health.avg_latency_ms = latency_ms
+            else:
+                health.avg_latency_ms = 0.9 * health.avg_latency_ms + 0.1 * latency_ms
+
+    async def record_failure(self, provider: str, error: str = ""):
         """
         Record a failed operation for a provider.
 
         Increments consecutive failure counter. Opens circuit breaker
         after FAILURE_THRESHOLD consecutive failures.
         """
-        health = self._health[provider]
-        health.provider = provider
-        health.consecutive_failures += 1
-        health.last_failure_ts = time.time()
-        health.total_failures += 1
+        # Lazy-create lock to avoid Python 3.9 event loop binding bug
+        if self._lock is None:
+            self._lock = asyncio.Lock()
 
-        if health.consecutive_failures >= self.FAILURE_THRESHOLD:
-            logger.warning(
-                f"Circuit breaker opened for provider: {provider} "
-                f"(failures: {health.consecutive_failures}, error: {error})"
-            )
+        async with self._lock:
+            health = self._health[provider]
+            health.provider = provider
+            health.consecutive_failures += 1
+            health.last_failure_ts = time.time()
+            health.total_failures += 1
 
-    def record_preemption(self, provider: str, region: str = ""):
+            if health.consecutive_failures >= self.FAILURE_THRESHOLD:
+                logger.warning(
+                    f"Circuit breaker opened for provider: {provider} "
+                    f"(failures: {health.consecutive_failures}, error: {error})"
+                )
+
+    async def record_preemption(self, provider: str, region: str = ""):
         """
         Record a spot instance preemption for a provider.
 
         Used to calculate spot preemption rate for provider ranking.
         """
-        now = time.time()
-        self._spot_preemptions[provider].append(now)
+        # Lazy-create lock to avoid Python 3.9 event loop binding bug
+        if self._lock is None:
+            self._lock = asyncio.Lock()
 
-        # Clean old preemptions (older than 24 hours)
-        cutoff = now - 86400
-        self._spot_preemptions[provider] = [
-            ts for ts in self._spot_preemptions[provider] if ts > cutoff
-        ]
+        async with self._lock:
+            now = time.time()
+            self._spot_preemptions[provider].append(now)
+
+            # Clean old preemptions (older than 24 hours)
+            cutoff = now - 86400
+            self._spot_preemptions[provider] = [
+                ts for ts in self._spot_preemptions[provider] if ts > cutoff
+            ]
 
     def get_spot_score(self, provider: str, region: str = "") -> float:
         """

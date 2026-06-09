@@ -439,7 +439,8 @@ def _run_on(
     # Allow alphanumeric, spaces, and basic shell-safe characters.
     # SECURITY: quotes ('"') are deliberately excluded — they are shell metacharacters
     # that can be used to escape a quoted context and inject arbitrary commands.
-    if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t|>&]+$', cmd):
+    # Explicitly exclude shell metacharacters (|, >, &) to prevent command chaining
+    if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t]+$', cmd):
         return -1, "", "Unsafe command characters detected"
 
     if host and host not in ("localhost", "127.0.0.1"):

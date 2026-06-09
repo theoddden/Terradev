@@ -2,7 +2,7 @@
 """
 Terradev MCP Server v2.1.0 - Complete Agentic GPU Infrastructure for Claude Code
 
-218 MCP tools: GPU provisioning, Kubernetes clusters, Karpenter auto-provisioning,
+220 MCP tools: GPU provisioning, Kubernetes clusters, Karpenter auto-provisioning,
 GitOps/ArgoCD automation, event-driven triggers, environment promotion, lineage tracking,
 cross-provider migration, vLLM/SGLang/Ollama inference, Arize Phoenix trace observability,
 NeMo Guardrails output safety, Qdrant vector DB, Ray cluster management, W&B/LangSmith/MLflow/DVC,
@@ -982,15 +982,19 @@ server = Server("terradev-mcp")
 _tools_loaded = False
 _tool_registry: Dict[str, callable] = {}
 _tool_schemas: Dict[str, Dict] = {}
-_load_lock = asyncio.Lock()
+_load_lock: Optional[asyncio.Lock] = None
 _concurrent_requests = 0
 _max_concurrent = 100
-_request_semaphore = asyncio.Semaphore(_max_concurrent)
+_request_semaphore: Optional[asyncio.Semaphore] = None
 
 
 async def _ensure_tools_loaded():
     """Ensure tools are loaded (lazy loading)"""
-    global _tools_loaded, _tool_registry, _tool_schemas
+    global _tools_loaded, _tool_registry, _tool_schemas, _load_lock
+
+    # Lazy-create lock to avoid Python 3.9 event loop binding bug
+    if _load_lock is None:
+        _load_lock = asyncio.Lock()
 
     if _tools_loaded:
         return
@@ -5336,7 +5340,11 @@ else:
 @server.list_tools()
 async def handle_list_tools() -> ListToolsResult:
     """List available Terradev tools (lazy loading with compression)"""
-    global _concurrent_requests
+    global _concurrent_requests, _request_semaphore
+
+    # Lazy-create semaphore to avoid Python 3.9 event loop binding bug
+    if _request_semaphore is None:
+        _request_semaphore = asyncio.Semaphore(_max_concurrent)
 
     # Adaptive concurrency control
     async with _request_semaphore:
@@ -5355,10 +5363,14 @@ async def handle_list_tools() -> ListToolsResult:
 @server.call_tool()
 async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
     """Handle tool calls with adaptive concurrency control"""
-    global _concurrent_requests
+    global _concurrent_requests, _request_semaphore
 
     tool_name = request.params.name
     arguments = request.params.arguments or {}
+
+    # Lazy-create semaphore to avoid Python 3.9 event loop binding bug
+    if _request_semaphore is None:
+        _request_semaphore = asyncio.Semaphore(_max_concurrent)
 
     # Adaptive concurrency control
     async with _request_semaphore:
