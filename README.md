@@ -1,4 +1,4 @@
-# Terradev CLI v5.3.3
+# Terradev CLI v5.3.4
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -8,7 +8,13 @@
 
 pypi.org/project/terradev-cli/
 
-Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
+Terradev is a cross-cloud compute control plane for AI workloads, not just a provisioning wrapper. 
+
+Combines quoting, provisioning, topology optimization, training orchestration, inference tuning, and cost analytics in one CLI, with a Rust-accelerated idempotent runtime underneath.
+
+Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
+
+Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
 **NOTES ON 5.3.3**
 
