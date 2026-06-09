@@ -229,7 +229,7 @@ class YottaLabsProvider(BaseProvider):
         return {
             "instance_id": str(pod.get("id", f"yl-{datetime.now().strftime('%Y%m%d%H%M%S')}")),
             "instance_type": yotta_gpu_type,
-            "region": region or "us-east-1",
+            "region": region or "ap-south-1",
             "gpu_type": gpu_type,
             "status": pod.get("status", "Initialize"),
             "provider": "yottalabs",
