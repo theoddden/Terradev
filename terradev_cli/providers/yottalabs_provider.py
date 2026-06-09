@@ -142,7 +142,7 @@ class YottaLabsProvider(BaseProvider):
                 "instance_type": yotta_gpu_type,
                 "gpu_type": gpu_type,
                 "price_per_hour": info["price"],
-                "region": region or "us-east-1",
+                "region": region or "ap-south-1",
                 "available": True,
                 "provider": "yottalabs",
                 "vcpus": info["vcpus"],
@@ -170,8 +170,8 @@ class YottaLabsProvider(BaseProvider):
                 ):
                     continue
 
-            for r in entry.get("regions", [region or "us-east-1"]):
-                target_region = r if isinstance(r, str) else r.get("region", "us-east-1")
+            for r in entry.get("regions", [region or "ap-south-1"]):
+                target_region = r if isinstance(r, str) else r.get("region", "ap-south-1")
                 if region and target_region != region:
                     continue
                 price = entry.get("pricePerHour", entry.get("price_per_hour", 0))
@@ -213,7 +213,7 @@ class YottaLabsProvider(BaseProvider):
             "gpuType": yotta_gpu_type,
             "gpuCount": gpu_count,
             "containerVolumeInGb": volume_gb,
-            "regions": [region] if region else ["us-east-1"],
+            "regions": [region] if region else ["ap-south-1"],
             "minSingleCardVcpu": 8,
             "minSingleCardRamInGb": 32,
             "environmentVars": [

@@ -115,7 +115,7 @@ class E2ENetworksProvider(BaseProvider):
                 "instance_type": self.GPU_PLAN_MAP.get(gpu_type, gpu_type.lower()),
                 "gpu_type": gpu_type,
                 "price_per_hour": info["price"],
-                "region": region or "in-delhi-1",
+                "region": region or "in-mumbai-1",
                 "available": True,
                 "provider": "e2enetworks",
                 "vcpus": info["vcpus"],
@@ -156,7 +156,7 @@ class E2ENetworksProvider(BaseProvider):
             # Convert INR to USD if price looks like INR (>10 per hour for GPU)
             price_usd = price_inr / 83.5 if price_inr > 10 else price_inr
 
-            plan_region = plan.get("region", region or "in-delhi-1")
+            plan_region = plan.get("region", region or "in-mumbai-1")
             if region and plan_region != region:
                 continue
 
@@ -195,7 +195,7 @@ class E2ENetworksProvider(BaseProvider):
         body: Dict[str, Any] = {
             "name": f"terradev-{gpu_type.lower().replace('_', '-')}-{datetime.now().strftime('%H%M%S')}",
             "plan": instance_type,
-            "location": region or "in-delhi-1",
+            "location": region or "in-mumbai-1",
             "image": image,
             "gpu_count": gpu_count,
         }
@@ -208,7 +208,7 @@ class E2ENetworksProvider(BaseProvider):
         return {
             "instance_id": str(node.get("id", f"e2e-{datetime.now().strftime('%Y%m%d%H%M%S')}")),
             "instance_type": instance_type,
-            "region": region or "in-delhi-1",
+            "region": region or "in-mumbai-1",
             "gpu_type": gpu_type,
             "status": node.get("status", "provisioning"),
             "provider": "e2enetworks",
