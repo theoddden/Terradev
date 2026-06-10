@@ -188,14 +188,13 @@ def test_cli_integration():
     try:
         from terradev_cli.cli import cli
 
-        # Check if vllm group exists
+        # Check if vllm group exists under ml group
         vllm_group = None
-        for command in cli.commands.values():
-            if hasattr(command, "name") and command.name == "vllm":
-                vllm_group = command
-                break
+        ml_group = cli.commands.get("ml")
+        if ml_group and hasattr(ml_group, "commands"):
+            vllm_group = ml_group.commands.get("vllm")
 
-        assert vllm_group is not None, "vLLM CLI group not found"
+        assert vllm_group is not None, "vLLM CLI group not found under ml group"
 
         # Check if auto-optimize command exists
         assert "auto-optimize" in vllm_group.commands, "auto-optimize command not found"
