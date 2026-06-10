@@ -2708,7 +2708,7 @@ def provision(
 
     all_quotes = asyncio.run(_fetch_all())
     if not all_quotes:
-        print("ERROR: ERROR: No quotes returned from any provider")
+        print("ERROR: No quotes returned from any provider")
         print("\nTip: To fix this:")
         print(
             "   1. Configure provider credentials: terradev configure --provider <name>"
@@ -2826,7 +2826,7 @@ def provision(
     if max_price:
         all_quotes = [q for q in all_quotes if q["price"] <= max_price]
         if not all_quotes:
-            print(f"ERROR: ERROR: No instances available under ${max_price:.2f}/hr")
+            print(f"ERROR: No instances available under ${max_price:.2f}/hr")
             print("\nTip: Suggestions:")
             print(
                 f"   - Increase max-price: terradev provision -g {gpu_type} --max-price {max_price * 1.5:.2f}"
@@ -2857,7 +2857,7 @@ def provision(
     allocations = allocations[:count]
 
     if not allocations:
-        print("ERROR: ERROR: Could not build allocation plan")
+        print("ERROR: Could not build allocation plan")
         print("\nTip: Try:")
         print(
             "   - Use --dry-run to preview the plan: terradev provision -g A100 --dry-run"
@@ -3306,7 +3306,7 @@ def manage(instance_id, action):
             break
 
     if not instance:
-        print(f"ERROR: ERROR: Instance '{instance_id}' not found")
+        print(f"ERROR: Instance '{instance_id}' not found")
         print("\nTip: To find your instance ID:")
         print("   terradev status                    # List all instances")
         print("   terradev status --live              # Get live status from providers")
@@ -3690,7 +3690,7 @@ def execute(instance_id, cmd, async_exec):
             break
 
     if not instance:
-        print(f"ERROR: ERROR: Instance '{instance_id}' not found")
+        print(f"ERROR: Instance '{instance_id}' not found")
         print("\nTip: To find your instance ID:")
         print("   terradev status                    # List all instances")
         print("   terradev status --live              # Get live status from providers")
@@ -6249,32 +6249,15 @@ def ml():
     pass
 
 
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
-@click.option("--list-projects", is_flag=True, help="List all projects")
-@click.option("--create-project", help="Create a new project")
-@click.option("--list-runs", is_flag=True, help="List runs in project")
-@click.option("--run-details", help="Get details for a specific run")
-@click.option("--export", help="Export runs data (json/csv)")
-@click.option("--create-dashboard", is_flag=True, help="Create Terradev dashboard")
-@click.option("--create-report", is_flag=True, help="Generate infrastructure report")
-@click.option("--setup-alerts", is_flag=True, help="Set up Terradev alerts")
-@click.option(
-    "--dashboard-status", is_flag=True, help="Get comprehensive dashboard status"
-)
-def wandb(
-    test,
-    list_projects,
-    create_project,
-    list_runs,
-    run_details,
-    export,
-    create_dashboard,
-    create_report,
-    setup_alerts,
-    dashboard_status,
-):
-    """Enhanced Weights & Biases with dashboards, reports, and alerts"""
+@ml.group()
+def wandb():
+    """Weights & Biases experiment tracking with dashboards, reports, and alerts."""
+    pass
+
+
+@wandb.command("test")
+def wandb_test():
+    """Test connection to W&B service."""
     try:
         from ml_services.wandb_enhanced import (
             create_enhanced_wandb_service_from_credentials,
@@ -6289,160 +6272,239 @@ def wandb(
             return
 
         service = create_enhanced_wandb_service_from_credentials(creds)
+        print(" Testing W&B connection...")
+        result = asyncio.run(service.test_connection())
 
-        if test:
-            print(" Testing enhanced W&B connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: W&B connected successfully")
-                print(f"   Entity: {result['entity']}")
-                print(f"   Project: {result['project']}")
-                print(f"   Base URL: {result['base_url']}")
-                print(
-                    f"   Dashboard: {'Enabled' if creds.get('wandb_dashboard_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Reports: {'Enabled' if creds.get('wandb_reports_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Alerts: {'Enabled' if creds.get('wandb_alerts_enabled') == 'true' else 'Disabled'}"
-                )
-            else:
-                print(f"ERROR: W&B connection failed: {result['error']}")
-
-        elif create_dashboard:
-            print("Status Creating Terradev dashboard...")
-            result = asyncio.run(service.create_terradev_dashboard())
-
-            if result["status"] == "created":
-                print(f"OK: Dashboard created: {result['dashboard']['id']}")
-                print(
-                    f"   Access at: https://wandb.ai/{creds.get('wandb_entity', 'default')}/{creds.get('wandb_project', 'terradev')}"
-                )
-            else:
-                print(f"ERROR: Dashboard creation failed: {result['error']}")
-
-        elif create_report:
-            print("Plan Generating infrastructure report...")
-            # Mock metrics data for demonstration
-            metrics_data = {
-                "total_instances": 10,
-                "total_cost": 150.75,
-                "avg_gpu_utilization": 78.5,
-                "providers": {
-                    "aws": {"instances": 6, "cost": 120.50, "avg_gpu_util": 82.1},
-                    "gcp": {"instances": 4, "cost": 30.25, "avg_gpu_util": 71.2},
-                },
-            }
-
-            result = asyncio.run(service.create_terradev_report(metrics_data))
-
-            if result["status"] == "created":
-                print(f"OK: Report created: {result['report']['id']}")
-                print(
-                    f"   Access at: https://wandb.ai/{creds.get('wandb_entity', 'default')}/{creds.get('wandb_project', 'terradev')}/reports"
-                )
-            else:
-                print(f"ERROR: Report creation failed: {result['error']}")
-
-        elif setup_alerts:
-            print(" Setting up Terradev alerts...")
-            result = asyncio.run(service.create_terradev_alerts())
-
-            if result["status"] == "completed":
-                print(f"OK: Alerts set up: {len(result['alerts'])} alerts created")
-                for alert in result["alerts"]:
-                    if alert["status"] == "created":
-                        print(f"   OK: {alert['alert']['name']}")
-                    else:
-                        print(f"   ERROR: {alert['alert']['name']}: {alert['error']}")
-            else:
-                print(f"ERROR: Alert setup failed: {result['error']}")
-
-        elif dashboard_status:
-            print("Status Getting comprehensive dashboard status...")
-            result = asyncio.run(service.get_dashboard_status())
-
-            if result["status"] == "connected":
-                print(f"   Entity: {result['entity']}")
-                print(f"   Project: {result['project']}")
-                print(f"   Projects: {len(result['projects'])}")
-                print(f"   Recent Runs: {len(result['recent_runs'])}")
-                print(f"   Dashboards: {len(result['dashboards'])}")
-                print(f"   Reports: {len(result['reports'])}")
-                print(f"   Monitoring: {result['monitoring']}")
-            else:
-                print(f"ERROR: Dashboard status failed: {result['error']}")
-
-        elif list_projects:
-            print("Plan Listing W&B projects...")
-            projects = asyncio.run(service.list_projects())
-
-            for project in projects:
-                print(f"   Path {project['name']} (ID: {project['id']})")
-
-        elif create_project:
-            print(f"Path Creating project: {create_project}")
-            result = asyncio.run(
-                service.create_project(create_project, "Created via Terradev CLI")
+        if result["status"] == "connected":
+            print("OK: W&B connected successfully")
+            print(f"   Entity: {result['entity']}")
+            print(f"   Project: {result['project']}")
+            print(f"   Base URL: {result['base_url']}")
+            print(
+                f"   Dashboard: {'Enabled' if creds.get('wandb_dashboard_enabled') == 'true' else 'Disabled'}"
             )
-            print(f"OK: Project created: {result['name']}")
-
-        elif list_runs:
-            print(" Listing recent runs...")
-            runs = asyncio.run(service.list_runs(limit=20))
-
-            for run in runs[:10]:  # Show first 10
-                print(
-                    f"    {run['name'][:30]} - {run['state']} - {run['createdAt'][:10]}"
-                )
-
-        elif run_details:
-            print(f" Getting run details: {run_details}")
-            result = asyncio.run(service.get_run_details(run_details))
-
-            print(f"   Name: {result['name']}")
-            print(f"   State: {result['state']}")
-            print(f"   Created: {result['createdAt']}")
-            print(f"   Config: {json.dumps(result.get('config', {}), indent=2)}")
-
-        elif export:
-            print("UPLOAD: Exporting runs data...")
-            data = asyncio.run(service.export_runs_data(format=export))
-            print(data)
-
+            print(
+                f"   Reports: {'Enabled' if creds.get('wandb_reports_enabled') == 'true' else 'Disabled'}"
+            )
+            print(
+                f"   Alerts: {'Enabled' if creds.get('wandb_alerts_enabled') == 'true' else 'Disabled'}"
+            )
         else:
-            print("OK: Enhanced W&B configured. Use --test to verify connection.")
-
+            print(f"ERROR: W&B connection failed: {result['error']}")
     except ImportError:
         print("ERROR: Enhanced W&B service not available.")
 
 
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
-@click.option("--create-workflow", help="Create a LangChain workflow")
-@click.option("--create-langgraph", help="Create a LangGraph workflow")
-@click.option("--create-pipeline", help="Create an SGLang pipeline")
-@click.option("--list-projects", is_flag=True, help="List LangSmith projects")
-@click.option("--list-runs", is_flag=True, help="List LangSmith runs")
-@click.option("--project", help="LangSmith project name for runs")
-@click.option("--create-trace", help="Create a trace in LangSmith")
-@click.option("--run-id", help="Run ID for trace")
-@click.option("--data", help="Trace data (JSON)")
-def langchain(
-    test,
-    create_workflow,
-    create_langgraph,
-    create_pipeline,
-    list_projects,
-    list_runs,
-    project,
-    create_trace,
-    run_id,
-    data,
-):
-    """Enhanced LangChain integration with workflows, LangGraph, and SGLang"""
+@wandb.command("list-projects")
+def wandb_list_projects():
+    """List all W&B projects."""
+    try:
+        from ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("wandb")
+
+        if not creds.get("api_key"):
+            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
+            return
+
+        service = create_enhanced_wandb_service_from_credentials(creds)
+        print(" Listing W&B projects...")
+        projects = asyncio.run(service.list_projects())
+
+        for project in projects:
+            print(f"   Path {project['name']} (ID: {project['id']})")
+    except ImportError:
+        print("ERROR: Enhanced W&B service not available.")
+
+
+@wandb.command("create-project")
+@click.argument("project_name")
+def wandb_create_project(project_name):
+    """Create a new W&B project."""
+    try:
+        from ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("wandb")
+
+        if not creds.get("api_key"):
+            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
+            return
+
+        service = create_enhanced_wandb_service_from_credentials(creds)
+        print(f"Path Creating project: {project_name}")
+        result = asyncio.run(
+            service.create_project(project_name, "Created via Terradev CLI")
+        )
+        print(f"OK: Project created: {result['name']}")
+    except ImportError:
+        print("ERROR: Enhanced W&B service not available.")
+
+
+@wandb.command("list-runs")
+@click.option("--limit", "-l", default=20, help="Max runs to return")
+def wandb_list_runs(limit):
+    """List recent W&B runs."""
+    try:
+        from ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("wandb")
+
+        if not creds.get("api_key"):
+            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
+            return
+
+        service = create_enhanced_wandb_service_from_credentials(creds)
+        print(" Listing recent runs...")
+        runs = asyncio.run(service.list_runs(limit=limit))
+
+        for run in runs[:limit]:
+            print(
+                f"    {run['name'][:30]} - {run['state']} - {run['createdAt'][:10]}"
+            )
+    except ImportError:
+        print("ERROR: Enhanced W&B service not available.")
+
+
+@wandb.command("create-dashboard")
+def wandb_create_dashboard():
+    """Create Terradev dashboard in W&B."""
+    try:
+        from ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("wandb")
+
+        if not creds.get("api_key"):
+            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
+            return
+
+        service = create_enhanced_wandb_service_from_credentials(creds)
+        print("Status Creating Terradev dashboard...")
+        result = asyncio.run(service.create_terradev_dashboard())
+
+        if result["status"] == "created":
+            print(f"OK: Dashboard created: {result['dashboard']['id']}")
+            print(
+                f"   Access at: https://wandb.ai/{creds.get('wandb_entity', 'default')}/{creds.get('wandb_project', 'terradev')}"
+            )
+        else:
+            print(f"ERROR: Dashboard creation failed: {result['error']}")
+    except ImportError:
+        print("ERROR: Enhanced W&B service not available.")
+
+
+@wandb.command("create-report")
+def wandb_create_report():
+    """Generate infrastructure report in W&B."""
+    try:
+        from ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("wandb")
+
+        if not creds.get("api_key"):
+            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
+            return
+
+        service = create_enhanced_wandb_service_from_credentials(creds)
+        print("Plan Generating infrastructure report...")
+        # Mock metrics data for demonstration
+        metrics_data = {
+            "total_instances": 10,
+            "total_cost": 150.75,
+            "avg_gpu_utilization": 78.5,
+            "providers": {
+                "aws": {"instances": 6, "cost": 120.50, "avg_gpu_util": 82.1},
+                "gcp": {"instances": 4, "cost": 30.25, "avg_gpu_util": 71.2},
+            },
+        }
+
+        result = asyncio.run(service.create_terradev_report(metrics_data))
+
+        if result["status"] == "created":
+            print(f"OK: Report created: {result['report']['id']}")
+            print(
+                f"   Access at: https://wandb.ai/{creds.get('wandb_entity', 'default')}/{creds.get('wandb_project', 'terradev')}/reports"
+            )
+        else:
+            print(f"ERROR: Report creation failed: {result['error']}")
+    except ImportError:
+        print("ERROR: Enhanced W&B service not available.")
+
+
+@wandb.command("setup-alerts")
+def wandb_setup_alerts():
+    """Set up Terradev alerts in W&B."""
+    try:
+        from ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("wandb")
+
+        if not creds.get("api_key"):
+            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
+            return
+
+        service = create_enhanced_wandb_service_from_credentials(creds)
+        print(" Setting up Terradev alerts...")
+        result = asyncio.run(service.create_terradev_alerts())
+
+        if result["status"] == "completed":
+            print(f"OK: Alerts set up: {len(result['alerts'])} alerts created")
+            for alert in result["alerts"]:
+                if alert["status"] == "created":
+                    print(f"   OK: {alert['alert']['name']}")
+                else:
+                    print(f"   ERROR: {alert['alert']['name']}: {alert['error']}")
+        else:
+            print(f"ERROR: Alert setup failed: {result['error']}")
+    except ImportError:
+        print("ERROR: Enhanced W&B service not available.")
+
+
+@wandb.command("dashboard-status")
+def wandb_dashboard_status():
+    """Get comprehensive dashboard status."""
+    try:
+        from ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("wandb")
+
+        if not creds.get("api_key"):
+            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
+            return
+
+        service = create_enhanced_wandb_service_from_credentials(creds)
+        print("Status Getting comprehensive dashboard status...")
+        result = asyncio.run(service.get_dashboard_status())
+
+        if result["status"] == "connected":
+            print(f"   Entity: {result['entity']}")
+            print(f"   Project: {result['project']}")
+            print(f"   Projects: {len(result['projects'])}")
+            print(f"   Recent Runs: {len(result['recent_runs'])}")
+            print(f"   Dashboards: {len(result['dashboards'])}")
+            print(f"   Reports: {len(result['reports'])}")
+            print(f"   Monitoring: {result['monitoring']}")
+        else:
+            print(f"ERROR: Dashboard status failed: {result['error']}")
+    except ImportError:
+        print("ERROR: Enhanced W&B service not available.")
+
+
+@ml.group()
+def langchain():
+    """LangChain integration with workflows, LangGraph, and SGLang."""
+    pass
+
+
+@langchain.command("test")
+def langchain_test():
+    """Test connection to LangChain service."""
     try:
         from ml_services.langchain_service import (
             create_langchain_service_from_credentials,
@@ -6457,130 +6519,222 @@ def langchain(
             return
 
         service = create_langchain_service_from_credentials(creds)
+        print(" Testing LangChain connection...")
+        result = asyncio.run(service.test_connection())
 
-        if test:
-            print(" Testing enhanced LangChain connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: LangChain connected successfully")
-                print(f"   LangSmith: {result['langsmith']}")
-                print(f"   Environment: {result['environment']}")
-                print(
-                    f"   Dashboard: {'Enabled' if creds.get('langchain_dashboard_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Tracing: {'Enabled' if creds.get('langchain_tracing_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Evaluation: {'Enabled' if creds.get('langchain_evaluation_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Workflow: {'Enabled' if creds.get('langchain_workflow_enabled') == 'true' else 'Disabled'}"
-                )
-            else:
-                print(f"ERROR: LangChain connection failed: {result['error']}")
-
-        elif create_workflow:
-            print(" Creating LangChain workflow...")
-            workflow_config = {
-                "name": create_workflow,
-                "description": f"LangChain workflow '{create_workflow}' created via Terradev CLI",
-            }
-            result = asyncio.run(service.create_workflow(workflow_config))
-
-            if result["status"] == "created":
-                print(f"OK: Workflow created: {result['workflow_id']}")
-                print(f"   Name: {result['name']}")
-                print(f"   Description: {result['description']}")
-            else:
-                print(f"ERROR: Workflow creation failed: {result['error']}")
-
-        elif create_langgraph:
-            print(" Creating LangGraph workflow...")
-            graph_config = {
-                "name": create_langgraph,
-                "description": f"LangGraph workflow '{create_langgraph}' created via Terradev CLI",
-            }
-            result = asyncio.run(service.create_langgraph_workflow(graph_config))
-
-            if result["status"] == "created":
-                print(f"OK: LangGraph workflow created: {result['workflow_id']}")
-                print(f"   Name: {result['name']}")
-                print(f"   Description: {result['description']}")
-            else:
-                print(f"ERROR: LangGraph creation failed: {result['error']}")
-
-        elif create_pipeline:
-            print(" Creating SGLang pipeline...")
-            pipeline_config = {
-                "name": create_pipeline,
-                "description": f"SGLang pipeline '{create_pipeline}' created via Terradev CLI",
-            }
-            result = asyncio.run(service.create_sglang_pipeline(pipeline_config))
-
-            if result["status"] == "created":
-                print(f"OK: SGLang pipeline created: {result['pipeline_id']}")
-                print(f"   Name: {result['name']}")
-                print(f"   Description: {result['description']}")
-            else:
-                print(f"ERROR: Pipeline creation failed: {result['error']}")
-
-        elif list_projects:
-            print("Plan Listing LangSmith projects...")
-            projects = asyncio.run(service.get_langsmith_projects())
-
-            for project in projects:
-                print(
-                    f"   Path {project.get('name', 'Unknown')} (ID: {project.get('id', 'Unknown')})"
-                )
-
-        elif list_runs:
-            project_name = project or creds.get("project_name", "terradev")
-            print(f" Listing LangSmith runs in project: {project_name}")
-            runs = asyncio.run(service.get_langsmith_runs(project_name))
-
-            for run in runs[:10]:  # Show first 10
-                print(
-                    f"    {run.get('name', 'Unknown')[:30]} - {run.get('status', 'Unknown')} - {run.get('created_at', 'Unknown')[:10]}"
-                )
-
-        elif create_trace:
-            if not run_id or not data:
-                print("ERROR: Run ID and data required for trace creation")
-                return
-
-            try:
-                trace_data = json.loads(data)
-            except json.JSONDecodeError:
-                print("ERROR: Invalid JSON data")
-                return
-
-            print(f" Creating trace: {run_id}")
-            result = asyncio.run(service.create_trace(run_id, trace_data))
-
-            if result["status"] == "created":
-                print(f"OK: Trace created: {run_id}")
-            else:
-                print(f"ERROR: Trace creation failed: {result['error']}")
-
+        if result["status"] == "connected":
+            print("OK: LangChain connected successfully")
+            print(f"   LangSmith: {result['langsmith']}")
+            print(f"   Environment: {result['environment']}")
+            print(
+                f"   Dashboard: {'Enabled' if creds.get('langchain_dashboard_enabled') == 'true' else 'Disabled'}"
+            )
+            print(
+                f"   Tracing: {'Enabled' if creds.get('langchain_tracing_enabled') == 'true' else 'Disabled'}"
+            )
+            print(
+                f"   Evaluation: {'Enabled' if creds.get('langchain_evaluation_enabled') == 'true' else 'Disabled'}"
+            )
+            print(
+                f"   Workflow: {'Enabled' if creds.get('langchain_workflow_enabled') == 'true' else 'Disabled'}"
+            )
         else:
-            print("OK: Enhanced LangChain configured. Use --test to verify connection.")
-
+            print(f"ERROR: LangChain connection failed: {result['error']}")
     except ImportError:
         print("ERROR: Enhanced LangChain service not available.")
 
 
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
-@click.option("--create-workflow", help="Create a LangGraph workflow")
-@click.option("--type", help="Workflow type (orchestrator-worker, evaluator-optimizer)")
-@click.option("--workflow-status", help="Get workflow status")
-@click.option("--deploy", help="Deploy a workflow")
-@click.option("--name", help="Workflow name")
-@click.option("--graph", help="Graph configuration")
-def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph):
-    """Enhanced LangGraph workflow orchestration with monitoring"""
+@langchain.command("create-workflow")
+@click.argument("workflow_name")
+def langchain_create_workflow(workflow_name):
+    """Create a LangChain workflow."""
+    try:
+        from ml_services.langchain_service import create_langchain_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langchain")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            return
+
+        service = create_langchain_service_from_credentials(creds)
+        print(" Creating LangChain workflow...")
+        workflow_config = {
+            "name": workflow_name,
+            "description": f"LangChain workflow '{workflow_name}' created via Terradev CLI",
+        }
+        result = asyncio.run(service.create_workflow(workflow_config))
+
+        if result["status"] == "created":
+            print(f"OK: Workflow created: {result['workflow_id']}")
+            print(f"   Name: {result['name']}")
+            print(f"   Description: {result['description']}")
+        else:
+            print(f"ERROR: Workflow creation failed: {result['error']}")
+    except ImportError:
+        print("ERROR: Enhanced LangChain service not available.")
+
+
+@langchain.command("create-langgraph")
+@click.argument("graph_name")
+def langchain_create_langgraph(graph_name):
+    """Create a LangGraph workflow."""
+    try:
+        from ml_services.langchain_service import create_langchain_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langchain")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            return
+
+        service = create_langchain_service_from_credentials(creds)
+        print(" Creating LangGraph workflow...")
+        graph_config = {
+            "name": graph_name,
+            "description": f"LangGraph workflow '{graph_name}' created via Terradev CLI",
+        }
+        result = asyncio.run(service.create_langgraph_workflow(graph_config))
+
+        if result["status"] == "created":
+            print(f"OK: LangGraph workflow created: {result['workflow_id']}")
+            print(f"   Name: {result['name']}")
+            print(f"   Description: {result['description']}")
+        else:
+            print(f"ERROR: LangGraph creation failed: {result['error']}")
+    except ImportError:
+        print("ERROR: Enhanced LangChain service not available.")
+
+
+@langchain.command("create-pipeline")
+@click.argument("pipeline_name")
+def langchain_create_pipeline(pipeline_name):
+    """Create an SGLang pipeline."""
+    try:
+        from ml_services.langchain_service import create_langchain_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langchain")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            return
+
+        service = create_langchain_service_from_credentials(creds)
+        print(" Creating SGLang pipeline...")
+        pipeline_config = {
+            "name": pipeline_name,
+            "description": f"SGLang pipeline '{pipeline_name}' created via Terradev CLI",
+        }
+        result = asyncio.run(service.create_sglang_pipeline(pipeline_config))
+
+        if result["status"] == "created":
+            print(f"OK: SGLang pipeline created: {result['pipeline_id']}")
+            print(f"   Name: {result['name']}")
+            print(f"   Description: {result['description']}")
+        else:
+            print(f"ERROR: Pipeline creation failed: {result['error']}")
+    except ImportError:
+        print("ERROR: Enhanced LangChain service not available.")
+
+
+@langchain.command("list-projects")
+def langchain_list_projects():
+    """List LangSmith projects."""
+    try:
+        from ml_services.langchain_service import create_langchain_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langchain")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            return
+
+        service = create_langchain_service_from_credentials(creds)
+        print("Plan Listing LangSmith projects...")
+        projects = asyncio.run(service.get_langsmith_projects())
+
+        for project in projects:
+            print(
+                f"   Path {project.get('name', 'Unknown')} (ID: {project.get('id', 'Unknown')}"
+            )
+    except ImportError:
+        print("ERROR: Enhanced LangChain service not available.")
+
+
+@langchain.command("list-runs")
+@click.option("--project", "-p", help="LangSmith project name")
+def langchain_list_runs(project):
+    """List LangSmith runs."""
+    try:
+        from ml_services.langchain_service import create_langchain_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langchain")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            return
+
+        service = create_langchain_service_from_credentials(creds)
+        project_name = project or creds.get("project_name", "terradev")
+        print(f" Listing LangSmith runs in project: {project_name}")
+        runs = asyncio.run(service.get_langsmith_runs(project_name))
+
+        for run in runs[:10]:
+            print(
+                f"    {run.get('name', 'Unknown')[:30]} - {run.get('status', 'Unknown')} - {run.get('created_at', 'Unknown')[:10]}"
+            )
+    except ImportError:
+        print("ERROR: Enhanced LangChain service not available.")
+
+
+@langchain.command("create-trace")
+@click.option("--run-id", "-r", required=True, help="Run ID for trace")
+@click.option("--data", "-d", required=True, help="Trace data (JSON)")
+def langchain_create_trace(run_id, data):
+    """Create a trace in LangSmith."""
+    try:
+        from ml_services.langchain_service import create_langchain_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langchain")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            return
+
+        service = create_langchain_service_from_credentials(creds)
+
+        try:
+            trace_data = json.loads(data)
+        except json.JSONDecodeError:
+            print("ERROR: Invalid JSON data")
+            return
+
+        print(f" Creating trace: {run_id}")
+        result = asyncio.run(service.create_trace(run_id, trace_data))
+
+        if result["status"] == "created":
+            print(f"OK: Trace created: {run_id}")
+        else:
+            print(f"ERROR: Trace creation failed: {result['error']}")
+    except ImportError:
+        print("ERROR: Enhanced LangChain service not available.")
+
+
+@ml.group()
+def langgraph():
+    """LangGraph workflow orchestration with monitoring."""
+    pass
+
+
+@langgraph.command("test")
+def langgraph_test():
+    """Test connection to LangGraph service."""
     try:
         from ml_services.langgraph_service import (
             create_langgraph_service_from_credentials,
@@ -6595,217 +6749,141 @@ def langgraph(test, create_workflow, type, workflow_status, deploy, name, graph)
             return
 
         service = create_langgraph_service_from_credentials(creds)
+        print(" Testing LangGraph connection...")
+        result = asyncio.run(service.test_connection())
 
-        if test:
-            print(" Testing enhanced LangGraph connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: LangGraph connected successfully")
-                print(f"   LangSmith: {result['langsmith']}")
-                print(f"   Environment: {result['environment']}")
-                print(
-                    f"   Dashboard: {'Enabled' if creds.get('langchain_dashboard_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Tracing: {'Enabled' if creds.get('langchain_tracing_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Evaluation: {'Enabled' if creds.get('langchain_evaluation_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Deployment: {'Enabled' if creds.get('langchain_deployment_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Observability: {'Enabled' if creds.get('langchain_observability_enabled') == 'true' else 'Disabled'}"
-                )
-            else:
-                print(f"ERROR: LangGraph connection failed: {result['error']}")
-
-        elif create_workflow:
-            if not type:
-                print("ERROR: Workflow type required")
-                return
-
-            print(f" Creating {type} LangGraph workflow...")
-            workflow_config = {
-                "name": create_workflow,
-                "description": f"LangGraph {type} workflow '{create_workflow}' created via Terradev CLI",
-                "type": type,
-            }
-
-            if type == "orchestrator-worker":
-                result = asyncio.run(
-                    service.create_orchestrator_worker_workflow(workflow_config)
-                )
-            elif type == "evaluator-optimizer":
-                result = asyncio.run(
-                    service.create_evaluation_workflow(workflow_config)
-                )
-            else:
-                result = asyncio.run(service.create_workflow(workflow_config))
-
-            if result["status"] == "created":
-                print(f"OK: {type} workflow created: {result['workflow_id']}")
-                print(f"   Name: {result['name']}")
-                print(f"   Description: {result['description']}")
-            else:
-                print(f"ERROR: Workflow creation failed: {result['error']}")
-
-        elif workflow_status:
-            print(f"Status Getting workflow status: {workflow_status}")
-            result = asyncio.run(service.get_workflow_status(workflow_status))
-
-            if result["status"] == "running":
-                print(f"   Status: {result['status']}")
-                print(f"   Workflow ID: {result['workflow_id']}")
-                print(f"   Metrics: {result['metrics']}")
-                print(f"   Monitoring: {result['monitoring']}")
-            else:
-                print(f"ERROR: Status check failed: {result['error']}")
-
-        elif deploy:
-            if not name:
-                print("ERROR: Workflow name required for deployment")
-                return
-
-            print(f"Deploying workflow: {name}")
-            # This would integrate with LangGraph's deployment APIs
-            print(f"OK: Workflow deployed: {name}")
-            print(f"   Access at: https://smith.langchain.com/deployments/{name}")
-
+        if result["status"] == "connected":
+            print("OK: LangGraph connected successfully")
+            print(f"   LangSmith: {result['langsmith']}")
+            print(f"   Environment: {result['environment']}")
+            print(
+                f"   Dashboard: {'Enabled' if creds.get('langchain_dashboard_enabled') == 'true' else 'Disabled'}"
+            )
+            print(
+                f"   Tracing: {'Enabled' if creds.get('langchain_tracing_enabled') == 'true' else 'Disabled'}"
+            )
+            print(
+                f"   Evaluation: {'Enabled' if creds.get('langchain_evaluation_enabled') == 'true' else 'Disabled'}"
+            )
+            print(
+                f"   Deployment: {'Enabled' if creds.get('langchain_deployment_enabled') == 'true' else 'Disabled'}"
+            )
+            print(
+                f"   Observability: {'Enabled' if creds.get('langchain_observability_enabled') == 'true' else 'Disabled'}"
+            )
         else:
-            print("OK: Enhanced LangGraph configured. Use --test to verify connection.")
-
+            print(f"ERROR: LangGraph connection failed: {result['error']}")
     except ImportError:
         print("ERROR: Enhanced LangGraph service not available.")
 
 
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
-@click.option("--create-pipeline", help="Create an SGLang pipeline")
-@click.option("--model-path", help="Model path for pipeline")
-@click.option("--serve", is_flag=True, help="Start SGLang serving")
-@click.option("--port", help="Serving port (default: 8000)")
-@click.option("--metrics", is_flag=True, help="Get SGLang metrics")
-@click.option("--dashboard", is_flag=True, help="Access SGLang dashboard")
-def sglang_legacy(test, create_pipeline, model_path, serve, port, metrics, dashboard):
-    """Enhanced SGLang model serving with monitoring"""
+@langgraph.command("create-workflow")
+@click.argument("workflow_name")
+@click.option("--type", "-t", required=True, type=click.Choice(["orchestrator-worker", "evaluator-optimizer"]), help="Workflow type")
+def langgraph_create_workflow(workflow_name, type):
+    """Create a LangGraph workflow."""
     try:
-        from ml_services.sglang_service import (
-            create_sglang_service_from_credentials,
-            get_sglang_setup_instructions,
-        )
+        from ml_services.langgraph_service import create_langgraph_service_from_credentials
 
         api = TerradevAPI()
-        creds = api._provider_creds("sglang")
+        creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print(get_sglang_setup_instructions())
+            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
             return
 
-        service = create_sglang_service_from_credentials(creds)
+        service = create_langgraph_service_from_credentials(creds)
+        print(f" Creating {type} LangGraph workflow...")
+        workflow_config = {
+            "name": workflow_name,
+            "description": f"LangGraph {type} workflow '{workflow_name}' created via Terradev CLI",
+            "type": type,
+        }
 
-        if test:
-            print(" Testing enhanced SGLang connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: SGLang connected successfully")
-                print(f"   Version: {result['sglang_version']}")
-                print(f"   Model Path: {result['model_path']}")
-                print(
-                    f"   Dashboard: {'Enabled' if creds.get('sglang_dashboard_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Tracing: {'Enabled' if creds.get('sglang_tracing_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Metrics: {'Enabled' if creds.get('sglang_metrics_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Deployment: {'Enabled' if creds.get('sglang_deployment_enabled') == 'true' else 'Disabled'}"
-                )
-                print(
-                    f"   Observability: {'Enabled' if creds.get('sglang_observability_enabled') == 'true' else 'Disabled'}"
-                )
-            else:
-                print(f"ERROR: SGLang connection failed: {result['error']}")
-
-        elif create_pipeline:
-            if not model_path:
-                print("ERROR: Model path required for pipeline creation")
-                return
-
-            print(f" Creating SGLang pipeline: {create_pipeline}")
-            pipeline_config = {
-                "name": create_pipeline,
-                "description": f"SGLang pipeline '{create_pipeline}' created via Terradev CLI",
-                "model_path": model_path,
-            }
-            result = asyncio.run(service.create_pipeline(pipeline_config))
-
-            if result["status"] == "created":
-                print(f"OK: Pipeline created: {result['pipeline_id']}")
-                print(f"   Name: {result['name']}")
-                print(f"   Description: {result['description']}")
-                print(f"   Model Path: {result['model_path']}")
-            else:
-                print(f"ERROR: Pipeline creation failed: {result['error']}")
-
-        elif serve:
-            serve_port = port or "8000"
-            model_to_serve = model_path or creds.get("sglang_model_path")
-
-            if not model_to_serve:
-                print("ERROR: Model path required for serving")
-                return
-
-            print("Deploying Starting SGLang serving...")
-            print(f"   Model: {model_to_serve}")
-            print(f"   Port: {serve_port}")
-            print(f"   Dashboard: http://localhost:{serve_port}/dashboard")
-            print(f"   Metrics: http://localhost:{serve_port}/metrics")
-
-            # This would integrate with SGLang's serving APIs
-            print(f"OK: SGLang serving started on port {serve_port}")
-
-        elif metrics:
-            print("Status Getting SGLang metrics...")
-            result = asyncio.run(service.get_sglang_metrics())
-
-            if result["status"] == "connected":
-                print(f"   Version: {result['sglang_version']}")
-                print(f"   Model Path: {result['model_path']}")
-                print(f"   Metrics: {result['metrics']}")
-                print(f"   Requests/sec: {result['metrics']['requests_per_second']}")
-                print(f"   Avg Latency: {result['metrics']['avg_latency_ms']}ms")
-                print(f"   Success Rate: {result['metrics']['success_rate']:.2%}")
-                print(
-                    f"   GPU Utilization: {result['metrics']['gpu_utilization']:.1f}%"
-                )
-                print(f"   Memory Usage: {result['metrics']['memory_usage']:.2%}")
-            else:
-                print(f"ERROR: Metrics check failed: {result['error']}")
-
-        elif dashboard:
-            print(" Accessing SGLang dashboard...")
-            serve_port = port or "8000"
-            print(f"   Dashboard: http://localhost:{serve_port}/dashboard")
-            print(f"   Metrics: http://localhost:{serve_port}/metrics")
-            print(f"   Health: http://localhost:{serve_port}/health")
-
+        if type == "orchestrator-worker":
+            result = asyncio.run(
+                service.create_orchestrator_worker_workflow(workflow_config)
+            )
+        elif type == "evaluator-optimizer":
+            result = asyncio.run(
+                service.create_evaluation_workflow(workflow_config)
+            )
         else:
-            print("OK: Enhanced SGLang configured. Use --test to verify connection.")
+            result = asyncio.run(service.create_workflow(workflow_config))
 
+        if result["status"] == "created":
+            print(f"OK: {type} workflow created: {result['workflow_id']}")
+            print(f"   Name: {result['name']}")
+            print(f"   Description: {result['description']}")
+        else:
+            print(f"ERROR: Workflow creation failed: {result['error']}")
     except ImportError:
-        print("ERROR: Enhanced SGLang service not available.")
+        print("ERROR: Enhanced LangGraph service not available.")
 
 
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
-def kserve(test):
-    """KServe model deployment and management"""
+@langgraph.command("status")
+@click.argument("workflow_id")
+def langgraph_status(workflow_id):
+    """Get workflow status."""
+    try:
+        from ml_services.langgraph_service import create_langgraph_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langchain")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            return
+
+        service = create_langgraph_service_from_credentials(creds)
+        print(f"Status Getting workflow status: {workflow_id}")
+        result = asyncio.run(service.get_workflow_status(workflow_id))
+
+        if result["status"] == "running":
+            print(f"   Status: {result['status']}")
+            print(f"   Workflow ID: {result['workflow_id']}")
+            print(f"   Metrics: {result['metrics']}")
+            print(f"   Monitoring: {result['monitoring']}")
+        else:
+            print(f"ERROR: Status check failed: {result['error']}")
+    except ImportError:
+        print("ERROR: Enhanced LangGraph service not available.")
+
+
+@langgraph.command("deploy")
+@click.argument("workflow_name")
+def langgraph_deploy(workflow_name):
+    """Deploy a workflow."""
+    try:
+        from ml_services.langgraph_service import create_langgraph_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langchain")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            return
+
+        service = create_langgraph_service_from_credentials(creds)
+        print(f"Deploying workflow: {workflow_name}")
+        # This would integrate with LangGraph's deployment APIs
+        print(f"OK: Workflow deployed: {workflow_name}")
+        print(f"   Access at: https://smith.langchain.com/deployments/{workflow_name}")
+    except ImportError:
+        print("ERROR: Enhanced LangGraph service not available.")
+
+
+
+
+@ml.group()
+def kserve():
+    """KServe model deployment and management."""
+    pass
+
+
+@kserve.command("test")
+def kserve_test():
+    """Test connection to KServe service."""
     try:
         from ml_services.kserve_service import (
             create_kserve_service_from_credentials,
@@ -6820,30 +6898,27 @@ def kserve(test):
             return
 
         service = create_kserve_service_from_credentials(creds)
+        print(" Testing KServe connection...")
+        result = asyncio.run(service.test_connection())
 
-        if test:
-            print(" Testing KServe connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: KServe connected successfully")
-                print(f"   Namespace: {result['namespace']}")
-            else:
-                print(f"ERROR: KServe connection failed: {result['error']}")
+        if result["status"] == "connected":
+            print("OK: KServe connected successfully")
+            print(f"   Namespace: {result['namespace']}")
         else:
-            print("OK: KServe configured. Use --test to verify connection.")
-
+            print(f"ERROR: KServe connection failed: {result['error']}")
     except ImportError:
         print("ERROR: KServe service not available. Install with: pip install kserve")
 
 
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
-@click.option("--list-projects", is_flag=True, help="List all projects")
-@click.option("--create-project", help="Create a new project")
-@click.option("--export", type=click.Choice(["json", "csv"]), help="Export runs data")
-def langsmith(test, list_projects, create_project, export):
-    """LangSmith experiment tracking and monitoring"""
+@ml.group()
+def langsmith():
+    """LangSmith experiment tracking and monitoring."""
+    pass
+
+
+@langsmith.command("test")
+def langsmith_test():
+    """Test connection to LangSmith service."""
     try:
         from ml_services.langsmith_service import (
             create_langsmith_service_from_credentials,
@@ -6858,54 +6933,97 @@ def langsmith(test, list_projects, create_project, export):
             return
 
         service = create_langsmith_service_from_credentials(creds)
+        print(" Testing LangSmith connection...")
+        result = asyncio.run(service.test_connection())
 
-        if test:
-            print(" Testing LangSmith connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: LangSmith connected successfully")
-                print(f"   Workspace: {result['workspace_id']}")
-                print(f"   Endpoint: {result['endpoint']}")
-            else:
-                print(f"ERROR: LangSmith connection failed: {result['error']}")
-
-        elif list_projects:
-            print("Plan Listing LangSmith projects...")
-            projects = asyncio.run(service.list_projects())
-
-            for project in projects:
-                print(f"   Path {project['name']} (ID: {project['id']})")
-
-        elif create_project:
-            print(f"Path Creating project: {create_project}")
-            result = asyncio.run(
-                service.create_project(create_project, "Created via Terradev CLI")
-            )
-            print(f"OK: Project created: {result['id']}")
-
-        elif export:
-            print("UPLOAD: Exporting runs data...")
-            data = asyncio.run(service.export_runs(format=export))
-            print(data)
-
+        if result["status"] == "connected":
+            print("OK: LangSmith connected successfully")
+            print(f"   Workspace: {result['workspace_id']}")
+            print(f"   Endpoint: {result['endpoint']}")
         else:
-            print("OK: LangSmith configured. Use --test to verify connection.")
-
+            print(f"ERROR: LangSmith connection failed: {result['error']}")
     except ImportError:
         print("ERROR: LangSmith service not available.")
 
 
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
-@click.option("--init", is_flag=True, help="Initialize DVC repository")
-@click.option("--add-remote", help="Add remote storage (name:url)")
-@click.option("--add-data", help="Add data to tracking")
-@click.option("--push", is_flag=True, help="Push data to remote")
-@click.option("--pull", is_flag=True, help="Pull data from remote")
-@click.option("--status", is_flag=True, help="Show repository status")
-def dvc(test, init, add_remote, add_data, push, pull, status):
-    """DVC (Data Version Control) management"""
+@langsmith.command("list-projects")
+def langsmith_list_projects():
+    """List all LangSmith projects."""
+    try:
+        from ml_services.langsmith_service import create_langsmith_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langsmith")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangSmith not configured. Run 'terradev ml langsmith configure' first.")
+            return
+
+        service = create_langsmith_service_from_credentials(creds)
+        print("Plan Listing LangSmith projects...")
+        projects = asyncio.run(service.list_projects())
+
+        for project in projects:
+            print(f"   Path {project['name']} (ID: {project['id']})")
+    except ImportError:
+        print("ERROR: LangSmith service not available.")
+
+
+@langsmith.command("create-project")
+@click.argument("project_name")
+def langsmith_create_project(project_name):
+    """Create a new LangSmith project."""
+    try:
+        from ml_services.langsmith_service import create_langsmith_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langsmith")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangSmith not configured. Run 'terradev ml langsmith configure' first.")
+            return
+
+        service = create_langsmith_service_from_credentials(creds)
+        print(f"Path Creating project: {project_name}")
+        result = asyncio.run(
+            service.create_project(project_name, "Created via Terradev CLI")
+        )
+        print(f"OK: Project created: {result['id']}")
+    except ImportError:
+        print("ERROR: LangSmith service not available.")
+
+
+@langsmith.command("export")
+@click.option("--format", "-f", type=click.Choice(["json", "csv"]), default="json", help="Export format")
+def langsmith_export(format):
+    """Export runs data."""
+    try:
+        from ml_services.langsmith_service import create_langsmith_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("langsmith")
+
+        if not creds.get("api_key"):
+            print("ERROR: LangSmith not configured. Run 'terradev ml langsmith configure' first.")
+            return
+
+        service = create_langsmith_service_from_credentials(creds)
+        print("UPLOAD: Exporting runs data...")
+        data = asyncio.run(service.export_runs(format=format))
+        print(data)
+    except ImportError:
+        print("ERROR: LangSmith service not available.")
+
+
+@ml.group()
+def dvc():
+    """DVC (Data Version Control) management."""
+    pass
+
+
+@dvc.command("test")
+def dvc_test():
+    """Test connection to DVC service."""
     try:
         from ml_services.dvc_service import (
             create_dvc_service_from_credentials,
@@ -6920,67 +7038,161 @@ def dvc(test, init, add_remote, add_data, push, pull, status):
             return
 
         service = create_dvc_service_from_credentials(creds)
+        print(" Testing DVC connection...")
+        result = asyncio.run(service.test_connection())
 
-        if test:
-            print(" Testing DVC connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: DVC connected successfully")
-                print(f"   Repository: {result['repo_path']}")
-            else:
-                print(f"ERROR: DVC connection failed: {result['error']}")
-
-        elif init:
-            print("Path Initializing DVC repository...")
-            result = asyncio.run(service.init_repo())
-            print(f"OK: Repository initialized: {result['repo_path']}")
-
-        elif add_remote:
-            if ":" not in add_remote:
-                print("ERROR: Remote format should be: name:url")
-                return
-            name, url = add_remote.split(":", 1)
-            print(f"PACKAGE: Adding remote: {name} -> {url}")
-            result = asyncio.run(service.add_remote(name, url))
-            print(f"OK: Remote added: {result['name']}")
-
-        elif add_data:
-            print(f"Status Adding data to tracking: {add_data}")
-            result = asyncio.run(service.add_data(add_data))
-            print(f"OK: Data added: {add_data}")
-
-        elif push:
-            print("UPLOAD: Pushing data to remote...")
-            result = asyncio.run(service.push_data())
-            print(f"OK: Data pushed: {result['targets']}")
-
-        elif pull:
-            print(" Pulling data from remote...")
-            result = asyncio.run(service.pull_data())
-            print(f"OK: Data pulled: {result['targets']}")
-
-        elif status:
-            print("Status Repository status:")
-            result = asyncio.run(service.get_status())
-            for detail in result["details"]:
-                print(f"   {detail}")
-
+        if result["status"] == "connected":
+            print("OK: DVC connected successfully")
+            print(f"   Repository: {result['repo_path']}")
         else:
-            print("OK: DVC configured. Use --test to verify connection.")
-
+            print(f"ERROR: DVC connection failed: {result['error']}")
     except ImportError:
         print("ERROR: DVC service not available. Install with: pip install dvc")
 
 
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
-@click.option("--list-experiments", is_flag=True, help="List all experiments")
-@click.option("--create-experiment", help="Create a new experiment")
-@click.option("--list-runs", help="List runs in experiment")
-@click.option("--export", help="Export experiment data (json/csv)")
-def mlflow_legacy(test, list_experiments, create_experiment, list_runs, export):
-    """MLflow experiment tracking and model registry"""
+@dvc.command("init")
+def dvc_init():
+    """Initialize DVC repository."""
+    try:
+        from ml_services.dvc_service import create_dvc_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("dvc")
+
+        if not creds.get("repo_path"):
+            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
+            return
+
+        service = create_dvc_service_from_credentials(creds)
+        print("Path Initializing DVC repository...")
+        result = asyncio.run(service.init_repo())
+        print(f"OK: Repository initialized: {result['repo_path']}")
+    except ImportError:
+        print("ERROR: DVC service not available. Install with: pip install dvc")
+
+
+@dvc.command("add-remote")
+@click.argument("remote_spec")
+def dvc_add_remote(remote_spec):
+    """Add remote storage (name:url)."""
+    try:
+        from ml_services.dvc_service import create_dvc_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("dvc")
+
+        if not creds.get("repo_path"):
+            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
+            return
+
+        if ":" not in remote_spec:
+            print("ERROR: Remote format should be: name:url")
+            return
+
+        name, url = remote_spec.split(":", 1)
+        service = create_dvc_service_from_credentials(creds)
+        print(f"PACKAGE: Adding remote: {name} -> {url}")
+        result = asyncio.run(service.add_remote(name, url))
+        print(f"OK: Remote added: {result['name']}")
+    except ImportError:
+        print("ERROR: DVC service not available. Install with: pip install dvc")
+
+
+@dvc.command("add-data")
+@click.argument("data_path")
+def dvc_add_data(data_path):
+    """Add data to tracking."""
+    try:
+        from ml_services.dvc_service import create_dvc_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("dvc")
+
+        if not creds.get("repo_path"):
+            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
+            return
+
+        service = create_dvc_service_from_credentials(creds)
+        print(f"Status Adding data to tracking: {data_path}")
+        result = asyncio.run(service.add_data(data_path))
+        print(f"OK: Data added: {data_path}")
+    except ImportError:
+        print("ERROR: DVC service not available. Install with: pip install dvc")
+
+
+@dvc.command("push")
+def dvc_push():
+    """Push data to remote."""
+    try:
+        from ml_services.dvc_service import create_dvc_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("dvc")
+
+        if not creds.get("repo_path"):
+            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
+            return
+
+        service = create_dvc_service_from_credentials(creds)
+        print("UPLOAD: Pushing data to remote...")
+        result = asyncio.run(service.push_data())
+        print(f"OK: Data pushed: {result['targets']}")
+    except ImportError:
+        print("ERROR: DVC service not available. Install with: pip install dvc")
+
+
+@dvc.command("pull")
+def dvc_pull():
+    """Pull data from remote."""
+    try:
+        from ml_services.dvc_service import create_dvc_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("dvc")
+
+        if not creds.get("repo_path"):
+            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
+            return
+
+        service = create_dvc_service_from_credentials(creds)
+        print(" Pulling data from remote...")
+        result = asyncio.run(service.pull_data())
+        print(f"OK: Data pulled: {result['targets']}")
+    except ImportError:
+        print("ERROR: DVC service not available. Install with: pip install dvc")
+
+
+@dvc.command("status")
+def dvc_status():
+    """Show repository status."""
+    try:
+        from ml_services.dvc_service import create_dvc_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("dvc")
+
+        if not creds.get("repo_path"):
+            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
+            return
+
+        service = create_dvc_service_from_credentials(creds)
+        print("Status Repository status:")
+        result = asyncio.run(service.get_status())
+        for detail in result["details"]:
+            print(f"   {detail}")
+    except ImportError:
+        print("ERROR: DVC service not available. Install with: pip install dvc")
+
+
+@ml.group()
+def mlflow_legacy():
+    """MLflow experiment tracking and model registry."""
+    pass
+
+
+@mlflow_legacy.command("test")
+def mlflow_legacy_test():
+    """Test connection to MLflow service."""
     try:
         from ml_services.mlflow_service import (
             create_mlflow_service_from_credentials,
@@ -6995,86 +7207,125 @@ def mlflow_legacy(test, list_experiments, create_experiment, list_runs, export):
             return
 
         service = create_mlflow_service_from_credentials(creds)
+        print(" Testing MLflow connection...")
+        result = asyncio.run(service.test_connection())
 
-        if test:
-            print(" Testing MLflow connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: MLflow connected successfully")
-                print(f"   Tracking URI: {result['tracking_uri']}")
-                print(f"   Experiments: {result['experiments_count']}")
-            else:
-                print(f"ERROR: MLflow connection failed: {result['error']}")
-
-        elif list_experiments:
-            print("Plan Listing MLflow experiments...")
-            experiments = asyncio.run(service.list_experiments())
-
-            for exp in experiments:
-                print(f"    {exp['name']} (ID: {exp['experiment_id']})")
-
-        elif create_experiment:
-            print(f" Creating experiment: {create_experiment}")
-            result = asyncio.run(
-                service.create_experiment(create_experiment, "Created via Terradev CLI")
-            )
-            print(f"OK: Experiment created: {result['experiment_id']}")
-
-        elif list_runs:
-            print(f"Status Listing runs in experiment: {list_runs}")
-            runs = asyncio.run(service.list_runs([list_runs]))
-
-            for run in runs[:10]:  # Show first 10
-                info = run.get("info", {})
-                print(
-                    f"    {info.get('run_id', 'N/A')[:8]} - {info.get('status', 'N/A')}"
-                )
-
-        elif export:
-            print("UPLOAD: Exporting experiment data...")
-            data = asyncio.run(service.export_experiment_data(export, "json"))
-            print(data)
-
+        if result["status"] == "connected":
+            print("OK: MLflow connected successfully")
+            print(f"   Tracking URI: {result['tracking_uri']}")
+            print(f"   Experiments: {result['experiments_count']}")
         else:
-            print("OK: MLflow configured. Use --test to verify connection.")
-
+            print(f"ERROR: MLflow connection failed: {result['error']}")
     except ImportError:
         print("ERROR: MLflow service not available. Install with: pip install mlflow")
 
 
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
-@click.option("--status", is_flag=True, help="Show cluster status")
-@click.option("--list-nodes", is_flag=True, help="List cluster nodes")
-@click.option("--start", is_flag=True, help="Start Ray cluster")
-@click.option("--stop", is_flag=True, help="Stop Ray cluster")
-@click.option("--dashboard", is_flag=True, help="Get dashboard URL")
-@click.option("--install", is_flag=True, help="Show installation instructions")
-@click.option(
-    "--install-monitoring",
-    is_flag=True,
-    help="Install monitoring stack with Ray dashboards",
-)
-@click.option(
-    "--metrics-summary", is_flag=True, help="Get comprehensive metrics summary"
-)
-@click.option("--grafana", is_flag=True, help="Access Grafana dashboard")
-@click.option("--prometheus", is_flag=True, help="Access Prometheus metrics")
-def ray(
-    test,
-    status,
-    list_nodes,
-    start,
-    stop,
-    dashboard,
-    install,
-    install_monitoring,
-    metrics_summary,
-    grafana,
-    prometheus,
-):
-    """Enhanced Ray distributed computing with monitoring and dashboards"""
+@mlflow_legacy.command("list-experiments")
+def mlflow_legacy_list_experiments():
+    """List all MLflow experiments."""
+    try:
+        from ml_services.mlflow_service import create_mlflow_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("mlflow")
+
+        if not creds.get("tracking_uri"):
+            print("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.")
+            return
+
+        service = create_mlflow_service_from_credentials(creds)
+        print("Plan Listing MLflow experiments...")
+        experiments = asyncio.run(service.list_experiments())
+
+        for exp in experiments:
+            print(f"    {exp['name']} (ID: {exp['experiment_id']})")
+    except ImportError:
+        print("ERROR: MLflow service not available. Install with: pip install mlflow")
+
+
+@mlflow_legacy.command("create-experiment")
+@click.argument("experiment_name")
+def mlflow_legacy_create_experiment(experiment_name):
+    """Create a new MLflow experiment."""
+    try:
+        from ml_services.mlflow_service import create_mlflow_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("mlflow")
+
+        if not creds.get("tracking_uri"):
+            print("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.")
+            return
+
+        service = create_mlflow_service_from_credentials(creds)
+        print(f" Creating experiment: {experiment_name}")
+        result = asyncio.run(
+            service.create_experiment(experiment_name, "Created via Terradev CLI")
+        )
+        print(f"OK: Experiment created: {result['experiment_id']}")
+    except ImportError:
+        print("ERROR: MLflow service not available. Install with: pip install mlflow")
+
+
+@mlflow_legacy.command("list-runs")
+@click.argument("experiment_id")
+def mlflow_legacy_list_runs(experiment_id):
+    """List runs in experiment."""
+    try:
+        from ml_services.mlflow_service import create_mlflow_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("mlflow")
+
+        if not creds.get("tracking_uri"):
+            print("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.")
+            return
+
+        service = create_mlflow_service_from_credentials(creds)
+        print(f"Status Listing runs in experiment: {experiment_id}")
+        runs = asyncio.run(service.list_runs([experiment_id]))
+
+        for run in runs[:10]:
+            info = run.get("info", {})
+            print(
+                f"    {info.get('run_id', 'N/A')[:8]} - {info.get('status', 'N/A')}"
+            )
+    except ImportError:
+        print("ERROR: MLflow service not available. Install with: pip install mlflow")
+
+
+@mlflow_legacy.command("export")
+@click.argument("experiment_id")
+@click.option("--format", "-f", type=click.Choice(["json", "csv"]), default="json", help="Export format")
+def mlflow_legacy_export(experiment_id, format):
+    """Export experiment data."""
+    try:
+        from ml_services.mlflow_service import create_mlflow_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("mlflow")
+
+        if not creds.get("tracking_uri"):
+            print("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.")
+            return
+
+        service = create_mlflow_service_from_credentials(creds)
+        print("UPLOAD: Exporting experiment data...")
+        data = asyncio.run(service.export_experiment_data(experiment_id, format))
+        print(data)
+    except ImportError:
+        print("ERROR: MLflow service not available. Install with: pip install mlflow")
+
+
+@ml.group()
+def ray():
+    """Enhanced Ray distributed computing with monitoring and dashboards."""
+    pass
+
+
+@ray.command("test")
+def ray_test():
+    """Test connection to Ray service."""
     try:
         from ml_services.ray_enhanced import (
             create_enhanced_ray_service_from_credentials,
@@ -7086,145 +7337,241 @@ def ray(
 
         # Ray can work without credentials for local clusters
         service = create_enhanced_ray_service_from_credentials(creds)
+        print(" Testing enhanced Ray connection...")
+        result = asyncio.run(service.test_connection())
 
-        if install:
-            print(get_enhanced_ray_setup_instructions())
-            return
-
-        if test:
-            print(" Testing enhanced Ray connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: Ray connected successfully")
-                print(f"   Version: {result.get('ray_version', 'N/A')}")
-                print(f"   Cluster: {result.get('cluster_name', 'local')}")
-                print(f"   Dashboard: {result.get('dashboard_uri', 'N/A')}")
-                print(
-                    f"   Monitoring: {'Enabled' if creds.get('ray_monitoring_enabled') == 'true' else 'Disabled'}"
-                )
-            elif result["status"] == "not_connected":
-                print("Warning  Ray installed but cluster not running")
-                print(f"   Version: {result.get('ray_version', 'N/A')}")
-                print(f"   Error: {result['error']}")
-                print(f"   Tip: Suggestion: {result.get('suggestion')}")
-            else:
-                print(f"ERROR: Ray connection failed: {result['error']}")
-                if "not installed" in result["error"]:
-                    print("   Tip: Install Ray: pip install ray[default]")
-                    print("    For full features: pip install ray[default,train]")
-
-        elif install_monitoring:
-            print("Deploying Installing enhanced Ray monitoring stack...")
-            result = asyncio.run(service.install_monitoring_stack())
-
-            if result["status"] == "installed":
-                print("OK: Ray monitoring stack installed")
-                print(f"   Ray Dashboard: {result.get('ray')}")
-                print(f"   Prometheus: {result.get('prometheus')}")
-                print(f"   Grafana: {result.get('grafana')}")
-                print(f"   Dashboards: {result.get('dashboards')}")
-                print("   Access Ray Dashboard: http://localhost:8265")
-                print("   Access Grafana: http://localhost:3000")
-            else:
-                print(f"ERROR: Installation failed: {result['error']}")
-
-        elif metrics_summary:
-            print("Status Getting comprehensive Ray metrics summary...")
-            result = asyncio.run(service.get_monitoring_status())
-
-            if result.get("status") != "failed":
-                print(f"   Ray Status: {result.get('ray', {})}")
-                print(f"   Monitoring: {result.get('monitoring', {})}")
-                print(f"   Metrics: {result.get('metrics', {})}")
-            else:
-                print(f"ERROR: Metrics summary failed: {result.get('error')}")
-
-        elif grafana:
-            print(" Accessing Ray Grafana dashboard...")
-            print("   Access at: http://localhost:3000")
-            print("   Username: admin")
-            print("   Password: prom-operator")
-            print("   Ray metrics are available in the 'Ray Overview' dashboard")
-
-        elif prometheus:
-            print("Status Accessing Ray Prometheus metrics...")
-            print("   Access at: http://localhost:8080")
+        if result["status"] == "connected":
+            print("OK: Ray connected successfully")
+            print(f"   Version: {result.get('ray_version', 'N/A')}")
+            print(f"   Cluster: {result.get('cluster_name', 'local')}")
+            print(f"   Dashboard: {result.get('dashboard_uri', 'N/A')}")
             print(
-                "   Available metrics: ray_cluster_total_workers, ray_cluster_cpu_total, ray_cluster_memory_total"
+                f"   Monitoring: {'Enabled' if creds.get('ray_monitoring_enabled') == 'true' else 'Disabled'}"
             )
-
-        elif status:
-            print("Status Enhanced Ray cluster status:")
-            result = asyncio.run(service.get_monitoring_status())
-
-            if result.get("ray", {}).get("status") == "running":
-                print(f"   OK: Status: {result['ray']['status']}")
-                print(f"   Version: {result['ray'].get('version', 'N/A')}")
-                print(f"   Cluster: {result['ray'].get('cluster_name', 'local')}")
-                print(f"   Dashboard: {result['ray'].get('dashboard_uri', 'N/A')}")
-
-                if result.get("metrics"):
-                    metrics = result["metrics"]
-                    print(f"   Workers: {metrics.get('total_workers', 0)}")
-                    print(f"   CPU Total: {metrics.get('cpu_total', 0)}")
-                    print(f"   CPU Used: {metrics.get('cpu_used', 0)}")
-                    print(f"   Memory Total: {metrics.get('memory_total', 0)}")
-                    print(f"   Memory Used: {metrics.get('memory_used', 0)}")
-                    print(f"   GPU Total: {metrics.get('gpu_total', 0)}")
-                    print(f"   GPU Used: {metrics.get('gpu_used', 0)}")
-            else:
-                print(
-                    f"   ERROR: Status: {result.get('ray', {}).get('status', 'Unknown')}"
-                )
-                print(
-                    f"   Error: {result.get('ray', {}).get('error', 'Unknown error')}"
-                )
-
-        elif list_nodes:
-            print(" Listing Ray nodes...")
-            result = asyncio.run(service.get_monitoring_status())
-
-            if result.get("ray", {}).get("status") == "running":
-                metrics = result.get("metrics", {})
-                total_workers = metrics.get("total_workers", 0)
-                print(f"   Total Workers: {total_workers}")
-                print(f"   Active Workers: {total_workers}")
-                print(f"   Head Node: {creds.get('ray_head_node_ip', 'localhost')}")
-            else:
-                print("   INFO:  No active Ray cluster found")
-
-        elif start:
-            print("Deploying Starting enhanced Ray cluster...")
-            result = asyncio.run(service.start_cluster(head_node=True))
-            print(f"OK: Cluster started: {result['status']}")
-
-            if creds.get("ray_monitoring_enabled") == "true":
-                print("   Status Monitoring enabled - access dashboards:")
-                print("      Ray Dashboard: http://localhost:8265")
-                print("      Grafana: http://localhost:3000")
-                print("      Prometheus: http://localhost:8080")
-
-        elif stop:
-            print(" Stopping Ray cluster...")
-            result = asyncio.run(service.stop_cluster())
-            print(f"OK: Cluster stopped: {result['status']}")
-
-        elif dashboard:
-            print("Status Getting Ray dashboard URL...")
-            url = asyncio.run(service.get_ray_dashboard_url())
-            if url:
-                print(f" Dashboard: {url}")
-            else:
-                print("ERROR: Dashboard URL not found")
-
+        elif result["status"] == "not_connected":
+            print("Warning  Ray installed but cluster not running")
+            print(f"   Version: {result.get('ray_version', 'N/A')}")
+            print(f"   Error: {result['error']}")
+            print(f"   Tip: Suggestion: {result.get('suggestion')}")
         else:
-            print("OK: Enhanced Ray configured. Use --test to verify connection.")
-            if creds.get("ray_monitoring_enabled") == "true":
-                print(
-                    "   Status Monitoring enabled - use --install-monitoring to set up dashboards"
-                )
+            print(f"ERROR: Ray connection failed: {result['error']}")
+            if "not installed" in result["error"]:
+                print("   Tip: Install Ray: pip install ray[default]")
+                print("    For full features: pip install ray[default,train]")
+    except ImportError:
+        print(
+            "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
+        )
 
+
+@ray.command("install")
+def ray_install():
+    """Show installation instructions."""
+    try:
+        from ml_services.ray_enhanced import get_enhanced_ray_setup_instructions
+
+        print(get_enhanced_ray_setup_instructions())
+    except ImportError:
+        print(
+            "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
+        )
+
+
+@ray.command("install-monitoring")
+def ray_install_monitoring():
+    """Install monitoring stack with Ray dashboards."""
+    try:
+        from ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("ray")
+        service = create_enhanced_ray_service_from_credentials(creds)
+        print("Deploying Installing enhanced Ray monitoring stack...")
+        result = asyncio.run(service.install_monitoring_stack())
+
+        if result["status"] == "installed":
+            print("OK: Ray monitoring stack installed")
+            print(f"   Ray Dashboard: {result.get('ray')}")
+            print(f"   Prometheus: {result.get('prometheus')}")
+            print(f"   Grafana: {result.get('grafana')}")
+            print(f"   Dashboards: {result.get('dashboards')}")
+            print("   Access Ray Dashboard: http://localhost:8265")
+            print("   Access Grafana: http://localhost:3000")
+        else:
+            print(f"ERROR: Installation failed: {result['error']}")
+    except ImportError:
+        print(
+            "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
+        )
+
+
+@ray.command("metrics-summary")
+def ray_metrics_summary():
+    """Get comprehensive metrics summary."""
+    try:
+        from ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("ray")
+        service = create_enhanced_ray_service_from_credentials(creds)
+        print("Status Getting comprehensive Ray metrics summary...")
+        result = asyncio.run(service.get_monitoring_status())
+
+        if result.get("status") != "failed":
+            print(f"   Ray Status: {result.get('ray', {})}")
+            print(f"   Monitoring: {result.get('monitoring', {})}")
+            print(f"   Metrics: {result.get('metrics', {})}")
+        else:
+            print(f"ERROR: Metrics summary failed: {result.get('error')}")
+    except ImportError:
+        print(
+            "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
+        )
+
+
+@ray.command("grafana")
+def ray_grafana():
+    """Access Grafana dashboard."""
+    print(" Accessing Ray Grafana dashboard...")
+    print("   Access at: http://localhost:3000")
+    print("   Username: admin")
+    print("   Password: prom-operator")
+    print("   Ray metrics are available in the 'Ray Overview' dashboard")
+
+
+@ray.command("prometheus")
+def ray_prometheus():
+    """Access Prometheus metrics."""
+    print("Status Accessing Ray Prometheus metrics...")
+    print("   Access at: http://localhost:8080")
+    print(
+        "   Available metrics: ray_cluster_total_workers, ray_cluster_cpu_total, ray_cluster_memory_total"
+    )
+
+
+@ray.command("status")
+def ray_status():
+    """Show cluster status."""
+    try:
+        from ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("ray")
+        service = create_enhanced_ray_service_from_credentials(creds)
+        print("Status Enhanced Ray cluster status:")
+        result = asyncio.run(service.get_monitoring_status())
+
+        if result.get("ray", {}).get("status") == "running":
+            print(f"   OK: Status: {result['ray']['status']}")
+            print(f"   Version: {result['ray'].get('version', 'N/A')}")
+            print(f"   Cluster: {result['ray'].get('cluster_name', 'local')}")
+            print(f"   Dashboard: {result['ray'].get('dashboard_uri', 'N/A')}")
+
+            if result.get("metrics"):
+                metrics = result["metrics"]
+                print(f"   Workers: {metrics.get('total_workers', 0)}")
+                print(f"   CPU Total: {metrics.get('cpu_total', 0)}")
+                print(f"   CPU Used: {metrics.get('cpu_used', 0)}")
+                print(f"   Memory Total: {metrics.get('memory_total', 0)}")
+                print(f"   Memory Used: {metrics.get('memory_used', 0)}")
+                print(f"   GPU Total: {metrics.get('gpu_total', 0)}")
+                print(f"   GPU Used: {metrics.get('gpu_used', 0)}")
+        else:
+            print(
+                f"   ERROR: Status: {result.get('ray', {}).get('status', 'Unknown')}"
+            )
+            print(
+                f"   Error: {result.get('ray', {}).get('error', 'Unknown error')}"
+            )
+    except ImportError:
+        print(
+            "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
+        )
+
+
+@ray.command("list-nodes")
+def ray_list_nodes():
+    """List cluster nodes."""
+    try:
+        from ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("ray")
+        service = create_enhanced_ray_service_from_credentials(creds)
+        print(" Listing Ray nodes...")
+        result = asyncio.run(service.get_monitoring_status())
+
+        if result.get("ray", {}).get("status") == "running":
+            metrics = result.get("metrics", {})
+            total_workers = metrics.get("total_workers", 0)
+            print(f"   Total Workers: {total_workers}")
+            print(f"   Active Workers: {total_workers}")
+            print(f"   Head Node: {creds.get('ray_head_node_ip', 'localhost')}")
+        else:
+            print("   INFO:  No active Ray cluster found")
+    except ImportError:
+        print(
+            "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
+        )
+
+
+@ray.command("start")
+def ray_start():
+    """Start Ray cluster."""
+    try:
+        from ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("ray")
+        service = create_enhanced_ray_service_from_credentials(creds)
+        print("Deploying Starting enhanced Ray cluster...")
+        result = asyncio.run(service.start_cluster(head_node=True))
+        print(f"OK: Cluster started: {result['status']}")
+
+        if creds.get("ray_monitoring_enabled") == "true":
+            print("   Status Monitoring enabled - access dashboards:")
+            print("      Ray Dashboard: http://localhost:8265")
+            print("      Grafana: http://localhost:3000")
+            print("      Prometheus: http://localhost:8080")
+    except ImportError:
+        print(
+            "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
+        )
+
+
+@ray.command("stop")
+def ray_stop():
+    """Stop Ray cluster."""
+    try:
+        from ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("ray")
+        service = create_enhanced_ray_service_from_credentials(creds)
+        print(" Stopping Ray cluster...")
+        result = asyncio.run(service.stop_cluster())
+        print(f"OK: Cluster stopped: {result['status']}")
+    except ImportError:
+        print(
+            "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
+        )
+
+
+@ray.command("dashboard")
+def ray_dashboard():
+    """Get dashboard URL."""
+    try:
+        from ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
+
+        api = TerradevAPI()
+        creds = api._provider_creds("ray")
+        service = create_enhanced_ray_service_from_credentials(creds)
+        print("Status Getting Ray dashboard URL...")
+        url = asyncio.run(service.get_ray_dashboard_url())
+        if url:
+            print(f" Dashboard: {url}")
+        else:
+            print("ERROR: Dashboard URL not found")
     except ImportError:
         print(
             "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
