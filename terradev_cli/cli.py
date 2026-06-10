@@ -10415,7 +10415,7 @@ def sso_test(provider):
 # ── SGLANG COMMAND GROUP ──
 
 
-@cli.group()
+@ml.group()
 def sglang():
     """SGLang optimization and management with workload-specific auto-tuning"""
     pass

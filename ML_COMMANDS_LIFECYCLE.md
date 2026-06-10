@@ -415,13 +415,13 @@ terradev ml vllm benchmark -e http://localhost:8000 -c 10
 
 ### SGLang Lifecycle
 
-**Command:** `terradev ml sglang-legacy`
+**Command:** `terradev ml sglang`
 
 #### Phase 1: Setup
 
 ```bash
 # Test connection
-terradev ml sglang-legacy --test
+terradev ml sglang --test
 # Output: Version, model path, dashboard/tracing/metrics/deployment/observability status
 ```
 
@@ -429,7 +429,7 @@ terradev ml sglang-legacy --test
 
 ```bash
 # Create pipeline
-terradev ml sglang-legacy --create-pipeline my-pipeline --model-path /models/mistral-7b
+terradev ml sglang --create-pipeline my-pipeline --model-path /models/mistral-7b
 # Output: Pipeline ID, name, description, model path
 ```
 
@@ -437,7 +437,7 @@ terradev ml sglang-legacy --create-pipeline my-pipeline --model-path /models/mis
 
 ```bash
 # Start serving
-terradev ml sglang-legacy --serve --model-path /models/mistral-7b --port 8000
+terradev ml sglang --serve --model-path /models/mistral-7b --port 8000
 # Output: Model, port, dashboard/metrics/health URLs
 # Dashboard: http://localhost:8000/dashboard
 # Metrics: http://localhost:8000/metrics
@@ -448,7 +448,7 @@ terradev ml sglang-legacy --serve --model-path /models/mistral-7b --port 8000
 
 ```bash
 # Get metrics
-terradev ml sglang-legacy --metrics
+terradev ml sglang --metrics
 # Output: Version, model path, metrics (requests/sec, avg latency, success rate, GPU utilization, memory usage)
 ```
 
@@ -456,7 +456,7 @@ terradev ml sglang-legacy --metrics
 
 ```bash
 # Access dashboard
-terradev ml sglang-legacy --dashboard --port 8000
+terradev ml sglang --dashboard --port 8000
 # Output: Dashboard, metrics, health URLs
 ```
 
@@ -693,7 +693,7 @@ terradev ml databricks deploy-model --model-uri dbfs:/models/my-model --endpoint
 | `terradev ml langchain` | LLM orchestration | Workflows, LangGraph, SGLang, tracing |
 | `terradev ml langgraph` | LLM orchestration | Workflows, deployment, monitoring |
 | `terradev ml vllm` | vLLM optimization | Configuration, LoRA adapters, benchmarking |
-| `terradev ml sglang-legacy` | Inference serving | Pipelines, serving, metrics, dashboard |
+| `terradev ml sglang` | Inference serving | Pipelines, serving, metrics, dashboard |
 | `terradev ml kserve` | Model deployment | K8s model serving |
 | `terradev ml qdrant` | Vector database | Collections, search, RAG infrastructure |
 | `terradev ml guardrails` | Output safety | Jailbreak detection, PII masking |
