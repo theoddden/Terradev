@@ -6251,168 +6251,6 @@ def ml():
 
 @ml.command()
 @click.option("--test", is_flag=True, help="Test connection to the service")
-@click.option("--gpu-nodes", is_flag=True, help="List GPU-enabled nodes")
-@click.option(
-    "--install-karpenter", is_flag=True, help="Install Karpenter for auto-scaling"
-)
-@click.option("--create-provisioner", help="Create Karpenter provisioner for GPU type")
-@click.option("--gpu-type", help="GPU type for provisioner")
-@click.option("--cpu-limit", help="CPU limit for provisioner")
-@click.option("--memory-limit", help="Memory limit for provisioner")
-@click.option("--resources", is_flag=True, help="Get cluster resources")
-@click.option(
-    "--install-monitoring",
-    is_flag=True,
-    help="Install Prometheus and Grafana with Karpenter dashboards",
-)
-@click.option(
-    "--metrics-summary", is_flag=True, help="Get comprehensive metrics summary"
-)
-@click.option("--dashboard", is_flag=True, help="Access Grafana dashboard")
-def kubernetes(
-    test,
-    gpu_nodes,
-    install_karpenter,
-    create_provisioner,
-    gpu_type,
-    cpu_limit,
-    memory_limit,
-    resources,
-    install_monitoring,
-    metrics_summary,
-    dashboard,
-):
-    """Enhanced Kubernetes cluster management with Karpenter and monitoring"""
-    try:
-        from ml_services.kubernetes_enhanced import (
-            create_enhanced_kubernetes_service_from_credentials,
-            get_enhanced_kubernetes_setup_instructions,
-        )
-
-        api = TerradevAPI()
-        creds = api._provider_creds("kubernetes")
-
-        if not any(creds.values()):
-            print(get_enhanced_kubernetes_setup_instructions())
-            return
-
-        service = create_enhanced_kubernetes_service_from_credentials(creds)
-
-        if test:
-            print(" Testing enhanced Kubernetes connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: Kubernetes connected successfully")
-                print(f"   Cluster: {result['cluster_name']}")
-                print(f"   Namespace: {result['namespace']}")
-                print(f"   Nodes: {len(result['nodes'])}")
-                print(
-                    f"   Karpenter: {'Enabled' if result['karpenter_enabled'] else 'Disabled'}"
-                )
-                print(
-                    f"   Monitoring: {'Enabled' if creds.get('kubernetes_monitoring_enabled') == 'true' else 'Disabled'}"
-                )
-            else:
-                print(f"ERROR: Kubernetes connection failed: {result['error']}")
-
-        elif install_monitoring:
-            print("Deploying Installing enhanced monitoring stack...")
-            result = asyncio.run(service.install_monitoring_stack())
-
-            if result["status"] == "installed":
-                print("OK: Monitoring stack installed")
-                print(f"   Prometheus: {result.get('prometheus')}")
-                print(f"   Grafana: {result.get('grafana')}")
-                print(f"   Dashboards: {result.get('dashboards')}")
-                print(
-                    "   Access Grafana: kubectl port-forward -n monitoring svc/grafana 3000:80"
-                )
-            else:
-                print(f"ERROR: Installation failed: {result['error']}")
-
-        elif metrics_summary:
-            print("Status Getting comprehensive metrics summary...")
-            result = asyncio.run(service.get_metrics_summary())
-
-            if result.get("status") != "failed":
-                print(f"   Cluster: {result.get('cluster', {})}")
-                print(f"   Resources: {result.get('resources', {})}")
-                print(f"   Monitoring: {result.get('monitoring', {})}")
-                print(f"   Karpenter: {result.get('karpenter', {})}")
-            else:
-                print(f"ERROR: Metrics summary failed: {result.get('error')}")
-
-        elif dashboard:
-            print(" Accessing Grafana dashboard...")
-            dashboard_port = creds.get("kubernetes_dashboard_port", "3000")
-            print(
-                f"   Port-forward Grafana: kubectl port-forward -n monitoring svc/grafana {dashboard_port}:80"
-            )
-            print(f"   Access at: http://localhost:{dashboard_port}")
-            print("   Username: admin")
-            print("   Password: prom-operator")
-
-        elif gpu_nodes:
-            print(" Listing GPU-enabled nodes...")
-            nodes = asyncio.run(service.get_gpu_nodes())
-
-            if nodes:
-                for node in nodes:
-                    print(
-                        f"    {node['name']} - {node['instance_type']} - {node['gpu_capacity']} GPUs"
-                    )
-            else:
-                print("   INFO:  No GPU nodes found")
-
-        elif install_karpenter:
-            print("Deploying Installing Karpenter...")
-            result = asyncio.run(service.install_karpenter())
-
-            if result["status"] == "installed":
-                print(f"OK: Karpenter installed: {result['version']}")
-            else:
-                print(f"ERROR: Installation failed: {result['error']}")
-
-        elif create_provisioner:
-            if not gpu_type:
-                print("ERROR: GPU type required for provisioner creation")
-                return
-
-            limits = {}
-            if cpu_limit:
-                limits["cpu"] = cpu_limit
-            if memory_limit:
-                limits["memory"] = memory_limit
-
-            print(f" Creating Karpenter provisioner for {gpu_type}...")
-            result = asyncio.run(service.create_karpenter_provisioner(gpu_type, limits))
-
-            if result["status"] == "created":
-                print(f"OK: Provisioner created: {result['provisioner']}")
-            else:
-                print(f"ERROR: Creation failed: {result['error']}")
-
-        elif resources:
-            print("Status Getting cluster resources...")
-            resources_data = asyncio.run(service.get_cluster_resources())
-
-            print(f"   CPU: {resources_data['total_cpu']:.1f} cores")
-            print(f"   Memory: {resources_data['total_memory']:.1f} GB")
-            print(f"   GPUs: {resources_data['total_gpu']}")
-            print(f"   Nodes: {len(resources_data['nodes'])}")
-
-        else:
-            print(
-                "OK: Enhanced Kubernetes configured. Use --test to verify connection."
-            )
-
-    except ImportError:
-        print("ERROR: Enhanced Kubernetes service not available.")
-
-
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
 @click.option("--list-projects", is_flag=True, help="List all projects")
 @click.option("--create-project", help="Create a new project")
 @click.option("--list-runs", is_flag=True, help="List runs in project")
@@ -6962,129 +6800,6 @@ def sglang_legacy(test, create_pipeline, model_path, serve, port, metrics, dashb
 
     except ImportError:
         print("ERROR: Enhanced SGLang service not available.")
-
-
-@ml.command()
-@click.option("--test", is_flag=True, help="Test connection to the service")
-@click.option("--list-models", is_flag=True, help="List models")
-@click.option("--author", help="Filter models by author")
-@click.option("--list-datasets", is_flag=True, help="List datasets")
-@click.option("--model-info", help="Get model information")
-@click.option("--create-endpoint", help="Create inference endpoint")
-@click.option("--model", help="Model ID for endpoint")
-@click.option("--name", help="Endpoint name")
-@click.option("--instance-type", help="Instance type (default: gpu-medium-a10g)")
-@click.option("--list-endpoints", is_flag=True, help="List inference endpoints")
-@click.option("--inference", help="Run inference on endpoint")
-@click.option("--inputs", help="JSON inputs for inference")
-def huggingface(
-    test,
-    list_models,
-    author,
-    list_datasets,
-    model_info,
-    create_endpoint,
-    model,
-    name,
-    instance_type,
-    list_endpoints,
-    inference,
-    inputs,
-):
-    """Hugging Face models, datasets, and inference endpoints"""
-    try:
-        from ml_services.huggingface_service import (
-            create_huggingface_service_from_credentials,
-            get_huggingface_setup_instructions,
-        )
-
-        api = TerradevAPI()
-        creds = api._provider_creds("huggingface")
-
-        if not creds.get("api_key"):
-            print(get_huggingface_setup_instructions())
-            return
-
-        service = create_huggingface_service_from_credentials(creds)
-
-        if test:
-            print(" Testing Hugging Face connection...")
-            result = asyncio.run(service.test_connection())
-
-            if result["status"] == "connected":
-                print("OK: Hugging Face connected successfully")
-                print(f"   Namespace: {result['namespace']}")
-                print(f"   Organization: {result['organization']}")
-            else:
-                print(f"ERROR: Hugging Face connection failed: {result['error']}")
-
-        elif list_models:
-            print(" Listing Hugging Face models...")
-            models = asyncio.run(service.list_models(author=author, limit=20))
-
-            for model in models[:10]:  # Show first 10
-                print(f"    {model['id'][:50]} - {model.get('downloads', 0)} downloads")
-
-        elif list_datasets:
-            print("Status Listing Hugging Face datasets...")
-            datasets = asyncio.run(service.list_datasets(author=author, limit=20))
-
-            for dataset in datasets[:10]:  # Show first 10
-                print(
-                    f"   Status {dataset['id'][:50]} - {dataset.get('downloads', 0)} downloads"
-                )
-
-        elif model_info:
-            print(f" Getting model info: {model_info}")
-            result = asyncio.run(service.get_model_info(model_info))
-
-            print(f"   Model: {result['id']}")
-            print(f"   Downloads: {result.get('downloads', 0)}")
-            print(f"   Likes: {result.get('likes', 0)}")
-            print(f"   Tags: {', '.join(result.get('tags', [])[:5])}")
-
-        elif create_endpoint:
-            if not model or not name:
-                print("ERROR: Model and name required for endpoint creation")
-                return
-
-            instance = instance_type or "gpu-medium-a10g"
-            print(f"Deploying Creating inference endpoint: {name}")
-            result = asyncio.run(
-                service.create_inference_endpoint(model, name, instance)
-            )
-
-            print(f"OK: Endpoint created: {result['name']}")
-            print(f"   Status: {result.get('status', 'Unknown')}")
-
-        elif list_endpoints:
-            print(" Listing inference endpoints...")
-            endpoints = asyncio.run(service.list_inference_endpoints())
-
-            for endpoint in endpoints:
-                print(f"    {endpoint['name']} - {endpoint.get('status', 'Unknown')}")
-
-        elif inference:
-            if not inputs:
-                print("ERROR: Inputs required for inference")
-                return
-
-            try:
-                inputs_data = json.loads(inputs)
-            except json.JSONDecodeError:
-                print("ERROR: Invalid JSON inputs")
-                return
-
-            print(f" Running inference on: {inference}")
-            result = asyncio.run(service.run_inference(inference, inputs_data))
-
-            print(f"Status Inference result: {json.dumps(result, indent=2)}")
-
-        else:
-            print("OK: Hugging Face configured. Use --test to verify connection.")
-
-    except ImportError:
-        print("ERROR: Hugging Face service not available.")
 
 
 @ml.command()
@@ -9729,7 +9444,7 @@ def _parse_vllm_endpoint(endpoint: str):
     return p.hostname or "127.0.0.1", p.port or 8000
 
 
-@cli.group()
+@ml.group()
 def vllm():
     """vLLM optimization and management commands."""
     pass
@@ -10223,7 +9938,7 @@ def lora_remove_cmd(endpoint, name, api_key):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@cli.group()
+@ml.group()
 def phoenix():
     """Arize Phoenix LLM trace observability  traces, spans, OTEL."""
     pass
@@ -10347,7 +10062,7 @@ def phoenix_k8s(namespace):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@cli.group()
+@ml.group()
 def guardrails():
     """NeMo Guardrails  LLM output safety, jailbreak detection, PII masking."""
     pass
@@ -10434,7 +10149,7 @@ def guardrails_k8s(namespace):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@cli.group()
+@ml.group()
 def qdrant():
     """Qdrant vector database  collections, search, RAG infrastructure."""
     pass
@@ -11388,7 +11103,7 @@ def retrain_history(limit, fmt):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@cli.group()
+@ml.group()
 def langfuse():
     """Langfuse LLM observability  traces, scores, datasets, prompts."""
     pass
@@ -11666,7 +11381,7 @@ def langfuse_k8s(namespace):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@cli.group()
+@ml.group()
 def databricks():
     """Databricks MLOps  jobs, clusters, model serving, MLflow."""
     pass
