@@ -1,4 +1,4 @@
-# Terradev CLI v5.3.3
+# Terradev CLI v5.3.8
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -8,11 +8,17 @@
 
 pypi.org/project/terradev-cli/
 
-Terradev is a cross-cloud compute-provisioning CLI that compresses + stages datasets, provisions optimal instances + nodes, and deploys **3-5x faster** than sequential provisioning.
+Terradev is a cross-cloud compute control plane for AI workloads, not just a provisioning wrapper. 
+
+Combines quoting, provisioning, topology optimization, training orchestration, inference tuning, and cost analytics in one CLI, with a Rust-accelerated idempotent runtime underneath.
+
+Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
+
+Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
 **NOTES ON 5.3.3**
 
-Added **provider profile system** for intelligent quirk-aware routing across 23 cloud providers:
+Added **provider registration and profiling system** for intelligent quirk-aware routing across 23 cloud providers, and registration for custom providers from .yaml import:
 
 - **ProviderProfile schema** (`providers/types.py`): Encodes provider-specific behaviors including API style (REST/GraphQL/JSON:API), authentication type (Bearer/Basic/HMAC/X-Api-Key), rate limits, spot instance support, egress costs, fallback routing, capacity checks, container image pinning, and spot interruption handling.
 
@@ -29,20 +35,6 @@ Added **provider profile system** for intelligent quirk-aware routing across 23 
   terradev providers show-profile runpod
   terradev providers remove-profile my_custom_provider
   terradev providers export-example -o ~/.terradev/custom_providers.yaml
-  ```
-
-**NOTES ON 5.3.0**
-
-Added **transport-agnostic Prefill/Decode (P/D) disaggregation layer** and **multi-agent KV cache sharing planner**:
-
-- **Transport-agnostic P/D layer** (`core/pd_transport.py`): KV cache transfer is abstracted across NIXL/NVLink (600 GB/s), NIXL/InfiniBand (200–400 GB/s), CXL 3.0 (planned migration), RoCE RDMA, and TCP fallback. The `TransportSelector` probes at provision time and selects the best available transport. Documented NIXL→CXL migration path (Phase 1 co-existence → Phase 2 CXL-primary → Phase 3 fabric switch).
-
-- **Multi-agent KV sharing planner** (`core/kv_sharing.py`): Computes fleet VRAM requirements with KV cache sharing topologies (broadcast/star/chain/none). For 20 agents with 70% shared context (broadcast), VRAM reduces by 66% → 3× more agents per GPU, 3× fewer GPUs needed, ~$14/hr savings on H100 fleet. Includes `EvictionCostModel` to quantify re-prefill penalty when VRAM is under-provisioned.
-
-- **CLI integration**: `terradev provision` now supports `--agents`, `--context`, `--sharing-topology`, `--dtype` flags. When `--agents` is passed, the KV planner outputs the heterogeneous fleet spec with cost savings:
-  ```bash
-  terradev provision -g H100 --agents 20 --context 32k --model-name llama-70b
-  terradev provision -g H100 --agents 20 --context 32k --sharing-topology broadcast --dry-run
   ```
 
 **NOTES ON 5.2.1**
@@ -676,6 +668,5 @@ Apache 2.0.
 
 ## Support
 
-- **Documentation**: [Full User Guide](USER_GUIDE.md)
 - **Issues**: [GitHub Issues](https://github.com/theoddden/Terradev/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/theoddden/Terradev/discussions)

@@ -1,4 +1,4 @@
-# Terradev CLI v5.3.7
+# Terradev CLI v5.3.8
 
 **An imperative command-line-interface for AI workload orchestration.**
 
