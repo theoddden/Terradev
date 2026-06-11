@@ -636,7 +636,7 @@ class DriftRetrainService:
 
     # ── Adapter-Specific Drift Detection (for LoRA Versioning) ───────────
 
-    async def detect_drift(
+    async def detect_adapter_drift(
         self,
         model_name: str,
         source: str = "phoenix-traces",

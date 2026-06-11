@@ -279,7 +279,7 @@ class LoRAVersioningManager:
 
         try:
             # Detect drift using drift service
-            drift_result = await self.drift_service.detect_drift(
+            drift_result = await self.drift_service.detect_adapter_drift(
                 model_name=adapter_name,
                 source=source,
                 threshold=drift_threshold,

@@ -92,7 +92,7 @@ class LoRAConsistencyManager:
             # Load K8s config
             try:
                 config.load_incluster_config()
-            except:
+            except config.ConfigException:
                 config.load_kube_config()
 
             v1 = client.CoreV1Api()
