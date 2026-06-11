@@ -634,6 +634,54 @@ class DriftRetrainService:
         except Exception as e:
             logger.debug(f"Failed to save manifest: {e}")
 
+    # ── Adapter-Specific Drift Detection (for LoRA Versioning) ───────────
+
+    async def detect_drift(
+        self,
+        model_name: str,
+        source: str = "phoenix-traces",
+        threshold: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Detect drift for a specific model/adapter.
+
+        This is a simplified drift detection method for use by LoRAVersioningManager.
+        Returns current performance score and drift status.
+        """
+        if threshold is None:
+            threshold = self.config.degradation_threshold
+
+        # Use existing detect_drift method
+        drift_result = await self._detect_drift_from_phoenix()
+
+        return {
+            "has_drift": drift_result["drifted"],
+            "current_score": drift_result["score"],
+            "baseline_score": drift_result["baseline"],
+            "threshold": threshold,
+            "samples": drift_result["samples"],
+            "detail": drift_result["detail"],
+        }
+
+    async def retrain_on_drift(
+        self,
+        model_name: str,
+        source: str = "phoenix-traces",
+    ) -> Dict[str, Any]:
+        """
+        Trigger retraining for a specific model/adapter on drift detection.
+
+        This is a simplified entry point for LoRAVersioningManager to trigger
+        retraining when drift is detected.
+        """
+        # Update config with model name
+        self.config.model_id = model_name
+
+        # Run the full cycle
+        result = await self.run_full_cycle()
+
+        return result
+
     # ── History ───────────────────────────────────────────────────────────
 
     @staticmethod

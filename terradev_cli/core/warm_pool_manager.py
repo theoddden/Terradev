@@ -67,6 +67,10 @@ class WarmPoolConfig:
     )
     strategy: WarmStrategy = WarmStrategy.TRAFFIC_BASED
     enable_predictive_warming: bool = True  # Use traffic patterns to predict warming
+    # LoRA adapter warm pool settings
+    max_warm_adapters_per_replica: int = 5  # Max adapters to keep warm per replica
+    adapter_warm_threshold_rph: float = 3.0  # Requests per hour for adapter warming
+    enable_adapter_aware_warming: bool = True  # Track adapter warm state per replica
 
 
 @dataclass
@@ -106,7 +110,7 @@ class WarmPoolManager:
     5. CUDA Graph-aware warming strategies
     """
 
-    def __init__(self, config: WarmPoolConfig, config_dir: Optional[Path] = None):
+    def __init__(self, config: WarmPoolConfig, config_dir: Optional[Path] = None, cost_service: Optional[Any] = None):
         self.config = config
         self.config_dir = config_dir or Path.home() / ".terradev"
 
@@ -117,6 +121,16 @@ class WarmPoolManager:
         self.model_traffic: Dict[str, List[datetime]] = {}
         self.model_load_times: Dict[str, float] = {}
 
+        # LoRA adapter warm state per replica
+        # replica_id -> set of adapter names that are warm on that replica
+        self.replica_adapter_warm_state: Dict[str, Set[str]] = {}
+        # adapter_name -> list of replica_ids where it's warm
+        self.adapter_replica_mapping: Dict[str, Set[str]] = {}
+        # adapter_name -> list of request timestamps
+        self.adapter_traffic: Dict[str, List[datetime]] = {}
+        # adapter_name -> last load time per replica
+        self.adapter_load_times: Dict[str, Dict[str, datetime]] = {}
+
         # CUDA Graph optimization state
         self.cuda_graph_models: Set[str] = set()  # Models that can use CUDA Graphs
         self.model_graph_scores: Dict[str, float] = {}  # Graph optimization scores
@@ -124,16 +138,21 @@ class WarmPoolManager:
             {}
         )  # NUMA scores per endpoint
 
+        # Cost attribution service
+        self.cost_service = cost_service
+
         # Metrics tracking
         self.metrics = WarmPoolMetrics()
         self.metrics_file = self.config_dir / "warm_pool_metrics.json"
         self.traffic_file = self.config_dir / "model_traffic.json"
         self.graph_metrics_file = self.config_dir / "cuda_graph_metrics.json"
+        self.adapter_metrics_file = self.config_dir / "adapter_warm_metrics.json"
 
         # Background tasks
         self._warming_task: Optional[asyncio.Task] = None
         self._eviction_task: Optional[asyncio.Task] = None
         self._graph_optimization_task: Optional[asyncio.Task] = None
+        self._adapter_warming_task: Optional[asyncio.Task] = None
         self._running = False
 
         # Async lock to protect shared state
@@ -143,6 +162,7 @@ class WarmPoolManager:
         self._load_metrics()
         self._load_traffic_history()
         self._load_cuda_graph_metrics()
+        self._load_adapter_metrics()
 
     async def start(self):
         """Start warm pool management background tasks"""
@@ -152,7 +172,11 @@ class WarmPoolManager:
         self._graph_optimization_task = asyncio.create_task(
             self._cuda_graph_optimizer()
         )
-        logger.info("Warm Pool Manager started with CUDA Graph optimization")
+        if self.config.enable_adapter_aware_warming:
+            self._adapter_warming_task = asyncio.create_task(
+                self._adapter_warming_manager()
+            )
+        logger.info("Warm Pool Manager started with CUDA Graph optimization and adapter-aware warming")
 
     async def stop(self):
         """Stop warm pool management"""
@@ -163,6 +187,8 @@ class WarmPoolManager:
             self._eviction_task.cancel()
         if self._graph_optimization_task:
             self._graph_optimization_task.cancel()
+        if self._adapter_warming_task:
+            self._adapter_warming_task.cancel()
         logger.info("Warm Pool Manager stopped")
 
     # ── Model Management ──
@@ -796,6 +822,257 @@ class WarmPoolManager:
             )
 
         return recommendations
+
+    # ── LoRA Adapter Warm Pool Management ──
+
+    async def register_replica(self, replica_id: str):
+        """Register a replica for adapter warm pool tracking"""
+        async with self._lock:
+            if replica_id not in self.replica_adapter_warm_state:
+                self.replica_adapter_warm_state[replica_id] = set()
+                logger.debug(f"Registered replica {replica_id} for adapter warm pool")
+
+    async def record_adapter_load(
+        self, replica_id: str, adapter_name: str, load_time_ms: float, tenant_id: Optional[str] = None
+    ):
+        """Record an adapter load event on a replica"""
+        async with self._lock:
+            now = datetime.now()
+
+            # Update replica warm state
+            if replica_id not in self.replica_adapter_warm_state:
+                self.replica_adapter_warm_state[replica_id] = set()
+            self.replica_adapter_warm_state[replica_id].add(adapter_name)
+
+            # Update adapter replica mapping
+            if adapter_name not in self.adapter_replica_mapping:
+                self.adapter_replica_mapping[adapter_name] = set()
+            self.adapter_replica_mapping[adapter_name].add(replica_id)
+
+            # Update load times
+            if adapter_name not in self.adapter_load_times:
+                self.adapter_load_times[adapter_name] = {}
+            self.adapter_load_times[adapter_name][replica_id] = now
+
+            # Record traffic
+            if adapter_name not in self.adapter_traffic:
+                self.adapter_traffic[adapter_name] = []
+            self.adapter_traffic[adapter_name].append(now)
+
+            # Clean old traffic data (keep last 7 days)
+            cutoff = now - timedelta(days=7)
+            self.adapter_traffic[adapter_name] = [
+                timestamp
+                for timestamp in self.adapter_traffic[adapter_name]
+                if timestamp > cutoff
+            ]
+
+            self._save_adapter_metrics()
+            logger.debug(
+                f"Recorded adapter load: {adapter_name} on {replica_id} ({load_time_ms:.2f}ms)"
+            )
+
+        # Record cost if cost service is available
+        if self.cost_service:
+            # Estimate GPU time for load (load_time_ms is wall clock, assume 1 GPU)
+            gpu_seconds = load_time_ms / 1000
+            await self.cost_service.record_inference_cost(
+                adapter_name=adapter_name,
+                tenant_id=tenant_id,
+                replica_id=replica_id,
+                gpu_seconds=gpu_seconds,
+                tokens=0,  # Load doesn't process tokens
+                instance_type="a10g",  # Default instance type
+            )
+
+    async def record_adapter_request(
+        self, replica_id: str, adapter_name: str, latency_ms: float, was_warm: bool, 
+        gpu_seconds: float = 0.0, tokens: int = 0, tenant_id: Optional[str] = None
+    ):
+        """Record an adapter inference request"""
+        async with self._lock:
+            now = datetime.now()
+
+            # Record traffic
+            if adapter_name not in self.adapter_traffic:
+                self.adapter_traffic[adapter_name] = []
+            self.adapter_traffic[adapter_name].append(now)
+
+            # Update metrics
+            if was_warm:
+                self.metrics.cache_hits += 1
+            else:
+                self.metrics.cache_misses += 1
+                self.metrics.cold_start_requests += 1
+
+            # Clean old traffic data
+            cutoff = now - timedelta(days=7)
+            self.adapter_traffic[adapter_name] = [
+                timestamp
+                for timestamp in self.adapter_traffic[adapter_name]
+                if timestamp > cutoff
+            ]
+
+            self._save_adapter_metrics()
+
+        # Record cost if cost service is available
+        if self.cost_service and (gpu_seconds > 0 or tokens > 0):
+            await self.cost_service.record_inference_cost(
+                adapter_name=adapter_name,
+                tenant_id=tenant_id,
+                replica_id=replica_id,
+                gpu_seconds=gpu_seconds,
+                tokens=tokens,
+                instance_type="a10g",  # Default instance type
+            )
+
+    async def record_adapter_unload(self, replica_id: str, adapter_name: str):
+        """Record an adapter unload event on a replica"""
+        async with self._lock:
+            # Update replica warm state
+            if replica_id in self.replica_adapter_warm_state:
+                self.replica_adapter_warm_state[replica_id].discard(adapter_name)
+
+            # Update adapter replica mapping
+            if adapter_name in self.adapter_replica_mapping:
+                self.adapter_replica_mapping[adapter_name].discard(replica_id)
+
+            # Clean up empty mappings
+            if not self.adapter_replica_mapping[adapter_name]:
+                del self.adapter_replica_mapping[adapter_name]
+
+            self._save_adapter_metrics()
+            logger.debug(f"Recorded adapter unload: {adapter_name} on {replica_id}")
+
+    async def should_warm_adapter_on_replica(
+        self, replica_id: str, adapter_name: str
+    ) -> bool:
+        """Determine if an adapter should be kept warm on a specific replica"""
+        async with self._lock:
+            # Check if already warm
+            if (
+                replica_id in self.replica_adapter_warm_state
+                and adapter_name in self.replica_adapter_warm_state[replica_id]
+            ):
+                return True
+
+            # Check if replica has capacity
+            if replica_id in self.replica_adapter_warm_state:
+                current_count = len(self.replica_adapter_warm_state[replica_id])
+                if current_count >= self.config.max_warm_adapters_per_replica:
+                    return False
+
+            # Check adapter traffic
+            if adapter_name not in self.adapter_traffic:
+                return False
+
+            # Calculate requests per hour
+            now = datetime.now()
+            one_hour_ago = now - timedelta(hours=1)
+            recent_requests = [
+                timestamp
+                for timestamp in self.adapter_traffic[adapter_name]
+                if timestamp > one_hour_ago
+            ]
+
+            if len(recent_requests) < self.config.adapter_warm_threshold_rph:
+                return False
+
+            return True
+
+    async def get_adapter_warm_replicas(self, adapter_name: str) -> Set[str]:
+        """Get set of replicas where an adapter is currently warm"""
+        async with self._lock:
+            return self.adapter_replica_mapping.get(adapter_name, set()).copy()
+
+    async def get_replica_warm_adapters(self, replica_id: str) -> Set[str]:
+        """Get set of adapters warm on a specific replica"""
+        async with self._lock:
+            return self.replica_adapter_warm_state.get(replica_id, set()).copy()
+
+    async def _adapter_warming_manager(self):
+        """Background task to manage adapter warm pool state"""
+        while self._running:
+            try:
+                await asyncio.sleep(60)  # Check every minute
+
+                async with self._lock:
+                    now = datetime.now()
+                    idle_threshold = timedelta(minutes=self.config.idle_eviction_minutes)
+
+                    # Evict idle adapters from replicas
+                    for replica_id, adapters in list(
+                        self.replica_adapter_warm_state.items()
+                    ):
+                        for adapter_name in list(adapters):
+                            # Check last request time
+                            if adapter_name in self.adapter_traffic:
+                                last_requests = self.adapter_traffic[adapter_name]
+                                if last_requests:
+                                    last_request = max(last_requests)
+                                    if now - last_request > idle_threshold:
+                                        # Evict adapter from this replica
+                                        await self.record_adapter_unload(
+                                            replica_id, adapter_name
+                                        )
+                                        logger.info(
+                                            f"Evicted idle adapter {adapter_name} from replica {replica_id}"
+                                        )
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Adapter warming manager error: {e}")
+
+    def _load_adapter_metrics(self):
+        """Load adapter warm pool metrics from disk"""
+        try:
+            if self.adapter_metrics_file.exists():
+                with open(self.adapter_metrics_file) as f:
+                    data = json.load(f)
+                    self.replica_adapter_warm_state = {
+                        k: set(v) for k, v in data.get("replica_adapter_warm_state", {}).items()
+                    }
+                    self.adapter_replica_mapping = {
+                        k: set(v) for k, v in data.get("adapter_replica_mapping", {}).items()
+                    }
+                    self.adapter_traffic = {
+                        k: [datetime.fromisoformat(ts) for ts in v]
+                        for k, v in data.get("adapter_traffic", {}).items()
+                    }
+                    self.adapter_load_times = {
+                        k: {
+                            rep: datetime.fromisoformat(ts)
+                            for rep, ts in v.items()
+                        }
+                        for k, v in data.get("adapter_load_times", {}).items()
+                    }
+        except Exception as e:
+            logger.debug(f"Failed to load adapter metrics: {e}")
+
+    def _save_adapter_metrics(self):
+        """Save adapter warm pool metrics to disk"""
+        try:
+            data = {
+                "replica_adapter_warm_state": {
+                    k: list(v) for k, v in self.replica_adapter_warm_state.items()
+                },
+                "adapter_replica_mapping": {
+                    k: list(v) for k, v in self.adapter_replica_mapping.items()
+                },
+                "adapter_traffic": {
+                    k: [ts.isoformat() for ts in v]
+                    for k, v in self.adapter_traffic.items()
+                },
+                "adapter_load_times": {
+                    k: {rep: ts.isoformat() for rep, ts in v.items()}
+                    for k, v in self.adapter_load_times.items()
+                },
+            }
+            with open(self.adapter_metrics_file, "w") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.debug(f"Failed to save adapter metrics: {e}")
 
     def _get_optimization_potential(self, graph_score: float) -> str:
         """Get human-readable optimization potential"""

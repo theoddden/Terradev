@@ -1,5 +1,5 @@
 # Terradev CLI BNF Grammar
-# Complete syntax specification for all commands and options — v5.3.0
+# Complete syntax specification for all commands and options — v5.4.0
 
 <terradev-cli> ::= <global-options> <command>
 
@@ -25,6 +25,8 @@
     | <cleanup-command>
     | <job-command>
     | <deploy-command>
+    | <providers-command>
+    | <karpenter-command>
     # ─ Price Intelligence ─
     | <price-discovery-command>
     | <budget-optimize-command>
@@ -77,12 +79,7 @@
     | <sso-commands>
     | <gitops-commands>
     | <inferx-commands>
-    | <phoenix-commands>
-    | <guardrails-commands>
-    | <qdrant-commands>
     | <retrain-commands>
-    | <langfuse-commands>
-    | <databricks-commands>
     | <agentic-serving-commands>
     | <model-router-commands>
     | <migrate-commands>
@@ -475,13 +472,18 @@
     | wandb        <ml-wandb-options>
     | langchain    <ml-lc-options>
     | langgraph    <ml-lg-options>
+    | langsmith    <ml-ls-options>
     | sglang       <ml-sglang-options>
     | huggingface  <ml-hf-options>
     | kserve       <ml-kserve-options>
-    | langsmith    <ml-ls-options>
     | dvc          <ml-dvc-options>
-    | mlflow       <ml-mlflow-options>
+    | mlflow_legacy <ml-mlflow-options>
     | ray          <ml-ray-options>
+    | phoenix      <ml-phoenix-options>
+    | guardrails   <ml-guardrails-options>
+    | qdrant       <ml-qdrant-options>
+    | langfuse     <ml-langfuse-options>
+    | databricks   <ml-databricks-options>
 
 <ml-k8s-options> ::=
     [--test] [--gpu-nodes] [--install-karpenter] [--create-provisioner]
@@ -520,6 +522,35 @@
 
 <ml-mlflow-options> ::=
     [--test] [--create-experiment] [--list-experiments] [--experiment-name <string>]
+
+<ml-phoenix-options> ::=
+    [--test] [--projects] [--spans] [--trace] [--otel-env] [--snippet] [--k8s]
+    [-p <string>] [-f <string>] [-l <integer>] [-t <string>]
+
+<ml-guardrails-options> ::=
+    [--test] [--chat] [--generate-config] [--k8s]
+    [-m <string>] [-c <string>] [-o <path>] [-n <string>]
+
+<ml-qdrant-options> ::=
+    [--test] [--collections] [--create-collection] [--info] [--count] [--k8s]
+    [-n <string>] [-e <string>]
+
+<ml-langfuse-options> ::=
+    [--configure] [--test] [--traces] [--trace] [--scores] [--score]
+    [--datasets] [--export-training-data] [--quality] [--otel-env] [--k8s]
+    [--public-key <string>] [--secret-key <string>] [--host <url>]
+    [-n <integer>] [--name <string>] [-f <json-or-text>]
+    [--trace-id <string>] [--observation-id <string>] [--value <float>]
+    [--comment <string>] [--min-score <float>] [--score-name <string>]
+    [-o <path>] [-p <string>]
+
+<ml-databricks-options> ::=
+    [--configure] [--test] [--jobs] [--run] [--run-status]
+    [--clusters] [--serving-endpoints] [--deploy-model] [--query]
+    [--mlflow] <databricks-mlflow-subcommand>
+    [--host <url>] [--token <string>] [-n <integer>] [-f <json-or-text>]
+    <integer> [--endpoint <string>] [--prompt <string>]
+    <databricks-deploy-model-options>
 
 <ml-ray-options> ::=
     [--test] [--install-monitoring] [--metrics-summary] [--grafana] [--prometheus]
@@ -736,50 +767,6 @@
 
 
 # ════════════════════════════════════════════════════════════════════
-# PHOENIX COMMAND GROUP
-# ════════════════════════════════════════════════════════════════════
-
-<phoenix-commands> ::= phoenix <phoenix-subcommand>
-
-<phoenix-subcommand> ::=
-    | test
-    | projects  [-l <integer>]
-    | spans     [-p <string>] [-f <string>] [-l <integer>]
-    | trace     -t <string>  [-p <string>]
-    | otel-env  [-p <string>]
-    | snippet   [-p <string>]
-    | k8s       [-n <string>]
-
-
-# ════════════════════════════════════════════════════════════════════
-# GUARDRAILS COMMAND GROUP
-# ════════════════════════════════════════════════════════════════════
-
-<guardrails-commands> ::= guardrails <guardrails-subcommand>
-
-<guardrails-subcommand> ::=
-    | test
-    | chat            -m <string> [-c <string>]
-    | generate-config [-c <string>] [-o <path>]
-    | k8s             [-n <string>]
-
-
-# ════════════════════════════════════════════════════════════════════
-# QDRANT COMMAND GROUP
-# ════════════════════════════════════════════════════════════════════
-
-<qdrant-commands> ::= qdrant <qdrant-subcommand>
-
-<qdrant-subcommand> ::=
-    | test
-    | collections
-    | create-collection  [-n <string>] [-e <string>]
-    | info               [-n <string>]
-    | count              [-n <string>]
-    | k8s                [-n <string>]
-
-
-# ════════════════════════════════════════════════════════════════════
 # RETRAIN COMMAND GROUP
 # ════════════════════════════════════════════════════════════════════
 
@@ -823,62 +810,6 @@
     [-f <json-or-text>]
 
 <deploy-strategy> ::= canary | direct
-
-
-# ════════════════════════════════════════════════════════════════════
-# LANGFUSE COMMAND GROUP
-# ════════════════════════════════════════════════════════════════════
-
-<langfuse-commands> ::= langfuse <langfuse-subcommand>
-
-<langfuse-subcommand> ::=
-    | configure          [--public-key <string>] [--secret-key <string>] [--host <url>]
-    | test
-    | traces             [-n <integer>] [--name <string>] [-f <json-or-text>]
-    | trace              <string>       [-f <json-or-text>]
-    | scores             [--trace-id <string>] [--name <string>] [-n <integer>] [-f <json-or-text>]
-    | score              --trace-id <string> --name <string> --value <float>
-                         [--observation-id <string>] [--comment <string>]
-    | datasets           [-n <integer>] [-f <json-or-text>]
-    | export-training-data
-                         [-n <integer>] [--name <string>] [--min-score <float>]
-                         [--score-name <string>] [-o <path>]
-    | quality            [--score-name <string>] [-n <integer>] [-f <json-or-text>]
-    | otel-env           [-p <string>]
-    | k8s                [-n <string>]
-
-
-# ════════════════════════════════════════════════════════════════════
-# DATABRICKS COMMAND GROUP
-# ════════════════════════════════════════════════════════════════════
-
-<databricks-commands> ::= databricks <databricks-subcommand>
-
-<databricks-subcommand> ::=
-    | configure          [--host <url>] [--token <string>]
-    | test
-    | jobs               [-n <integer>] [-f <json-or-text>]
-    | run                <integer> [-f <json-or-text>]
-    | run-status         <integer> [-f <json-or-text>]
-    | clusters           [-f <json-or-text>]
-    | serving-endpoints  [-f <json-or-text>]
-    | deploy-model       <databricks-deploy-model-options>
-    | query              --endpoint <string> --prompt <string> [-f <json-or-text>]
-    | mlflow             <databricks-mlflow-subcommand>
-
-<databricks-deploy-model-options> ::=
-    --endpoint-name <string>
-    --model-name <string>
-    [--model-version <string>]
-    [--workload-size <db-workload-size>]
-    [--scale-to-zero | --no-scale-to-zero]
-    [-f <json-or-text>]
-
-<db-workload-size> ::= Small | Medium | Large
-
-<databricks-mlflow-subcommand> ::=
-    | experiments  [-n <integer>] [-f <json-or-text>]
-    | models       [-n <integer>] [-f <json-or-text>]
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -1102,6 +1033,55 @@
 
 
 # ════════════════════════════════════════════════════════════════════
+# PROVIDERS COMMAND GROUP
+# ════════════════════════════════════════════════════════════════════
+
+<providers-command> ::= providers <providers-subcommand>
+
+<providers-subcommand> ::=
+    | load-profiles   <providers-load-options>
+    | list-profiles
+    | remove-profile  <string>
+    | export-profiles <providers-export-options>
+
+<providers-load-options> ::=
+    --path <path>
+    [--override]
+
+<providers-export-options> ::=
+    [--output <path>]
+    [--format <json-or-yaml>]
+
+
+# ════════════════════════════════════════════════════════════════════
+# KARPENTER COMMAND GROUP
+# ════════════════════════════════════════════════════════════════════
+
+<karpenter-command> ::= karpenter <karpenter-subcommand>
+
+<karpenter-subcommand> ::=
+    | install         <karpenter-install-options>
+    | status
+    | nodepools
+    | create-nodepool <karpenter-nodepool-options>
+    | delete-nodepool <string>
+    | events
+    | logs
+    | gpu-nodes
+    | resources
+
+<karpenter-install-options> ::=
+    [--version <string>]
+    --cluster-name <string>
+
+<karpenter-nodepool-options> ::=
+    --name <string>
+    --gpu-type <gpu-type>
+    [--region <string>]
+    [--capacity <string>]
+
+
+# ════════════════════════════════════════════════════════════════════
 # LOCAL GPU POOL COMMAND GROUP
 # ════════════════════════════════════════════════════════════════════
 
@@ -1135,12 +1115,12 @@
     | aws | gcp | azure | runpod | vastai | lambda | coreweave
     | tensordock | baseten | oracle | crusoe | hyperstack
     | digitalocean | alibaba | ovhcloud | fluidstack | hetzner
-    | siliconflow | inferx | demo
+    | siliconflow | inferx | demo | yottalabs | e2enetworks
 
 <gpu-type> ::=
-    | H100 | A100 | A40 | L40 | L40S | A10G
-    | RTX4090 | RTX3090 | RTX3080
-    | T4 | V100
+    | H100 | H100-PCIe | A100 | A100-PCIe | A40 | L40 | L40S | A10G
+    | RTX4090 | RTX5090 | RTX3090 | RTX3080 | RTX6000Ada | RTXPro6000
+    | T4 | V100 | B200 | B300 | MI300X | GB200
 
 <workload-type> ::=
     | agentic_chat | batch_inference | low_latency | moe_model

@@ -10189,11 +10189,148 @@ def vllm_benchmark(endpoint, api_key, prompt, concurrent):
 
 @cli.group()
 def lora():
-    """Manage LoRA adapters on a running vLLM endpoint.
+    """Production-grade LoRA adapter management with registry and cross-replica consistency.
 
-    Serve N fine-tuned models on one base model, on one GPU.
+    Manage adapter versions, track replica distribution, and ensure consistency across deployments.
     """
     pass
+
+
+# ── Registry Commands ──
+
+
+@lora.command("register")
+@click.option("--name", "-n", required=True, help="Adapter name")
+@click.option("--path", required=True, help="Path to adapter weights")
+@click.option("--base-model", "-b", required=True, help="Base model name (e.g., meta-llama/Llama-2-7b-hf)")
+@click.option("--rank", default=64, help="LoRA rank (default: 64)")
+@click.option("--tenant", help="Associate with tenant ID")
+@click.option("--metadata", help="JSON metadata string")
+def lora_register_cmd(name, path, base_model, rank, tenant, metadata):
+    """Register a LoRA adapter in the central registry with version tracking.
+
+    Examples:
+        terradev lora register -n customer-a --path /adapters/customer-a -b meta-llama/Llama-2-7b-hf
+        terradev lora register -n customer-b --path /adapters/customer-b -b meta-llama/Llama-2-7b-hf --tenant t-123
+    """
+    import json
+    from ml_services.lora_registry import get_lora_registry
+
+    registry = get_lora_registry()
+    metadata_dict = json.loads(metadata) if metadata else {}
+
+    version = registry.register_adapter(
+        adapter_name=name,
+        base_model=base_model,
+        path=path,
+        rank=rank,
+        metadata=metadata_dict,
+    )
+
+    if tenant:
+        registry.map_tenant_to_adapter(tenant, name)
+
+    print(f"OK: Registered adapter '{name}' version {version.version_id}")
+    print(f"   Base model: {base_model}")
+    print(f"   Path: {path}")
+    print(f"   Rank: {rank}")
+    if tenant:
+        print(f"   Tenant: {tenant}")
+
+
+@lora.command("versions")
+@click.option("--name", "-n", required=True, help="Adapter name")
+def lora_versions_cmd(name):
+    """List all versions of an adapter.
+
+    Examples:
+        terradev lora versions -n customer-a
+    """
+    from ml_services.lora_registry import get_lora_registry
+
+    registry = get_lora_registry()
+    versions = registry.get_adapter_versions(name)
+
+    if not versions:
+        print(f"ERROR: No versions found for adapter '{name}'")
+        return
+
+    active = registry.get_active_version(name)
+
+    print(f"Adapter: {name}")
+    print(f"Versions ({len(versions)}):")
+    for v in versions:
+        status_marker = " [ACTIVE]" if v.status.value == "active" else ""
+        print(f"  {v.version_id[:8]}...  {v.created_at.strftime('%Y-%m-%d %H:%M:%S')}  {v.status.value}{status_marker}")
+        print(f"    Path: {v.path}")
+        print(f"    Rank: {v.rank}")
+        if v.performance_metrics:
+            print(f"    Metrics: {v.performance_metrics}")
+
+
+@lora.command("activate")
+@click.option("--name", "-n", required=True, help="Adapter name")
+@click.option("--version", "-v", required=True, help="Version ID to activate")
+def lora_activate_cmd(name, version):
+    """Activate a specific version across all replicas.
+
+    Examples:
+        terradev lora activate -n customer-a -v abc123...
+    """
+    from ml_services.lora_registry import get_lora_registry
+
+    registry = get_lora_registry()
+    success = registry.mark_version_active(name, version)
+
+    if success:
+        print(f"OK: Activated version {version[:8]}... for adapter '{name}'")
+    else:
+        print(f"ERROR: Failed to activate version {version}")
+
+
+@lora.command("sync")
+@click.option("--deployment", "-d", required=True, help="Deployment name")
+@click.option("--name", "-n", required=True, help="Adapter name")
+@click.option("--replicas", help="Comma-separated list of replica endpoints (host:port)")
+def lora_sync_cmd(deployment, name, replicas):
+    """Synchronize adapter state across all replicas in a deployment.
+
+    Examples:
+        terradev lora sync -d prod -n customer-a --replicas 10.0.0.1:8000,10.0.0.2:8000
+    """
+    import asyncio
+    from ml_services.lora_registry import get_lora_registry
+    from core.lora_consistency import LoRAConsistencyManager
+
+    registry = get_lora_registry()
+    active_version = registry.get_active_version(name)
+
+    if not active_version:
+        print(f"ERROR: No active version found for adapter '{name}'")
+        return
+
+    # Parse replicas
+    replica_list = []
+    if replicas:
+        for replica in replicas.split(","):
+            host, port = replica.split(":")
+            replica_list.append({"replica_id": replica, "host": host, "port": int(port)})
+
+    consistency_mgr = LoRAConsistencyManager(registry=registry, replicas=replica_list)
+    result = asyncio.run(consistency_mgr.sync_adapter_state(name, active_version.version_id))
+
+    if result["status"] == "success":
+        print(f"OK: Adapter '{name}' synchronized across replicas")
+        final = result.get("final_consistency", {})
+        print(f"   Expected replicas: {len(final.get('expected_replicas', []))}")
+        print(f"   Loaded replicas: {len(final.get('loaded_replicas', []))}")
+    else:
+        print(f"ERROR: {result.get('error')}")
+        if "load_result" in result:
+            print(f"   Load result: {result['load_result']}")
+
+
+# ── Existing Commands (Updated for Registry) ──
 
 
 @lora.command("list")
@@ -10201,12 +10338,35 @@ def lora():
     "--endpoint", "-e", required=True, help="vLLM endpoint (e.g. http://10.0.0.1:8000)"
 )
 @click.option("--api-key", help="vLLM API key")
-def lora_list_cmd(endpoint, api_key):
+@click.option("--registry", is_flag=True, help="Show registry state instead of live endpoint")
+def lora_list_cmd(endpoint, api_key, registry):
     """List loaded LoRA adapters.
 
     Examples:
         terradev lora list -e http://10.0.0.1:8000
+        terradev lora list -e http://10.0.0.1:8000 --registry
     """
+    if registry:
+        from ml_services.lora_registry import get_lora_registry
+
+        reg = get_lora_registry()
+        stats = reg.get_registry_stats()
+        adapters = reg.list_all_adapters()
+
+        print(f"Registry Statistics:")
+        print(f"  Total adapters: {stats['total_adapter_names']}")
+        print(f"  Total versions: {stats['total_versions']}")
+        print(f"  Active versions: {stats['active_versions']}")
+        print(f"  Total replicas: {stats['total_replicas']}")
+        print(f"  Total tenants: {stats['total_tenants']}")
+        print()
+        print(f"Registered adapters ({len(adapters)}):")
+        for adapter in adapters:
+            active = reg.get_active_version(adapter)
+            active_marker = " [ACTIVE]" if active else ""
+            print(f"  {adapter}{active_marker}")
+        return
+
     from ml_services.vllm_service import VLLMConfig, VLLMService
 
     host, port = _parse_vllm_endpoint(endpoint)
@@ -10240,17 +10400,40 @@ def lora_list_cmd(endpoint, api_key):
 )
 @click.option("--path", required=True, help="Path to adapter weights")
 @click.option("--api-key", help="vLLM API key")
-def lora_add_cmd(endpoint, name, path, api_key):
+@click.option("--register", is_flag=True, help="Also register in central registry")
+@click.option("--base-model", help="Base model (required with --register)")
+@click.option("--rank", default=64, help="LoRA rank (default: 64)")
+def lora_add_cmd(endpoint, name, path, api_key, register, base_model, rank):
     """Hot-load a LoRA adapter onto a running vLLM server.
 
     Examples:
         terradev lora add -e http://10.0.0.1:8000 -n customer-a --path /adapters/customer-a
+        terradev lora add -e http://10.0.0.1:8000 -n customer-a --path /adapters/customer-a --register --base-model meta-llama/Llama-2-7b-hf
     """
     from ml_services.vllm_service import VLLMConfig, VLLMService, LoRAModule
 
     host, port = _parse_vllm_endpoint(endpoint)
+    
+    # Register if requested
+    version_id = None
+    if register:
+        if not base_model:
+            print("ERROR: --base-model required when using --register")
+            return
+        from ml_services.lora_registry import get_lora_registry
+        
+        registry = get_lora_registry()
+        version = registry.register_adapter(
+            adapter_name=name,
+            base_model=base_model,
+            path=path,
+            rank=rank,
+        )
+        version_id = version.version_id
+        print(f"Registered adapter '{name}' as version {version_id[:8]}...")
+
     svc = VLLMService(VLLMConfig(model_name="", host=host, port=port, api_key=api_key))
-    result = asyncio.run(svc.lora_load(LoRAModule(name=name, path=path)))
+    result = asyncio.run(svc.lora_load(LoRAModule(name=name, path=path), version_id=version_id))
 
     if result["status"] == "loaded":
         print(f'OK: Adapter \'{name}\' loaded  use "model": "{name}" in requests')
@@ -10278,6 +10461,164 @@ def lora_remove_cmd(endpoint, name, api_key):
         print(f"OK: Adapter '{name}' unloaded")
     else:
         print(f"ERROR: {result.get('error')}")
+
+
+# ── Versioning Commands ──
+
+
+@lora.command("rollback")
+@click.option("--name", "-n", required=True, help="Adapter name to rollback")
+@click.option("--to-version", "-v", help="Target version ID (default: previous stable)")
+@click.option("--replicas", help="Comma-separated list of replica endpoints (host:port)")
+def lora_rollback_cmd(name, to_version, replicas):
+    """Rollback adapter to previous stable version.
+
+    Examples:
+        terradev lora rollback -n customer-a
+        terradev lora rollback -n customer-a -v abc123... --replicas 10.0.0.1:8000,10.0.0.2:8000
+    """
+    import asyncio
+    from ml_services.lora_registry import get_lora_registry
+    from core.lora_versioning import LoRAVersioningManager
+    from core.lora_consistency import LoRAConsistencyManager
+
+    registry = get_lora_registry()
+    versioning_mgr = LoRAVersioningManager(registry=registry)
+
+    # Parse replicas
+    replica_list = None
+    if replicas:
+        replica_list = []
+        for replica in replicas.split(","):
+            host, port = replica.split(":")
+            replica_list.append({"replica_id": replica, "host": host, "port": int(port)})
+        versioning_mgr.consistency_manager = LoRAConsistencyManager(
+            registry=registry, replicas=replica_list
+        )
+
+    result = asyncio.run(
+        versioning_mgr.rollback_adapter(
+            adapter_name=name,
+            target_version_id=to_version,
+            replicas=replica_list,
+        )
+    )
+
+    if result.success:
+        print(f"OK: Rolled back adapter '{name}'")
+        print(f"   From version: {result.from_version_id[:8] if result.from_version_id else 'none'}")
+        print(f"   To version: {result.to_version_id[:8]}")
+        print(f"   Replicas affected: {result.replicas_affected}")
+    else:
+        print(f"ERROR: {result.error}")
+
+
+@lora.command("drift-check")
+@click.option("--name", "-n", required=True, help="Adapter name to check")
+@click.option("--version", "-v", help="Specific version to check (default: active)")
+@click.option("--threshold", "-t", type=float, default=0.1, help="Drift threshold (default: 0.1)")
+@click.option("--source", default="phoenix-traces", help="Data source for drift detection")
+def lora_drift_check_cmd(name, version, threshold, source):
+    """Check for performance drift in an adapter.
+
+    Examples:
+        terradev lora drift-check -n customer-a
+        terradev lora drift-check -n customer-a -t 0.15
+    """
+    import asyncio
+    from ml_services.lora_registry import get_lora_registry
+    from core.lora_versioning import LoRAVersioningManager
+
+    registry = get_lora_registry()
+    versioning_mgr = LoRAVersioningManager(registry=registry)
+
+    result = asyncio.run(
+        versioning_mgr.detect_drift(
+            adapter_name=name,
+            version_id=version,
+            drift_threshold=threshold,
+            source=source,
+        )
+    )
+
+    print(f"Adapter: {name}")
+    print(f"Version: {result.version_id[:8]}")
+    print(f"Baseline score: {result.baseline_score:.4f}")
+    print(f"Current score: {result.current_score:.4f}")
+    print(f"Drift magnitude: {result.drift_magnitude:.2%}")
+    print(f"Threshold: {result.drift_threshold}")
+    print(f"Has drift: {result.has_drift}")
+    print(f"Recommended action: {result.recommended_action}")
+
+    if result.has_drift:
+        print(f"\nWARNING: Performance drift detected!")
+        if result.recommended_action == "rollback":
+            print("Consider running: terradev lora rollback -n {name}")
+        elif result.recommended_action == "retrain":
+            print("Consider triggering retraining via drift service")
+
+
+# ── Cost Attribution Commands ──
+
+
+@lora.command("cost-report")
+@click.option("--days", "-d", type=int, default=30, help="Number of days to report (default: 30)")
+@click.option("--adapter", "-a", help="Specific adapter to report on")
+@click.option("--tenant", "-t", help="Specific tenant to report on")
+def lora_cost_report_cmd(days, adapter, tenant):
+    """Generate cost attribution report for LoRA adapters.
+
+    Examples:
+        terradev lora cost-report -d 7
+        terradev lora cost-report -a customer-a
+        terradev lora cost-report -t tenant-123
+    """
+    import asyncio
+    from core.lora_cost_attribution import CostAttributionService, CostConfig
+
+    config = CostConfig()
+    cost_service = CostAttributionService(config)
+
+    if adapter:
+        # Get adapter-specific breakdown
+        breakdown = asyncio.run(cost_service.get_cost_breakdown(adapter, days))
+        print(f"Cost Breakdown: {adapter}")
+        print(f"  Window: {days} days")
+        print(f"  Total requests: {breakdown['total_requests']}")
+        print(f"  GPU cost: ${breakdown['gpu_cost_usd']}")
+        print(f"  Token cost: ${breakdown['token_cost_usd']}")
+        print(f"  Total cost: ${breakdown['total_cost_usd']}")
+        print(f"\n  Cost by replica:")
+        for replica in breakdown['cost_by_replica']:
+            print(f"    {replica['replica_id']}: ${replica['cost_usd']}")
+    elif tenant:
+        # Get tenant-specific cost
+        tenant_record = asyncio.run(cost_service.get_tenant_cost(tenant))
+        if tenant_record:
+            print(f"Cost Report: Tenant {tenant}")
+            print(f"  Adapters: {len(tenant_record.adapters)}")
+            print(f"  GPU hours: {tenant_record.gpu_hours:.2f}")
+            print(f"  Tokens processed: {tenant_record.tokens_processed:,}")
+            print(f"  Requests served: {tenant_record.requests_served:,}")
+            print(f"  Storage: {tenant_record.storage_gb:.2f} GB")
+            print(f"  Total cost: ${tenant_record.total_cost_usd:.2f}")
+            print(f"  Last updated: {tenant_record.last_updated}")
+        else:
+            print(f"ERROR: No cost data found for tenant '{tenant}'")
+    else:
+        # Get overall summary
+        summary = asyncio.run(cost_service.get_cost_summary(days))
+        print(f"Cost Summary: Last {days} days")
+        print(f"  Total GPU hours: {summary['total_gpu_hours']}")
+        print(f"  Total tokens: {summary['total_tokens']:,}")
+        print(f"  Total requests: {summary['total_requests']:,}")
+        print(f"  Total cost: ${summary['total_cost_usd']}")
+        print(f"\n  Top adapters by cost:")
+        for adapter in summary['top_adapters']:
+            print(f"    {adapter['name']}: ${adapter['cost_usd']}")
+        print(f"\n  Top tenants by cost:")
+        for tenant in summary['top_tenants']:
+            print(f"    {tenant['tenant_id']}: ${tenant['cost_usd']}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -95,6 +95,18 @@ class ModelEndpoint:
 
 
 @dataclass
+class AdapterEndpoint(ModelEndpoint):
+    """A model endpoint with LoRA adapter tracking for adapter-aware routing."""
+
+    loaded_adapters: set = None  # Set of adapter names loaded on this replica
+    replica_id: str = ""  # K8s pod ID or instance IP
+
+    def __post_init__(self):
+        if self.loaded_adapters is None:
+            self.loaded_adapters = set()
+
+
+@dataclass
 class RouterConfig:
     """Configuration for the model router."""
 
@@ -583,3 +595,215 @@ def create_router_from_credentials(credentials: Dict[str, str]) -> ModelRouter:
         llmd_epp_url=credentials.get("llmd_epp_url"),
     )
     return ModelRouter(config)
+
+
+# ── Adapter-Aware Routing for LoRA ───────────────────────────────────────
+
+
+class AdapterAwareRouter(ModelRouter):
+    """
+    ModelRouter extension for adapter-aware routing.
+
+    Routes requests to replicas that have the required LoRA adapter loaded.
+    This is critical for multi-tenant LoRA serving where different tenants
+    require different adapters.
+    """
+
+    def __init__(self, config: RouterConfig, registry: Optional[Any] = None):
+        super().__init__(config)
+        self.registry = registry  # AdapterRegistry instance
+        self.adapter_endpoints: Dict[str, AdapterEndpoint] = {}  # replica_id -> endpoint
+
+    def register_adapter_endpoint(self, endpoint: AdapterEndpoint):
+        """Register an adapter endpoint for routing."""
+        self.adapter_endpoints[endpoint.replica_id] = endpoint
+        logger.info(f"Registered adapter endpoint: {endpoint.replica_id} with adapters {endpoint.loaded_adapters}")
+
+    def update_endpoint_adapters(self, replica_id: str, loaded_adapters: set):
+        """Update the set of loaded adapters for a replica."""
+        if replica_id in self.adapter_endpoints:
+            self.adapter_endpoints[replica_id].loaded_adapters = loaded_adapters
+            logger.debug(f"Updated adapters for {replica_id}: {loaded_adapters}")
+
+    async def route_with_adapter(
+        self,
+        messages: List[Dict[str, Any]],
+        adapter_name: str,
+        *,
+        tool_call_expected: bool = False,
+        is_retry: bool = False,
+        force_tier: Optional[ModelTier] = None,
+    ) -> Tuple[AdapterEndpoint, StepType, str]:
+        """
+        Route request to replica that has the required adapter loaded.
+
+        Args:
+            messages: Chat messages for inference
+            adapter_name: LoRA adapter name required for this request
+            tool_call_expected: Whether tool call is expected
+            is_retry: Whether this is a retry
+            force_tier: Force specific model tier
+
+        Returns:
+            (endpoint, step_type, reason) tuple
+        """
+        step_type = self.classifier.classify(
+            messages,
+            tool_call_expected=tool_call_expected,
+            is_retry=is_retry,
+        )
+
+        # Find replicas with the required adapter
+        candidates = [
+            ep for ep in self.adapter_endpoints.values()
+            if adapter_name in ep.loaded_adapters
+        ]
+
+        if not candidates:
+            # Fallback: no replica has adapter loaded
+            # In production, this should trigger adapter load via consistency manager
+            logger.warning(f"No replica has adapter '{adapter_name}' loaded, using default routing")
+            endpoint, _, reason = self.route(
+                messages,
+                tool_call_expected=tool_call_expected,
+                is_retry=is_retry,
+                force_tier=force_tier,
+            )
+            # Convert to AdapterEndpoint if needed
+            if not isinstance(endpoint, AdapterEndpoint):
+                endpoint = AdapterEndpoint(
+                    name=endpoint.name,
+                    url=endpoint.url,
+                    model_id=endpoint.model_id,
+                    tier=endpoint.tier,
+                    api_key=endpoint.api_key,
+                    cost_per_1k_tokens=endpoint.cost_per_1k_tokens,
+                    max_tokens=endpoint.max_tokens,
+                    loaded_adapters=set(),
+                    replica_id=endpoint.name,
+                )
+            return endpoint, step_type, f"adapter_not_loaded_{reason}"
+
+        # Apply existing routing logic to select from candidates
+        if force_tier:
+            # Filter candidates by tier
+            tier_candidates = [ep for ep in candidates if ep.tier == force_tier]
+            if tier_candidates:
+                endpoint = self._select_adapter_endpoint(tier_candidates, step_type)
+                reason = f"forced_{force_tier.value}_with_adapter"
+            else:
+                endpoint = self._select_adapter_endpoint(candidates, step_type)
+                reason = f"forced_{force_tier.value}_fallback_adapter"
+        else:
+            endpoint = self._select_adapter_endpoint(candidates, step_type)
+            reason = f"adapter_affinity_{adapter_name}"
+
+        self._log_decision(step_type, endpoint, reason)
+        return endpoint, step_type, reason
+
+    def _select_adapter_endpoint(
+        self, candidates: List[AdapterEndpoint], step_type: StepType
+    ) -> AdapterEndpoint:
+        """
+        Select the best adapter endpoint from candidates.
+
+        Selection strategy:
+        1. Prefer STRONG tier for complex steps
+        2. Prefer WEAK tier for simple steps
+        3. Round-robin among same-tier candidates
+        """
+        # Separate by tier
+        strong_candidates = [ep for ep in candidates if ep.tier == ModelTier.STRONG]
+        weak_candidates = [ep for ep in candidates if ep.tier == ModelTier.WEAK]
+
+        # Select based on step type
+        if step_type in _STRONG_ONLY_STEPS:
+            if strong_candidates:
+                return self._round_robin_select(strong_candidates)
+            return self._round_robin_select(weak_candidates)  # Fallback
+        elif step_type in _WEAK_ELIGIBLE_STEPS:
+            if weak_candidates:
+                return self._round_robin_select(weak_candidates)
+            return self._round_robin_select(strong_candidates)  # Fallback
+        else:
+            # Default to strong for code generation and general
+            if strong_candidates:
+                return self._round_robin_select(strong_candidates)
+            return self._round_robin_select(weak_candidates)
+
+    def _round_robin_select(self, candidates: List[AdapterEndpoint]) -> AdapterEndpoint:
+        """Simple round-robin selection from candidates."""
+        if not candidates:
+            raise ValueError("No candidates for round-robin selection")
+        # Use timestamp for simple round-robin
+        index = int(time.time() * 1000) % len(candidates)
+        return candidates[index]
+
+    async def load_and_route(
+        self,
+        messages: List[Dict[str, Any]],
+        adapter_name: str,
+        adapter_path: str,
+        *,
+        tool_call_expected: bool = False,
+        is_retry: bool = False,
+        force_tier: Optional[ModelTier] = None,
+    ) -> Tuple[AdapterEndpoint, StepType, str]:
+        """
+        Load adapter on a replica and route to it.
+
+        This is a fallback when no replica has the adapter loaded.
+        In production, this should be handled by the consistency manager.
+        """
+        # Select a replica to load on (prefer weak tier for cost)
+        if self.adapter_endpoints:
+            candidates = list(self.adapter_endpoints.values())
+            weak_candidates = [ep for ep in candidates if ep.tier == ModelTier.WEAK]
+            target = self._round_robin_select(weak_candidates if weak_candidates else candidates)
+        else:
+            # No adapter endpoints registered, use default routing
+            endpoint, step_type, reason = self.route(
+                messages,
+                tool_call_expected=tool_call_expected,
+                is_retry=is_retry,
+                force_tier=force_tier,
+            )
+            if not isinstance(endpoint, AdapterEndpoint):
+                endpoint = AdapterEndpoint(
+                    name=endpoint.name,
+                    url=endpoint.url,
+                    model_id=endpoint.model_id,
+                    tier=endpoint.tier,
+                    api_key=endpoint.api_key,
+                    cost_per_1k_tokens=endpoint.cost_per_1k_tokens,
+                    max_tokens=endpoint.max_tokens,
+                    loaded_adapters=set(),
+                    replica_id=endpoint.name,
+                )
+            return endpoint, step_type, f"no_adapter_endpoints_{reason}"
+
+        # Load adapter on target replica
+        try:
+            from ..ml_services.vllm_service import LoRAModule, VLLMService, VLLMConfig
+
+            host = target.url.replace("http://", "").split(":")[0]
+            port = int(target.url.split(":")[-1]) if ":" in target.url else 8000
+
+            config = VLLMConfig(model_name="", host=host, port=port)
+            async with VLLMService(config) as svc:
+                adapter = LoRAModule(name=adapter_name, path=adapter_path)
+                result = await svc.lora_load(adapter)
+
+                if result.get("status") == "loaded":
+                    # Update endpoint's loaded adapters
+                    target.loaded_adapters.add(adapter_name)
+                    logger.info(f"Loaded adapter '{adapter_name}' on {target.replica_id}")
+                    return target, StepType.GENERAL, f"loaded_and_routed_{adapter_name}"
+                else:
+                    logger.error(f"Failed to load adapter: {result.get('error')}")
+                    # Fallback to routing without adapter
+                    return target, StepType.GENERAL, f"adapter_load_failed_{result.get('error')}"
+
+        except Exception as e:
+            logger.error(f"Error loading adapter: {e}")
+            return target, StepType.GENERAL, f"adapter_load_error_{str(e)}"

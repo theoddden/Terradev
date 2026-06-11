@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "lora-serving.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "lora-serving.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "lora-serving.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "lora-serving.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "lora-serving.serviceAccountName" . }}
+      containers:
+      - name: vllm
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.service.port }}
+          name: http
+          protocol: TCP
+        env:
+        - name: VLLM_MODEL
+          value: {{ .Values.model.name | quote }}
+        - name: VLLM_TENSOR_PARALLEL_SIZE
+          value: {{ .Values.model.tensorParallelSize | quote }}
+        {{- if .Values.lora.enabled }}
+        - name: VLLM_ENABLE_LORA
+          value: "true"
+        - name: VLLM_MAX_LORAS
+          value: {{ .Values.lora.maxLoras | quote }}
+        - name: VLLM_MAX_LORA_RANK
+          value: {{ .Values.lora.maxLoraRank | quote }}
+        - name: VLLM_LORA_EXTRA_VOCAB_SIZE
+          value: {{ .Values.lora.extraVocabSize | quote }}
+        - name: VLLM_LORA_TUNED_CONFIG_DIR
+          value: {{ .Values.lora.tunedConfigDir | quote }}
+        {{- if .Values.lora.registry.enabled }}
+        - name: LORA_REGISTRY_ENABLED
+          value: "true"
+        - name: LORA_REGISTRY_PATH
+          value: {{ .Values.lora.registry.path | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.performance.kvOffloading.enabled }}
+        - name: VLLM_KV_CONNECTOR
+          value: "offloading"
+        {{- end }}
+        {{- if .Values.performance.speculative.enabled }}
+        - name: VLLM_SPECULATIVE_CONFIG_METHOD
+          value: {{ .Values.performance.speculative.method | quote }}
+        {{- end }}
+        {{- if .Values.performance.sleepMode.enabled }}
+        - name: VLLM_ENABLE_SLEEP_MODE
+          value: "true"
+        {{- if .Values.performance.sleepMode.devMode }}
+        - name: VLLM_SERVER_DEV_MODE
+          value: "1"
+        {{- end }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        - name: adapter-storage
+          mountPath: {{ .Values.lora.tunedConfigDir }}
+        {{- if .Values.lora.registry.enabled }}
+        - name: registry-storage
+          mountPath: /data
+        {{- end }}
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: adapter-storage
+        persistentVolumeClaim:
+          claimName: {{ include "lora-serving.fullname" . }}-adapter-pvc
+      {{- if .Values.lora.registry.enabled }}
+      - name: registry-storage
+        persistentVolumeClaim:
+          claimName: {{ include "lora-serving.fullname" . }}-registry-pvc
+      {{- end }}
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.storage.shm.size }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

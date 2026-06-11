@@ -10,6 +10,7 @@ import statistics
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 
 @dataclass
@@ -400,10 +401,11 @@ class VLLMConfig:
 class VLLMService:
     """vLLM integration service for LLM inference"""
 
-    def __init__(self, config: VLLMConfig):
+    def __init__(self, config: VLLMConfig, registry: Optional[Any] = None):
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
         self.base_url = f"http://{config.host}:{config.port}/v1"
+        self.registry = registry  # Optional AdapterRegistry for production LoRA management
 
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
@@ -931,8 +933,11 @@ systemctl daemon-reload
         except Exception as e:
             return {"status": "failed", "error": str(e)}
 
-    async def lora_load(self, adapter: LoRAModule) -> Dict[str, Any]:
-        """Hot-load a LoRA adapter onto the running server (POST /loras)."""
+    async def lora_load(self, adapter: LoRAModule, version_id: Optional[str] = None) -> Dict[str, Any]:
+        """Hot-load a LoRA adapter onto the running server (POST /loras).
+        
+        If registry is provided, records the load operation.
+        """
         try:
             if not self.session:
                 self.session = aiohttp.ClientSession()
@@ -951,6 +956,14 @@ systemctl daemon-reload
                 timeout=aiohttp.ClientTimeout(total=60),
             ) as resp:
                 if resp.status == 200:
+                    # Update registry if provided
+                    if self.registry and version_id:
+                        replica_id = f"{self.config.host}:{self.config.port}"
+                        self.registry.record_replica_load(
+                            replica_id=replica_id,
+                            adapter_name=adapter.name,
+                            version_id=version_id,
+                        )
                     return {"status": "loaded", "adapter": adapter.name}
                 body = await resp.text()
                 return {"status": "failed", "error": f"HTTP {resp.status}: {body}"}
@@ -958,7 +971,10 @@ systemctl daemon-reload
             return {"status": "failed", "error": str(e)}
 
     async def lora_unload(self, adapter_name: str) -> Dict[str, Any]:
-        """Hot-unload a LoRA adapter from the running server."""
+        """Hot-unload a LoRA adapter from the running server.
+        
+        If registry is provided, records the unload operation.
+        """
         try:
             if not self.session:
                 self.session = aiohttp.ClientSession()
@@ -974,9 +990,47 @@ systemctl daemon-reload
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 if resp.status == 200:
+                    # Update registry if provided
+                    if self.registry:
+                        replica_id = f"{self.config.host}:{self.config.port}"
+                        self.registry.record_replica_unload(replica_id, adapter_name)
                     return {"status": "unloaded", "adapter": adapter_name}
                 body = await resp.text()
                 return {"status": "failed", "error": f"HTTP {resp.status}: {body}"}
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
+    async def lora_broadcast_load(
+        self,
+        adapter: LoRAModule,
+        version_id: str,
+        replicas: Optional[List[Dict[str, Any]]] = None,
+        timeout: float = 60.0,
+    ) -> Dict[str, Any]:
+        """Broadcast adapter load to multiple replicas using consistency manager.
+        
+        This is a convenience method that creates a consistency manager and
+        broadcasts the load operation. For production use, create a
+        LoRAConsistencyManager instance separately and manage its lifecycle.
+        """
+        try:
+            from ..core.lora_consistency import LoRAConsistencyManager
+
+            consistency_mgr = LoRAConsistencyManager(
+                registry=self.registry,
+                replicas=replicas,
+            )
+            result = await consistency_mgr.broadcast_load_to_replicas(
+                adapter=adapter,
+                version_id=version_id,
+                timeout=timeout,
+            )
+            return result
+        except ImportError:
+            return {
+                "status": "failed",
+                "error": "LoRAConsistencyManager not available. Install terradev with full dependencies.",
+            }
         except Exception as e:
             return {"status": "failed", "error": str(e)}
 

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "lora-serving.fullname" . }}-adapter-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "lora-serving.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - {{ .Values.storage.adapterStorage.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.adapterStorage.size }}
+  storageClassName: {{ .Values.storage.adapterStorage.storageClass }}

@@ -67,6 +67,17 @@ serving:
       size: 50Gi
       storageClass: efs-sc         # CHANGE: your shared filesystem StorageClass
       mountPath: /adapters
+    # ── LoRA Registry (optional, for production-grade multi-tenant serving) ─────
+    # Enables adapter versioning, rollback, drift detection, and cost attribution
+    registry:
+      enabled: false               # Enable central adapter registry
+      path: "/data/lora_registry.db"  # SQLite registry database path
+      # Registry storage PVC (RWO for SQLite)
+      registryStorage:
+        enabled: false
+        size: 10Gi
+        storageClass: gp2
+        mountPath: /data
 
   # ── Auto-applied cost optimizations (Terradev defaults) ─────────────────────
   # These are ON by default. Users don't configure them — they just save money.
