@@ -1,4 +1,4 @@
-# Terradev CLI Lifecycles (v5.1.5)
+# Terradev CLI Lifecycles (v5.3.9)
 
 Complete end-to-end workflows covering nearly every command in the CLI. These have been updated to match the current CLI signatures and remove deprecated commands.
 
@@ -1386,6 +1386,158 @@ terradev local scan \
 ```bash
 # Scan and register GPU
 terradev local scan --register --name workstation-4090
+```
+
+---
+
+## Lifecycle 17 — LoRAX Multi-LoRA Inference (NEW)
+
+**Goal:** Deploy LoRAX server for serving thousands of fine-tuned models on a single GPU with dynamic adapter loading.
+
+### Phase 1: Import Adapter from HuggingFace
+
+```bash
+# Import LoRA adapter from HuggingFace
+terradev lora peft import \
+  -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k \
+  --local-name gsm8k-adapter
+
+# Import and register in Terradev registry
+terradev lora peft import \
+  -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k \
+  --local-name gsm8k-adapter \
+  --register \
+  --base-model mistralai/Mistral-7B-Instruct-v0.1
+
+# Import from private repo
+terradev lora peft import \
+  -a username/private-adapter \
+  --token hf_xxx
+```
+
+### Phase 2: List Local Adapters
+
+```bash
+# List all imported adapters
+terradev lora peft list
+
+# Validate adapter structure
+terradev lora peft validate -p ~/.terradev/peft_adapters/username--adapter
+```
+
+### Phase 3: Deploy LoRAX Server (Docker)
+
+```bash
+# Deploy LoRAX with Docker
+terradev lora lorax deploy \
+  -m mistralai/Mistral-7B-Instruct-v0.1 \
+  --docker
+
+# Deploy with quantization
+terradev lora lorax deploy \
+  -m mistralai/Mistral-7B-Instruct-v0.1 \
+  --quantization bitsandbytes \
+  --max-loras 16 \
+  --docker
+```
+
+### Phase 4: Deploy LoRAX Server (Kubernetes)
+
+```bash
+# Deploy LoRAX to Kubernetes
+terradev lora lorax deploy \
+  -m mistralai/Mistral-7B-Instruct-v0.1 \
+  --k8s \
+  --namespace lorax
+
+# Install via Helm
+helm install lorax ./clusters/lorax-template/helm \
+  -f clusters/lorax-template/helm/values-lorax.yaml \
+  --set model.id=mistralai/Mistral-7B-Instruct-v0.1 \
+  --set maxLoras=8
+```
+
+### Phase 5: Test LoRAX Server
+
+```bash
+# Test server connectivity
+terradev lora lorax test --host localhost --port 8080
+
+# Test with custom host/port
+terradev lora lorax test --host 10.0.0.1 --port 8080
+```
+
+### Phase 6: Load Adapters
+
+```bash
+# Load adapter from HuggingFace
+terradev lora lorax load-adapter \
+  -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+
+# Load local adapter with custom name
+terradev lora lorax load-adapter \
+  -a ~/.terradev/peft_adapters/gsm8k-adapter \
+  --adapter-name gsm8k-adapter \
+  --host localhost --port 8080
+```
+
+### Phase 7: List Loaded Adapters
+
+```bash
+# List all loaded adapters
+terradev lora lorax list-adapters
+
+# List from specific server
+terradev lora lorax list-adapters --host 10.0.0.1 --port 8080
+```
+
+### Phase 8: Generate Text
+
+```bash
+# Generate with base model
+terradev lora lorax generate \
+  -p "What is 2+2?" \
+  --max-tokens 64
+
+# Generate with adapter
+terradev lora lorax generate \
+  -p "Natalia sold clips to 48 of her friends..." \
+  -a gsm8k-adapter \
+  --temperature 0.7
+```
+
+### Phase 9: Unload Adapter
+
+```bash
+# Unload adapter
+terradev lora lorax unload-adapter -a gsm8k-adapter
+```
+
+### Phase 10: Sync Registry
+
+```bash
+# Sync Terradev registry with LoRAX state
+terradev lora lorax sync-registry
+
+# Sync specific adapter
+terradev lora lorax sync-registry -a gsm8k-adapter
+```
+
+### Phase 11: Delete Local Adapter
+
+```bash
+# Delete imported adapter
+terradev lora peft delete -a username/adapter
+```
+
+### Phase 12: Cleanup
+
+```bash
+# Terminate LoRAX server
+docker stop <container-id>
+
+# Or delete Kubernetes deployment
+helm uninstall lorax -n lorax
 ```
 
 ### Phase 4: View Hybrid Pool

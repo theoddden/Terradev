@@ -1,0 +1,66 @@
+# LoRAX Helm Values
+# Deploy LoRAX multi-LoRA inference server
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/predibase/lorax
+  tag: main
+  pullPolicy: IfNotPresent
+
+# Base model configuration
+model:
+  id: mistralai/Mistral-7B-Instruct-v0.1  # HuggingFace model ID
+  quantization: none  # none, bitsandbytes, gptq, awq
+
+# LoRA adapter configuration
+maxLoras: 8  # Maximum number of adapters to load simultaneously
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+# Resource limits
+resources:
+  limits:
+    nvidia.com/gpu: 1
+    memory: 32Gi
+  requests:
+    cpu: 4
+    memory: 16Gi
+
+# Storage for adapter cache
+storage:
+  enabled: true
+  size: 100Gi
+  storageClass: standard
+
+# Node selector for GPU nodes
+nodeSelector:
+  accelerator: nvidia-tesla-a100
+
+# Tolerations for GPU nodes
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+
+# Environment variables
+env:
+  - name: CUDA_VISIBLE_DEVICES
+    value: "0"
+  - name: SHM_SIZE
+    value: "1g"
+
+# Prometheus metrics
+metrics:
+  enabled: true
+  port: 8080
+  path: /metrics
+
+# OpenTelemetry tracing
+tracing:
+  enabled: false
+  endpoint: http://jaeger:4318

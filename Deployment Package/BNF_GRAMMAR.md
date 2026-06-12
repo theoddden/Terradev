@@ -1,5 +1,5 @@
 # Terradev CLI BNF Grammar
-# Complete syntax specification for all commands and options — v5.4.0
+# Complete syntax specification for all commands and options — v5.3.9
 
 <terradev-cli> ::= <global-options> <command>
 
@@ -605,9 +605,41 @@
 <lora-commands> ::= lora <lora-subcommand>
 
 <lora-subcommand> ::=
-    | list   -e <url> [--api-key <string>]
-    | add    -e <url> -n <string> --path <path> [--api-key <string>]
-    | remove -e <url> -n <string> [--api-key <string>]
+    | list         -e <url> [--api-key <string>] [--registry]
+    | add          -e <url> -n <string> --path <path> [--api-key <string>] [--register] [-b <string>] [--rank <integer>]
+    | remove       -e <url> -n <string> [--api-key <string>]
+    | register     -n <string> --path <path> -b <string> [--rank <integer>] [--tenant <string>] [--metadata <string>]
+    | versions     -n <string>
+    | activate     -n <string> -v <string>
+    | sync         -d <string> -n <string> [--replicas <string>]
+    | rollback     -n <string> [-v <string>] [--replicas <string>]
+    | drift-check  -n <string> [-v <string>] [-t <float>] [--source <string>]
+    | cost-report  [-d <integer>] [-a <string>] [-t <string>]
+    | lorax        <lorax-subcommand>
+    | peft         <peft-subcommand>
+
+
+# ── LoRAX Subcommands (under lora) ──
+
+<lorax-subcommand> ::=
+    | deploy    -m <string> [--host <string>] [-p <integer>] [--quantization <lorax-quant>] [--gpu-memory-fraction <float>] [--max-loras <integer>] [--docker] [--k8s] [--namespace <string>]
+    | test      [--host <string>] [-p <integer>]
+    | list-adapters [--host <string>] [-p <integer>]
+    | load-adapter -a <string> [--adapter-name <string>] [--host <string>] [-p <integer>]
+    | unload-adapter -a <string> [--host <string>] [-p <integer>]
+    | sync-registry [--host <string>] [-p <integer>] [-a <string>]
+    | generate   -p <string> [-a <string>] [--max-tokens <integer>] [--temperature <float>] [--host <string>] [-p <integer>]
+
+<lorax-quant> ::= none | bitsandbytes | gptq | awq
+
+
+# ── PEFT Subcommands (under lora) ──
+
+<peft-subcommand> ::=
+    | import   -a <string> [--local-name <string>] [--token <string>] [--register] [-b <string>] [--rank <integer>]
+    | list
+    | validate -p <path>
+    | delete   -a <string>
 
 
 # ════════════════════════════════════════════════════════════════════

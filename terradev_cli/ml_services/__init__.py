@@ -20,6 +20,8 @@ from .guardrails_service import GuardrailsService
 from .qdrant_service import QdrantService
 from .drift_retrain_service import DriftRetrainService
 from .langfuse_service import LangfuseService
+from .lorax_service import LoRAXService, LoRAXConfig
+from .peft_import_service import PEFTImportService, PEFTAdapterConfig
 from .agentic_serving import AgenticServingConfig, ToolCallTracker
 from .model_router import ModelRouter, RouterConfig
 
@@ -40,6 +42,10 @@ __all__ = [
     "QdrantService",
     "DriftRetrainService",
     "LangfuseService",
+    "LoRAXService",
+    "LoRAXConfig",
+    "PEFTImportService",
+    "PEFTAdapterConfig",
     "AgenticServingConfig",
     "ToolCallTracker",
     "ModelRouter",

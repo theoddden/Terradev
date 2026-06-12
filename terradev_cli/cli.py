@@ -10621,6 +10621,408 @@ def lora_cost_report_cmd(days, adapter, tenant):
             print(f"    {tenant['tenant_id']}: ${tenant['cost_usd']}")
 
 
+# ── LoRAX Integration (Predibase LoRA eXchange) ──
+
+
+@lora.group()
+def lorax():
+    """LoRAX (LoRA eXchange) multi-LoRA inference server from Predibase.
+
+    Deploy and manage LoRAX servers for serving thousands of fine-tuned models
+    on a single GPU with dynamic adapter loading.
+    """
+    pass
+
+
+@lorax.command("deploy")
+@click.option("--model-id", "-m", required=True, help="Base model ID (e.g., mistralai/Mistral-7B-Instruct-v0.1)")
+@click.option("--host", default="localhost", help="LoRAX server host")
+@click.option("--port", "-p", default=8080, help="LoRAX server port")
+@click.option("--quantization", type=click.Choice(["none", "bitsandbytes", "gptq", "awq"]), default="none", help="Quantization method")
+@click.option("--gpu-memory-fraction", type=float, default=0.9, help="GPU memory fraction to use")
+@click.option("--max-loras", type=int, default=8, help="Maximum number of adapters to load")
+@click.option("--docker", is_flag=True, help="Deploy using Docker")
+@click.option("--k8s", is_flag=True, help="Deploy using Kubernetes")
+@click.option("--namespace", default="default", help="Kubernetes namespace (for --k8s)")
+def lorax_deploy_cmd(model_id, host, port, quantization, gpu_memory_fraction, max_loras, docker, k8s, namespace):
+    """Deploy a LoRAX server.
+
+    Examples:
+        terradev lora lorax deploy -m mistralai/Mistral-7B-Instruct-v0.1 --docker
+        terradev lora lorax deploy -m meta-llama/Llama-2-7b-hf --k8s --namespace lorax
+    """
+    if docker:
+        print(f"Deploying LoRAX with Docker...")
+        print(f"  Model: {model_id}")
+        print(f"  Port: {port}")
+        print(f"  Quantization: {quantization}")
+        print(f"\nDocker command:")
+        print(f"  docker run --gpus all --shm-size 1g -p {port}:80 \\")
+        print(f"    -v $PWD/data:/data \\")
+        print(f"    ghcr.io/predibase/lorax:main \\")
+        print(f"    --model-id {model_id} \\")
+        print(f"    --max-loras {max_loras}")
+        if quantization != "none":
+            print(f"    --quantize {quantization}")
+    elif k8s:
+        print(f"Deploying LoRAX to Kubernetes...")
+        print(f"  Namespace: {namespace}")
+        print(f"  Model: {model_id}")
+        print(f"\nHelm command:")
+        print(f"  helm install lorax ./clusters/lorax-template/helm \\")
+        print(f"    -f clusters/lorax-template/helm/values-lorax.yaml \\")
+        print(f"    --set model.id={model_id} \\")
+        print(f"    --set service.port={port} \\")
+        print(f"    --set maxLoras={max_loras}")
+        print(f"\nNote: Create the lorax-template cluster first with:")
+        print(f"  terradev cluster create lorax-template")
+    else:
+        print(f"ERROR: Specify --docker or --k8s for deployment")
+
+
+@lorax.command("test")
+@click.option("--host", default="localhost", help="LoRAX server host")
+@click.option("--port", "-p", default=8080, help="LoRAX server port")
+def lorax_test_cmd(host, port):
+    """Test LoRAX server connectivity.
+
+    Examples:
+        terradev lora lorax test
+        terradev lora lorax test --host 10.0.0.1 --port 8080
+    """
+    import asyncio
+    from ml_services.lorax_service import get_lorax_service
+
+    svc = get_lorax_service(host=host, port=port)
+    result = asyncio.run(svc.health_check())
+
+    if result["status"] == "healthy":
+        print(f"OK: LoRAX server is healthy at {host}:{port}")
+        model_info = asyncio.run(svc.get_model_info())
+        if "error" not in model_info:
+            print(f"   Model: {model_info.get('model_id', 'unknown')}")
+            print(f"   Architecture: {model_info.get('architecture', 'unknown')}")
+    else:
+        print(f"ERROR: LoRAX server health check failed")
+        print(f"   Status: {result.get('status')}")
+        if "error" in result:
+            print(f"   Error: {result['error']}")
+
+    asyncio.run(svc.close())
+
+
+@lorax.command("list-adapters")
+@click.option("--host", default="localhost", help="LoRAX server host")
+@click.option("--port", "-p", default=8080, help="LoRAX server port")
+def lorax_list_adapters_cmd(host, port):
+    """List loaded adapters on LoRAX server.
+
+    Examples:
+        terradev lora lorax list-adapters
+    """
+    import asyncio
+    from ml_services.lorax_service import get_lorax_service
+
+    svc = get_lorax_service(host=host, port=port)
+    adapters = asyncio.run(svc.list_loaded_adapters())
+
+    print(f"Loaded adapters on {host}:{port}:")
+    if adapters:
+        for adapter in adapters:
+            print(f"  {adapter.adapter_id}")
+            if adapter.adapter_name:
+                print(f"    Name: {adapter.adapter_name}")
+            if adapter.base_model:
+                print(f"    Base model: {adapter.base_model}")
+            if adapter.rank:
+                print(f"    Rank: {adapter.rank}")
+    else:
+        print("  (no adapters loaded)")
+
+    asyncio.run(svc.close())
+
+
+@lorax.command("load-adapter")
+@click.option("--adapter-id", "-a", required=True, help="Adapter ID (HuggingFace repo or local path)")
+@click.option("--adapter-name", help="Custom name for the adapter")
+@click.option("--host", default="localhost", help="LoRAX server host")
+@click.option("--port", "-p", default=8080, help="LoRAX server port")
+def lorax_load_adapter_cmd(adapter_id, adapter_name, host, port):
+    """Load a LoRA adapter onto LoRAX server.
+
+    Examples:
+        terradev lora lorax load-adapter -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+        terradev lora lorax load-adapter -a /path/to/local/adapter --adapter-name my-adapter
+    """
+    import asyncio
+    from ml_services.lorax_service import get_lorax_service
+
+    svc = get_lorax_service(host=host, port=port)
+    result = asyncio.run(svc.load_adapter(adapter_id, adapter_name))
+
+    if result["status"] == "loaded":
+        print(f"OK: Adapter '{adapter_id}' loaded")
+        if adapter_name:
+            print(f"   Name: {adapter_name}")
+    else:
+        print(f"ERROR: Failed to load adapter '{adapter_id}'")
+        if "error" in result:
+            print(f"   Error: {result['error']}")
+        if "response" in result:
+            print(f"   Response: {result['response']}")
+
+    asyncio.run(svc.close())
+
+
+@lorax.command("unload-adapter")
+@click.option("--adapter-id", "-a", required=True, help="Adapter ID to unload")
+@click.option("--host", default="localhost", help="LoRAX server host")
+@click.option("--port", "-p", default=8080, help="LoRAX server port")
+def lorax_unload_adapter_cmd(adapter_id, host, port):
+    """Unload a LoRA adapter from LoRAX server.
+
+    Examples:
+        terradev lora lorax unload-adapter -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+    """
+    import asyncio
+    from ml_services.lorax_service import get_lorax_service
+
+    svc = get_lorax_service(host=host, port=port)
+    result = asyncio.run(svc.unload_adapter(adapter_id))
+
+    if result["status"] == "unloaded":
+        print(f"OK: Adapter '{adapter_id}' unloaded")
+    else:
+        print(f"ERROR: Failed to unload adapter '{adapter_id}'")
+        if "error" in result:
+            print(f"   Error: {result['error']}")
+        if "response" in result:
+            print(f"   Response: {result['response']}")
+
+    asyncio.run(svc.close())
+
+
+@lorax.command("sync-registry")
+@click.option("--host", default="localhost", help="LoRAX server host")
+@click.option("--port", "-p", default=8080, help="LoRAX server port")
+@click.option("--adapter", "-a", help="Specific adapter to sync")
+def lorax_sync_registry_cmd(host, port, adapter):
+    """Sync Terradev LoRA registry with LoRAX server state.
+
+    Examples:
+        terradev lora lorax sync-registry
+        terradev lora lorax sync-registry -a customer-a
+    """
+    import asyncio
+    from ml_services.lorax_service import get_lorax_service
+    from ml_services.lora_registry import get_lorax_registry
+
+    # Get registry state
+    registry = get_lorax_registry()
+    if adapter:
+        adapters = [adapter]
+    else:
+        adapters = registry.list_all_adapters()
+
+    # Get LoRAX state
+    svc = get_lorax_service(host=host, port=port)
+    lorax_adapters = asyncio.run(svc.list_loaded_adapters())
+    lorax_ids = {a.adapter_id for a in lorax_adapters}
+
+    print(f"Syncing registry with LoRAX at {host}:{port}")
+    print(f"  Registry adapters: {len(adapters)}")
+    print(f"  LoRAX loaded: {len(lorax_adapters)}")
+
+    for adapter_name in adapters:
+        active_version = registry.get_active_version(adapter_name)
+        if active_version:
+            if active_version.path not in lorax_ids:
+                print(f"  [MISSING] {adapter_name} (version {active_version.version_id[:8]})")
+                print(f"    Path: {active_version.path}")
+                print(f"    To load: terradev lora lorax load-adapter -a {active_version.path}")
+            else:
+                print(f"  [SYNCED] {adapter_name}")
+
+    asyncio.run(svc.close())
+
+
+@lorax.command("generate")
+@click.option("--prompt", "-p", required=True, help="Input prompt")
+@click.option("--adapter-id", "-a", help="Adapter ID to use")
+@click.option("--max-tokens", type=int, default=64, help="Max tokens to generate")
+@click.option("--temperature", type=float, default=0.7, help="Sampling temperature")
+@click.option("--host", default="localhost", help="LoRAX server host")
+@click.option("--port", default=8080, help="LoRAX server port")
+def lorax_generate_cmd(prompt, adapter_id, max_tokens, temperature, host, port):
+    """Generate text using LoRAX server.
+
+    Examples:
+        terradev lora lorax generate -p "Hello, world!"
+        terradev lora lorax generate -p "What is 2+2?" -a my-adapter
+    """
+    import asyncio
+    from ml_services.lorax_service import get_lorax_service
+
+    svc = get_lorax_service(host=host, port=port)
+    response = asyncio.run(svc.generate(
+        prompt=prompt,
+        adapter_id=adapter_id,
+        max_new_tokens=max_tokens,
+        temperature=temperature
+    ))
+
+    print(f"Prompt: {prompt}")
+    if adapter_id:
+        print(f"Adapter: {adapter_id}")
+    print(f"Generated: {response.generated_text}")
+    if response.finish_reason:
+        print(f"Finish reason: {response.finish_reason}")
+    print(f"Tokens: {response.tokens_generated}")
+
+    asyncio.run(svc.close())
+
+
+# ── HuggingFace PEFT Import ──
+
+
+@lora.group()
+def peft():
+    """HuggingFace PEFT adapter import and management.
+
+    Download, validate, and prepare LoRA adapters from HuggingFace for use
+    with vLLM, LoRAX, or other inference servers.
+    """
+    pass
+
+
+@peft.command("import")
+@click.option("--adapter-id", "-a", required=True, help="HuggingFace adapter ID (e.g., username/adapter-name)")
+@click.option("--local-name", help="Local name for the adapter")
+@click.option("--token", help="HuggingFace auth token (for private repos)")
+@click.option("--register", is_flag=True, help="Register imported adapter in Terradev registry")
+@click.option("--base-model", "-b", help="Base model (required with --register)")
+@click.option("--rank", type=int, help="LoRA rank (auto-detected if not specified)")
+def peft_import_cmd(adapter_id, local_name, token, register, base_model, rank):
+    """Import a LoRA adapter from HuggingFace.
+
+    Examples:
+        terradev lora peft import -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+        terradev lora peft import -a username/adapter --local-name my-adapter --register --base-model mistralai/Mistral-7B-Instruct-v0.1
+    """
+    from ml_services.peft_import_service import get_peft_import_service
+
+    svc = get_peft_import_service()
+
+    print(f"Importing adapter from HuggingFace: {adapter_id}")
+
+    try:
+        config = svc.download_adapter(
+            adapter_id=adapter_id,
+            local_name=local_name,
+            token=token
+        )
+
+        print(f"OK: Adapter imported successfully")
+        print(f"  Local path: {config.local_path}")
+        print(f"  Base model: {config.base_model or 'unknown'}")
+        print(f"  Rank: {config.rank or 'unknown'}")
+        print(f"  Alpha: {config.alpha or 'unknown'}")
+        print(f"  PEFT type: {config.peft_type}")
+
+        # Register if requested
+        if register:
+            if not base_model:
+                print(f"ERROR: --base-model required when using --register")
+                return
+
+            from ml_services.lora_registry import get_lorax_registry
+            registry = get_lorax_registry()
+
+            version = registry.register_adapter(
+                adapter_name=local_name or adapter_id.replace("/", "--"),
+                base_model=base_model,
+                path=str(config.local_path),
+                rank=rank or config.rank or 64,
+            )
+
+            print(f"\nRegistered in Terradev registry:")
+            print(f"  Version ID: {version.version_id}")
+            print(f"  Adapter name: {version.adapter_name}")
+
+    except Exception as e:
+        print(f"ERROR: Failed to import adapter: {e}")
+
+
+@peft.command("list")
+def peft_list_cmd():
+    """List all locally imported PEFT adapters.
+
+    Examples:
+        terradev lora peft list
+    """
+    from ml_services.peft_import_service import get_peft_import_service
+
+    svc = get_peft_import_service()
+    adapters = svc.list_local_adapters()
+
+    print(f"Local PEFT adapters ({len(adapters)}):")
+    if adapters:
+        for adapter in adapters:
+            print(f"  {adapter.adapter_id}")
+            print(f"    Path: {adapter.local_path}")
+            if adapter.base_model:
+                print(f"    Base model: {adapter.base_model}")
+            if adapter.rank:
+                print(f"    Rank: {adapter.rank}")
+            if adapter.alpha:
+                print(f"    Alpha: {adapter.alpha}")
+            print(f"    PEFT type: {adapter.peft_type}")
+    else:
+        print("  (no adapters imported)")
+
+
+@peft.command("validate")
+@click.option("--path", "-p", required=True, help="Path to adapter directory")
+def peft_validate_cmd(path):
+    """Validate a PEFT adapter structure.
+
+    Examples:
+        terradev lora peft validate -p ~/.terradev/peft_adapters/username--adapter-name
+    """
+    from ml_services.peft_import_service import get_peft_import_service
+
+    svc = get_peft_import_service()
+    result = svc.validate_adapter(Path(path))
+
+    if result["valid"]:
+        print(f"OK: Adapter is valid")
+    else:
+        print(f"ERROR: Adapter validation failed")
+        print(f"  Missing files: {', '.join(result['missing_files'])}")
+
+    if result["warnings"]:
+        print(f"\nWarnings:")
+        for warning in result["warnings"]:
+            print(f"  - {warning}")
+
+
+@peft.command("delete")
+@click.option("--adapter-id", "-a", required=True, help="Adapter ID to delete")
+def peft_delete_cmd(adapter_id):
+    """Delete a locally imported adapter.
+
+    Examples:
+        terradev lora peft delete -a username/adapter-name
+    """
+    from ml_services.peft_import_service import get_peft_import_service
+
+    svc = get_peft_import_service()
+    if svc.delete_adapter(adapter_id):
+        print(f"OK: Deleted adapter '{adapter_id}'")
+    else:
+        print(f"ERROR: Adapter '{adapter_id}' not found locally")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Phoenix  LLM Trace Observability (Arize Phoenix, ELv2)
 # ═══════════════════════════════════════════════════════════════════════════════

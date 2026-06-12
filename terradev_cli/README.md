@@ -1,4 +1,4 @@
-# Terradev CLI v5.3.8
+# Terradev CLI v5.3.9
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -15,6 +15,38 @@ Combines quoting, provisioning, topology optimization, training orchestration, i
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
+
+**NOTES ON 5.3.9**
+
+Added **LoRAX (LoRA eXchange) integration** and **HuggingFace PEFT import** for production-grade multi-LoRA inference serving:
+
+- **LoRAX Service** (`ml_services/lorax_service.py`): Async HTTP client for Predibase LoRAX multi-LoRA inference server that serves thousands of fine-tuned models on a single GPU with dynamic adapter loading, heterogeneous continuous batching, and adapter exchange scheduling.
+
+- **LoRAX CLI commands** (`terradev lora lorax`):
+  ```bash
+  terradev lora lorax deploy -m mistralai/Mistral-7B-Instruct-v0.1 --docker
+  terradev lora lorax test --host localhost --port 8080
+  terradev lora lorax list-adapters
+  terradev lora lorax load-adapter -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+  terradev lora lorax unload-adapter -a my-adapter
+  terradev lora lorax generate -p "What is 2+2?" -a my-adapter
+  terradev lora lorax sync-registry
+  ```
+
+- **PEFT Import Service** (`ml_services/peft_import_service.py`): Download, validate, and prepare LoRA adapters from HuggingFace using the PEFT library with auto-detection of rank, alpha, and target modules.
+
+- **PEFT CLI commands** (`terradev lora peft`):
+  ```bash
+  terradev lora peft import -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+  terradev lora peft import -a username/adapter --local-name my-adapter --register --base-model mistralai/Mistral-7B-Instruct-v0.1
+  terradev lora peft list
+  terradev lora peft validate -p ~/.terradev/peft_adapters/username--adapter
+  terradev lora peft delete -a username/adapter
+  ```
+
+- **LoRAX Helm Template** (`clusters/lorax-template/helm/`): Production-ready Kubernetes manifests with GPU resource limits, storage configuration, and Prometheus metrics support.
+
+- **Registry Integration**: One-step import from HuggingFace and automatic registration in Terradev LoRA registry with version tracking, cross-replica sync, and cost attribution.
 
 **NOTES ON 5.3.3**
 
