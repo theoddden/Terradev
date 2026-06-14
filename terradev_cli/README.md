@@ -1,4 +1,4 @@
-# Terradev CLI v5.3.9
+# Terradev CLI v5.4.1
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -15,6 +15,33 @@ Combines quoting, provisioning, topology optimization, training orchestration, i
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
+
+**NOTES ON 5.4.1**
+
+Fixed **credential persistence scope bug** in `terradev configure`:
+
+- **Bug**: `api` variable was only instantiated inside the `else` block (interactive mode), but `api.save_credentials()` was called unconditionally at line 1530. This caused `UnboundLocalError` when using `--provider` flag (single-provider mode), and would have overwritten credentials with empty data in interactive mode.
+
+- **Fix**:
+  - Moved `api = TerradevAPI()` to line 952 (before `if provider:` branching) to ensure it's always in scope
+  - Removed duplicate `api` instantiation from the `else` block
+  - Moved `api.save_credentials()` inside the `else` block (line 1531) - it only runs in interactive mode since single-provider mode saves directly to file at line 1186-1187
+
+- **Impact**: Both `terradev configure --provider <name>` and `terradev configure` (interactive) now correctly persist credentials to `~/.terradev/credentials.json`.
+
+**NOTES ON 5.4.0**
+
+Fixed **credential persistence bug** in `terradev configure` interactive mode:
+
+- **Bug**: Interactive mode (`terradev configure` without `--provider` flag) crashed with `NameError: name 'api' is not defined` at line 1515, preventing credentials from being saved to disk. This caused `terradev quote` to return empty results for all providers.
+
+- **Fix**: 
+  - Added `api = TerradevAPI()` initialization in interactive mode
+  - Added `api.load_credentials()` after `prompt_for_credentials()` to reload credentials from disk
+  - Fixed incorrectly nested Kubernetes configuration prompts (were inside "No providers configured" else block)
+  - Restored `api.save_credentials()` to save all credentials (provider + ML integrations + Kubernetes settings)
+
+- **Impact**: Users can now successfully configure providers in interactive mode and retrieve real-time pricing via `terradev quote`.
 
 **NOTES ON 5.3.9**
 

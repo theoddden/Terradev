@@ -116,10 +116,18 @@ class TerradevAPI:
         # Check if all credentials are still placeholder values
         placeholder_patterns = ["your_", "example_", "test_", "placeholder_", "xxx"]
         for key, value in self.credentials.items():
-            if value and not any(
+            if isinstance(value, dict):
+                # Check nested credentials (from configure --provider)
+                for nested_key, nested_value in value.items():
+                    if nested_value and isinstance(nested_value, str) and not any(
+                        pattern in nested_value.lower()
+                        for pattern in placeholder_patterns
+                    ):
+                        return False  # Found a real nested credential
+            elif value and isinstance(value, str) and not any(
                 pattern in value.lower() for pattern in placeholder_patterns
             ):
-                return False  # Found a real credential
+                return False  # Found a real flat credential
 
         return True  # All credentials appear to be placeholders
 
@@ -272,8 +280,20 @@ class TerradevAPI:
         # Check for nested dict format first (from configure --provider)
         nested = self.credentials.get(provider_name, {})
         if isinstance(nested, dict) and nested:
-            # Nested dict already has the right key names for the provider
-            return {k: str(v) for k, v in nested.items() if v}
+            # Check if nested values are placeholders (not real credentials)
+            placeholder_patterns = ["paste_", "your_", "example_", "test_", "placeholder_", "xxx"]
+            has_real_creds = False
+            for v in nested.values():
+                if isinstance(v, str) and v:
+                    v_lower = v.lower()
+                    if not any(pattern in v_lower for pattern in placeholder_patterns):
+                        has_real_creds = True
+                        break
+            
+            if has_real_creds:
+                # Nested dict has real credentials, use it
+                return {k: str(v) for k, v in nested.items() if v}
+            # Otherwise fall back to flat format
 
         creds: Dict[str, str] = {}
         if provider_name == "aws":
@@ -463,10 +483,11 @@ class TerradevAPI:
     ) -> List[Dict[str, Any]]:
         """Get quotes from a real provider via the BYOAPI provider layer"""
         try:
-            from providers.provider_factory import ProviderFactory
+            from terradev_cli.providers.provider_factory import ProviderFactory
 
             factory = ProviderFactory()
             creds = self._provider_creds(provider_name)
+            
             provider = factory.create_provider(provider_name, creds)
             try:
                 raw_quotes = await provider.get_instance_quotes(gpu_type)
@@ -761,7 +782,7 @@ def run_interactive_onboarding(api: TerradevAPI):
         existing_value = api.credentials.get(
             f"{provider_key}_api_key"
         ) or api.credentials.get(f"{provider_key}_access_key_id")
-        if existing_value and not any(
+        if existing_value and isinstance(existing_value, str) and not any(
             pattern in existing_value.lower()
             for pattern in ["your_", "example_", "test_", "placeholder_", "xxx"]
         ):
@@ -946,6 +967,10 @@ def configure(provider):
     Quick Start:
       RunPod is the easiest to set up (5 minutes): terradev setup runpod --quick
     """
+
+    # Initialize API object for credential management
+    # Must be instantiated before branching to ensure it's in scope for save_credentials()
+    api = TerradevAPI()
 
     if provider:
         # Configure specific provider
@@ -1206,6 +1231,10 @@ def configure(provider):
 
         configured_providers = prompt_for_credentials()
 
+        # Reload credentials from file after prompt_for_credentials saves them
+        # This ensures api.credentials includes the provider credentials
+        api.load_credentials()
+
         if configured_providers:
             print(f"\nReady to get quotes from: {', '.join(configured_providers)}")
             print("   Try: terradev quote --gpu-type a100")
@@ -1218,6 +1247,12 @@ def configure(provider):
             print(
                 "   Or use 'terradev setup runpod' for the easiest setup (5 minutes)"
             )
+
+        # Kubernetes configuration (optional)
+        kubernetes_config = click.prompt(
+            "Configure Kubernetes? (y/n)", default="n", show_default=False
+        )
+        if kubernetes_config.lower() == "y":
             kubernetes_namespace = click.prompt(
                 "Kubernetes namespace (default: default)",
                 default="default",
@@ -1512,30 +1547,14 @@ def configure(provider):
                 api.credentials["ray_head_node_ip"] = ray_head
             print("   Ray configured  distributed computing")
 
-    api.save_credentials()
+        # Save all credentials (provider + integrations) to disk
+        # Only in interactive mode - single-provider mode saves directly to file
+        api.save_credentials()
 
-    print("\nCredentials saved successfully!")
-    print(f"Stored in: {api.credentials_file}")
-    print("Your keys are encrypted and stored locally only.")
-    # Tier system removed - unlimited access
-    prov_used = api.usage.get("provisions_this_month", 0)
-    print("\nOpen Source Mode: Unlimited access")
-    print(f"Provisions this month: {prov_used} (unlimited)")
-
-    # Show integration status
-    try:
-        from integrations.wandb_integration import is_configured as wandb_ok
-        from integrations.prometheus_integration import is_configured as prom_ok
-
-        integrations = []
-        if wandb_ok(api.credentials):
-            integrations.append("W&B")
-        if prom_ok(api.credentials):
-            integrations.append("Prometheus")
-        if integrations:
-            print(f"Active integrations: {', '.join(integrations)}")
-    except Exception:
-        pass
+        print("\nCredentials saved successfully!")
+        print(f"Stored in: {api.credentials_file}")
+        print("Your keys are encrypted and stored locally only.")
+        print("\nOpen Source Mode: Unlimited access")
 
 
 @cli.command()

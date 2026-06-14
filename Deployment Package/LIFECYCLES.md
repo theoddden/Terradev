@@ -1556,6 +1556,208 @@ terradev provision --gpu rtx4090 --count 1 --pool hybrid
 
 ---
 
+## Lifecycle 18 — HuggingFace PEFT Import (NEW)
+
+**Goal:** Import, validate, and manage LoRA adapters from HuggingFace using the PEFT library.
+
+### Phase 1: Import Adapter from HuggingFace
+
+```bash
+# Import public adapter
+terradev lora peft import \
+  -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+
+# Import with custom local name
+terradev lora peft import \
+  -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k \
+  --local-name gsm8k-adapter
+
+# Import from private repository
+terradev lora peft import \
+  -a username/private-adapter \
+  --token hf_xxx
+```
+
+**What happens:**
+- Downloads adapter from HuggingFace Hub using PEFT library
+- Auto-detects rank, alpha, and target modules from adapter config
+- Stores adapter in `~/.terradev/peft_adapters/username--adapter/`
+- Validates adapter structure and compatibility
+
+### Phase 2: Import and Register in Terradev Registry
+
+```bash
+# Import and register in one step
+terradev lora peft import \
+  -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k \
+  --local-name gsm8k-adapter \
+  --register \
+  --base-model mistralai/Mistral-7B-Instruct-v0.1
+
+# Import with custom rank override
+terradev lora peft import \
+  -a username/adapter \
+  --register \
+  --base-model meta-llama/Llama-2-7b-hf \
+  --rank 128
+```
+
+**What happens:**
+- Downloads and validates adapter (same as Phase 1)
+- Registers adapter in Terradev LoRA registry (`~/.terradev/lora_registry.db`)
+- Creates version entry with auto-generated version ID
+- Associates with base model for compatibility tracking
+- Captures metadata for cost attribution
+
+### Phase 3: List Local Adapters
+
+```bash
+# List all imported adapters
+terradev lora peft list
+```
+
+**Output:**
+```
+Imported PEFT Adapters:
+  vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+    Local name: gsm8k-adapter
+    Base model: mistralai/Mistral-7B-Instruct-v0.1
+    Rank: 64
+    Alpha: 16
+    Target modules: q_proj, v_proj
+    Path: ~/.terradev/peft_adapters/vineetsharma--qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+    Registered: Yes
+```
+
+### Phase 4: Validate Adapter Structure
+
+```bash
+# Validate adapter
+terradev lora peft validate \
+  -p ~/.terradev/peft_adapters/vineetsharma--qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+```
+
+**What happens:**
+- Checks adapter_config.json exists and is valid
+- Verifies adapter weights are present
+- Validates target modules match base model
+- Checks rank and alpha values are consistent
+- Reports any structural issues
+
+**Output:**
+```
+Validation: PASSED
+  Config: ✓ Valid
+  Weights: ✓ Present (8 files)
+  Target modules: ✓ Compatible with base model
+  Rank: 64
+  Alpha: 16
+```
+
+### Phase 5: Use with LoRAX
+
+```bash
+# Deploy LoRAX server
+terradev lora lorax deploy \
+  -m mistralai/Mistral-7B-Instruct-v0.1 \
+  --docker
+
+# Load imported adapter
+terradev lora lorax load-adapter \
+  -a ~/.terradev/peft_adapters/gsm8k-adapter \
+  --adapter-name gsm8k-adapter
+
+# Generate with adapter
+terradev lora lorax generate \
+  -p "Solve: Natalia sold clips to 48 of her friends..." \
+  -a gsm8k-adapter
+```
+
+### Phase 6: Use with vLLM
+
+```bash
+# Deploy vLLM with LoRA support
+terradev ml vllm --start \
+  --instance-ip <ip> \
+  --model mistralai/Mistral-7B-Instruct-v0.1 \
+  --enable-lora \
+  --lora-modules gsm8k=~/.terradev/peft_adapters/gsm8k-adapter
+
+# Generate with adapter
+curl -X POST http://<ip>:8000/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "mistralai/Mistral-7B-Instruct-v0.1",
+    "prompt": "What is 2+2?",
+    "max_tokens": 64
+  }'
+```
+
+### Phase 7: Delete Local Adapter
+
+```bash
+# Delete imported adapter
+terradev lora peft delete -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
+
+# Delete by local name
+terradev lora peft delete -a gsm8k-adapter
+```
+
+**What happens:**
+- Removes adapter from `~/.terradev/peft_adapters/`
+- Removes from registry if previously registered
+- Frees disk space
+- Updates local adapter index
+
+### Phase 8: Batch Import Multiple Adapters
+
+```bash
+# Import multiple adapters for a tenant
+terradev lora peft import \
+  -a customer-a/adapter-1 \
+  --local-name customer-a-adapter-1 \
+  --register \
+  --base-model meta-llama/Llama-2-7b-hf
+
+terradev lora peft import \
+  -a customer-a/adapter-2 \
+  --local-name customer-a-adapter-2 \
+  --register \
+  --base-model meta-llama/Llama-2-7b-hf
+
+terradev lora peft import \
+  -a customer-a/adapter-3 \
+  --local-name customer-a-adapter-3 \
+  --register \
+  --base-model meta-llama/Llama-2-7b-hf
+
+# List all tenant adapters
+terradev lora peft list
+```
+
+### Phase 9: Troubleshooting
+
+```bash
+# If import fails due to missing token
+terradev lora peft import \
+  -a username/private-adapter \
+  --token hf_xxx
+
+# If adapter is incompatible with base model
+terradev lora peft validate -p ~/.terradev/peft_adapters/username--adapter
+
+# If rank detection fails, specify manually
+terradev lora peft import \
+  -a username/adapter \
+  --rank 64
+
+# If disk space is low, delete unused adapters
+terradev lora peft list
+terradev lora peft delete -a unused-adapter
+```
+
+---
+
 ## Lifecycle 17 — Langfuse Integration (NEW)
 
 **Goal:** Track LLM observability with Langfuse.

@@ -1,4 +1,4 @@
-# Terradev CLI v5.3.8
+# Terradev CLI v5.5.1
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -269,17 +269,17 @@ If you're serving a model with vLLM, there are 6 settings most teams leave at de
 
 Auto-tune all six from your workload profile:
 ```bash
-terradev vllm auto-optimize -s workload.json -m meta-llama/Llama-2-7b-hf -g 4
+terradev ml vllm auto-optimize -s workload.json -m meta-llama/Llama-2-7b-hf -g 4
 ```
 
 Or analyze a running server:
 ```bash
-terradev vllm analyze -e http://localhost:8000
+terradev ml vllm analyze -e http://localhost:8000
 ```
 
 Benchmark:
 ```bash
-terradev vllm benchmark -e http://localhost:8000 -c 10
+terradev ml vllm benchmark -e http://localhost:8000 -c 10
 ```
 
 ### Step 10: Deploy a MoE Model with Auto-Applied Optimizations
@@ -584,7 +584,7 @@ terradev status --live
 terradev train --from-provision latest
 
 # Auto-tune 6 critical vLLM knobs
-terradev vllm auto-optimize
+terradev ml vllm auto-optimize
 
 # Topology-optimized Kubernetes cluster
 terradev k8s create
