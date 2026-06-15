@@ -11,15 +11,14 @@ from typing import Dict, List, Any, Optional, Callable, Awaitable
 from dataclasses import asdict
 import asyncio
 import aiohttp
+import logging
 import time
 
-# Rust connection pool integration
-try:
-    from terradev_connection_pool import PyConnectionPool, PyConnectionConfig
+logger = logging.getLogger(__name__)
 
-    USE_RUST_POOL = True
-except ImportError:
-    USE_RUST_POOL = False
+# Rust connection pool integration - optional dependency
+# If not available, falls back to pure Python aiohttp connection pooling
+USE_RUST_POOL = False
 
 # Import new typed contracts
 from .types import (
@@ -95,23 +94,24 @@ class BaseProvider(ABC):
         self.session = None
         self._owns_session = False
 
+    # Abstract methods for old Dict-based API - providers must implement these
     @abstractmethod
     async def get_instance_quotes(
         self, gpu_type: str, region: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Get instance quotes for GPU type"""
+        """Get instance quotes for GPU type (old Dict-based API)"""
         pass
 
     @abstractmethod
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
-        """Provision an instance"""
+        """Provision an instance (old Dict-based API)"""
         pass
 
     @abstractmethod
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
-        """Get instance status"""
+        """Get instance status (old Dict-based API)"""
         pass
 
     @abstractmethod
@@ -142,31 +142,24 @@ class BaseProvider(ABC):
         pass
 
     # ── New Typed APIs (to be implemented by providers) ─────────────────────
+    # These are optional for now - providers can implement them when migrating
+    # from the old Dict-based API above.
 
     async def get_quotes(self, request: QuoteRequest) -> List[Quote]:
         """
         Get instance quotes for GPU type (new typed API).
 
-        Providers should implement this method. The old get_instance_quotes()
-        method below is a backwards-compat shim that calls this.
-
-        Default implementation raises NotImplementedError - providers should
-        override this as they migrate to the new typed API.
+        Providers should implement this method when migrating from the old
+        Dict-based API. Default implementation returns empty list.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not implement get_quotes(). "
-            "Please use get_instance_quotes() for now."
-        )
+        return []
 
     async def provision(self, request: ProvisionRequest) -> ProvisionResult:
         """
         Provision an instance (new typed API).
 
-        Providers should implement this method. The old provision_instance()
-        method below is a backwards-compat shim that calls this.
-
-        Default implementation raises NotImplementedError - providers should
-        override this as they migrate to the new typed API.
+        Providers should implement this method when migrating from the old
+        Dict-based API. Default implementation raises NotImplementedError.
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} does not implement provision(). "
@@ -177,116 +170,13 @@ class BaseProvider(ABC):
         """
         Get instance status (new typed API).
 
-        Providers should implement this method. The old get_instance_status()
-        method below is a backwards-compat shim that calls this.
-
-        Default implementation raises NotImplementedError - providers should
-        override this as they migrate to the new typed API.
+        Providers should implement this method when migrating from the old
+        Dict-based API. Default implementation raises NotImplementedError.
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} does not implement get_instance(). "
             "Please use get_instance_status() for now."
         )
-
-    # ── Backwards-Compatibility Shims ───────────────────────────────────────
-    # These allow existing code to continue working while providers migrate
-    # to the new typed APIs incrementally.
-
-    async def get_instance_quotes(  # noqa: F811
-        self, gpu_type: str, region: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Backwards-compat shim for old Dict-based signature.
-
-        Delegates to get_quotes() and converts Quote objects to Dict.
-        """
-        # Normalize GPU type using catalog
-        gpu_desc = normalize(gpu_type)
-        if gpu_desc is None:
-            # Fallback: create minimal descriptor from string
-            gpu_desc = GPUDescriptor(
-                name=gpu_type,
-                vendor=GPUVendor.NVIDIA,
-                vram_gb=0,
-            )
-
-        request = QuoteRequest(gpu=gpu_desc, region=region)
-        quotes = await self.get_quotes(request)
-
-        # Convert Quote objects to Dict for backwards compat
-        return [
-            {
-                "provider": q.provider,
-                "instance_type": q.provider_instance_type,
-                "gpu_type": q.gpu.name,
-                "price_per_hour": q.price_hr,
-                "region": q.region,
-                "available": q.availability == "available",
-                "spot": q.spot,
-                "vcpus": q.vcpus,
-                "memory_gb": q.gpu.vram_gb,
-                "gpu_count": q.gpu.count,
-                **q.raw,
-            }
-            for q in quotes
-        ]
-
-    async def provision_instance(  # noqa: F811
-        self, instance_type: str, region: str, gpu_type: str
-    ) -> Dict[str, Any]:
-        """
-        Backwards-compat shim for old Dict-based signature.
-
-        Delegates to provision() and converts ProvisionResult to Dict.
-        """
-        gpu_desc = normalize(gpu_type)
-        if gpu_desc is None:
-            gpu_desc = GPUDescriptor(
-                name=gpu_type,
-                vendor=GPUVendor.NVIDIA,
-                vram_gb=0,
-            )
-
-        request = ProvisionRequest(
-            gpu=gpu_desc,
-            region=region,
-        )
-        result = await self.provision(request)
-
-        return {
-            "instance_id": result.instance_id,
-            "provider": result.provider,
-            "region": result.region,
-            "gpu_type": result.gpu.name,
-            "price_per_hour": result.price_hr,
-            "spot": result.spot,
-            "status": result.status.value,
-            "ip": result.ip,
-            "ssh_user": result.ssh_user,
-            **result.raw,
-        }
-
-    async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:  # noqa: F811
-        """
-        Backwards-compat shim for old Dict-based signature.
-
-        Delegates to get_instance() and converts InstanceInfo to Dict.
-        """
-        info = await self.get_instance(instance_id)
-
-        return {
-            "instance_id": info.instance_id,
-            "provider": info.provider,
-            "status": info.status.value,
-            "gpu_type": info.gpu.name if info.gpu else None,
-            "ip": info.ip,
-            "price_per_hour": info.price_hr,
-            "spot": info.spot,
-            "uptime_s": info.uptime_s,
-            "region": info.region,
-            "ssh_user": info.ssh_user,
-            **info.raw,
-        }
 
     # ── Optional Health & Event Methods (default implementations) ──────────
 

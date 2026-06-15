@@ -23,15 +23,18 @@ class RunPodProvider(BaseProvider):
     """RunPod provider for GPU instances - BYOAPI only, no static fallback data"""
 
     API_BASE = "https://api.runpod.io/graphql"
+    
+    # Class-level rate limiting state shared across all instances
+    _last_request_time = 0
+    _request_count = 0
+    _rate_limit_lock = None
+    _rate_limit_window = 60  # 1 minute window
+    _max_requests_per_window = 100
 
     def __init__(self, credentials: Dict[str, str]):
         super().__init__(credentials)
         self.name = "runpod"
         self.api_key = credentials.get("api_key", "")
-        self.last_request_time = 0
-        self.request_count = 0
-        self.rate_limit_window = 60  # 1 minute window
-        self.max_requests_per_window = 100
 
     async def get_instance_quotes(
         self, gpu_type: str, region: Optional[str] = None
@@ -138,6 +141,7 @@ class RunPodProvider(BaseProvider):
         gpu_type: str,
         attach_volume: bool = True,
         volume_size_gb: int = 100,
+        ssh_public_key: str = "",
     ) -> Dict[str, Any]:
         """Provision RunPod instance with optional volume attachment"""
         if not self.api_key:
@@ -150,27 +154,22 @@ class RunPodProvider(BaseProvider):
             )
 
         try:
-            # Extract GPU ID from instance type (format: runpod-secure-A100 or runpod-community-H100)
-            if "-" not in instance_type:
-                raise Exception(f"Invalid instance type format: {instance_type}")
-
-            # Split on last hyphen to separate cloud_type from gpu_id
-            parts = instance_type.rsplit("-", 1)
-            if len(parts) != 2:
-                raise Exception(f"Invalid instance type format: {instance_type}")
-
-            cloud_type, gpu_id = parts
-            if cloud_type not in ["runpod-community", "runpod-secure"]:
-                raise Exception(f"Unsupported cloud type: {cloud_type}")
-
-            # Determine cloud type for API
-            is_secure = cloud_type == "runpod-secure"
+            # Extract GPU ID from instance type (format: runpod-community-<GPU_ID> or runpod-secure-<GPU_ID>)
+            # Use startswith to handle GPU IDs that contain hyphens (e.g. NVIDIA A100-SXM4-40GB)
+            if instance_type.startswith("runpod-community-"):
+                is_secure = False
+                gpu_id = instance_type[len("runpod-community-"):]
+            elif instance_type.startswith("runpod-secure-"):
+                is_secure = True
+                gpu_id = instance_type[len("runpod-secure-"):]
+            else:
+                raise Exception(f"Unsupported cloud type: {instance_type}")
 
             # Create pod specification
             pod_spec = {
                 "name": f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "imageId": "runpod/base:latest",
-                "gpuType": gpu_id,
+                "imageName": "runpod/base:latest",
+                "gpuTypeId": gpu_id,
                 "cloudType": "SECURE" if is_secure else "COMMUNITY",
                 "containerDiskInGb": 40,
                 "minMemoryInGb": 80,
@@ -179,7 +178,10 @@ class RunPodProvider(BaseProvider):
                     {"key": "TERRADEV_MANAGED", "value": "true"},
                     {"key": "GPU_TYPE", "value": gpu_type},
                 ],
-                "ports": ["http", "https"],
+                "ports": "22/tcp,8888/http",
+                "gpuCount": 1,
+                "startSsh": True,
+                "supportPublicIp": True,
             }
 
             # CRITICAL: Add volume if requested
@@ -223,7 +225,30 @@ class RunPodProvider(BaseProvider):
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("RunPod API key not configured")
-        query = "query Pod($podId: String!) { pod(input: {podId: $podId}) { id name desiredStatus gpuCount } }"
+        query = """
+        query Pod($podId: String!) {
+            pod(input: {podId: $podId}) {
+                id
+                name
+                desiredStatus
+                gpuCount
+                runtime {
+                    ports {
+                        ip
+                        isIpPublic
+                        privatePort
+                        publicPort
+                        type
+                    }
+                    gpus {
+                        id
+                        gpuUtilPercent
+                        memoryUtilPercent
+                    }
+                }
+            }
+        }
+        """
         try:
             data = await self._make_request(
                 "POST",
@@ -231,10 +256,25 @@ class RunPodProvider(BaseProvider):
                 json={"query": query, "variables": {"podId": instance_id}},
             )
             pod = data.get("data", {}).get("pod", {})
+            runtime = pod.get("runtime", {})
+            ports = runtime.get("ports", [])
+            
+            # Extract public IP and SSH port
+            public_ip = None
+            ssh_port = None
+            for port in ports:
+                if port.get("isIpPublic") and port.get("privatePort") == 22:
+                    public_ip = port.get("ip")
+                    ssh_port = port.get("publicPort")
+                    break
+            
             return {
                 "instance_id": instance_id,
                 "status": (pod.get("desiredStatus") or "unknown").lower(),
                 "provider": "runpod",
+                "ip": public_ip,
+                "port": ssh_port,
+                "gpu_count": pod.get("gpuCount", 1),
             }
         except Exception as e:
             raise Exception(f"RunPod status failed: {e}")
@@ -305,87 +345,111 @@ class RunPodProvider(BaseProvider):
     ) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("RunPod API key not configured")
-        # RunPod supports exec via their runsync/run endpoints
-        endpoint = "run" if async_exec else "runsync"
+        
+        # Get instance status to find SSH connection details
         try:
-            data = await self._make_request(
-                "POST",
-                f"https://api.runpod.ai/v2/{instance_id}/{endpoint}",
-                json={"input": {"command": command}},
-            )
-            if async_exec:
-                return {
-                    "instance_id": instance_id,
-                    "command": command,
-                    "exit_code": 0,
-                    "job_id": data.get("id", "unknown"),
-                    "output": f"Async job submitted: {data.get('id', 'unknown')}",
-                    "async": True,
-                }
-            output = data.get("output", data.get("result", ""))
-            return {
-                "instance_id": instance_id,
-                "command": command,
-                "exit_code": 0 if data.get("status") == "COMPLETED" else 1,
-                "output": str(output),
-                "async": False,
-            }
-        except Exception as e:
-            # Fallback: SSH exec if pod has SSH enabled
-            try:
-                import subprocess
-
-                result = subprocess.run(
-                    [
-                        "ssh",
-                        "-o",
-                        "StrictHostKeyChecking=accept-new",
-                        "-o",
-                        f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
-                        "-o",
-                        "ConnectTimeout=10",
-                        f"root@{instance_id}.runpod.io",
-                        command,
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=300,
-                )
-                return {
-                    "instance_id": instance_id,
-                    "command": command,
-                    "exit_code": result.returncode,
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
-                    "async": async_exec,
-                }
-            except Exception as ssh_err:
+            status = await self.get_instance_status(instance_id)
+            public_ip = status.get("ip")
+            ssh_port = status.get("port", 22)
+            
+            if not public_ip:
                 return {
                     "instance_id": instance_id,
                     "command": command,
                     "exit_code": 1,
-                    "output": f"RunPod exec error: {e}; SSH fallback error: {ssh_err}",
+                    "output": "No public IP available - instance may still be provisioning",
                     "async": async_exec,
                 }
+        except Exception as e:
+            return {
+                "instance_id": instance_id,
+                "command": command,
+                "exit_code": 1,
+                "output": f"Failed to get instance status for SSH: {e}",
+                "async": async_exec,
+            }
+        
+        # Use SSH for command execution
+        try:
+            import subprocess
+            
+            # Ensure known_hosts directory exists
+            known_hosts_path = os.path.expanduser('~/.terradev/known_hosts')
+            os.makedirs(os.path.dirname(known_hosts_path), exist_ok=True)
+            
+            ssh_cmd = [
+                "ssh",
+                "-o", "StrictHostKeyChecking=accept-new",
+                "-o", f"UserKnownHostsFile={known_hosts_path}",
+                "-o", "ConnectTimeout=10",
+                "-p", str(ssh_port),
+                f"root@{public_ip}",
+                command,
+            ]
+            
+            if async_exec:
+                proc = subprocess.Popen(
+                    ssh_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
+                return {
+                    "instance_id": instance_id,
+                    "command": command,
+                    "exit_code": 0,
+                    "job_id": str(proc.pid),
+                    "output": f"Async SSH process started (PID: {proc.pid})",
+                    "async": True,
+                }
+            
+            result = subprocess.run(
+                ssh_cmd, capture_output=True, text=True, timeout=300
+            )
+            return {
+                "instance_id": instance_id,
+                "command": command,
+                "exit_code": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "async": False,
+            }
+        except Exception as e:
+            return {
+                "instance_id": instance_id,
+                "command": command,
+                "exit_code": 1,
+                "output": f"SSH execution failed: {e}",
+                "async": async_exec,
+            }
 
     def _get_auth_headers(self) -> Dict[str, str]:
-        return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        return {}  # RunPod auth is via ?api_key= query param; see _make_request override
+
+    async def _make_request(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
+        """Override to inject api_key as query parameter per RunPod docs."""
+        if self.api_key:
+            sep = "&" if "?" in url else "?"
+            url = f"{url}{sep}api_key={self.api_key}"
+        return await super()._make_request(method, url, **kwargs)
 
     async def _check_rate_limit(self) -> bool:
-        """CRITICAL: Check rate limiting for API calls"""
+        """CRITICAL: Check rate limiting for API calls (class-level shared state)"""
+        # Lazy-create lock to avoid Python 3.9 event loop binding bug
+        if self.__class__._rate_limit_lock is None:
+            self.__class__._rate_limit_lock = asyncio.Lock()
+        
         current_time = datetime.now().timestamp()
 
-        # Reset window if needed
-        if current_time - self.last_request_time > self.rate_limit_window:
-            self.request_count = 0
-            self.last_request_time = current_time
+        async with self.__class__._rate_limit_lock:
+            # Reset window if needed
+            if current_time - self.__class__._last_request_time > self.__class__._rate_limit_window:
+                self.__class__._request_count = 0
+                self.__class__._last_request_time = current_time
 
-        # Check if we're within limits
-        if self.request_count >= self.max_requests_per_window:
-            return False
+            # Check if we're within limits
+            if self.__class__._request_count >= self.__class__._max_requests_per_window:
+                return False
 
-        self.request_count += 1
-        return True
+            self.__class__._request_count += 1
+            return True
 
     async def _create_and_attach_volume(
         self, pod_name: str, size_gb: int

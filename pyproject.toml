@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "5.5.1"
+version = "5.5.5"
 description = "An imperative command-line-interface for AI workload orchestration."
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -195,10 +195,19 @@ include = ["terradev_cli", "terradev_cli.*"]
 
 [tool.setuptools.package-data]
 terradev_cli = [
-    "templates/*.yaml",
-    "templates/*.json",
-    "config/*.json",
+    "*.md",
+    "*.txt",
     "core/semantic_signals/*.yaml",
+    "core/*.json",
+    "integrations/*.png",
+    "kubernetes/*.yaml",
+    "kubernetes/*.py",
+    "terraform/*.tf",
+    "terraform/*.py",
+    "terraform/modules/**/*.tf",
+    "terraform/modules/**/*.sh",
+    "terraform/modules/**/*.tpl",
+    "terraform/modules/**/*.py",
 ]
 
 [tool.black]

@@ -93,7 +93,7 @@ class LambdaLabsProvider(BaseProvider):
                             "egress_cost": 0.0,  # Lambda has no egress costs
                             "egress_advantage": True,
                             "lambda_stack_preinstalled": True,
-                            "container_conflict_risk": await self._check_container_conflicts(
+                            "container_conflict_risk": self._check_container_conflicts(
                                 gpu_type
                             ),
                         }
@@ -134,7 +134,7 @@ class LambdaLabsProvider(BaseProvider):
                 "egress_cost": 0.0,
                 "egress_advantage": True,
                 "lambda_stack_preinstalled": True,
-                "container_conflict_risk": await self._check_container_conflicts(
+                "container_conflict_risk": self._check_container_conflicts(
                     gpu_type
                 ),
                 "fallback_routing": {
@@ -180,6 +180,7 @@ class LambdaLabsProvider(BaseProvider):
         region: str,
         gpu_type: str,
         enable_fallback: bool = True,
+        ssh_public_key: str = "",
     ) -> Dict[str, Any]:
         """Provision Lambda instance with optional fallback routing"""
         if not self.api_key:
@@ -320,12 +321,16 @@ class LambdaLabsProvider(BaseProvider):
                 }
             import subprocess
 
+            # Ensure known_hosts directory exists
+            known_hosts_path = os.path.expanduser('~/.terradev/known_hosts')
+            os.makedirs(os.path.dirname(known_hosts_path), exist_ok=True)
+
             ssh_cmd = [
                 "ssh",
                 "-o",
                 "StrictHostKeyChecking=accept-new",
                 "-o",
-                f"UserKnownHostsFile={os.path.expanduser('~/.terradev/known_hosts')}",
+                f"UserKnownHostsFile={known_hosts_path}",
                 "-o",
                 "ConnectTimeout=10",
                 f"ubuntu@{public_ip}",
