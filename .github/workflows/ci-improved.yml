@@ -116,7 +116,8 @@ jobs:
         file: ./coverage.xml
         flags: unittests-linux-${{ matrix.python-version }}
         name: codecov-linux-${{ matrix.python-version }}
-        fail_ci_if_error: true
+        fail_ci_if_error: false
+      continue-on-error: true
 
   # === CLI Functionality Tests ===
   cli-functionality:
