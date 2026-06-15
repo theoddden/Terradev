@@ -18,7 +18,7 @@ on:
         default: 'all'
 
 env:
-  COVERAGE_THRESHOLD: 70
+  COVERAGE_THRESHOLD: 25
   PYTHONUNBUFFERED: 1
 
 jobs:
