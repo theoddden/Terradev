@@ -159,26 +159,32 @@ def test_server_args_generation():
 
     config = VLLMConfig.create_throughput_optimized("meta-llama/Llama-2-7b-hf")
     service = VLLMService(config)
-    args = service._build_server_args()
+    try:
+        args = service._build_server_args()
 
-    # Verify optimization flags are included
-    assert "--max-num-batched-tokens" in args, "Missing batched tokens flag"
-    assert "--max-num-seqs" in args, "Missing max sequences flag"
-    assert "--enable-prefix-caching" in args, "Missing prefix caching flag"
-    assert "--enable-chunked-prefill" in args, "Missing chunked prefill flag"
+        # Verify optimization flags are included
+        assert "--max-num-batched-tokens" in args, "Missing batched tokens flag"
+        assert "--max-num-seqs" in args, "Missing max sequences flag"
+        assert "--enable-prefix-caching" in args, "Missing prefix caching flag"
+        assert "--enable-chunked-prefill" in args, "Missing chunked prefill flag"
 
-    # Verify values
-    batch_idx = args.index("--max-num-batched-tokens")
-    assert (
-        args[batch_idx + 1] == "16384"
-    ), f"Wrong batch size value: {args[batch_idx + 1]}"
+        # Verify values
+        batch_idx = args.index("--max-num-batched-tokens")
+        assert (
+            args[batch_idx + 1] == "16384"
+        ), f"Wrong batch size value: {args[batch_idx + 1]}"
 
-    seq_idx = args.index("--max-num-seqs")
-    assert (
-        args[seq_idx + 1] == "1024"
-    ), f"Wrong max sequences value: {args[seq_idx + 1]}"
+        seq_idx = args.index("--max-num-seqs")
+        assert (
+            args[seq_idx + 1] == "1024"
+        ), f"Wrong max sequences value: {args[seq_idx + 1]}"
 
-    print("✅ Server args generation tests passed")
+        print("✅ Server args generation tests passed")
+    finally:
+        # Ensure session is closed if it was created
+        if service.session:
+            import asyncio
+            asyncio.run(service.session.close())
 
 
 def test_cli_integration():
