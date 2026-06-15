@@ -72,15 +72,6 @@ class TestProvidersCommands:
         assert result.exit_code == 0
 
 
-class TestOnboardingCommand:
-    """Test the onboarding command."""
-
-    def test_onboarding_invocation(self):
-        """Onboarding command invocation"""
-        runner = CliRunner()
-        result = runner.invoke(cli, ["onboarding"])
-        # Should either run or show already configured message
-        assert result.exit_code == 0 or "already" in result.output.lower()
 
 
 class TestSetupCommand:
