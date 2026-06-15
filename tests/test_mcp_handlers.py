@@ -256,7 +256,7 @@ class TestMCPHandlerPatterns:
 
             async def test_aiohttp():
                 # This is a pattern test - we won't make real HTTP calls
-                async with aiohttp.ClientSession():
+                async with aiohttp.ClientSession() as session:
                     # Mock the request
                     pass
 
