@@ -110,7 +110,7 @@ class AzureProvider(BaseProvider):
         self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         if not self.compute_client:
-            raise Exception(
+            raise RuntimeError(
                 "Azure client not initialised – configure credentials first"
             )
 

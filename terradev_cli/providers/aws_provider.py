@@ -233,7 +233,7 @@ class AWSProvider(BaseProvider):
     ) -> Dict[str, Any]:
         """Provision EC2 instance"""
         if not self.ec2_client:
-            raise Exception("AWS client not initialized")
+            raise RuntimeError("AWS client not initialized")
 
         try:
             # Create instance request

@@ -253,7 +253,7 @@ class GCPProvider(BaseProvider):
         self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         if not self.instances_client or not self.project_id:
-            raise Exception("GCP client not initialised – configure credentials first")
+            raise RuntimeError("GCP client not initialised – configure credentials first")
 
         zone = f"{region}-a"
         instance_name = (
