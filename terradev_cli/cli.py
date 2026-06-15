@@ -2783,10 +2783,14 @@ def provision(
                 f"COST: Filtering for spot instances: {len(all_quotes)}/{original_count} available"
             )
             if not all_quotes:
-                print("ERROR: No spot instances available. Try:")
-                print("    Use --on-demand for guaranteed availability")
-                print("    Try different GPU types or regions")
-                print("    Wait for spot capacity to become available")
+                print("ERROR: No spot instances available for this GPU type/region.")
+                print("\nTo fix this:")
+                print("   1. Use --on-demand for guaranteed availability (costs ~2-3x more)")
+                print("   2. Try a different GPU type: terradev quote -g H100")
+                print("   3. Try a different region: terradev provision -g A100 -r us-west-2")
+                print("   4. Check provider status: terradev status")
+                print("\nExample with on-demand:")
+                print("   terradev provision -g A100 --on-demand")
                 return
         else:
             # Filter for on-demand instances only
