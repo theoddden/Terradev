@@ -221,6 +221,8 @@ target-version = "py39"
 select = [
     "BLE",  # flake8-blind-except (BLE001 = broad exception catch) - CRITICAL
     "F401", # unused imports (auto-fixable)
+    "B006", # mutable-argument-defaults (prevents shared mutable defaults)
+    "B017", # assert-raises-exception (catches incorrect assert raises usage)
 ]
 ignore = [
     "E501", # line too long (cosmetic, not critical)

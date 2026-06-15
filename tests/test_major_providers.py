@@ -224,7 +224,7 @@ class TestProviderErrorHandling:
         """Providers should raise error on provision without API key"""
         provider = provider_class(credentials)
 
-        with pytest.raises(Exception):
+        with pytest.raises(RuntimeError):
             run_async(provider.provision_instance("type", "region", "A100"))
 
     @pytest.mark.parametrize(
