@@ -914,11 +914,13 @@ def cli(config=None, verbose=False, skip_onboarding=False):
     Parallel provisioning and orchestration for cross-cloud cost optimization.
     Save 30% on end-to-end compute provisioning costs with real-time cloud arbitrage.
     """
-    # Check for first-time user and trigger onboarding
+    # Check for first-time user and trigger onboarding (skip if --help is present)
     if not skip_onboarding and not os.environ.get("TERRADEV_SKIP_ONBOARDING"):
-        api = TerradevAPI()
-        if api.is_first_time_user():
-            run_interactive_onboarding(api)
+        # Skip onboarding if --help or -h is in arguments
+        if "--help" not in sys.argv and "-h" not in sys.argv:
+            api = TerradevAPI()
+            if api.is_first_time_user():
+                run_interactive_onboarding(api)
 
 
 @cli.command()
