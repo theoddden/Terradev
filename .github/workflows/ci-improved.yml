@@ -113,12 +113,12 @@ jobs:
 
     - name: Run unit tests with coverage
       run: |
-        pytest tests/ -v --tb=short --cov=terradev_cli --cov-report=xml --cov-report=html --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} --ignore=tests/test_mcp_handlers.py -n auto || true
+        pytest tests/ -v --tb=short --cov=terradev_cli --cov-report=xml --cov-report=html --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} --ignore=tests/test_mcp_handlers.py || true
 
     - name: CLI-specific coverage report
       run: |
         echo "=== CLI Module Coverage ==="
-        pytest tests/ -v --tb=short --cov=terradev_cli.cli --cov-report=term-missing --ignore=tests/test_mcp_handlers.py -n auto || true
+        pytest tests/ -v --tb=short --cov=terradev_cli.cli --cov-report=term-missing --ignore=tests/test_mcp_handlers.py || true
         echo "=========================="
 
     - name: Upload coverage to Codecov
