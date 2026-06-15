@@ -39,6 +39,9 @@ from .gpu_catalog import (
     list_providers_for_gpu,
 )
 
+# Individual provider classes (lazy-loaded via ProviderFactory, but exported for direct import)
+from .lambda_labs_provider import LambdaLabsProvider
+
 __all__ = [
     # Types
     "GPUDescriptor",
@@ -59,6 +62,8 @@ __all__ = [
     "BaseProvider",
     "ProviderFactory",
     "ProviderRegistry",
+    # Individual providers (for direct import)
+    "LambdaLabsProvider",
     # GPU catalog functions
     "normalize",
     "get_canonical_name",

@@ -1603,6 +1603,17 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
       A100, H100, RTX4090, L40S, V100, L4, T4
     """
 
+    # Validate GPU type parameter
+    if not gpu_type or gpu_type.strip() == "":
+        print("ERROR: GPU type is required")
+        print("\nUsage: terradev quote -g <gpu-type>")
+        print("\nExample GPU types:")
+        print("  terradev quote -g A100")
+        print("  terradev quote -g H100")
+        print("  terradev quote -g RTX4090")
+        print("\nCommon GPUs: A100, H100, RTX4090, L40S, V100, L4, T4")
+        return
+
     if _telemetry:
         _telemetry.log_action(
             "quote",

@@ -412,6 +412,132 @@ class IntegrationTestFramework:
         await asyncio.sleep(0.1)  # Simulate network latency
         return True
 
+    async def _test_large_scale_operations(self) -> bool:
+        """Test large-scale operations performance"""
+        try:
+            if not self.config.performance_mode:
+                return True  # Skip if not in performance mode
+
+            start_time = time.time()
+
+            # Simulate large-scale operations (100 instances)
+            tasks = []
+            for i in range(100):
+                task = asyncio.create_task(
+                    self._mock_provision_instance(f"instance-{i}")
+                )
+                tasks.append(task)
+
+            results = await asyncio.gather(*tasks)
+
+            end_time = time.time()
+            duration = end_time - start_time
+
+            # Should complete in reasonable time
+            assert duration < 60.0, f"Large-scale operations took too long: {duration}s"
+            assert all(results), "Some large-scale operations failed"
+
+            return True
+        except Exception as e:
+            print(f"Large-scale operations test failed: {e}")
+            return False
+
+    async def _test_memory_efficiency(self) -> bool:
+        """Test memory efficiency under load"""
+        try:
+            if not self.config.performance_mode:
+                return True  # Skip if not in performance mode
+
+            import psutil
+            import os
+
+            process = psutil.Process(os.getpid())
+            initial_memory = process.memory_info().rss
+
+            # Simulate memory-intensive operations
+            large_data = []
+            for i in range(1000):
+                large_data.append([0] * 1000)
+
+            peak_memory = process.memory_info().rss
+            memory_increase = peak_memory - initial_memory
+
+            # Memory increase should be reasonable (< 100MB)
+            assert memory_increase < 100 * 1024 * 1024, f"Memory increase too large: {memory_increase / 1024 / 1024:.2f}MB"
+
+            # Clean up
+            del large_data
+
+            return True
+        except Exception as e:
+            print(f"Memory efficiency test failed: {e}")
+            return False
+
+    async def _test_network_performance(self) -> bool:
+        """Test network performance characteristics"""
+        try:
+            if not self.config.performance_mode:
+                return True  # Skip if not in performance mode
+
+            start_time = time.time()
+
+            # Simulate network operations
+            tasks = []
+            for i in range(10):
+                task = asyncio.create_task(self._mock_network_call())
+                tasks.append(task)
+
+            results = await asyncio.gather(*tasks)
+
+            end_time = time.time()
+            duration = end_time - start_time
+
+            # Should complete in reasonable time
+            assert duration < 5.0, f"Network operations took too long: {duration}s"
+            assert all(results), "Some network operations failed"
+
+            return True
+        except Exception as e:
+            print(f"Network performance test failed: {e}")
+            return False
+
+    async def _test_api_response_times(self) -> bool:
+        """Test API response times"""
+        try:
+            if not self.config.performance_mode:
+                return True  # Skip if not in performance mode
+
+            response_times = []
+
+            # Simulate API calls
+            for i in range(20):
+                start = time.time()
+                await self._mock_api_call()
+                end = time.time()
+                response_times.append((end - start) * 1000)  # Convert to ms
+
+            avg_response_time = sum(response_times) / len(response_times)
+            max_response_time = max(response_times)
+
+            # Response times should be reasonable
+            assert avg_response_time < 100, f"Average response time too high: {avg_response_time:.2f}ms"
+            assert max_response_time < 500, f"Max response time too high: {max_response_time:.2f}ms"
+
+            return True
+        except Exception as e:
+            print(f"API response times test failed: {e}")
+            return False
+
+    async def _mock_network_call(self) -> bool:
+        """Mock network call for performance testing"""
+        await asyncio.sleep(0.05)  # Simulate network latency
+        return True
+
+    async def _mock_api_call(self) -> bool:
+        """Mock API call for performance testing"""
+        await asyncio.sleep(0.02)  # Simulate API latency
+        return True
+
     # Test framework utilities
     async def _run_test_suite(self, tests: List) -> Dict[str, Any]:
         """Run a suite of tests and return results"""
