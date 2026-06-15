@@ -158,8 +158,7 @@ class OVHcloudProvider(BaseProvider):
                 timestamp,
             ]
         )
-        # nosec B324 - SHA1 is required by OVH API specification for HMAC signatures
-        return "$1$" + hashlib.sha1(to_sign.encode("utf-8")).hexdigest()
+        return "$1$" + hashlib.sha1(to_sign.encode("utf-8")).hexdigest()  # nosec B324 - SHA1 is required by OVH API specification for HMAC signatures
 
     async def _ovh_request(
         self, method: str, path: str, body: Optional[Dict] = None

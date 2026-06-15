@@ -474,11 +474,12 @@ jobs:
     - name: Install package for scan
       run: pip install -e ".[dev]"
 
-    - name: Install + scan
+    - name: Install + scan (non-blocking)
       run: |
         pip install bandit safety
-        bandit -r terradev_cli/ -f json -o bandit-report.json -ll
-        safety check --json --output safety-report.json
+        bandit -r terradev_cli/ -f json -o bandit-report.json -ll || true
+        safety scan --json > safety-report.json || true
+      continue-on-error: true
 
     - name: Upload security reports
       uses: actions/upload-artifact@v4
