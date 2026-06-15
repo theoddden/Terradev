@@ -220,9 +220,15 @@ target-version = "py39"
 [tool.ruff.lint]
 select = [
     "BLE",  # flake8-blind-except (BLE001 = broad exception catch) - CRITICAL
+    "F401", # unused imports (auto-fixable)
 ]
-ignore = []
+ignore = [
+    "E501", # line too long (cosmetic, not critical)
+]
 
 # Per-file ignores - will expand as we add more rules
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["BLE001"]  # allow broad except in tests
+"tests/*" = ["BLE001", "F401"]  # allow broad except and unused imports (for availability testing) in tests
+"terradev_cli/providers/*" = ["F401"]  # allow unused imports (for Rust auth availability testing) in providers
+"terradev_cli/core/*" = ["F401"]  # allow unused imports (for Rust integration availability testing) in core
+"terradev_cli/mcp/*" = ["F401"]  # allow unused imports (for MCP/starlette availability testing) in mcp

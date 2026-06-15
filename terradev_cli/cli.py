@@ -7517,7 +7517,6 @@ def ray_test():
     try:
         from terradev_cli.ml_services.ray_enhanced import (
             create_enhanced_ray_service_from_credentials,
-            get_enhanced_ray_setup_instructions,
         )
 
         api = TerradevAPI()

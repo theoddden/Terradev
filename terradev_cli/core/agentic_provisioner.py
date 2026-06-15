@@ -23,7 +23,7 @@ import logging
 import os
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -34,8 +34,7 @@ from terradev_cli.core.agentic_topology import (
     _build_vllm_args,
     GPU_SPOT_PRICE_HR,
 )
-from terradev_cli.core.dag_executor import DAGExecutor
-from terradev_cli.core.parallel_provisioner import ParallelProvisioner, ProvisionResult
+from terradev_cli.core.parallel_provisioner import ParallelProvisioner
 
 logger = logging.getLogger(__name__)
 

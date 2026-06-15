@@ -19,7 +19,7 @@ import asyncio
 from typing import Dict, List, Optional
 from collections import defaultdict
 
-from .types import ProviderHealth, HealthStatus
+from .types import ProviderHealth
 from .provider_factory import ProviderFactory
 from .provider_profiles import get_profile
 

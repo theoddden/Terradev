@@ -8,7 +8,7 @@ IDE autocomplete, and provider-agnostic interfaces.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, List, Dict, Any, Callable, Awaitable
+from typing import Optional, List, Dict, Any
 
 
 class InstanceStatus(str, Enum):

@@ -8,7 +8,6 @@ Provides:
 - Integration with drift_retrain_service for continuous fine-tuning
 """
 
-import asyncio
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime

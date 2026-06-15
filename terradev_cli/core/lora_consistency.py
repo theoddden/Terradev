@@ -6,16 +6,13 @@ Uses vLLM Router for coordination and implements gossip protocol for state synch
 """
 
 import asyncio
-import aiohttp
 import logging
-import time
-from typing import Dict, List, Optional, Set, Any, Tuple
+from typing import Dict, List, Optional, Set, Any
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 
 from ..ml_services.vllm_service import LoRAModule, VLLMService, VLLMConfig
-from ..ml_services.lora_registry import AdapterRegistry, AdapterReplicaState
+from ..ml_services.lora_registry import AdapterRegistry
 
 logger = logging.getLogger(__name__)
 

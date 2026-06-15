@@ -48,7 +48,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, List, Optional, Any
 
 if TYPE_CHECKING:
-    from terradev_cli.core.kv_sharing import KVSharingPlan
+    pass
 
 from terradev_cli.core.dag_executor import DAGExecutor
 

@@ -492,7 +492,6 @@ def load_profiles_from_file(path: str, override: bool = False) -> None:
             egress_cost: 0.05
             supports_spot: true
     """
-    import os
     from pathlib import Path
 
     path_obj = Path(path)
