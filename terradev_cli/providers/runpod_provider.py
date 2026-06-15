@@ -2,11 +2,6 @@
 """
 RunPod Provider - RunPod GPU cloud integration
 
-CRITICAL FIXES v4.0.0:
-- Volume attachment for data persistence
-- Secure vs Community Cloud selection
-- Rate limiting handling for multi-pod management
-- Cold start SLA monitoring
 """
 
 import asyncio
@@ -24,18 +19,17 @@ class RunPodProvider(BaseProvider):
     """RunPod provider for GPU instances - BYOAPI only, no static fallback data"""
 
     API_BASE = "https://api.runpod.io/graphql"
-    
-    # Class-level rate limiting state shared across all instances
-    _last_request_time = 0
-    _request_count = 0
-    _rate_limit_lock = None
-    _rate_limit_window = 60  # 1 minute window
-    _max_requests_per_window = 100
 
     def __init__(self, credentials: Dict[str, str]):
         super().__init__(credentials)
         self.name = "runpod"
         self.api_key = credentials.get("api_key", "")
+        # Instance-level rate limiting state (consistent with all other providers)
+        self._last_request_time = 0
+        self._request_count = 0
+        self._rate_limit_lock: Optional[asyncio.Lock] = None
+        self._rate_limit_window = 60  # 1 minute window
+        self._max_requests_per_window = 100
 
     async def get_instance_quotes(
         self, gpu_type: str, region: Optional[str] = None
@@ -432,24 +426,22 @@ class RunPodProvider(BaseProvider):
         return await super()._make_request(method, url, **kwargs)
 
     async def _check_rate_limit(self) -> bool:
-        """CRITICAL: Check rate limiting for API calls (class-level shared state)"""
+        """Check rate limiting for API calls (instance-level state)"""
         # Lazy-create lock to avoid Python 3.9 event loop binding bug
-        if self.__class__._rate_limit_lock is None:
-            self.__class__._rate_limit_lock = asyncio.Lock()
-        
+        if self._rate_limit_lock is None:
+            self._rate_limit_lock = asyncio.Lock()
+
         current_time = datetime.now().timestamp()
 
-        async with self.__class__._rate_limit_lock:
-            # Reset window if needed
-            if current_time - self.__class__._last_request_time > self.__class__._rate_limit_window:
-                self.__class__._request_count = 0
-                self.__class__._last_request_time = current_time
+        async with self._rate_limit_lock:
+            if current_time - self._last_request_time > self._rate_limit_window:
+                self._request_count = 0
+                self._last_request_time = current_time
 
-            # Check if we're within limits
-            if self.__class__._request_count >= self.__class__._max_requests_per_window:
+            if self._request_count >= self._max_requests_per_window:
                 return False
 
-            self.__class__._request_count += 1
+            self._request_count += 1
             return True
 
     async def _create_and_attach_volume(

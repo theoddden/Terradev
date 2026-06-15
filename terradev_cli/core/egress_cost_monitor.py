@@ -2,11 +2,6 @@
 """
 Egress Cost Monitor - Proactive egress cost warnings and optimization
 
-CRITICAL FIXES v4.0.0:
-- Cross-cloud egress cost warnings
-- Multi-hop routing recommendations
-- Real-time cost tracking
-- Budget alert integration
 """
 
 import logging

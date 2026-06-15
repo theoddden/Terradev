@@ -72,7 +72,7 @@ class VastAIProvider(BaseProvider):
         return sorted(quotes, key=lambda q: q["price_per_hour"])
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("Vast.ai API key not configured")

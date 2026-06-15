@@ -2,12 +2,6 @@
 """
 GCP Provider - Google Cloud Platform integration
 
-CRITICAL FIXES v4.0.0:
-- A3/A4/A4X capacity reservation workflow
-- Zone availability probing for H100s
-- TPU vs GPU guidance
-- Flex-start VM provisioning
-- GKE GPU driver management
 """
 
 import asyncio
@@ -256,7 +250,7 @@ class GCPProvider(BaseProvider):
         return quotes
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         if not self.instances_client or not self.project_id:
             raise Exception("GCP client not initialised – configure credentials first")

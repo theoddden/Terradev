@@ -473,7 +473,7 @@ class AutoOptimizer:
             base_confidence += 0.05
 
         # Adjust based on historical performance
-        if deployment_id in self.optimization_history:
+        if context.deployment_id in self.optimization_history:
             historical_success = self._calculate_historical_success_rate(
                 context.deployment_id
             )

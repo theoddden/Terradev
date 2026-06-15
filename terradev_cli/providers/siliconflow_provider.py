@@ -171,7 +171,7 @@ class SiliconFlowProvider(BaseProvider):
     # ── Provisioning (deploy a model to dedicated GPU) ────────────────
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         """Deploy a model to dedicated GPU capacity on SiliconFlow."""
         if not self.api_key:

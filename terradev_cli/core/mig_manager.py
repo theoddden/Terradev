@@ -2,11 +2,6 @@
 """
 MIG Manager - Multi-Instance GPU enablement and management
 
-CRITICAL FIXES v4.0.0:
-- MIG enablement for GPU fractionation on AWS/GCP/Azure
-- Cost optimization for smaller workloads
-- Automatic MIG configuration detection
-- Instance compatibility validation
 """
 
 import logging

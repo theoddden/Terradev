@@ -2,11 +2,6 @@
 """
 CoreWeave Provider - CoreWeave Kubernetes-native GPU cloud
 
-CRITICAL FIXES v4.0.0:
-- Permissions upgrade detection for new accounts
-- Kubernetes-only deployment validation
-- Legacy node pool filtering for costs
-- Public IP billing tracking
 """
 
 from typing import Dict, List, Any, Optional
@@ -95,7 +90,7 @@ class CoreWeaveProvider(BaseProvider):
         return quotes
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("CoreWeave API key not configured")

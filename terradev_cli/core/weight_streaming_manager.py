@@ -2,11 +2,6 @@
 """
 Weight Streaming Manager - Start generating before fully loaded
 
-CRITICAL FIXES v4.1.0:
-- Parallel weight download and computation for 3-10x faster cold starts
-- Layer-by-layer streaming with early token generation
-- Integration with vLLM v1 async engine and SGLang chunked prefill
-- Optimized for Lambda (zero egress) and CoreWeave (VAST Data storage)
 
 Standard cold start: Download all weights → load all weights → start inference
 Time to first token: 30-45 minutes for 70B model

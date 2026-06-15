@@ -158,8 +158,12 @@ hf = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
     "black>=22.0.0",
-    "flake8>=5.0.0",
+    "ruff>=0.4.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
     "build>=0.10.0",
     "twine>=4.0.0",
 ]
@@ -195,22 +199,47 @@ include = ["terradev_cli", "terradev_cli.*"]
 
 [tool.setuptools.package-data]
 terradev_cli = [
-    "*.md",
-    "*.txt",
     "core/semantic_signals/*.yaml",
-    "core/*.json",
     "integrations/*.png",
     "kubernetes/*.yaml",
-    "kubernetes/*.py",
     "terraform/*.tf",
-    "terraform/*.py",
     "terraform/modules/**/*.tf",
     "terraform/modules/**/*.sh",
     "terraform/modules/**/*.tpl",
-    "terraform/modules/**/*.py",
 ]
 
 [tool.black]
 target-version = ["py39", "py310", "py311", "py312"]
 line-length = 120
 skip-string-normalization = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "B",    # flake8-bugbear
+    "BLE",  # flake8-blind-except (BLE001 = broad exception catch)
+    "T20",  # flake8-print (T201 = print statements in production code)
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by black)
+    "B008",   # do not perform function calls in default arguments
+    "B904",   # raise without from in except (too widespread to fix at once)
+    "SIM105", # use contextlib.suppress (too widespread)
+    "SIM117", # nested with statements (cosmetic)
+    "UP007",  # use X | Y for type unions (requires Python 3.10+)
+    "UP006",  # use type instead of Type (requires Python 3.9 careful usage)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["T20", "BLE001"]  # allow print and broad except in tests
+"terradev_cli/core/*_tests.py" = ["T20", "BLE001"]  # allow in embedded test files
+"terradev_cli/demo.py" = ["T20"]  # demo files legitimately use print
+"terradev_cli/core/quick_start.py" = ["T20"]  # quick-start UX intentionally uses print

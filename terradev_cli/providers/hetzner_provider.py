@@ -2,11 +2,6 @@
 """
 Hetzner Provider - Hetzner Cloud API + Robot API (dedicated GPU) integration
 
-CRITICAL FIXES v4.0.0:
-- Traffic allowance monitoring to prevent overage charges
-- GPU type limitations for enterprise workloads
-- Order fulfillment delays for dedicated servers
-- Public IP billing tracking
 BYOAPI: Uses the end-client's Hetzner Cloud API token (and optional Robot credentials)
 API: https://api.hetzner.cloud/v1 (Cloud) / https://robot-ws.your-server.de (Dedicated)
 
@@ -275,7 +270,7 @@ class HetznerProvider(BaseProvider):
     # ── Provisioning ──────────────────────────────────────────────────
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         # Determine if this is a Cloud or Robot provisioning
         info = self.GPU_PRICING.get(gpu_type, {})

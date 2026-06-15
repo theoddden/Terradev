@@ -244,7 +244,7 @@ class CrusoeProvider(BaseProvider):
     # ── Provisioning ──────────────────────────────────────────────────
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         if not self.access_key or not self.secret_key:
             raise Exception("Crusoe API credentials not configured")

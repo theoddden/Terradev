@@ -123,9 +123,12 @@
     [--spot-strategy <spot-strategy>]
     [--backend <inference-backend>]
     [--prefer-local]
+    [--select <selection>]
+    [--auto]
 
 <provision-type>   ::= inference | training | jupyter | custom
-<spot-strategy>    ::= cheapest | most-available | balanced
+<spot-strategy>    ::= aggressive | cheapest | balanced | conservative | safe
+<selection>       ::= <integer> | "cheapest" | "cheapest-spot" | "cheapest-secure"
 
 <instance-command> ::= instance
     -i <string>

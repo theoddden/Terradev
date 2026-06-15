@@ -2,13 +2,13 @@
 """
 Base Provider - Abstract base class for cloud providers
 
-Provides both new typed APIs (get_quotes, provision, get_instance) and
-backwards-compatible Dict-based shims for existing provider implementations.
+Defines the Dict-based provider interface used by all concrete provider
+implementations. The event subscription system uses InstanceStatus for
+polling-based state-change detection.
 """
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional, Callable, Awaitable
-from dataclasses import asdict
 import asyncio
 import aiohttp
 import logging
@@ -20,20 +20,11 @@ logger = logging.getLogger(__name__)
 # If not available, falls back to pure Python aiohttp connection pooling
 USE_RUST_POOL = False
 
-# Import new typed contracts
 from .types import (
-    GPUDescriptor,
-    GPUVendor,
     InstanceStatus,
-    Quote,
-    QuoteRequest,
-    ProvisionRequest,
-    ProvisionResult,
-    InstanceInfo,
     ProviderEvent,
     HealthStatus,
 )
-from .gpu_catalog import normalize
 
 
 class BaseProvider(ABC):
@@ -141,43 +132,6 @@ class BaseProvider(ABC):
         """Execute command on instance"""
         pass
 
-    # ── New Typed APIs (to be implemented by providers) ─────────────────────
-    # These are optional for now - providers can implement them when migrating
-    # from the old Dict-based API above.
-
-    async def get_quotes(self, request: QuoteRequest) -> List[Quote]:
-        """
-        Get instance quotes for GPU type (new typed API).
-
-        Providers should implement this method when migrating from the old
-        Dict-based API. Default implementation returns empty list.
-        """
-        return []
-
-    async def provision(self, request: ProvisionRequest) -> ProvisionResult:
-        """
-        Provision an instance (new typed API).
-
-        Providers should implement this method when migrating from the old
-        Dict-based API. Default implementation raises NotImplementedError.
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not implement provision(). "
-            "Please use provision_instance() for now."
-        )
-
-    async def get_instance(self, instance_id: str) -> InstanceInfo:
-        """
-        Get instance status (new typed API).
-
-        Providers should implement this method when migrating from the old
-        Dict-based API. Default implementation raises NotImplementedError.
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not implement get_instance(). "
-            "Please use get_instance_status() for now."
-        )
-
     # ── Optional Health & Event Methods (default implementations) ──────────
 
     async def check_health(self) -> HealthStatus:
@@ -216,28 +170,40 @@ class BaseProvider(ABC):
 
         Inspired by HarmonAIze macro-level pub/sub abstraction.
         """
+        _STATUS_MAP = {
+            "running": InstanceStatus.RUNNING,
+            "pending": InstanceStatus.PENDING,
+            "starting": InstanceStatus.STARTING,
+            "stopped": InstanceStatus.STOPPED,
+            "failed": InstanceStatus.FAILED,
+            "terminated": InstanceStatus.TERMINATED,
+            "preempted": InstanceStatus.PREEMPTED,
+        }
+
         async def _poll_loop():
             last_states: Dict[str, InstanceStatus] = {}
 
             while True:
                 for iid in instance_ids:
                     try:
-                        info = await self.get_instance(iid)
+                        raw = await self.get_instance_status(iid)
+                        raw_status = raw.get("status", "").lower()
+                        status = _STATUS_MAP.get(raw_status, InstanceStatus.UNKNOWN)
                         last_status = last_states.get(iid)
 
                         # Detect state changes
-                        if last_status != info.status:
-                            if info.status == InstanceStatus.PREEMPTED:
+                        if last_status != status:
+                            if status == InstanceStatus.PREEMPTED:
                                 await callback(
                                     ProviderEvent(
                                         provider=self.name,
                                         instance_id=iid,
                                         event_type="preempted",
-                                        payload={"status": info.status.value},
+                                        payload={"status": status.value},
                                         timestamp=time.time(),
                                     )
                                 )
-                            elif info.status == InstanceStatus.RUNNING and last_status in (
+                            elif status == InstanceStatus.RUNNING and last_status in (
                                 InstanceStatus.PENDING,
                                 InstanceStatus.STARTING,
                             ):
@@ -246,25 +212,24 @@ class BaseProvider(ABC):
                                         provider=self.name,
                                         instance_id=iid,
                                         event_type="recovered",
-                                        payload={"status": info.status.value},
+                                        payload={"status": status.value},
                                         timestamp=time.time(),
                                     )
                                 )
-                            elif info.status == InstanceStatus.FAILED:
+                            elif status == InstanceStatus.FAILED:
                                 await callback(
                                     ProviderEvent(
                                         provider=self.name,
                                         instance_id=iid,
                                         event_type="health_degraded",
-                                        payload={"status": info.status.value},
+                                        payload={"status": status.value},
                                         timestamp=time.time(),
                                     )
                                 )
 
-                        last_states[iid] = info.status
+                        last_states[iid] = status
                     except Exception as e:
-                        # Log but don't break the loop
-                        logger.debug(f"poll_loop error for {iid}: {e}")
+                        logger.warning(f"poll_loop error for {iid}: {e}")
 
                 await asyncio.sleep(poll_interval_s)
 

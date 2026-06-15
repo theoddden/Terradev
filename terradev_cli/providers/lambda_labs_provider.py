@@ -2,11 +2,6 @@
 """
 Lambda Labs Provider - Lambda Cloud GPU integration
 
-CRITICAL FIXES v4.0.0:
-- Capacity fallback routing when Lambda is sold out
-- Egress advantage signaling (no egress costs)
-- Lambda Stack conflict detection
-- Container image pinning strategy
 """
 
 import base64

@@ -130,6 +130,11 @@ dmypy.json
 bandit-report.json
 safety-report.json
 
+# Stripe and service credentials — never commit real keys
+.env.stripe
+.env.local
+.env.*.local
+
 # Ruff cache
 .ruff_cache/
 

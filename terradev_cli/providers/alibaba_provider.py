@@ -2,11 +2,6 @@
 """
 Alibaba Cloud Provider - Alibaba Cloud ECS GPU integration
 
-CRITICAL FIXES v4.0.0:
-- Cross-border data transfer compliance alerts
-- Multi-API complexity handling (ECS/PAI-DLC/PAI-EAS)
-- Resource validation before deployment
-- International billing issues detection
 BYOAPI: Uses the end-client's Alibaba Cloud AccessKey ID + Secret
 API: https://ecs.{region_id}.aliyuncs.com (OpenAPI 2014-05-26)
 
@@ -322,7 +317,7 @@ class AlibabaProvider(BaseProvider):
     # ── Provisioning ──────────────────────────────────────────────────
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         """Provision Alibaba instance with compliance checks"""
         # CRITICAL: Check compliance before provisioning

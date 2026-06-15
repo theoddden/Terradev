@@ -18,6 +18,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -33,7 +34,7 @@ try:
     import aiohttp
 except ImportError:
     aiohttp = None  # type: ignore[assignment]
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
 try:

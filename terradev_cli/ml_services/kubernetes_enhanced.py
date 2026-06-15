@@ -6,11 +6,14 @@ Integrates Karpenter, Prometheus, Grafana, and Terradev monitoring
 
 import os
 import json
+import logging
 import aiohttp
 import subprocess
 from typing import Dict, List, Any, Optional
 
 from .kubernetes_service import KubernetesConfig  # single canonical definition
+
+logger = logging.getLogger(__name__)
 
 
 class EnhancedKubernetesService:

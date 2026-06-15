@@ -483,20 +483,24 @@ class SmartTemplateGenerator:
         if not model_spec or model_spec.model_type != "llm":
             return "# Error: This model is not suitable for chat applications"
 
-        return f'''import gradio as gr
+        hardware = model_spec.recommended_hardware.upper()
+        parameters = str(model_spec.parameters)
+        streaming = "✅ Enabled" if model_spec.streaming_capable else "❌ Disabled"
+
+        template = '''import gradio as gr
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 import threading
 import time
 
 # Model configuration
-MODEL_ID = "{model_id}"
+MODEL_ID = "__MODEL_ID__"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_LENGTH = 500
 TEMPERATURE = 0.7
 
 # Load model and tokenizer
-print(f"Loading model: {{MODEL_ID}}")
+print(f"Loading model: {MODEL_ID}")
 try:
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
     if tokenizer.pad_token is None:
@@ -512,7 +516,7 @@ try:
     model.eval()
     print("Model loaded successfully!")
 except Exception as e:
-    print(f"Error loading model: {{e}}")
+    print(f"Error loading model: {e}")
     model = None
     tokenizer = None
 
@@ -559,7 +563,7 @@ def generate_response_stream(message, history, temperature=TEMPERATURE, max_leng
             yield partial_text
             
     except Exception as e:
-        yield f"❌ Generation error: {{e}}"
+        yield f"❌ Generation error: {e}"
 
 def generate_response_non_stream(message, history, temperature=TEMPERATURE, max_length=MAX_LENGTH):
     """Generate non-streaming response (fallback)"""
@@ -570,8 +574,8 @@ def generate_response_non_stream(message, history, temperature=TEMPERATURE, max_
         # Simple prompt for non-streaming mode
         prompt = message
         if history:
-            context = "\\n".join([f"User: {{h}}\\nAssistant: {{a}}" for h, a in history[-3:]])
-            prompt = f"{{context}}\\nUser: {{message}}\\nAssistant: "
+            context = "\\n".join([f"User: {h}\\nAssistant: {a}" for h, a in history[-3:]])
+            prompt = f"{context}\\nUser: {message}\\nAssistant: "
         
         inputs = tokenizer(prompt, return_tensors="pt").to(DEVICE)
         
@@ -589,17 +593,17 @@ def generate_response_non_stream(message, history, temperature=TEMPERATURE, max_
         return response
         
     except Exception as e:
-        return f"❌ Generation error: {{e}}"
+        return f"❌ Generation error: {e}"
 
 # Create enhanced chat interface
-with gr.Blocks(title="{space_name}", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="__SPACE_NAME__", theme=gr.themes.Soft()) as demo:
     gr.Markdown(f"""
-    # 🤖 {space_name}
+    # 🤖 __SPACE_NAME__
     
     **Model:** `{MODEL_ID}`  
-    **Hardware:** {model_spec.recommended_hardware.upper()}  
-    **Parameters:** {model_spec.parameters}  
-    **Streaming:** {'✅ Enabled' if model_spec.streaming_capable else '❌ Disabled'}
+    **Hardware:** __HARDWARE__  
+    **Parameters:** __PARAMETERS__  
+    **Streaming:** __STREAMING__
     
     ---
     """)
@@ -717,10 +721,18 @@ if __name__ == "__main__":
     demo.queue()
     demo.launch()
 '''
+        return (
+            template
+            .replace("__MODEL_ID__", model_id)
+            .replace("__SPACE_NAME__", space_name)
+            .replace("__HARDWARE__", hardware)
+            .replace("__PARAMETERS__", parameters)
+            .replace("__STREAMING__", streaming)
+        )
 
     def generate_embedding_template(self, model_id: str, space_name: str) -> str:
         """Generate optimized embedding template"""
-        return f"""import streamlit as st
+        template = """import streamlit as st
 import torch
 from transformers import AutoModel, AutoTokenizer
 import numpy as np
@@ -730,14 +742,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Model configuration
-MODEL_ID = "{model_id}"
+MODEL_ID = "__MODEL_ID__"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 32
 MAX_SEQ_LENGTH = 512
 
-st.set_page_config(page_title="{space_name}", layout="wide")
+st.set_page_config(page_title="__SPACE_NAME__", layout="wide")
 
-st.title(f"🔤 {space_name}")
+st.title(f"🔤 __SPACE_NAME__")
 st.markdown(f"**Model:** `{MODEL_ID}`")
 st.markdown("**Hardware:** CPU-Optimized for Embeddings")
 
@@ -749,7 +761,7 @@ def load_model():
         model = SentenceTransformer(MODEL_ID)
         return model
     except Exception as e:
-        st.error(f"Error loading model: {{e}}")
+        st.error(f"Error loading model: {e}")
         return None
 
 st.header("Text Embedding Service")
@@ -801,8 +813,8 @@ if st.button("🚀 Generate Embeddings", type="primary"):
                     })
                     
                     # Show summary
-                    st.write(f"✅ Generated embeddings for **{{len(texts)}}** texts")
-                    st.write(f"📏 Embedding dimensions: **{{len(embeddings[0])}}**")
+                    st.write(f"✅ Generated embeddings for **{len(texts)}** texts")
+                    st.write(f"📏 Embedding dimensions: **{len(embeddings[0])}**")
                     
                     # Similarity matrix
                     if len(texts) > 1:
@@ -816,8 +828,8 @@ if st.button("🚀 Generate Embeddings", type="primary"):
                         fig = px.imshow(
                             similarity_matrix,
                             labels=dict(x="Text", y="Text", color="Similarity"),
-                            x=[f"Text {{i+1}}" for i in range(len(texts))],
-                            y=[f"Text {{i+1}}" for i in range(len(texts))],
+                            x=[f"Text {i+1}" for i in range(len(texts))],
+                            y=[f"Text {i+1}" for i in range(len(texts))],
                             color_continuous_scale="viridis"
                         )
                         fig.update_layout(title="Text Similarity Matrix")
@@ -921,6 +933,9 @@ with col2:
 st.markdown("---")
 st.markdown("🚀 **Powered by Terradev** | Multi-Cloud GPU Arbitrage Platform")
 """
+        return template.replace("__MODEL_ID__", model_id).replace(
+            "__SPACE_NAME__", space_name
+        )
 
 
 class HardwareOptimizer:

@@ -2,11 +2,6 @@
 """
 Public IP Billing Tracker - Monitor and track public IP billing across providers
 
-CRITICAL FIXES v4.0.0:
-- Public IP cost tracking for CoreWeave and other providers
-- Idle IP detection and optimization recommendations
-- Billing alerts for unused public IPs
-- Cost optimization for IP address management
 """
 
 import logging

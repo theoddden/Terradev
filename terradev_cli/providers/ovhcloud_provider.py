@@ -309,7 +309,7 @@ class OVHcloudProvider(BaseProvider):
     # ── Provisioning ──────────────────────────────────────────────────
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         if not self.project_id:
             raise Exception(

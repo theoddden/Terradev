@@ -2,12 +2,6 @@
 """
 KV Cache Checkpoint Manager - Preemptible KV Cache Checkpointing
 
-CRITICAL FIXES v4.1.0:
-- Serialize KV cache to NVMe in ~8 seconds for production batch sizes
-- Restore KV cache on new instance in ~12 seconds
-- Handle AWS spot 2-minute termination notice gracefully
-- Total user-visible interruption: 60-90 seconds instead of complete failure
-- Critical for long-context workloads (32K+ tokens) where KV cache = 10-30 minutes compute
 
 Flow:
 1. Spot instance receives 2-minute termination notice

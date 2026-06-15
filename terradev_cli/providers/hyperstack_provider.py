@@ -3,10 +3,6 @@
 Hyperstack Provider Integration for Terradev
 GPU VM provisioning and management via NexGen Cloud
 
-CRITICAL FIX v4.0.5:
-- Converted from standalone class to BaseProvider subclass for factory compatibility
-- Auth header: apiKey (Hyperstack-specific, NOT Authorization: Bearer)
-- API base: https://infrahub-api.nexgencloud.com/v1
 """
 
 import os
@@ -134,7 +130,7 @@ class HyperstackProvider(BaseProvider):
         return sorted(quotes, key=lambda q: q["price_per_hour"])
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("Hyperstack API key not configured")

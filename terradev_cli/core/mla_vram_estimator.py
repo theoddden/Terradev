@@ -2,11 +2,6 @@
 """
 MLA-Aware VRAM Estimator - Accurate memory estimation for DeepSeek V3/R1 and Kimi K2
 
-CRITICAL FIXES v4.1.0:
-- Multi-head Latent Attention (MLA) detection and KV cache optimization
-- 5-13x KV cache reduction for MLA architectures
-- Prevents over-provisioning of GPUs for DeepSeek/Kimi models
-- Architecture-aware memory calculation for standard vs MLA models
 
 Standard transformers use Multi-Head Attention:
 KV cache per token = 2 × num_heads × head_dim × num_layers × bytes_per_param

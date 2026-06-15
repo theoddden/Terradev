@@ -9,6 +9,25 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
 
+try:
+    from langchain_core.messages import SystemMessage, HumanMessage
+    from langchain_openai import ChatOpenAI
+
+    def LLM(llm: str = "openai/gpt-4", temperature: float = 0.7):
+        """Build a chat model from a 'provider/model' identifier."""
+        model = llm.split("/", 1)[-1]
+        return ChatOpenAI(model=model, temperature=temperature)
+
+except ImportError:  # pragma: no cover - optional dependency
+    SystemMessage = None  # type: ignore[assignment]
+    HumanMessage = None  # type: ignore[assignment]
+
+    def LLM(llm: str = "openai/gpt-4", temperature: float = 0.7):
+        raise RuntimeError(
+            "langchain-openai and langchain-core are required for LangGraph LLM nodes. "
+            "Install with: pip install langchain-openai langchain-core"
+        )
+
 
 @dataclass
 class LangGraphConfig:
@@ -55,7 +74,7 @@ class LangGraphService:
 
             # Test LangSmith connection
             if self.config.langsmith_api_key:
-                langsmith_session = langsmith_session
+                langsmith_session = self.session
 
                 url = f"{self.langsmith_api_base}/v1/organizations"
                 async with langsmith_session.get(
@@ -135,6 +154,24 @@ class LangGraphService:
         try:
             # Define the workflow state
             from langgraph.graph import StateGraph, START, END
+
+            workflow_id = (
+                f"terradev-orchestrator-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            )
+            enhanced_config = {
+                **workflow_config,
+                "monitoring": {
+                    "enabled": self.config.dashboard_enabled,
+                    "tracing": self.config.tracing_enabled,
+                    "evaluation": self.config.evaluation_enabled,
+                    "deployment": self.config.deployment_enabled,
+                    "observability": self.config.observability_enabled,
+                },
+                "langsmith": {
+                    "project": self.config.project_name or "terradev",
+                    "workspace_id": self.config.workspace_id,
+                },
+            }
 
             # Enhanced state with monitoring
             class WorkflowState:

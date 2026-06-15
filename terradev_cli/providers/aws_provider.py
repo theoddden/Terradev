@@ -2,11 +2,6 @@
 """
 AWS Provider - Amazon Web Services integration
 
-CRITICAL FIXES v4.0.0:
-- P5.4xlarge NCCL+EFA degradation detection
-- Spot interruption handling with 2-minute warning
-- MIG enablement for GPU fractionation
-- Egress cost warnings for cross-cloud transfers
 """
 
 import asyncio
@@ -70,11 +65,32 @@ class AWSProvider(BaseProvider):
             self.ec2_client = None
             self.ec2_resource = None
 
+    def _credentials_available(self) -> bool:
+        """Return True only if AWS credentials are actually resolvable.
+
+        Avoids emitting fabricated on-demand pricing when no real AWS access
+        exists. Supports explicit credentials as well as ambient credentials
+        (environment variables, shared config, or IAM instance/role profiles).
+        """
+        if self.credentials.get("api_key") and self.credentials.get("secret_key"):
+            return True
+        try:
+            import botocore.session
+
+            return botocore.session.get_session().get_credentials() is not None
+        except Exception:
+            return False
+
     async def get_instance_quotes(
         self, gpu_type: str, region: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get EC2 instance quotes for GPU type"""
         if not self.ec2_client:
+            return []
+
+        # Without resolvable credentials, return no quotes rather than
+        # fabricated hardcoded pricing.
+        if not self._credentials_available():
             return []
 
         try:
@@ -213,7 +229,7 @@ class AWSProvider(BaseProvider):
         return pricing_map.get(instance_type)
 
     async def provision_instance(
-        self, instance_type: str, region: str, gpu_type: str
+        self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         """Provision EC2 instance"""
         if not self.ec2_client:
