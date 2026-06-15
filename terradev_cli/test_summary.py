@@ -39,7 +39,7 @@ async def run_test_suite():
             test_results["mla_vram"] = "❌ FAILED"
             print("   ❌ MLA VRAM estimation failed")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         test_results["mla_vram"] = f"❌ ERROR: {e}"
         print(f"   ❌ Error running MLA tests: {e}")
 
@@ -65,7 +65,7 @@ async def run_test_suite():
             test_results["weight_streaming"] = "❌ FAILED"
             print("   ❌ Weight streaming failed")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         test_results["weight_streaming"] = f"❌ ERROR: {e}"
         print(f"   ❌ Error running weight streaming tests: {e}")
 
@@ -120,7 +120,7 @@ print("SUCCESS" if result else "FAILED")
             test_results["kv_checkpoint"] = "❌ FAILED"
             print("   ❌ KV cache checkpointing failed")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         test_results["kv_checkpoint"] = f"❌ ERROR: {e}"
         print(f"   ❌ Error running KV checkpoint tests: {e}")
 
@@ -156,7 +156,7 @@ print("SUCCESS")
             test_results["integration"] = "❌ FAILED"
             print("   ❌ Integration test failed")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         test_results["integration"] = f"❌ ERROR: {e}"
         print(f"   ❌ Error running integration test: {e}")
 

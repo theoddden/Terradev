@@ -131,7 +131,7 @@ class PEFTImportService:
                 metadata["alpha"] = getattr(peft_config, "lora_alpha", None)
                 metadata["target_modules"] = getattr(peft_config, "target_modules", None)
                 metadata["peft_type"] = getattr(peft_config, "peft_type", "LORA")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Could not load PEFT config: {e}")
 
         return metadata

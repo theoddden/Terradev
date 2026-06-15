@@ -264,7 +264,7 @@ class CUCoOptimizer:
                     reasoning=f"Below p95 thresholds: {validation_result['violations']}",
                 )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"CUCo optimization failed: {str(e)}")
             return OptimizationResult(
                 decision=OptimizationDecision.SKIP,

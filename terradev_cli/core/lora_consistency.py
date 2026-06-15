@@ -138,7 +138,7 @@ class LoRAConsistencyManager:
         except ImportError:
             logger.warning("Kubernetes client not available, skipping K8s discovery")
             return []
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"K8s discovery failed: {e}")
             return []
 
@@ -208,7 +208,7 @@ class LoRAConsistencyManager:
             except asyncio.TimeoutError:
                 results[replica_id] = {"status": "timeout", "error": "Operation timed out"}
                 logger.error(f"Timeout loading {adapter.name} on {replica_id}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 results[replica_id] = {"status": "error", "error": str(e)}
                 logger.error(f"Error loading {adapter.name} on {replica_id}: {e}")
 
@@ -282,7 +282,7 @@ class LoRAConsistencyManager:
 
             except asyncio.TimeoutError:
                 results[replica_id] = {"status": "timeout", "error": "Operation timed out"}
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 results[replica_id] = {"status": "error", "error": str(e)}
 
         successful = sum(1 for r in results.values() if r.get("status") == "unloaded")
@@ -435,7 +435,7 @@ class LoRAConsistencyManager:
                 await asyncio.sleep(self.gossip_interval_seconds)
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Gossip loop error: {e}")
                 await asyncio.sleep(self.gossip_interval_seconds)
 
@@ -474,7 +474,7 @@ class LoRAConsistencyManager:
             replica_a.loaded_adapters = merged_adapters
             replica_b.loaded_adapters = merged_adapters
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"State exchange failed between {replica_a.replica_id} and {replica_b.replica_id}: {e}")
 
     async def _get_replica_state(self, replica: ReplicaInfo) -> Dict[str, Any]:
@@ -485,7 +485,7 @@ class LoRAConsistencyManager:
                 result = await service.lora_list()
                 adapters = set(a.get("id") for a in result.get("lora_adapters", []))
                 return {"adapters": adapters}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to get state from {replica.replica_id}: {e}")
             return {"adapters": set()}
 
@@ -499,7 +499,7 @@ class LoRAConsistencyManager:
                 await asyncio.sleep(self.health_check_interval_seconds)
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Health check loop error: {e}")
                 await asyncio.sleep(self.health_check_interval_seconds)
 
@@ -520,7 +520,7 @@ class LoRAConsistencyManager:
             async with VLLMService(config) as service:
                 result = await service.test_connection()
                 return result.get("status") == "connected"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Health check failed for {replica.replica_id}: {e}")
             return False
 

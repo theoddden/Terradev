@@ -104,7 +104,7 @@ class LatitudeProvider(BaseProvider):
             vm_quotes = await self._get_virtual_machine_quotes(gpu_type, region)
             quotes.extend(vm_quotes)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Latitude.sh API error: {e}")
             return []
 
@@ -171,7 +171,7 @@ class LatitudeProvider(BaseProvider):
 
             return quotes
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Error getting bare metal quotes: {e}")
             return []
 
@@ -223,7 +223,7 @@ class LatitudeProvider(BaseProvider):
 
             return quotes
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Error getting VM quotes: {e}")
             # VM endpoints may not exist or be different
             return []
@@ -237,7 +237,7 @@ class LatitudeProvider(BaseProvider):
 
         # Check rate limiting
         if self.rate_limit_until and datetime.now() < self.rate_limit_until:
-            raise Exception(f"Rate limited. Retry after {self.rate_limit_until}")
+            raise RuntimeError(f"Rate limited. Retry after {self.rate_limit_until}")
 
         # Determine instance type
         if instance_type.startswith("latitude-bare-metal"):
@@ -249,7 +249,7 @@ class LatitudeProvider(BaseProvider):
                 instance_type, region, gpu_type, **kwargs
             )
         else:
-            raise Exception(f"Unknown instance type format: {instance_type}")
+            raise RuntimeError(f"Unknown instance type format: {instance_type}")
 
     async def _provision_bare_metal(
         self, instance_type: str, region: str, gpu_type: str, **kwargs
@@ -320,8 +320,8 @@ class LatitudeProvider(BaseProvider):
                 },
             }
 
-        except Exception as e:
-            raise Exception(f"Latitude.sh bare metal provisioning failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Latitude.sh bare metal provisioning failed: {e}") from e
 
     async def _provision_virtual_machine(
         self, instance_type: str, region: str, gpu_type: str, **kwargs
@@ -373,8 +373,8 @@ class LatitudeProvider(BaseProvider):
                 "metadata": {"vm_type": "gpu_instance", "gpu_dedicated": True},
             }
 
-        except Exception as e:
-            raise Exception(f"Latitude.sh VM provisioning failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Latitude.sh VM provisioning failed: {e}") from e
 
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         """Get status of either bare metal server or virtual machine"""
@@ -402,7 +402,7 @@ class LatitudeProvider(BaseProvider):
                     "created_at": attrs.get("created_at"),
                     "locked": attrs.get("locked", False),
                 }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
             # Try virtual machine
@@ -423,13 +423,13 @@ class LatitudeProvider(BaseProvider):
                     "specs": attrs.get("specs", {}),
                     "created_at": attrs.get("created_at"),
                 }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
-            raise Exception(f"Instance {instance_id} not found")
+            raise RuntimeError(f"Instance {instance_id} not found")
 
-        except Exception as e:
-            raise Exception(f"Latitude.sh status check failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Latitude.sh status check failed: {e}") from e
 
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         """Stop instance (power off)"""
@@ -449,7 +449,7 @@ class LatitudeProvider(BaseProvider):
                     "action": "stop",
                     "status": "stopping",
                 }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
             # Try virtual machine
@@ -464,13 +464,13 @@ class LatitudeProvider(BaseProvider):
                     "action": "stop",
                     "status": "stopping",
                 }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
-            raise Exception(f"Failed to stop instance {instance_id}")
+            raise RuntimeError(f"Failed to stop instance {instance_id}")
 
-        except Exception as e:
-            raise Exception(f"Latitude.sh stop failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Latitude.sh stop failed: {e}") from e
 
     async def start_instance(self, instance_id: str) -> Dict[str, Any]:
         """Start instance (power on)"""
@@ -490,7 +490,7 @@ class LatitudeProvider(BaseProvider):
                     "action": "start",
                     "status": "starting",
                 }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
             # Try virtual machine
@@ -505,13 +505,13 @@ class LatitudeProvider(BaseProvider):
                     "action": "start",
                     "status": "starting",
                 }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
-            raise Exception(f"Failed to start instance {instance_id}")
+            raise RuntimeError(f"Failed to start instance {instance_id}")
 
-        except Exception as e:
-            raise Exception(f"Latitude.sh start failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Latitude.sh start failed: {e}") from e
 
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
         """Terminate/destroy instance"""
@@ -529,7 +529,7 @@ class LatitudeProvider(BaseProvider):
                     "action": "terminate",
                     "status": "terminating",
                 }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
             # Try virtual machine
@@ -542,13 +542,13 @@ class LatitudeProvider(BaseProvider):
                     "action": "terminate",
                     "status": "terminating",
                 }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
-            raise Exception(f"Failed to terminate instance {instance_id}")
+            raise RuntimeError(f"Failed to terminate instance {instance_id}")
 
-        except Exception as e:
-            raise Exception(f"Latitude.sh terminate failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Latitude.sh terminate failed: {e}") from e
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         """List all instances (both bare metal and virtual machines)"""
@@ -581,7 +581,7 @@ class LatitudeProvider(BaseProvider):
                     }
                 )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Error listing bare metal servers: {e}")
 
         try:
@@ -608,7 +608,7 @@ class LatitudeProvider(BaseProvider):
                     }
                 )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Error listing virtual machines: {e}")
 
         return instances
@@ -671,7 +671,7 @@ class LatitudeProvider(BaseProvider):
                 "execution_method": "ssh",
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -716,11 +716,11 @@ class LatitudeProvider(BaseProvider):
                     .get("retry_after", 60)
                 )
                 self.rate_limit_until = datetime.now() + timedelta(seconds=retry_after)
-                raise Exception(f"Rate limited. Retry after {retry_after} seconds")
+                raise RuntimeError(f"Rate limited. Retry after {retry_after} seconds")
 
             if response.status >= 400:
                 error_text = await response.text()
-                raise Exception(f"HTTP {response.status}: {error_text}")
+                raise RuntimeError(f"HTTP {response.status}: {error_text}")
 
             return await response.json()
 

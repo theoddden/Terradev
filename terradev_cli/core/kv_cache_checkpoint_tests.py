@@ -61,7 +61,7 @@ class KVCacheCheckpointTests:
                     result = await test_method()
                     self.test_results.append(result)
                     logger.info(f"✅ {result['test_name']}: {result['status']}")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.error(f"❌ {test_method.__name__}: {e}")
                     self.test_results.append(
                         {
@@ -696,7 +696,7 @@ class KVCacheCheckpointTests:
 
             return True
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
 

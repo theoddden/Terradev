@@ -254,7 +254,7 @@ class NIXLNVLinkTransport(KVTransport):
             self._ready = True
             logger.info("NIXL/NVLink transport ready, peak %.0f GB/s", self._measured_bw)
             return True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.debug("NIXL/NVLink warm-up failed: %s", exc)
             return False
 
@@ -273,7 +273,7 @@ class NIXLNVLinkTransport(KVTransport):
             # Stub for environments without NIXL installed
             await asyncio.sleep(self.estimate_transfer_ms(size_bytes) / 1000)
             return True, (time.monotonic() - t0) * 1000
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning("NIXL transfer failed: %s", exc)
             return False, (time.monotonic() - t0) * 1000
 
@@ -552,7 +552,7 @@ class TCPFallbackTransport(KVTransport):
             self._ready = True
             logger.info("TCP fallback transport ready, %.0f GB/s", self._measured_bw)
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001
             # TCP fallback always "succeeds" at warm-up; failures happen at transfer time
             self._ready = True
             return True

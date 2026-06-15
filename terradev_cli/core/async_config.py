@@ -97,7 +97,7 @@ class AsyncConfigManager:
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON in config file {filename}: {e}")
                 return {}
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Error loading config file {filename}: {e}")
                 return {}
 
@@ -148,7 +148,7 @@ class AsyncConfigManager:
                 logger.debug(f"Saved config file: {filename} ({len(data)} keys)")
                 return True
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Error saving config file {filename}: {e}")
                 # Clean up temp file if it exists
                 temp_path = file_path.with_suffix(".tmp")

@@ -60,7 +60,7 @@ class AWSProvider(BaseProvider):
                 aws_secret_access_key=credentials.get("secret_key"),
                 region_name="us-east-1",
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Failed to initialize AWS client: {e}")
             self.ec2_client = None
             self.ec2_resource = None
@@ -78,7 +78,7 @@ class AWSProvider(BaseProvider):
             import botocore.session
 
             return botocore.session.get_session().get_credentials() is not None
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
     async def get_instance_quotes(
@@ -137,7 +137,7 @@ class AWSProvider(BaseProvider):
                             quote["nccl_warning"] = nccl_warning
                         quotes.append(quote)
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.debug(f"Error getting spot price for {instance_type}: {e}")
                     continue
 
@@ -169,7 +169,7 @@ class AWSProvider(BaseProvider):
 
             return quotes
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Error getting AWS quotes: {e}")
             return []
 
@@ -205,7 +205,7 @@ class AWSProvider(BaseProvider):
 
             return prices
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Error getting spot prices: {e}")
             return []
 
@@ -421,7 +421,7 @@ class AWSProvider(BaseProvider):
 
             return instances
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Error listing AWS instances: {e}")
             return []
 
@@ -490,7 +490,7 @@ class AWSProvider(BaseProvider):
                 "async": False,
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Fallback: try SSH if SSM is not available
             try:
                 status = await self.get_instance_status(instance_id)
@@ -532,7 +532,7 @@ class AWSProvider(BaseProvider):
                         "stderr": result.stderr,
                         "async": False,
                     }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             return {
                 "instance_id": instance_id,
@@ -674,7 +674,7 @@ class AWSProvider(BaseProvider):
                         pass
                     else:
                         logger.debug(f"Spot metadata error: {e}")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.debug(f"Spot monitoring error: {e}")
 
                 # Check every 10 seconds
@@ -720,7 +720,7 @@ class AWSProvider(BaseProvider):
                 0, (term_dt - datetime.now(term_dt.tzinfo)).total_seconds()
             )
             logger.warning(f"Time remaining: {time_remaining_s:.0f}s")
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         # 1. Find running job(s) on this instance and mark as PREEMPTED
@@ -765,7 +765,7 @@ class AWSProvider(BaseProvider):
                         logger.info(
                             f"SSH SIGUSR1 sent to {instance_id} for job {job.id}"
                         )
-                except Exception as sig_err:
+                except Exception as sig_err:  # noqa: BLE001
                     logger.warning(
                         f"SSH signal failed on {instance_id} (sidecar is primary defense): {sig_err}"
                     )
@@ -784,5 +784,5 @@ class AWSProvider(BaseProvider):
                     f"Job {job.id} marked PREEMPTED (spot termination of {instance_id})"
                 )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to handle spot preemption for running jobs: {e}")

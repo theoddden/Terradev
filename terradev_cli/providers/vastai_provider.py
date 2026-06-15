@@ -35,7 +35,7 @@ class VastAIProvider(BaseProvider):
             live = await self._get_live_offers(gpu_type)
             if live:
                 return live
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Vast.ai API error: {e}")
             return []
 
@@ -160,7 +160,7 @@ class VastAIProvider(BaseProvider):
                 }
                 for i in data.get("instances", [])
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -232,7 +232,7 @@ class VastAIProvider(BaseProvider):
                 "output": str(exec_data),
                 "async": async_exec,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,

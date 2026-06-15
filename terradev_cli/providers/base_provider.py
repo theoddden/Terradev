@@ -149,7 +149,7 @@ class BaseProvider(ABC):
                 latency_ms=latency_ms,
                 timestamp=time.time(),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return HealthStatus(
                 healthy=False,
                 reason=str(e),
@@ -228,7 +228,7 @@ class BaseProvider(ABC):
                                 )
 
                         last_states[iid] = status
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         logger.warning(f"poll_loop error for {iid}: {e}")
 
                 await asyncio.sleep(poll_interval_s)
@@ -246,7 +246,7 @@ class BaseProvider(ABC):
                 from terradev_cli.core.rate_limiter import RateLimiter
 
                 cls._rate_limiter = RateLimiter()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 cls._rate_limiter = False  # sentinel: don't retry
         return cls._rate_limiter if cls._rate_limiter is not False else None
 
@@ -262,7 +262,7 @@ class BaseProvider(ABC):
         if rl:
             try:
                 await rl.acquire(self.name)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass  # proceed even if rate limiter fails
 
         headers = kwargs.pop("headers", {})

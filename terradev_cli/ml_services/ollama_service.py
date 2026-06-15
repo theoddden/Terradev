@@ -75,7 +75,7 @@ class OllamaService:
                         "error": f"Ollama server not responding: {response.status}",
                     }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "status": "failed",
                 "error": f"Failed to connect to Ollama server: {str(e)}",
@@ -123,7 +123,7 @@ ollama --version
                     "error": f"Installation failed: {result.stderr}",
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to install Ollama: {str(e)}"}
 
     def _build_ssh_args(self, ip: str, user: str, key: Optional[str]) -> List[str]:
@@ -175,7 +175,7 @@ ollama list | grep {model_name}
                     "error": f"Failed to pull model: {result.stderr}",
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to pull model: {str(e)}"}
 
     async def list_models(self) -> Dict[str, Any]:
@@ -215,7 +215,7 @@ ollama list | grep {model_name}
                         "error": f"Failed to list models: {response.status} - {error_text}",
                     }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to list models: {str(e)}"}
 
     async def generate_text(
@@ -272,7 +272,7 @@ ollama list | grep {model_name}
                         "error": f"Generation failed: {response.status} - {error_text}",
                     }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to generate text: {str(e)}"}
 
     async def chat_completion(
@@ -332,7 +332,7 @@ ollama list | grep {model_name}
                         "error": f"Chat completion failed: {response.status} - {error_text}",
                     }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to complete chat: {str(e)}"}
 
     async def get_model_info(self, model: str) -> Dict[str, Any]:
@@ -362,7 +362,7 @@ ollama list | grep {model_name}
                         "error": f"Failed to get model info: {response.status} - {error_text}",
                     }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to get model info: {str(e)}"}
 
     async def delete_model(
@@ -406,7 +406,7 @@ ollama list
                     "error": f"Failed to delete model: {result.stderr}",
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to delete model: {str(e)}"}
 
     def get_popular_models(self) -> List[Dict[str, Any]]:
@@ -529,7 +529,7 @@ ollama --version 2>/dev/null || echo "Ollama not installed"
                     "error": f"Failed to get status: {result.stderr}",
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "status": "failed",
                 "error": f"Failed to get server status: {str(e)}",

@@ -92,7 +92,7 @@ class HetznerProvider(BaseProvider):
             try:
                 cloud_quotes = await self._get_cloud_gpu_types(gpu_type, region)
                 quotes.extend(cloud_quotes)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug(f"Hetzner Cloud API error: {e}")
 
         # Try Robot API for dedicated GPU servers
@@ -122,7 +122,7 @@ class HetznerProvider(BaseProvider):
                         }
                     )
                 quotes.extend(robot_quotes)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug(f"Hetzner Robot API error: {e}")
 
         # Static fallback
@@ -223,7 +223,7 @@ class HetznerProvider(BaseProvider):
                 return []
             try:
                 data = await response.json(content_type=None)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return []
 
         quotes = []
@@ -289,7 +289,7 @@ class HetznerProvider(BaseProvider):
         try:
             key_data = await self._make_request("GET", f"{self.CLOUD_API}/ssh_keys")
             ssh_keys = [k["id"] for k in key_data.get("ssh_keys", [])]
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         body = {
@@ -432,7 +432,7 @@ class HetznerProvider(BaseProvider):
                 }
                 for s in data.get("servers", [])
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -492,7 +492,7 @@ class HetznerProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,

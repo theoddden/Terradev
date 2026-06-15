@@ -114,7 +114,7 @@ class LoRAXService:
                 if resp.status == 200:
                     return {"status": "healthy", "details": await resp.json()}
                 return {"status": "unhealthy", "status_code": resp.status}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "error", "error": str(e)}
 
     async def get_model_info(self) -> Dict[str, Any]:
@@ -125,7 +125,7 @@ class LoRAXService:
                 if resp.status == 200:
                     return await resp.json()
                 return {"error": f"HTTP {resp.status}"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"error": str(e)}
 
     async def list_loaded_adapters(self) -> List[LoRAXAdapter]:
@@ -146,7 +146,7 @@ class LoRAXService:
                         ))
                     return adapters
                 return []
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to list adapters: {e}")
             return []
 
@@ -183,7 +183,7 @@ class LoRAXService:
                     "adapter_id": adapter_id,
                     "response": data
                 }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "error", "adapter_id": adapter_id, "error": str(e)}
 
     async def unload_adapter(self, adapter_id: str) -> Dict[str, Any]:
@@ -208,7 +208,7 @@ class LoRAXService:
                     "adapter_id": adapter_id,
                     "response": data
                 }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "error", "adapter_id": adapter_id, "error": str(e)}
 
     # ── Generation ──
@@ -306,7 +306,7 @@ class LoRAXService:
                 if resp.status == 200:
                     return await resp.json()
                 return {}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to get stats: {e}")
             return {}
 

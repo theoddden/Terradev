@@ -143,7 +143,7 @@ class QdrantService:
                 "url": self.config.url,
                 "collections": [c["name"] for c in cols],
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def list_collections(self) -> List[str]:

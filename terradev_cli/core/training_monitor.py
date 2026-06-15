@@ -164,7 +164,7 @@ def _run_on(
         try:
             r = subprocess.run(ssh, capture_output=True, text=True, timeout=timeout)
             return r.returncode, r.stdout.strip(), r.stderr.strip()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return -1, "", str(e)
     # SECURITY: shell=True is used but command is validated above
     try:
@@ -172,7 +172,7 @@ def _run_on(
             cmd, shell=True, capture_output=True, text=True, timeout=timeout
         )
         return r.returncode, r.stdout.strip(), r.stderr.strip()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return -1, "", str(e)
 
 
@@ -252,7 +252,7 @@ def _collect_gpu_prometheus(endpoint: str, node: str) -> List[GPUMetric]:
                 )
             )
         return metrics
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.debug(f"Prometheus scrape failed ({e}), falling back to nvidia-smi")
         return []
 
@@ -307,7 +307,7 @@ def _parse_training_log(ctx: Dict[str, Any]) -> Optional[TrainingMetrics]:
         with open(log_path, "r") as f:
             lines = f.readlines()
         tail = lines[-50:] if len(lines) > 50 else lines
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
     metrics = TrainingMetrics()
@@ -581,7 +581,7 @@ class TrainingMonitor:
         if self.state_manager and job_id and snap.training and snap.training.step > 0:
             try:
                 self.state_manager.update_job_step(job_id, snap.training.step)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         # W&B hook (optional — only if wandb_run is set)
@@ -598,14 +598,14 @@ class TrainingMonitor:
                         "cost_usd": snap.cost_usd,
                     }
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug(f"W&B log failed: {e}")
 
         # Custom callback hook
         if self.on_snapshot:
             try:
                 self.on_snapshot(snap)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug(f"Snapshot callback failed: {e}")
 
         return snap

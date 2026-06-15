@@ -329,7 +329,7 @@ async def execute_terradev_command(args: List[str]) -> Dict[str, Any]:
             + "📚 Docs: https://github.com/terradev-io/terradev-cli",
             "returncode": -1,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {
             "success": False,
             "stdout": "",
@@ -379,7 +379,7 @@ async def _UNSAFE_execute_shell_command(
             "stderr": f"Command timed out after {timeout}s",
             "returncode": -1,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "stdout": "", "stderr": str(e), "returncode": -1}
 
 
@@ -410,7 +410,7 @@ async def execute_safe_command(args: List[str], timeout: int = 120) -> Dict[str,
             "stderr": f"Command timed out after {timeout}s",
             "returncode": -1,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "stdout": "", "stderr": str(e), "returncode": -1}
 
 
@@ -486,7 +486,7 @@ async def execute_terraform_command(cmd: List[str], cwd: str) -> Dict[str, Any]:
             "stderr": stderr.decode().strip(),
             "returncode": process.returncode,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "stdout": "", "stderr": str(e), "returncode": -1}
 
 
@@ -592,7 +592,7 @@ async def execute_terraform_parallel(
             "workspace": workspace_name,
             "workspace_path": ws_dir,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {
             "success": False,
             "stdout": "",
@@ -5963,7 +5963,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                 ],
                                 isError=True,
                             )
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         return CallToolResult(
                             content=[
                                 TextContent(
@@ -6057,7 +6057,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                 ],
                                 isError=True,
                             )
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         return CallToolResult(
                             content=[
                                 TextContent(
@@ -7692,7 +7692,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[
                             TextContent(
@@ -7751,7 +7751,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[
                             TextContent(
@@ -7798,7 +7798,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[
                             TextContent(
@@ -8009,7 +8009,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[
                             TextContent(type="text", text=f"❌ Inference failed: {e}")
@@ -8054,7 +8054,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -8088,7 +8088,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -8142,7 +8142,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     )
                                 ]
                             )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -8638,7 +8638,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                         ],
                                         isError=True,
                                     )
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         return CallToolResult(
                             content=[
                                 TextContent(
@@ -8686,7 +8686,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                         ],
                                         isError=True,
                                     )
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         return CallToolResult(
                             content=[TextContent(type="text", text=f"❌ {e}")],
                             isError=True,
@@ -8900,7 +8900,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[
                             TextContent(type="text", text=f"❌ Inference failed: {e}")
@@ -8932,7 +8932,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -8974,7 +8974,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[
                             TextContent(
@@ -9061,7 +9061,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9099,7 +9099,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9130,7 +9130,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9180,7 +9180,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9236,7 +9236,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9269,7 +9269,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9314,7 +9314,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9361,7 +9361,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9398,7 +9398,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[
                             TextContent(type="text", text=f"❌ Correlation failed: {e}")
@@ -9446,7 +9446,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9492,7 +9492,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9536,7 +9536,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9576,7 +9576,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9606,7 +9606,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         content=[TextContent(type="text", text=output_text)],
                         isError=result.returncode != 0,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9642,7 +9642,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9670,7 +9670,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         content=[TextContent(type="text", text=output_text)],
                         isError=result.returncode != 0,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9713,7 +9713,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9776,7 +9776,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9820,7 +9820,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                             ],
                             isError=True,
                         )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9855,7 +9855,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9888,7 +9888,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9931,7 +9931,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -9972,7 +9972,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10043,7 +10043,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10099,7 +10099,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10155,7 +10155,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10195,7 +10195,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10230,7 +10230,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10269,7 +10269,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10304,7 +10304,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10334,7 +10334,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10361,7 +10361,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10395,7 +10395,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10424,7 +10424,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10462,7 +10462,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10507,7 +10507,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10544,7 +10544,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                                     ],
                                     isError=True,
                                 )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10576,7 +10576,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10605,7 +10605,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10634,7 +10634,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10663,7 +10663,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10694,7 +10694,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10735,7 +10735,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10764,7 +10764,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10793,7 +10793,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10822,7 +10822,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10850,7 +10850,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10878,7 +10878,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10913,7 +10913,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10945,7 +10945,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -10984,7 +10984,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11018,7 +11018,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11048,7 +11048,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11079,7 +11079,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11108,7 +11108,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11137,7 +11137,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11166,7 +11166,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11200,7 +11200,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11232,7 +11232,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11263,7 +11263,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11294,7 +11294,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11333,7 +11333,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11409,7 +11409,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11437,7 +11437,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11476,7 +11476,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11508,7 +11508,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11560,7 +11560,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11589,7 +11589,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11624,7 +11624,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11656,7 +11656,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11691,7 +11691,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11726,7 +11726,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11759,7 +11759,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                         ],
                         isError=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11787,7 +11787,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11808,7 +11808,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11836,7 +11836,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11862,7 +11862,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11883,7 +11883,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11906,7 +11906,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11927,7 +11927,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11952,7 +11952,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -11984,7 +11984,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -12009,7 +12009,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     return CallToolResult(
                         content=[TextContent(type="text", text=output_text)]
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"❌ {e}")], isError=True
                     )
@@ -12538,7 +12538,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     content=[TextContent(type="text", text=f"Error: {error_msg}")],
                     isError=True,
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return CallToolResult(
                 content=[TextContent(type="text", text=f"❌ Error: {e}")], isError=True
             )
@@ -12732,7 +12732,7 @@ def _is_redirect_uri_allowed(uri: str) -> bool:
     try:
         parsed = urlparse(uri)
         return parsed.hostname in ("localhost", "127.0.0.1", "::1")
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 # In-memory stores (single-instance server)
@@ -12842,7 +12842,7 @@ async def oauth_token(request: Request) -> JSONResponse:
 
     try:
         body = await request.form()
-    except Exception:
+    except Exception:  # noqa: BLE001
         body = {}
     body = dict(body)
 

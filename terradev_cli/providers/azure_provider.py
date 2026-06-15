@@ -38,7 +38,7 @@ class AzureProvider(BaseProvider):
             )
             self.compute_client = ComputeManagementClient(cred, self.subscription_id)
             self.quota_client = QuotaManagementClient(cred, self.subscription_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Azure client init deferred (BYOAPI): {e}")
 
     # Azure pricing from real API calls - NO STATIC FALLBACK
@@ -83,7 +83,7 @@ class AzureProvider(BaseProvider):
                         }
                     )
                 return pricing_info
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Error getting Azure pricing: {e}")
             return []
 
@@ -176,8 +176,8 @@ class AzureProvider(BaseProvider):
                     "subscription": self.subscription_id,
                 },
             }
-        except Exception as e:
-            raise Exception(f"Azure provision failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Azure provision failed: {e}") from e
 
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         if not self.compute_client:
@@ -202,8 +202,8 @@ class AzureProvider(BaseProvider):
                 "region": vm.location,
                 "provider": "azure",
             }
-        except Exception as e:
-            raise Exception(f"Azure status failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Azure status failed: {e}") from e
 
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.compute_client:
@@ -264,7 +264,7 @@ class AzureProvider(BaseProvider):
                 for vm in vms
                 if (vm.tags or {}).get("ManagedBy") == "Terradev"
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -327,7 +327,7 @@ class AzureProvider(BaseProvider):
                 "async": False,
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -444,7 +444,7 @@ class AzureProvider(BaseProvider):
                 ),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Quota check failed: {e}")
             return {
                 "available": False,
@@ -461,5 +461,5 @@ class AzureProvider(BaseProvider):
             # This would require ML workspace client - for now return None
             # In production, integrate with Azure ML quota APIs
             return None
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None

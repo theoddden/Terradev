@@ -343,7 +343,7 @@ class DAGExecutor:
                         result.outputs[node_name] = output
                         result.node_latencies[node_name] = latency
                         result.node_statuses[node_name] = "done"
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         result.errors[node_name] = str(e)
                         result.node_statuses[node_name] = "failed"
                         logger.error(
@@ -408,7 +408,7 @@ class DAGExecutor:
                 idx = batch_futures[future]
                 try:
                     results[idx] = future.result()
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     err_result = ExecutionResult()
                     err_result.errors["batch"] = str(e)
                     results[idx] = err_result
@@ -447,7 +447,7 @@ class DAGExecutor:
                     result.outputs[node_name] = output
                     result.node_latencies[node_name] = latency
                     result.node_statuses[node_name] = "done"
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     result.errors[node_name] = str(e)
                     result.node_statuses[node_name] = "failed"
                     if fail_fast:

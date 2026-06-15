@@ -178,7 +178,7 @@ class EventBus:
         for callback in callbacks:
             try:
                 callback(event)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.error(f"Error in event callback: {e}")
 
     def get_events(

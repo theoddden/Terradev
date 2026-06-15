@@ -104,7 +104,7 @@ class LambdaLabsProvider(BaseProvider):
                         }
 
                 return live
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         # Fallback to static pricing with capacity warning
@@ -236,8 +236,8 @@ class LambdaLabsProvider(BaseProvider):
                 "status": "provisioning",
                 "provider": "lambda_labs",
             }
-        except Exception as e:
-            raise Exception(f"Lambda Labs provision failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Lambda Labs provision failed: {e}") from e
 
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
@@ -294,7 +294,7 @@ class LambdaLabsProvider(BaseProvider):
                 }
                 for i in data.get("data", [])
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -354,7 +354,7 @@ class LambdaLabsProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -395,7 +395,7 @@ class LambdaLabsProvider(BaseProvider):
                 "total_capacity_regions": len(regions_with_capacity),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "available": False,
                 "status": "unknown",

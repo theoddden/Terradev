@@ -35,7 +35,7 @@ _PROVIDER_LOADERS = {
     "azure": _lazy_import(".azure_provider.AzureProvider"),
     "runpod": _lazy_import(".runpod_provider.RunPodProvider"),
     "vastai": _lazy_import(".vastai_provider.VastAIProvider"),
-    "lambda": _lazy_import(".lambda_labs_provider.LambdaLabsProvider"),
+    "lambda_labs": _lazy_import(".lambda_labs_provider.LambdaLabsProvider"),
     "coreweave": _lazy_import(".coreweave_provider.CoreWeaveProvider"),
     "tensordock": _lazy_import(".tensordock_provider.TensorDockProvider"),
     "huggingface": _lazy_import(".huggingface_provider.HuggingFaceProvider"),
@@ -107,7 +107,7 @@ class ProviderFactory:
             try:
                 provider = self.create_provider(provider_name, provider_credentials)
                 providers[provider_name] = provider
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug(f"Failed to create provider {provider_name}: {e}")
 
         return providers

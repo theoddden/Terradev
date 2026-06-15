@@ -312,7 +312,7 @@ class LoRAVersioningManager:
                 timestamp=timestamp,
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Drift detection failed for {adapter_name}: {e}")
             return DriftDetectionResult(
                 adapter_name=adapter_name,

@@ -466,5 +466,5 @@ class PipelineValidator:
             workflow = Workflow.from_file(file_path)
             errors = PipelineValidator.validate_workflow(workflow)
             return len(errors) == 0, errors
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return False, [f"Failed to parse YAML: {str(e)}"]

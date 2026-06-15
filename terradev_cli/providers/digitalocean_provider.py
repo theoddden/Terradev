@@ -62,7 +62,7 @@ class DigitalOceanProvider(BaseProvider):
             live = await self._get_live_sizes(gpu_type, region)
             if live:
                 return live
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         # Static fallback
@@ -245,7 +245,7 @@ class DigitalOceanProvider(BaseProvider):
                     }
                 )
             return instances
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -300,7 +300,7 @@ class DigitalOceanProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,

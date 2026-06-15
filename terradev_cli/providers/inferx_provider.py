@@ -92,7 +92,7 @@ class InferXProvider(BaseProvider):
             logger.info(f"InferX quotes retrieved for {gpu_type}")
             return quotes
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to get InferX quotes: {e}")
             return []
 
@@ -162,7 +162,7 @@ class InferXProvider(BaseProvider):
                 else:
                     error_text = await response.text()
                     logger.error(f"InferX deployment failed: {error_text}")
-                    raise Exception(f"Deployment failed: {error_text}")
+                    raise RuntimeError(f"Deployment failed: {error_text}")
 
         except Exception as e:
             logger.error(f"Failed to deploy model to InferX: {e}")
@@ -180,7 +180,7 @@ class InferXProvider(BaseProvider):
                     result = await response.json()
                     return result
                 else:
-                    raise Exception(f"Failed to get status: {response.status}")
+                    raise RuntimeError(f"Failed to get status: {response.status}")
 
         except Exception as e:
             logger.error(f"Failed to get InferX model status: {e}")
@@ -201,7 +201,7 @@ class InferXProvider(BaseProvider):
             ) as response:
                 return response.status == 200
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to delete InferX model: {e}")
             return False
 
@@ -225,9 +225,9 @@ class InferXProvider(BaseProvider):
                         "models_on_gpu": result.get("models_on_gpu", 0),
                     }
                 else:
-                    raise Exception(f"Failed to get metrics: {response.status}")
+                    raise RuntimeError(f"Failed to get metrics: {response.status}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to get InferX metrics: {e}")
             return {}
 
@@ -242,9 +242,9 @@ class InferXProvider(BaseProvider):
                     result = await response.json()
                     return result.get("models", [])
                 else:
-                    raise Exception(f"Failed to list models: {response.status}")
+                    raise RuntimeError(f"Failed to list models: {response.status}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to list InferX models: {e}")
             return []
 
@@ -263,7 +263,7 @@ class InferXProvider(BaseProvider):
                     result = await response.json()
                     return result
                 else:
-                    raise Exception(f"Failed to update model: {response.status}")
+                    raise RuntimeError(f"Failed to update model: {response.status}")
 
         except Exception as e:
             logger.error(f"Failed to update InferX model: {e}")
@@ -287,9 +287,9 @@ class InferXProvider(BaseProvider):
                         "gpu_utilization": result.get("gpu_util", 0),
                     }
                 else:
-                    raise Exception(f"Failed to get usage stats: {response.status}")
+                    raise RuntimeError(f"Failed to get usage stats: {response.status}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to get InferX usage stats: {e}")
             return {}
 

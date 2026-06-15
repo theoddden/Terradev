@@ -224,7 +224,7 @@ class AlibabaProvider(BaseProvider):
                 live = await self._get_live_availability(gpu_type, region)
                 if live:
                     return live
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug(f"Alibaba live availability error: {e}")
 
         # Static fallback
@@ -481,7 +481,7 @@ class AlibabaProvider(BaseProvider):
                 }
                 for inst in instances
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -545,7 +545,7 @@ class AlibabaProvider(BaseProvider):
                 "output": "No result yet — command may still be running",
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Fallback to SSH
             try:
                 status = await self.get_instance_status(instance_id)
@@ -578,7 +578,7 @@ class AlibabaProvider(BaseProvider):
                     "stderr": result.stderr,
                     "async": async_exec,
                 }
-            except Exception as ssh_err:
+            except Exception as ssh_err:  # noqa: BLE001
                 return {
                     "instance_id": instance_id,
                     "command": command,
@@ -703,7 +703,7 @@ class AlibabaProvider(BaseProvider):
 
             return {"valid": True}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "valid": False,
                 "reason": f"Resource validation failed: {str(e)}",
@@ -829,7 +829,7 @@ class AlibabaProvider(BaseProvider):
                             )
                             if alt_data.get("AvailableZones", {}).get("AvailableZone"):
                                 alternative_regions.append(alt_region)
-                        except Exception:
+                        except Exception:  # noqa: BLE001
                             continue
 
                 return {
@@ -837,7 +837,7 @@ class AlibabaProvider(BaseProvider):
                     "alternative_regions": alternative_regions,
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "available": False,
                 "reason": f"Availability check failed: {str(e)}",
@@ -853,7 +853,7 @@ class AlibabaProvider(BaseProvider):
                 "exceeded_resources": [],
                 "recommended_actions": [],
             }
-        except Exception:
+        except Exception:  # noqa: BLE001
             return {
                 "within_limits": True,
                 "exceeded_resources": [],

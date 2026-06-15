@@ -148,7 +148,7 @@ class KVCacheCheckpointManager:
             )
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to initialize checkpoint manager: {e}")
             self.metrics.errors.append(str(e))
             return False
@@ -222,7 +222,7 @@ class KVCacheCheckpointManager:
             )
             return checkpoint_id
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(
                 f"Failed to create checkpoint for request {request_id}: {e}"
             )
@@ -283,7 +283,7 @@ class KVCacheCheckpointManager:
             )
             return kv_cache_data
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to restore checkpoint {checkpoint_id}: {e}")
             checkpoint.state = CheckpointState.FAILED
             self.metrics.errors.append(str(e))
@@ -333,7 +333,7 @@ class KVCacheCheckpointManager:
                 self.logger.error("Failed to upload KV caches to persistent storage")
                 return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Error handling spot termination: {e}")
             self.metrics.errors.append(str(e))
             return False
@@ -379,7 +379,7 @@ class KVCacheCheckpointManager:
                             "request_id": request_id,
                             "error": "Restore failed",
                         }
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     restore_results[checkpoint_id] = {
                         "success": False,
                         "request_id": request_id,
@@ -407,7 +407,7 @@ class KVCacheCheckpointManager:
                 ),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Error restoring KV caches on new instance: {e}")
             self.metrics.errors.append(str(e))
             return {
@@ -428,7 +428,7 @@ class KVCacheCheckpointManager:
             if hasattr(kv_cache_data, "tolist"):
                 serializable = kv_cache_data.tolist()
             data_bytes = msgpack.packb(serializable, use_bin_type=True)
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Fallback: use torch.load path via buffer (weights_only safe)
             import io
             try:
@@ -436,7 +436,7 @@ class KVCacheCheckpointManager:
                 buf = io.BytesIO()
                 torch.save(kv_cache_data, buf)
                 data_bytes = buf.getvalue()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 raise RuntimeError(
                     "Cannot serialize KV cache: install msgpack or torch"
                 )
@@ -478,14 +478,14 @@ class KVCacheCheckpointManager:
         try:
             import msgpack
             return msgpack.unpackb(data_bytes, raw=False, strict_map_key=False)
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Fallback: torch.load with weights_only=True (no arbitrary code execution)
             import io
             try:
                 import torch
                 buf = io.BytesIO(data_bytes)
                 return torch.load(buf, weights_only=True)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 raise RuntimeError(
                     "Cannot deserialize KV cache: install msgpack or torch"
                 )
@@ -631,7 +631,7 @@ class KVCacheCheckpointManager:
             self.logger.debug(f"Saved active checkpoint {checkpoint.checkpoint_id}")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(
                 f"Failed to save active checkpoint {checkpoint.checkpoint_id}: {e}"
             )
@@ -664,7 +664,7 @@ class KVCacheCheckpointManager:
             )
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(
                 f"Failed to upload checkpoints to persistent storage: {e}"
             )
@@ -681,7 +681,7 @@ class KVCacheCheckpointManager:
             self.logger.info(f"Found {len(existing_files)} checkpoint files locally")
             return existing_files
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(
                 f"Failed to download checkpoints from persistent storage: {e}"
             )

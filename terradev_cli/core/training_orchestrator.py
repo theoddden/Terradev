@@ -467,7 +467,7 @@ def _run_on(
         try:
             r = subprocess.run(ssh, capture_output=True, text=True, timeout=timeout)
             return r.returncode, r.stdout.strip(), r.stderr.strip()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return -1, "", str(e)
     # SECURITY: shell=True is used but command is validated above
     try:
@@ -475,7 +475,7 @@ def _run_on(
             cmd, shell=True, capture_output=True, text=True, timeout=timeout
         )
         return r.returncode, r.stdout.strip(), r.stderr.strip()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return -1, "", str(e)
 
 
@@ -763,7 +763,7 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
         )
         try:
             resolved_log = Path(config.log_path).resolve()
-        except Exception:
+        except Exception:  # noqa: BLE001
             return {"status": "failed", "error": "Invalid log path"}
         if not any(resolved_log.is_relative_to(root) for root in _allowed_roots):
             logger.error(f"Log path outside allowed roots: {resolved_log}")
@@ -817,7 +817,7 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
                     timeout=15,
                 )
             logger.info(f"Spot-preemption sidecar deployed to {len(node_list)} node(s)")
-        except Exception as sidecar_err:
+        except Exception as sidecar_err:  # noqa: BLE001
             logger.debug(f"Spot sidecar deploy failed (non-fatal): {sidecar_err}")
 
         return {
@@ -830,7 +830,7 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
             "master_addr": artifacts.get("master_addr", "localhost"),
             "flashoptim": flashoptim_info,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"status": "failed", "error": str(e)}
 
 
@@ -861,7 +861,7 @@ def _launch_ray(ctx: Dict[str, Any]) -> Dict[str, Any]:
     except ImportError:
         logger.warning("Ray not available, falling back to native launch")
         return _launch_native(ctx)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"Ray launch failed ({e}), falling back to native")
         return _launch_native(ctx)
 

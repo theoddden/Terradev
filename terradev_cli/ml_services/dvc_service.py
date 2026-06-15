@@ -78,7 +78,7 @@ class DVCService:
                 "status": "failed",
                 "error": "DVC not installed. Run: pip install dvc",
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def init_repo(self, force: bool = False) -> Dict[str, Any]:
@@ -101,7 +101,7 @@ class DVCService:
             else:
                 raise Exception(f"Failed to initialize DVC repo: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to initialize DVC repository: {e}")
 
     async def add_remote(
@@ -128,7 +128,7 @@ class DVCService:
             else:
                 raise Exception(f"Failed to add remote: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to add remote {name}: {e}")
 
     async def list_remotes(self) -> List[Dict[str, Any]]:
@@ -153,7 +153,7 @@ class DVCService:
             else:
                 return []
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to list remotes: {e}")
 
     async def add_data(self, data_path: str) -> Dict[str, Any]:
@@ -176,7 +176,7 @@ class DVCService:
             else:
                 raise Exception(f"Failed to add data {data_path}: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to add data {data_path}: {e}")
 
     async def push_data(self, targets: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -203,7 +203,7 @@ class DVCService:
             else:
                 raise Exception(f"Failed to push data: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to push data: {e}")
 
     async def pull_data(self, targets: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -230,7 +230,7 @@ class DVCService:
             else:
                 raise Exception(f"Failed to pull data: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to pull data: {e}")
 
     async def get_status(self) -> Dict[str, Any]:
@@ -259,7 +259,7 @@ class DVCService:
             else:
                 raise Exception(f"Failed to get status: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get status: {e}")
 
     async def list_tracked_files(self) -> List[Dict[str, Any]]:
@@ -281,12 +281,12 @@ class DVCService:
                             "md5": dvc_content.get("md5", ""),
                         }
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     continue
 
             return tracked_files
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to list tracked files: {e}")
 
     async def cleanup_cache(self) -> Dict[str, Any]:
@@ -323,7 +323,7 @@ class DVCService:
             else:
                 raise Exception(f"Failed to get cache directory: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to cleanup cache: {e}")
 
     # ── Terradev-specific: checkpoint integration ──────────────────
@@ -427,7 +427,7 @@ class DVCService:
             else:
                 push_info = {"status": "push_failed", "error": push_proc.stderr}
             results["steps"].append({"action": "dvc_push", **push_info})
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             results["steps"].append(
                 {"action": "dvc_push", "status": "error", "error": str(e)}
             )
@@ -466,7 +466,7 @@ class DVCService:
                             "error": git_commit.stderr,
                         }
                     )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 results["steps"].append(
                     {"action": "git_commit", "status": "error", "error": str(e)}
                 )

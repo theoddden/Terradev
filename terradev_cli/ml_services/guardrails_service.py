@@ -157,7 +157,7 @@ class GuardrailsService:
         try:
             await self._request("GET", "/v1/rails/configs")
             return {"status": "connected", "server_url": self.config.server_url}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def chat_completion(

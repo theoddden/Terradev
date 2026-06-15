@@ -406,7 +406,7 @@ class AgentTopologyPlanner:
                 shared_fraction=shared_fraction,
                 dtype=dtype,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug("KV sharing plan skipped: %s", e)
 
         # Use context_k from KV plan if available, else P95 default

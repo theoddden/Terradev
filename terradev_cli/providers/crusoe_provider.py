@@ -162,7 +162,7 @@ class CrusoeProvider(BaseProvider):
                 live = await self._get_live_capacity(gpu_type, region)
                 if live:
                     return live
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         # Fallback to static pricing
@@ -366,7 +366,7 @@ class CrusoeProvider(BaseProvider):
                 }
                 for vm in instances
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -426,7 +426,7 @@ class CrusoeProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,

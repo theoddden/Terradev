@@ -141,7 +141,7 @@ class LangfuseService:
                 "projects": len(projects),
                 "project_names": [p.get("name", "?") for p in projects[:5]],
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     # ── Traces ────────────────────────────────────────────────────────

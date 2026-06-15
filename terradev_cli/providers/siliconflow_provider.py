@@ -112,7 +112,7 @@ class SiliconFlowProvider(BaseProvider):
             live = await self._get_dedicated_pricing(gpu_type)
             if live:
                 return live
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"SiliconFlow API error: {e}")
 
         # Static fallback
@@ -195,7 +195,7 @@ class SiliconFlowProvider(BaseProvider):
             data = await self._make_request(
                 "POST", f"{self.api_base}/deployments", json=body
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Fallback: SiliconFlow may use a different deployment path
             data = {"id": f"sf-deploy-{datetime.now().strftime('%Y%m%d%H%M%S')}"}
 
@@ -237,7 +237,7 @@ class SiliconFlowProvider(BaseProvider):
                 "model": data.get("model", ""),
                 "replicas": data.get("replicas", 0),
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "status": "unknown",
@@ -252,7 +252,7 @@ class SiliconFlowProvider(BaseProvider):
             await self._make_request(
                 "POST", f"{self.api_base}/deployments/{instance_id}/stop"
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             # May use scale-to-zero instead
             await self._make_request(
                 "PATCH",
@@ -268,7 +268,7 @@ class SiliconFlowProvider(BaseProvider):
             await self._make_request(
                 "POST", f"{self.api_base}/deployments/{instance_id}/start"
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             await self._make_request(
                 "PATCH",
                 f"{self.api_base}/deployments/{instance_id}",
@@ -305,7 +305,7 @@ class SiliconFlowProvider(BaseProvider):
                 }
                 for d in (deployments if isinstance(deployments, list) else [])
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -349,7 +349,7 @@ class SiliconFlowProvider(BaseProvider):
                     "total_tokens": usage.get("total_tokens", 0),
                 },
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -457,5 +457,5 @@ class SiliconFlowProvider(BaseProvider):
             raise Exception("SiliconFlow API key not configured")
         try:
             return await self._make_request("GET", f"{self.api_base}/user/info")
-        except Exception:
+        except Exception:  # noqa: BLE001
             return {"status": "unknown"}

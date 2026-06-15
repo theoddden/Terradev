@@ -233,7 +233,7 @@ class DriftDetector:
                     )
 
             return our_nodes
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error querying provider {provider_name}: {e}")
             return []
 
@@ -254,7 +254,7 @@ class DriftDetector:
             provider = self.provider_factory.get_provider(node.provider)
             result = await provider.terminate_instance(node.instance_id)
             return {"pod_id": node.pod_id, "status": "terminated", "result": result}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"pod_id": node.pod_id, "status": "error", "error": str(e)}
 
     async def _recreate_node(
@@ -273,5 +273,5 @@ class DriftDetector:
             )
 
             return {"pod_id": node.pod_id, "status": "recreated", "result": result}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"pod_id": node.pod_id, "status": "error", "error": str(e)}

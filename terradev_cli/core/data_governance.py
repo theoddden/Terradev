@@ -203,7 +203,7 @@ class DataGovernanceManager:
                 allowed_providers = getattr(
                     self.config, "default_providers", allowed_providers
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         self.opa_policies = {
@@ -769,7 +769,7 @@ class DataGovernanceManager:
                 self._audit_file.rename(self._audit_file.with_suffix(".jsonl.1"))
             with open(self._audit_file, "a") as af:
                 af.write(json.dumps(entry, default=str) + "\n")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning(f"Audit log write failed: {exc}")
 
     async def _log_consent_request(self, consent_request: ConsentRequest):

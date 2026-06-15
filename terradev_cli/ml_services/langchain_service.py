@@ -87,7 +87,7 @@ class LangChainService:
                 "workflow_enabled": self.config.workflow_enabled,
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def create_workflow(self, workflow_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -113,7 +113,7 @@ class LangChainService:
                 ),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def create_langgraph_workflow(
@@ -143,7 +143,7 @@ class LangChainService:
                 "edges": graph_config.get("edges", []),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def create_sglang_pipeline(
@@ -171,7 +171,7 @@ class LangChainService:
                 "serving_config": pipeline_config.get("serving_config", {}),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_langsmith_projects(self) -> List[Dict[str, Any]]:
@@ -196,7 +196,7 @@ class LangChainService:
                         f"Failed to get LangSmith projects: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get LangSmith projects: {e}")
 
     async def get_langsmith_workspaces(self) -> List[Dict[str, Any]]:
@@ -221,7 +221,7 @@ class LangChainService:
                         f"Failed to get LangSmith workspaces: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get LangSmith workspaces: {e}")
 
     async def create_langsmith_project(
@@ -258,7 +258,7 @@ class LangChainService:
                         f"Failed to create LangSmith project: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_langsmith_runs(
@@ -298,7 +298,7 @@ class LangChainService:
                         f"Failed to get LangSmith runs: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get LangSmith runs: {e}")
 
     async def create_trace(
@@ -326,7 +326,7 @@ class LangChainService:
                         f"Failed to create trace: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     def get_langchain_config(self) -> Dict[str, str]:

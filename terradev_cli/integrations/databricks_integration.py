@@ -108,7 +108,7 @@ def _request_sync(
             return {"success": True, "data": json.loads(resp.read().decode())}
     except urllib.error.HTTPError as e:
         return {"success": False, "error": f"HTTP {e.code}: {e.read().decode()[:500]}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -143,7 +143,7 @@ async def _request_async(
                     return {"success": True, "data": data}
                 text = await r.text()
                 return {"success": False, "error": f"HTTP {r.status}: {text[:500]}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 

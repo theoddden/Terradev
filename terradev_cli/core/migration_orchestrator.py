@@ -100,7 +100,7 @@ class MigrationOrchestrator:
                 )
                 workloads.append(workload)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to discover workloads: {e}")
 
         return workloads
@@ -242,7 +242,7 @@ class MigrationOrchestrator:
                 return multihop["total_cost"]
 
             return direct_cost
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Fallback: assume zero cost for same-provider, $0.05/GB for cross-provider
             return 0.0 if src_provider == dst_provider else size_gb * 0.05
 

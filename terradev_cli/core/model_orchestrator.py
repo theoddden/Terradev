@@ -316,7 +316,7 @@ class ModelOrchestrator:
                 instance.state = ModelState.ERROR
                 return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to load model {model_id}: {e}")
             instance.state = ModelState.ERROR
             return False
@@ -343,7 +343,7 @@ class ModelOrchestrator:
 
             return success
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error loading model {instance.model_id}: {e}")
             return False
 
@@ -384,7 +384,7 @@ class ModelOrchestrator:
                 f"Model {instance.model_id} warmed up in {instance.metrics.warmup_time_s:.1f}s"
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Warmup failed for {instance.model_id}: {e}")
 
     async def _warmup_pytorch(self, instance: ModelInstance):
@@ -510,7 +510,7 @@ class ModelOrchestrator:
             logger.info(f"Evicted model {model_id} ({self.used_memory_gb:.1f}GB used)")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to evict model {model_id}: {e}")
             instance.state = ModelState.ERROR
             return False
@@ -541,7 +541,7 @@ class ModelOrchestrator:
 
                 await asyncio.sleep(10)  # Monitor every 10 seconds
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Memory monitoring error: {e}")
                 await asyncio.sleep(30)
 
@@ -558,7 +558,7 @@ class ModelOrchestrator:
                 await self._apply_scaling_policy()
                 await asyncio.sleep(60)  # Check every minute
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Eviction manager error: {e}")
                 await asyncio.sleep(60)
 
@@ -664,7 +664,7 @@ class ModelOrchestrator:
 
             return True, latency_ms
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Inference error for {model_id}: {e}")
             instance.metrics.error_rate = min(instance.metrics.error_rate + 0.1, 1.0)
             return False, 0.0
@@ -712,7 +712,7 @@ class ModelOrchestrator:
                         model_id: ModelMetrics(model_id=model_id, **metrics)
                         for model_id, metrics in data.items()
                     }
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to load metrics: {e}")
                 self.metrics = {}
         else:

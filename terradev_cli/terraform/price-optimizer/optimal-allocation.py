@@ -64,7 +64,7 @@ class PriceOptimizer:
                     "L40": {"ondemand": 1.15, "spot": 0.92, "instance": "L40"},
                 },
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error loading pricing data: {e}", file=sys.stderr)
             return {}
 
@@ -211,7 +211,7 @@ def main():
         # Output JSON for Terraform
         print(json.dumps(result, indent=2))
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 

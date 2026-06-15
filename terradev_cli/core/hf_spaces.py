@@ -98,7 +98,7 @@ class HFSpacesDeployer:
                             "status": "error",
                             "error": f"Failed to create space: {response.status} - {error_text}",
                         }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "error", "error": str(e)}
 
     async def _add_secrets(

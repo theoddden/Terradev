@@ -197,5 +197,5 @@ def register_hf_spaces_commands(cli, TerradevAPI):
                 lines = d if isinstance(d, list) else d.get("logs", d.get("lines", []))
                 for line in (lines or [])[-30:]:
                     print(f"  [{kind}] {line}")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass

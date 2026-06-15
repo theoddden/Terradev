@@ -804,6 +804,6 @@ class AdapterAwareRouter(ModelRouter):
                     # Fallback to routing without adapter
                     return target, StepType.GENERAL, f"adapter_load_failed_{result.get('error')}"
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error loading adapter: {e}")
             return target, StepType.GENERAL, f"adapter_load_error_{str(e)}"

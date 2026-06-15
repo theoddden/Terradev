@@ -70,7 +70,7 @@ def _enable_cuda_graph_optimization():
         if not warm_pool._running:
             loop.create_task(warm_pool.start())
 
-    except Exception:
+    except Exception:  # noqa: BLE001
         # Fail silently - CUDA Graph optimization is optional
         pass
 

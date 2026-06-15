@@ -31,7 +31,7 @@ def main():
     except KeyboardInterrupt:
         print("\n👋 Goodbye!", file=sys.stderr)
         sys.exit(0)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ CLI Error: {e}", file=sys.stderr)
         sys.exit(1)
 

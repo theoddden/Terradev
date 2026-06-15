@@ -137,7 +137,7 @@ class QuickStart:
                 print("❌ Provision failed")
                 return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"❌ Error: {e}")
             return False
 
@@ -222,7 +222,7 @@ class QuickStart:
                 print("❌ Provision failed")
                 return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"❌ Error: {e}")
             return False
 
@@ -281,7 +281,7 @@ class QuickStart:
                         price_hr=best_quote.get("price", 0),
                         spot=best_quote.get("availability") == "spot",
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
 
                 return {
@@ -293,7 +293,7 @@ class QuickStart:
 
             return {}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Provision error: {e}")
             return {}
 

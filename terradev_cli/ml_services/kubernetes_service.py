@@ -127,7 +127,7 @@ class KubernetesService:
                 "status": "failed",
                 "error": "kubectl command timed out. Check your cluster connection.",
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_gpu_nodes(self) -> List[Dict[str, Any]]:
@@ -183,7 +183,7 @@ class KubernetesService:
 
             return gpu_nodes
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get GPU nodes: {e}")
 
     async def install_karpenter(self) -> Dict[str, Any]:
@@ -257,7 +257,7 @@ class KubernetesService:
                 }
             else:
                 raise Exception(f"Command not found: {e}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     def _gpu_instance_families(self, gpu_type: str) -> list:
@@ -384,7 +384,7 @@ spec:
             else:
                 raise Exception(f"Failed to create provisioner: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_cluster_resources(self) -> Dict[str, Any]:
@@ -463,7 +463,7 @@ spec:
 
             return resources
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get cluster resources: {e}")
 
     def get_kubernetes_config(self) -> Dict[str, str]:

@@ -72,7 +72,7 @@ class KServeService:
                 "status": "failed",
                 "error": "kubectl not found. Please install kubectl.",
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def list_inference_services(self) -> List[Dict[str, Any]]:
@@ -113,7 +113,7 @@ class KServeService:
             else:
                 raise Exception(f"kubectl command failed: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to list InferenceServices: {e}")
 
     async def create_inference_service(
@@ -179,7 +179,7 @@ class KServeService:
             finally:
                 os.unlink(temp_file)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to create InferenceService {name}: {e}")
 
     async def delete_inference_service(self, name: str) -> Dict[str, Any]:
@@ -206,7 +206,7 @@ class KServeService:
             else:
                 raise Exception(f"Failed to delete InferenceService: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to delete InferenceService {name}: {e}")
 
     async def get_service_url(self, name: str) -> Optional[str]:
@@ -256,7 +256,7 @@ class KServeService:
 
             return None
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get service URL for {name}: {e}")
 
     async def predict(self, name: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -284,7 +284,7 @@ class KServeService:
                         f"Prediction failed: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to make prediction to {name}: {e}")
 
     # ── Terradev-specific: GPU-aware manifest generation ─────────────
@@ -565,7 +565,7 @@ class KServeService:
                     yield {**event, "message": f"Rollout failed: {message}"}
                     return
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 yield {
                     "phase": "error",
                     "name": name,

@@ -78,7 +78,7 @@ class OIDCProvider:
                     logger.info(f"OIDC discovery successful for {self.discovery_url}")
                     return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"OIDC discovery failed: {e}")
             return False
 
@@ -250,7 +250,7 @@ class OIDCProvider:
                 async with session.get(self.jwks_uri) as resp:
                     if resp.status == 200:
                         return await resp.json()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"JWKS fetch failed: {e}")
         return None
 
@@ -389,7 +389,7 @@ class OIDCProvider:
             logger.info(f"OIDC provider test successful for {self.discovery_url}")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"OIDC provider test failed: {e}")
             return False
 

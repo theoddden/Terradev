@@ -100,7 +100,7 @@ class EnhancedWAndBService:
                         f"Failed to create dashboard: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def create_terradev_dashboard(self) -> Dict[str, Any]:
@@ -157,7 +157,7 @@ class EnhancedWAndBService:
 
             return await self.create_dashboard(dashboard_config)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def create_report(self, report_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -216,7 +216,7 @@ class EnhancedWAndBService:
                         f"Failed to create report: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def create_terradev_report(
@@ -236,7 +236,7 @@ class EnhancedWAndBService:
 
             return await self.create_report(report_config)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     def _generate_terradev_report_html(self, metrics_data: Dict[str, Any]) -> str:
@@ -370,7 +370,7 @@ class EnhancedWAndBService:
                         f"Failed to create alert: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def create_terradev_alerts(self) -> Dict[str, Any]:
@@ -424,7 +424,7 @@ class EnhancedWAndBService:
 
             return {"status": "completed", "alerts": results}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_dashboard_status(self) -> Dict[str, Any]:
@@ -462,7 +462,7 @@ class EnhancedWAndBService:
                 },
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def _get_dashboards(self) -> List[Dict[str, Any]]:
@@ -496,7 +496,7 @@ class EnhancedWAndBService:
                         f"Failed to list projects: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to list projects: {e}")
 
     async def list_runs(self, limit: int = 100) -> List[Dict[str, Any]]:
@@ -523,7 +523,7 @@ class EnhancedWAndBService:
                         f"Failed to list runs: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to list runs: {e}")
 
     def get_enhanced_config(self) -> Dict[str, str]:

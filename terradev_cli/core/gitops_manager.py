@@ -122,7 +122,7 @@ class GitOpsManager:
             logger.info("GitOps repository initialized successfully")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to initialize GitOps repository: {e}")
             return False
 
@@ -498,7 +498,7 @@ deny[msg] {
 
             return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to bootstrap GitOps: {e}")
             return False
 
@@ -521,7 +521,7 @@ deny[msg] {
             logger.info("ArgoCD bootstrapped successfully")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to bootstrap ArgoCD: {e}")
             return False
 
@@ -551,7 +551,7 @@ deny[msg] {
             logger.info("Flux bootstrapped successfully")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to bootstrap Flux: {e}")
             return False
 
@@ -569,7 +569,7 @@ deny[msg] {
 
             return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to sync cluster: {e}")
             return False
 
@@ -610,7 +610,7 @@ deny[msg] {
             logger.info(f"ArgoCD sync completed for environment {environment}")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to sync ArgoCD: {e}")
             return False
 
@@ -632,7 +632,7 @@ deny[msg] {
             logger.info(f"Flux sync completed for environment {environment}")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to sync Flux: {e}")
             return False
 
@@ -690,7 +690,7 @@ deny[msg] {
             logger.info(f"Validation completed. Valid: {validation_results['valid']}")
             return validation_results
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to validate configuration: {e}")
             return {"valid": False, "errors": [str(e)]}
 

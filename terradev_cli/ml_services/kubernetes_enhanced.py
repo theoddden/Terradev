@@ -212,7 +212,7 @@ dashboardProviders:
                 "dashboards": "Karpenter dashboards imported",
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def _import_karpenter_dashboards(self) -> Dict[str, Any]:
@@ -309,7 +309,7 @@ dashboardProviders:
                         f"Failed to import dashboard: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_monitoring_status(self) -> Dict[str, Any]:
@@ -330,7 +330,7 @@ dashboardProviders:
 
             return status
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def _get_cluster_status(self) -> Dict[str, Any]:
@@ -374,7 +374,7 @@ dashboardProviders:
             else:
                 raise Exception(f"Failed to get cluster status: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get cluster status: {e}")
 
     def _get_node_pools_summary(self, nodes_data: Dict) -> Dict[str, Any]:
@@ -426,7 +426,7 @@ dashboardProviders:
 
             return {"status": "unhealthy", "error": "Prometheus not running"}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def _check_grafana_health(self, env: Dict[str, str]) -> Dict[str, Any]:
@@ -448,7 +448,7 @@ dashboardProviders:
 
             return {"status": "unhealthy", "error": "Grafana not running"}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def _get_karpenter_status(self, env: Dict[str, str]) -> Dict[str, Any]:
@@ -470,7 +470,7 @@ dashboardProviders:
 
             return {"status": "unhealthy", "error": "Karpenter not running"}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_metrics_summary(self) -> Dict[str, Any]:
@@ -512,7 +512,7 @@ dashboardProviders:
                                 .get("value", [{}])[0]
                                 .get("value", 0)
                             )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
 
             return {
@@ -526,7 +526,7 @@ dashboardProviders:
                 },
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     # ── Methods called by MCP v5.0.0 K8s Enhanced tools ─────────────────
@@ -617,7 +617,7 @@ dashboardProviders:
             }
         except FileNotFoundError:
             return {"status": "failed", "error": "helm not found — install Helm first"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def configure_device_plugin(
@@ -673,7 +673,7 @@ dashboardProviders:
                 "strategy": strategy,
                 "replicas": replicas,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def configure_mig(
@@ -726,7 +726,7 @@ dashboardProviders:
                 "gpu_indices": gpu_indices or "all",
                 "note": "GPU Operator will apply MIG config on next device-plugin restart",
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def configure_time_slicing(
@@ -811,7 +811,7 @@ dashboardProviders:
                 "cluster_policy_patched": patch_result.returncode == 0,
                 "note": f"Each physical GPU now appears as {replicas} virtual GPUs",
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_cluster_resources(self) -> Dict[str, Any]:
@@ -890,7 +890,7 @@ dashboardProviders:
 
             return resources
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get cluster resources: {e}")
 
     def get_enhanced_config(self) -> Dict[str, str]:
@@ -983,7 +983,7 @@ suitableNodeCount: 1
                 "message": "DRA ResourceClass installed successfully",
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(
                 f"DRA installation failed, falling back to device plugin: {e}"
             )
@@ -1043,7 +1043,7 @@ suitableNodeCount: 1
                 "message": "NVIDIA device plugin installed (DRA fallback)",
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def configure_dra_mig(self) -> Dict[str, Any]:
@@ -1078,7 +1078,7 @@ suitableNodeCount: 1
 
             return {"status": "configured", "message": "MIG configured via DRA"}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
 

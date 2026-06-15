@@ -103,7 +103,7 @@ class LangGraphService:
                 "observability_enabled": self.config.observability_enabled,
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def create_workflow(self, workflow_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -144,7 +144,7 @@ class LangGraphService:
                 ),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def create_orchestrator_worker_workflow(
@@ -213,7 +213,7 @@ class LangGraphService:
                         ]
                     }
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return {"error": str(e)}
 
             # Enhanced worker with monitoring
@@ -237,7 +237,7 @@ class LangGraphService:
                         "metrics": {"section_length": len(section.content)},
                     }
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return {"error": str(e)}
 
             # Enhanced synthesizer with monitoring
@@ -253,7 +253,7 @@ class LangGraphService:
                         "metrics": {"report_length": len(completed_report)},
                     }
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return {"error": str(e)}
 
             # Conditional edge function for routing
@@ -296,7 +296,7 @@ class LangGraphService:
                 ),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def create_evaluation_workflow(
@@ -349,7 +349,7 @@ class LangGraphService:
                         "metrics": {"joke_length": len(msg.content)},
                     }
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return {"error": str(e)}
 
             # Enhanced evaluator with monitoring
@@ -369,7 +369,7 @@ class LangGraphService:
                         "metrics": {"evaluation_time": datetime.now().isoformat()},
                     }
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     return {"error": str(e)}
 
             # Conditional edge function for routing
@@ -408,7 +408,7 @@ class LangGraphService:
                 ),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_workflow_status(self, workflow_id: str) -> Dict[str, Any]:
@@ -428,7 +428,7 @@ class LangGraphService:
                 },
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     def get_langgraph_config(self) -> Dict[str, str]:

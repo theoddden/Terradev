@@ -46,7 +46,7 @@ class WeightStreamingBenchmarks:
                 result = await benchmark_method()
                 self.benchmark_results.append(result)
                 logger.info(f"✅ {result['benchmark_name']}: {result['status']}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"❌ {benchmark_method.__name__}: {e}")
                 self.benchmark_results.append(
                     {

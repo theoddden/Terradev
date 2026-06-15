@@ -286,7 +286,7 @@ class LMCacheService:
 
         except ImportError:
             return {"status": "failed", "error": "redis package not installed"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def estimate_cache_savings(

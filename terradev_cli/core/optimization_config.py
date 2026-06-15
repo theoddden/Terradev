@@ -59,7 +59,7 @@ class OptimizationConfigManager:
                 with open(self.config_path, "r") as f:
                     data = json.load(f)
                 return self._dict_to_config(data)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"Error loading optimization config: {e}")
                 return OptimizationConfig()
         else:

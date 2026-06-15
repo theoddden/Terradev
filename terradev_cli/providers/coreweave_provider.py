@@ -137,8 +137,8 @@ class CoreWeaveProvider(BaseProvider):
                     "gpu_count": 1,
                 },
             }
-        except Exception as e:
-            raise Exception(f"CoreWeave provision failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"CoreWeave provision failed: {e}") from e
 
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
@@ -154,8 +154,8 @@ class CoreWeaveProvider(BaseProvider):
                 "status": status.lower(),
                 "provider": "coreweave",
             }
-        except Exception as e:
-            raise Exception(f"CoreWeave status failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"CoreWeave status failed: {e}") from e
 
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
@@ -206,7 +206,7 @@ class CoreWeaveProvider(BaseProvider):
                 }
                 for vs in data.get("items", [])
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -253,7 +253,7 @@ class CoreWeaveProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Fallback: CoreWeave exec API
             try:
                 data = await self._make_request(
@@ -268,7 +268,7 @@ class CoreWeaveProvider(BaseProvider):
                     "output": str(data.get("output", data)),
                     "async": async_exec,
                 }
-            except Exception as api_err:
+            except Exception as api_err:  # noqa: BLE001
                 return {
                     "instance_id": instance_id,
                     "command": command,
@@ -295,14 +295,14 @@ class CoreWeaveProvider(BaseProvider):
                     "GET", f"{self.API_BASE}/v1/namespaces/{self.namespace}/pods"
                 )
                 k8s_access = True
-            except Exception:
+            except Exception:  # noqa: BLE001
                 k8s_access = False
 
             # Test Applications Catalog access
             try:
                 await self._make_request("GET", f"{self.API_BASE}/v1/applications")
                 catalog_access = True
-            except Exception:
+            except Exception:  # noqa: BLE001
                 catalog_access = False
 
             if not k8s_access or not catalog_access:
@@ -316,7 +316,7 @@ class CoreWeaveProvider(BaseProvider):
 
             return {"full_access": True}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "full_access": False,
                 "reason": f"Permission check failed: {str(e)}",
@@ -351,7 +351,7 @@ class CoreWeaveProvider(BaseProvider):
 
             return None
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     async def _generate_kubernetes_manifest(

@@ -182,7 +182,7 @@ async def query_requests(creds: Dict[str, str], **kwargs) -> Dict[str, Any]:
                     "success": False,
                     "error": f"HTTP {r.status}: {(await r.text())[:500]}",
                 }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -202,7 +202,7 @@ def _query_requests_sync(creds: Dict[str, str], **kwargs) -> Dict[str, Any]:
             return {"success": True, "data": json.loads(resp.read().decode())}
     except urllib.error.HTTPError as e:
         return {"success": False, "error": f"HTTP {e.code}: {e.read().decode()[:500]}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -288,7 +288,7 @@ async def submit_feedback(
                     "success": False,
                     "error": f"HTTP {r.status}: {(await r.text())[:300]}",
                 }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -326,7 +326,7 @@ async def update_request_property(
                     "success": False,
                     "error": f"HTTP {r.status}: {(await r.text())[:300]}",
                 }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 

@@ -65,7 +65,7 @@ class HuggingFaceService:
                         "error": f"API request failed: {response.status} - {error_text}",
                     }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def list_models(
@@ -96,7 +96,7 @@ class HuggingFaceService:
                         f"Failed to list models: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to list models: {e}")
 
     async def list_datasets(
@@ -127,7 +127,7 @@ class HuggingFaceService:
                         f"Failed to list datasets: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to list datasets: {e}")
 
     async def get_model_info(self, model_id: str) -> Dict[str, Any]:
@@ -149,7 +149,7 @@ class HuggingFaceService:
                         f"Failed to get model info: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get model info for {model_id}: {e}")
 
     async def create_inference_endpoint(
@@ -201,7 +201,7 @@ class HuggingFaceService:
                         f"Failed to create endpoint: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to create inference endpoint: {e}")
 
     async def list_inference_endpoints(self) -> List[Dict[str, Any]]:
@@ -227,7 +227,7 @@ class HuggingFaceService:
                         f"Failed to list endpoints: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to list inference endpoints: {e}")
 
     async def get_inference_endpoint(self, endpoint_name: str) -> Dict[str, Any]:
@@ -253,7 +253,7 @@ class HuggingFaceService:
                         f"Failed to get endpoint: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get inference endpoint {endpoint_name}: {e}")
 
     async def delete_inference_endpoint(self, endpoint_name: str) -> Dict[str, Any]:
@@ -279,7 +279,7 @@ class HuggingFaceService:
                         f"Failed to delete endpoint: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to delete inference endpoint {endpoint_name}: {e}")
 
     async def run_inference(
@@ -308,7 +308,7 @@ class HuggingFaceService:
                         f"Inference failed: {response.status} - {error_text}"
                     )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to run inference on {endpoint_name}: {e}")
 
     def get_huggingface_config(self) -> Dict[str, str]:

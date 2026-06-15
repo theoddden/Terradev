@@ -234,7 +234,7 @@ def push_metrics(
         return {"success": False, "error": f"HTTP {e.code}: {e.reason}"}
     except urllib.error.URLError as e:
         return {"success": False, "error": f"Connection failed: {e.reason}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 

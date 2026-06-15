@@ -141,7 +141,7 @@ class PhoenixService:
                 "collector_endpoint": self.config.collector_endpoint,
                 "projects_found": len(data.get("data", [])),
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def list_projects(

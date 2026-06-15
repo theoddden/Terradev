@@ -166,7 +166,7 @@ class TerraformWrapper:
         try:
             self._run_terraform_command(["terraform", "init"])
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to initialize Terraform: {e}")
             return False
 
@@ -212,7 +212,7 @@ class TerraformWrapper:
             self.logger.info(f"Cluster {cluster_config['name']} created successfully")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to create cluster: {e}")
             return False
 
@@ -239,7 +239,7 @@ class TerraformWrapper:
             self.logger.info(f"Cluster {cluster_name} destroyed successfully")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to destroy cluster: {e}")
             return False
 
@@ -256,7 +256,7 @@ class TerraformWrapper:
             with open(cluster_file, "r") as f:
                 return json.load(f)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to get cluster info: {e}")
             return None
 
@@ -274,14 +274,14 @@ class TerraformWrapper:
                     with open(cluster_file, "r") as f:
                         cluster_info = json.load(f)
                         clusters.append(cluster_info)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     self.logger.warning(
                         f"Failed to read cluster file {cluster_file}: {e}"
                     )
 
             return clusters
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to list clusters: {e}")
             return []
 
@@ -293,7 +293,7 @@ class TerraformWrapper:
             # Run terraform output to get structured data
             result = self._run_terraform_command(["terraform", "output", "-json"])
             outputs = json.loads(result.stdout)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.warning(f"Failed to parse Terraform outputs: {e}")
 
         return outputs
@@ -318,7 +318,7 @@ class TerraformWrapper:
 
             self.logger.info(f"Cluster info saved to {cluster_file}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to save cluster info: {e}")
 
     def _load_cluster_config(self, cluster_name: str) -> Dict:
@@ -350,7 +350,7 @@ class TerraformWrapper:
                 cluster_file.unlink()
                 self.logger.info(f"Cluster info removed for {cluster_name}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to remove cluster info: {e}")
 
 
@@ -451,7 +451,7 @@ def main():
     except KeyboardInterrupt:
         print("\nOperation cancelled by user")
         sys.exit(1)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error: {e}")
         sys.exit(1)
 

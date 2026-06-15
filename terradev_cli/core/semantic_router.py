@@ -194,7 +194,7 @@ class PolicyExpressionEvaluator:
 
         try:
             return bool(self._eval_node(node, context))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Policy expression eval failed: '{expression}' — {e}")
             return False
 
@@ -632,7 +632,7 @@ def load_policy(path: str) -> RoutingPolicy:
     else:
         try:
             return load_policy_from_json(path)
-        except (json.JSONDecodeError, Exception):
+        except (json.JSONDecodeError, Exception):  # noqa: BLE001
             return load_policy_from_yaml(path)
 
 

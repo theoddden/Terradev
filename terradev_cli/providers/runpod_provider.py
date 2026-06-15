@@ -63,7 +63,7 @@ class RunPodProvider(BaseProvider):
                     quote["data_loss_on_restart"] = True
                     quote["volume_attachment_available"] = True
                 return live
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"RunPod API error: {e}")
             return []
 
@@ -158,7 +158,7 @@ class RunPodProvider(BaseProvider):
                 is_secure = True
                 gpu_id = instance_type[len("runpod-secure-"):]
             else:
-                raise Exception(f"Unsupported cloud type: {instance_type}")
+                raise RuntimeError(f"Unsupported cloud type: {instance_type}")
 
             # Create pod specification
             pod_spec = {
@@ -214,8 +214,8 @@ class RunPodProvider(BaseProvider):
                 },
             }
 
-        except Exception as e:
-            raise Exception(f"RunPod provision failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"RunPod provision failed: {e}") from e
 
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
@@ -271,8 +271,8 @@ class RunPodProvider(BaseProvider):
                 "port": ssh_port,
                 "gpu_count": pod.get("gpuCount", 1),
             }
-        except Exception as e:
-            raise Exception(f"RunPod status failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"RunPod status failed: {e}") from e
 
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
@@ -332,7 +332,7 @@ class RunPodProvider(BaseProvider):
                 }
                 for p in pods
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -355,7 +355,7 @@ class RunPodProvider(BaseProvider):
                     "output": "No public IP available - instance may still be provisioning",
                     "async": async_exec,
                 }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -406,7 +406,7 @@ class RunPodProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -486,7 +486,7 @@ class RunPodProvider(BaseProvider):
 
             return None
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Failed to create volume for {pod_name}: {e}")
             return None
 

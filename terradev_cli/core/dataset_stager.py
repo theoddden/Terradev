@@ -230,7 +230,7 @@ class DatasetStager:
                 data_provider, data_region, targets, size_gb
             )
             plan_dict["egress"] = egress
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug("Egress optimization unavailable: %s", e)
             plan_dict["egress"] = {"strategy": "direct", "error": str(e)}
 
@@ -301,7 +301,7 @@ class DatasetStager:
                 try:
                     await self._upload_chunk(chunk_path, region, dataset)
                     uploaded += 1
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     errors.append(str(e))
             elapsed = (time.monotonic() - rt0) * 1000
             return {
@@ -346,7 +346,7 @@ class DatasetStager:
             egress_info = optimize_staging_route(
                 data_provider, data_region, targets, size_gb_actual
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug("Egress optimization unavailable: %s", e)
             egress_info = {"strategy": "direct", "error": str(e)}
 
@@ -385,7 +385,7 @@ class DatasetStager:
                 # Ensure bucket exists (best-effort)
                 try:
                     s3.head_bucket(Bucket=bucket)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     create_cfg = {}
                     if region != "us-east-1":
                         create_cfg = {
@@ -420,7 +420,7 @@ class DatasetStager:
                 bucket_name = f"terradev-staging-{region.replace('/', '-')}"
                 try:
                     bucket = client.get_bucket(bucket_name)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     bucket = client.create_bucket(bucket_name, location=region)
                 blob = bucket.blob(remote_key)
                 blob.upload_from_filename(chunk_path)
@@ -444,7 +444,7 @@ class DatasetStager:
                     container_name = f"terradev-staging-{region}"
                     try:
                         blob_service.create_container(container_name)
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         pass
                     blob_client = blob_service.get_blob_client(
                         container=container_name, blob=remote_key
@@ -522,7 +522,7 @@ class DatasetStager:
             s3 = boto3.client("s3")
             s3.download_file(bucket, key, local)
             return local
-        except Exception:
+        except Exception:  # noqa: BLE001
             placeholder = self._staging_dir / "s3_dataset.placeholder"
             placeholder.write_text(f"# S3 download pending: {uri}\n")
             return str(placeholder)
@@ -540,7 +540,7 @@ class DatasetStager:
             blob = bucket.blob(blob_name)
             blob.download_to_filename(local)
             return local
-        except Exception:
+        except Exception:  # noqa: BLE001
             placeholder = self._staging_dir / "gcs_dataset.placeholder"
             placeholder.write_text(f"# GCS download pending: {uri}\n")
             return str(placeholder)
@@ -554,7 +554,7 @@ class DatasetStager:
             local = str(self._staging_dir / filename)
             urllib.request.urlretrieve(url, local)
             return local
-        except Exception:
+        except Exception:  # noqa: BLE001
             placeholder = self._staging_dir / "http_dataset.placeholder"
             placeholder.write_text(f"# HTTP download pending: {url}\n")
             return str(placeholder)
@@ -574,7 +574,7 @@ class DatasetStager:
                 revision="main",
             )
             return local
-        except Exception:
+        except Exception:  # noqa: BLE001
             placeholder = (
                 self._staging_dir / f"{dataset_name.replace('/', '_')}.placeholder"
             )

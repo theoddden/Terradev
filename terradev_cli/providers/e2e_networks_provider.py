@@ -95,7 +95,7 @@ class E2ENetworksProvider(BaseProvider):
             live = await self._get_live_plans(gpu_type, region)
             if live:
                 return live
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"E2E Networks API error: {e}")
 
         # Static fallback
@@ -133,7 +133,7 @@ class E2ENetworksProvider(BaseProvider):
         """Query node plans/types from the API."""
         try:
             data = await self._make_request("GET", f"{self.API_BASE}/plans/")
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Fall back to node-types endpoint
             data = await self._make_request("GET", f"{self.API_BASE}/node-types/")
 
@@ -294,7 +294,7 @@ class E2ENetworksProvider(BaseProvider):
                 }
                 for node in (nodes if isinstance(nodes, list) else [])
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -347,7 +347,7 @@ class E2ENetworksProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -362,7 +362,7 @@ class E2ENetworksProvider(BaseProvider):
         """List all available node plans/configurations."""
         try:
             data = await self._make_request("GET", f"{self.API_BASE}/plans/")
-        except Exception:
+        except Exception:  # noqa: BLE001
             data = await self._make_request("GET", f"{self.API_BASE}/node-types/")
         return data if isinstance(data, list) else data.get("data", data.get("results", []))
 

@@ -72,7 +72,7 @@ class CacheManager:
                 value = entry.value
                 try:
                     return json.loads(value) if isinstance(value, str) else value
-                except Exception:
+                except Exception:  # noqa: BLE001
                     return value
             return None
         else:

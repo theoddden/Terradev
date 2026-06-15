@@ -133,7 +133,7 @@ class SessionManager:
                 await self.cleanup_expired_sessions()
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Background cleanup error: {e}")
 
     async def close_all(self):

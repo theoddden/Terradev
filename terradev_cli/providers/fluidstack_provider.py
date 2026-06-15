@@ -117,7 +117,7 @@ class FluidStackProvider(BaseProvider):
             live = await self._get_live_configurations(gpu_type)
             if live:
                 return live
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"FluidStack API error: {e}")
 
         # Static fallback
@@ -203,7 +203,7 @@ class FluidStackProvider(BaseProvider):
                 keys = await self._make_request("GET", f"{self.API_BASE}/ssh_keys")
                 if isinstance(keys, list) and keys:
                     ssh_key_name = keys[0].get("name", "")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         body: Dict[str, Any] = {
@@ -290,7 +290,7 @@ class FluidStackProvider(BaseProvider):
                 }
                 for inst in (data if isinstance(data, list) else [])
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -350,7 +350,7 @@ class FluidStackProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,

@@ -110,7 +110,7 @@ class ParallelProvisioner:
                 error=None,
                 elapsed_ms=round(elapsed, 1),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             elapsed = (time.monotonic() - t0) * 1000
             return ProvisionResult(
                 provider=provider_name,

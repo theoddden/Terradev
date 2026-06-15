@@ -199,7 +199,7 @@ class AgenticProvisioner:
                 self.provisioner.provision_parallel(reasoning_allocs) if reasoning_allocs else asyncio.coroutine(lambda: ("", []))(),
                 self.provisioner.provision_parallel(decode_allocs) if decode_allocs else asyncio.coroutine(lambda: ("", []))(),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             errors.append(f"GPU tier provisioning failed: {e}")
             r_results, d_results = [], []
 
@@ -303,7 +303,7 @@ class AgenticProvisioner:
                 },
                 "bandwidth_gbps": spec.networking.bandwidth_gbps,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"success": False, "error": str(e)}
 
     def _dry_run_result(

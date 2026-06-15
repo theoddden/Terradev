@@ -242,7 +242,7 @@ class EvaluationOrchestrator:
                     ) as resp:
                         await resp.text()
                         return (time.time() - start) * 1000  # Convert to ms
-                except Exception:
+                except Exception:  # noqa: BLE001
                     return 1000.0  # Fallback latency
 
         # Run synchronously for lightweight version
@@ -308,7 +308,7 @@ class EvaluationOrchestrator:
                         timeout=aiohttp.ClientTimeout(total=5),
                     ) as resp:
                         return resp.status < 500
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # Try the main endpoint if health endpoint fails
                 try:
                     async with aiohttp.ClientSession() as session:
@@ -316,7 +316,7 @@ class EvaluationOrchestrator:
                             endpoint_url, timeout=aiohttp.ClientTimeout(total=5)
                         ) as resp:
                             return resp.status < 500
-                except Exception:
+                except Exception:  # noqa: BLE001
                     return False
 
         loop = None
@@ -378,7 +378,7 @@ class EvaluationOrchestrator:
 
                 return comparison
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to load baseline from {baseline_path}: {e}")
 
         return {"error": "Baseline comparison failed"}

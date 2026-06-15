@@ -59,13 +59,13 @@ class AuthManager:
                             decrypted[key] = auth_manager.fernet.decrypt(
                                 value.encode()
                             ).decode()
-                        except Exception:
+                        except Exception:  # noqa: BLE001
                             decrypted[key] = value
                     auth_manager.credentials[provider] = decrypted
                 else:
                     auth_manager.credentials[provider] = cred_data
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error loading auth file: {e}")
             auth_manager._create_new_auth_file(auth_file_path, key_file_path)
 
@@ -247,7 +247,7 @@ class AuthManager:
 
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error creating backup: {e}")
             return False
 
@@ -276,14 +276,14 @@ class AuthManager:
                 for key, value in cred_data.items():
                     try:
                         decrypted[key] = self.fernet.decrypt(value.encode()).decode()
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         decrypted[key] = value
                 decrypted_credentials[provider] = decrypted
 
             self.credentials = decrypted_credentials
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error restoring backup: {e}")
             return False
 

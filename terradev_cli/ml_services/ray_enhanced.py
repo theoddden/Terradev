@@ -215,7 +215,7 @@ class EnhancedRayService:
                 "status": "failed",
                 "error": "Ray not installed. Run: pip install ray[default]",
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def start_cluster(
@@ -262,7 +262,7 @@ class EnhancedRayService:
                     raise RuntimeError(f"Failed to start worker: {result.stderr}")
             else:
                 raise ValueError("Must specify head_node=True or workers > 0")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def stop_cluster(self) -> Dict[str, Any]:
@@ -275,7 +275,7 @@ class EnhancedRayService:
                 "status": "stopped" if result.returncode == 0 else "failed",
                 "output": result.stdout,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_ray_dashboard_url(self) -> Optional[str]:
@@ -697,7 +697,7 @@ print(f"  KV Connector: {kv["type"]}")
                 "prometheus_config": prom_config,
                 "grafana_dashboard": grafana_config,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def get_monitoring_status(self) -> Dict[str, Any]:
@@ -742,7 +742,7 @@ print(f"  KV Connector: {kv["type"]}")
                     "monitoring": {"prometheus": False, "grafana": False},
                     "metrics": {},
                 }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "ray": {"status": "error", "error": str(e)},
                 "monitoring": {"prometheus": False, "grafana": False},
@@ -962,7 +962,7 @@ applications:
                 ["ray", "--version"], capture_output=True, text=True, timeout=5
             )
             return result.stdout.strip() if result.returncode == 0 else "unknown"
-        except Exception:
+        except Exception:  # noqa: BLE001
             return "unknown"
 
     def _parse_ray_status(self, output: str) -> Dict[str, Any]:

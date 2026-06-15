@@ -150,7 +150,7 @@ class MLflowService:
                 "experiments_count": len(data.get("experiments", [])),
                 "registry_uri": self.config.registry_uri,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def list_experiments(self) -> List[Dict[str, Any]]:
@@ -459,7 +459,7 @@ class MLflowService:
                             "value": value,
                         },
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.warning("Failed to set model version tag %s: %s", key, e)
 
         return {
@@ -497,7 +497,7 @@ class MLflowService:
                 ).fetchone()
             conn.close()
             return row[0] if row and row[0] else None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug("Failed to read cumulative spend: %s", e)
             return None
 
@@ -548,7 +548,7 @@ class MLflowService:
             else:
                 raise ValueError(f"Unsupported format: {format}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to export experiment data: {e}")
 
 

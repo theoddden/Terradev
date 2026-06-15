@@ -439,7 +439,7 @@ class DriftRetrainService:
                             ):
                                 correct += 1
                             total += 1
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.debug(f"Eval sample failed: {e}")
                     total += 1
 
@@ -631,7 +631,7 @@ class DriftRetrainService:
         try:
             with open(self._manifest_path(), "w") as f:
                 json.dump(self.manifest.to_dict(), f, indent=2)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Failed to save manifest: {e}")
 
     # ── Adapter-Specific Drift Detection (for LoRA Versioning) ───────────
@@ -696,6 +696,6 @@ class DriftRetrainService:
             try:
                 with open(path) as f:
                     results.append(json.load(f))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         return results

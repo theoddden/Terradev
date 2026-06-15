@@ -80,7 +80,7 @@ class HyperstackProvider(BaseProvider):
             live = await self._get_live_flavors(gpu_type)
             if live:
                 return live
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         # Static fallback
@@ -239,7 +239,7 @@ class HyperstackProvider(BaseProvider):
                 }
                 for vm in vms
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -294,7 +294,7 @@ class HyperstackProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,

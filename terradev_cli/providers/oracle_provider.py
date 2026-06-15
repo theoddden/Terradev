@@ -69,7 +69,7 @@ class OracleProvider(BaseProvider):
                 live = await self._get_live_shapes(gpu_type, region)
                 if live:
                     return live
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         info = self.GPU_SHAPES.get(gpu_type)
@@ -227,7 +227,7 @@ class OracleProvider(BaseProvider):
                 for i in items
                 if i.get("lifecycleState") != "TERMINATED"
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -261,7 +261,7 @@ class OracleProvider(BaseProvider):
                 "job_id": cmd_id,
                 "async": async_exec,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,

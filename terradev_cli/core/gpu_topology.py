@@ -329,7 +329,7 @@ class NUMADetector:
             for line in result.stdout.splitlines():
                 if "NUMA node(s):" in line:
                     return int(line.split(":")[1].strip())
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         return 1
 
@@ -340,7 +340,7 @@ class NUMADetector:
         try:
             val = int(numa_path.read_text().strip())
             return val if val >= 0 else 0
-        except Exception:
+        except Exception:  # noqa: BLE001
             return 0
 
     @staticmethod
@@ -357,7 +357,7 @@ class NUMADetector:
                 else:
                     cpus.append(int(part))
             return cpus
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
 
@@ -379,7 +379,7 @@ class PCIeTopologyDetector:
             for part in parts:
                 if part.startswith("pci"):
                     return part
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         return f"pci_unknown_{pci_bus_id[:7]}"
 
@@ -393,7 +393,7 @@ class PCIeTopologyDetector:
             for i, part in enumerate(parts):
                 if part == pci_bus_id and i >= 2:
                     return parts[i - 1]
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         return f"sw_unknown_{pci_bus_id[:7]}"
 
@@ -450,7 +450,7 @@ class PCIeTopologyDetector:
                 gpus.append(gpu)
         except FileNotFoundError:
             logger.debug("nvidia-smi not found")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"GPU detection failed: {e}")
         return gpus
 
@@ -522,7 +522,7 @@ class SRIOVManager:
                     driver=driver,
                 )
                 nics.append(nic)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug(f"Skipping interface {iface.name}: {e}")
                 continue
 
@@ -544,7 +544,7 @@ class SRIOVManager:
                 f"Permission denied creating VFs on {nic_name} (requires root)"
             )
             return False
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to create VFs on {nic_name}: {e}")
             return False
 
@@ -621,7 +621,7 @@ class RDMAConfigurator:
             if rdma_path.exists():
                 for dev in rdma_path.iterdir():
                     devices.append({"ifname": dev.name, "port": 1, "state": "ACTIVE"})
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"RDMA detection failed: {e}")
         return devices
 
@@ -633,7 +633,7 @@ class RDMAConfigurator:
                 ["lsmod"], capture_output=True, text=True, timeout=5
             )
             return "nvidia_peermem" in result.stdout
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
     @staticmethod
@@ -798,7 +798,7 @@ class TopologyManagerConfigurator:
             else:
                 logger.error(f"Failed to patch kubelet-config: {result.stderr}")
                 return False
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to apply topology config: {e}")
             return False
 

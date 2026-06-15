@@ -37,7 +37,7 @@ class BasetenProvider(BaseProvider):
                 live = await self._get_live_pricing(gpu_type)
                 if live:
                     return live
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         info = self.GPU_PRICING.get(gpu_type)
@@ -190,7 +190,7 @@ class BasetenProvider(BaseProvider):
                     }
                 )
             return instances
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(

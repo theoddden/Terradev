@@ -47,7 +47,7 @@ class GCPProvider(BaseProvider):
                 self.accelerator_client = compute_v1.AcceleratorTypesClient()
                 self.reservation_client = compute_v1.ReservationsClient()
             self.client = True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"GCP client init deferred (BYOAPI): {e}")
             self.instances_client = None
             self.accelerator_client = None
@@ -215,7 +215,7 @@ class GCPProvider(BaseProvider):
                     gpu_type, region
                 )
                 quotes.extend(preemptible_quotes)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass  # Fall back to static pricing
 
         return sorted(quotes, key=lambda q: q["price_per_hour"])
@@ -306,8 +306,8 @@ class GCPProvider(BaseProvider):
                 "provider": "gcp",
                 "metadata": {"project": self.project_id, "zone": zone},
             }
-        except Exception as e:
-            raise Exception(f"GCP provision failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"GCP provision failed: {e}") from e
 
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         if not self.instances_client or not self.project_id:
@@ -327,8 +327,8 @@ class GCPProvider(BaseProvider):
                 "region": self.zone.rsplit("-", 1)[0],
                 "provider": "gcp",
             }
-        except Exception as e:
-            raise Exception(f"GCP status failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"GCP status failed: {e}") from e
 
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.instances_client or not self.project_id:
@@ -395,7 +395,7 @@ class GCPProvider(BaseProvider):
                     }
                 )
             return instances
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -499,7 +499,7 @@ class GCPProvider(BaseProvider):
                         "stderr": result.stderr,
                         "async": False,
                     }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             return {
                 "instance_id": instance_id,
@@ -508,7 +508,7 @@ class GCPProvider(BaseProvider):
                 "output": "GCP exec failed: gcloud CLI not found and SSH fallback failed",
                 "async": async_exec,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -560,7 +560,7 @@ class GCPProvider(BaseProvider):
                         ),
                     )
                     available_zones.append(zone)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     continue  # Zone doesn't have this GPU type
 
             if not available_zones:
@@ -581,7 +581,7 @@ class GCPProvider(BaseProvider):
                 "zone_count": len(available_zones),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Zone availability check failed: {e}")
             return {"status": "error", "reason": str(e)}
 
@@ -660,7 +660,7 @@ class GCPProvider(BaseProvider):
 
             config = accelerator_configs.get(gpu_type)
             if not config:
-                raise Exception(f"No accelerator config for {gpu_type}")
+                raise RuntimeError(f"No accelerator config for {gpu_type}")
 
             # Create reservation
             reservation = compute_v1.Reservation(
@@ -701,5 +701,5 @@ class GCPProvider(BaseProvider):
                 "estimated_ready_minutes": 15,
             }
 
-        except Exception as e:
-            raise Exception(f"Failed to create capacity reservation: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Failed to create capacity reservation: {e}") from e

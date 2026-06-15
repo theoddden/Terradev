@@ -249,7 +249,7 @@ def submit_metrics_sync(
             }
     except urllib.error.HTTPError as e:
         return {"success": False, "error": f"HTTP {e.code}: {e.read().decode()[:300]}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -279,7 +279,7 @@ async def submit_metrics_async(
                     "success": False,
                     "error": f"HTTP {r.status}: {(await r.text())[:300]}",
                 }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -325,7 +325,7 @@ def send_event_sync(
             return {"success": True, "status_code": resp.status}
     except urllib.error.HTTPError as e:
         return {"success": False, "error": f"HTTP {e.code}: {e.read().decode()[:300]}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -355,7 +355,7 @@ async def send_event_async(
                     "success": False,
                     "error": f"HTTP {r.status}: {(await r.text())[:300]}",
                 }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -478,7 +478,7 @@ async def create_monitor(
                     "success": False,
                     "error": f"HTTP {r.status}: {json.dumps(body)[:500]}",
                 }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -503,7 +503,7 @@ def _create_monitor_sync(creds: Dict[str, str], monitor: Dict) -> Dict[str, Any]
             }
     except urllib.error.HTTPError as e:
         return {"success": False, "error": f"HTTP {e.code}: {e.read().decode()[:300]}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -546,7 +546,7 @@ async def list_monitors(creds: Dict[str, str]) -> Dict[str, Any]:
                     ]
                     return {"success": True, "count": len(mons), "monitors": mons}
                 return {"success": False, "error": f"HTTP {r.status}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -566,7 +566,7 @@ async def delete_monitor(creds: Dict[str, str], monitor_id: int) -> Dict[str, An
                 if r.status < 300:
                     return {"success": True, "deleted": monitor_id}
                 return {"success": False, "error": f"HTTP {r.status}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -768,7 +768,7 @@ async def create_dashboard(
                     "success": False,
                     "error": f"HTTP {r.status}: {json.dumps(body)[:500]}",
                 }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -794,7 +794,7 @@ def _create_dashboard_sync(creds: Dict[str, str], dashboard: Dict) -> Dict[str, 
             }
     except urllib.error.HTTPError as e:
         return {"success": False, "error": f"HTTP {e.code}: {e.read().decode()[:300]}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -828,7 +828,7 @@ async def list_dashboards(creds: Dict[str, str]) -> Dict[str, Any]:
                         ],
                     }
                 return {"success": False, "error": f"HTTP {r.status}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -861,7 +861,7 @@ async def query_metrics(
                         "data": body,
                     }
                 return {"success": False, "error": f"HTTP {r.status}"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"success": False, "error": str(e)}
 
 
@@ -1009,7 +1009,7 @@ async def push_cost_snapshot(creds: Dict[str, str]) -> Dict[str, Any]:
                     },
                 }
             )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # Price intelligence data
@@ -1036,7 +1036,7 @@ async def push_cost_snapshot(creds: Dict[str, str]) -> Dict[str, Any]:
                         "tags": {"provider": prov},
                     }
                 )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     if not metrics:

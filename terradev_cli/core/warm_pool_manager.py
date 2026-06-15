@@ -374,7 +374,7 @@ class WarmPoolManager:
             try:
                 await self._manage_warming()
                 await asyncio.sleep(30)  # Check every 30 seconds
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Warming manager error: {e}")
                 await asyncio.sleep(60)
 
@@ -384,7 +384,7 @@ class WarmPoolManager:
             try:
                 await self._manage_eviction()
                 await asyncio.sleep(60)  # Check every minute
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Eviction manager error: {e}")
                 await asyncio.sleep(60)
 
@@ -568,7 +568,7 @@ class WarmPoolManager:
                 with open(self.metrics_file, "r") as f:
                     data = json.load(f)
                     self.metrics = WarmPoolMetrics(**data)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to load warm pool metrics: {e}")
 
     def _save_metrics(self):
@@ -602,7 +602,7 @@ class WarmPoolManager:
                         model_id: [datetime.fromisoformat(ts) for ts in timestamps]
                         for model_id, timestamps in data.items()
                     }
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to load traffic history: {e}")
                 self.model_traffic = {}
 
@@ -626,7 +626,7 @@ class WarmPoolManager:
                     self.model_graph_scores = data.get("model_graph_scores", {})
                     self.endpoint_numa_scores = data.get("endpoint_numa_scores", {})
                     self.cuda_graph_models = set(data.get("cuda_graph_models", []))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to load CUDA Graph metrics: {e}")
                 self.model_graph_scores = {}
                 self.endpoint_numa_scores = {}
@@ -661,7 +661,7 @@ class WarmPoolManager:
                 await asyncio.sleep(300)  # Run every 5 minutes
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"CUDA Graph optimizer error: {e}")
                 await asyncio.sleep(60)  # Wait before retrying
 
@@ -1021,7 +1021,7 @@ class WarmPoolManager:
 
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Adapter warming manager error: {e}")
 
     def _load_adapter_metrics(self):
@@ -1047,7 +1047,7 @@ class WarmPoolManager:
                         }
                         for k, v in data.get("adapter_load_times", {}).items()
                     }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Failed to load adapter metrics: {e}")
 
     def _save_adapter_metrics(self):
@@ -1071,7 +1071,7 @@ class WarmPoolManager:
             }
             with open(self.adapter_metrics_file, "w") as f:
                 json.dump(data, f, indent=2)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Failed to save adapter metrics: {e}")
 
     def _get_optimization_potential(self, graph_score: float) -> str:

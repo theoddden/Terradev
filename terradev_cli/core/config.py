@@ -87,7 +87,7 @@ class TerradevConfig:
                 analytics_settings=data.get("analytics_settings", {}),
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error loading config: {e}")
             return cls._create_default()
 

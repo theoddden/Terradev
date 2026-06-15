@@ -130,7 +130,7 @@ class S3Storage:
         try:
             self._s3.head_object(Bucket=self.bucket, Key=self._key(remote_path))
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
     def delete(self, remote_path: str) -> bool:
@@ -249,7 +249,7 @@ def _run_on(
         try:
             r = subprocess.run(ssh, capture_output=True, text=True, timeout=timeout)
             return r.returncode, r.stdout.strip(), r.stderr.strip()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return -1, "", str(e)
     # SECURITY: shell=True is used but command is validated above
     try:
@@ -257,7 +257,7 @@ def _run_on(
             cmd, shell=True, capture_output=True, text=True, timeout=timeout
         )
         return r.returncode, r.stdout.strip(), r.stderr.strip()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return -1, "", str(e)
 
 
@@ -293,7 +293,7 @@ def _write_shard(ctx: Dict[str, Any]) -> ShardInfo:
             shard.size_bytes = os.path.getsize(dest_path)
             shard.sha256 = _compute_sha256(dest_path)
             shard.status = "written"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             shard.status = "failed"
             logger.error(f"Shard write rank {rank}: {e}")
     else:
@@ -318,7 +318,7 @@ def _write_shard(ctx: Dict[str, Any]) -> ShardInfo:
                 shard.status = "written"
             else:
                 shard.status = "failed"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             shard.status = "failed"
             logger.error(f"Remote shard write rank {rank}@{node}: {e}")
 
@@ -447,7 +447,7 @@ class CheckpointManager:
         if self.state_manager:
             try:
                 self.state_manager.create_checkpoint(job_id, step, dest_dir)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         # DAG: parallel shard writes → manifest → commit
@@ -498,7 +498,7 @@ class CheckpointManager:
             if self.state_manager:
                 try:
                     self.state_manager.fail_checkpoint(ckpt_id)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
             raise RuntimeError(f"Checkpoint save failed: {result.errors}")
 
@@ -524,7 +524,7 @@ class CheckpointManager:
                 self.state_manager.commit_checkpoint(ckpt_id)
                 self.state_manager.set_job_checkpoint(job_id, ckpt_id)
                 self.state_manager.delete_old_checkpoints(job_id, keep=self.retention)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         return manifest
@@ -590,7 +590,7 @@ class CheckpointManager:
                 return [
                     c.to_dict() for c in self.state_manager.list_checkpoints(job_id)
                 ]
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         job_dir = os.path.join(self.base_dir, job_id)
@@ -608,7 +608,7 @@ class CheckpointManager:
         if self.state_manager:
             try:
                 self.state_manager.promote_checkpoint(checkpoint_id)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         if dest_path:
@@ -638,7 +638,7 @@ class CheckpointManager:
                 if self.state_manager:
                     try:
                         self.state_manager.fail_checkpoint(checkpoint_id)
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         pass
                 return
 
@@ -654,7 +654,7 @@ class CheckpointManager:
                     mp = os.path.join(ckpt.path, "manifest.json")
                     if os.path.exists(mp):
                         return mp
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         if step is not None:
@@ -672,7 +672,7 @@ class CheckpointManager:
                     mp = os.path.join(ckpt.path, "manifest.json")
                     if os.path.exists(mp):
                         return mp
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         job_dir = os.path.join(self.base_dir, job_id)

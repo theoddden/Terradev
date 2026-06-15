@@ -487,7 +487,7 @@ class InferenceRouter:
                 topology_report=self._topology_report,
             )
             logger.info("Semantic router initialized (NUMA-aware routing active)")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Semantic router init skipped: {e}")
             self._semantic_router = None
 
@@ -521,7 +521,7 @@ class InferenceRouter:
                         kv_transfer_endpoint=ep_data.get("kv_transfer_endpoint"),
                     )
                     self.endpoints[ep.endpoint_id] = ep
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
     def _save_endpoints(self):
@@ -682,7 +682,7 @@ class InferenceRouter:
                     status_code=resp.status,
                     healthy=healthy,
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             latency_ms = (time.monotonic() - start) * 1000
             return HealthProbe(
                 endpoint_id=endpoint_id,
@@ -799,7 +799,7 @@ class InferenceRouter:
             try:
                 with open(log_file, "r") as f:
                     existing = json.load(f)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         existing.extend(events)
         with open(log_file, "w") as f:
@@ -834,7 +834,7 @@ class InferenceRouter:
                     t = float(line.split("time=")[1].split()[0])
                     latencies.append(t)
             return sum(latencies) / len(latencies) if latencies else None
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     async def measure_latency_wpt(
@@ -881,7 +881,7 @@ class InferenceRouter:
                                 )
                                 return float(ttfb) if ttfb is not None else None
                     return None
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return None
 
         # Fallback: direct HTTP TTFB probe
@@ -893,7 +893,7 @@ class InferenceRouter:
                 async with session.get(url) as resp:
                     ttfb_ms = (time.monotonic() - start) * 1000
                     return ttfb_ms
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     def get_best_endpoint(

@@ -89,7 +89,7 @@ class RayService:
                 "status": "failed",
                 "error": "Ray command timed out. Check if Ray is properly installed.",
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Unexpected error: {str(e)}"}
 
     async def get_cluster_status(self) -> Dict[str, Any]:
@@ -118,14 +118,14 @@ class RayService:
 
                     if nodes_result.returncode == 0:
                         status_info["memory_info"] = nodes_result.stdout.strip()
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
 
                 return status_info
             else:
                 raise Exception(f"Failed to get cluster status: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get cluster status: {e}")
 
     async def list_nodes(self) -> List[Dict[str, Any]]:
@@ -155,7 +155,7 @@ class RayService:
             else:
                 return []
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to list nodes: {e}")
 
     async def submit_job(
@@ -186,7 +186,7 @@ class RayService:
             else:
                 raise Exception(f"Failed to submit job: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to submit job: {e}")
 
     async def list_jobs(self) -> List[Dict[str, Any]]:
@@ -210,7 +210,7 @@ class RayService:
             else:
                 return []
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to list jobs: {e}")
 
     async def get_dashboard_url(self) -> Optional[str]:
@@ -237,7 +237,7 @@ class RayService:
 
             return None
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get dashboard URL: {e}")
 
     async def start_cluster(
@@ -283,7 +283,7 @@ class RayService:
             else:
                 raise Exception("Must specify either head_node=True or workers > 0")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to start cluster: {e}")
 
     async def stop_cluster(self) -> Dict[str, Any]:
@@ -298,7 +298,7 @@ class RayService:
             else:
                 raise Exception(f"Failed to stop cluster: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to stop cluster: {e}")
 
     async def get_cluster_resources(self) -> Dict[str, Any]:
@@ -329,14 +329,14 @@ class RayService:
 
                     if detailed_result.returncode == 0:
                         resources["details"] = detailed_result.stdout.strip()
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
 
                 return resources
             else:
                 raise Exception(f"Failed to get cluster resources: {result.stderr}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise Exception(f"Failed to get cluster resources: {e}")
 
     def get_ray_config(self) -> Dict[str, str]:

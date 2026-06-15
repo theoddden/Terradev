@@ -228,7 +228,7 @@ class AutoOptimizer:
                     results["failed_optimizations"].append(optimization)
                     results["errors"].append(result.get("error", "Unknown error"))
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Failed to apply optimization {optimization}: {str(e)}")
                 results["failed_optimizations"].append(optimization)
                 results["errors"].append(str(e))
@@ -286,7 +286,7 @@ class AutoOptimizer:
                 # Wait before next check
                 await asyncio.sleep(60)  # Check every minute
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(
                     f"Error in monitoring loop for deployment {deployment_id}: {str(e)}"
                 )
@@ -382,7 +382,7 @@ class AutoOptimizer:
                     "error": f"CUCo optimization not applicable: {result.reasoning}",
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"success": False, "error": str(e)}
 
     async def _apply_warm_pool_optimization(self, deployment_id: str) -> Dict[str, Any]:
@@ -402,7 +402,7 @@ class AutoOptimizer:
             else:
                 return {"success": False, "error": "Failed to configure warm pool"}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"success": False, "error": str(e)}
 
     async def _apply_semantic_routing(self, deployment_id: str) -> Dict[str, Any]:
@@ -425,7 +425,7 @@ class AutoOptimizer:
                     "error": "Failed to configure semantic routing",
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"success": False, "error": str(e)}
 
     async def _apply_auto_scaling(self, deployment_id: str) -> Dict[str, Any]:
@@ -445,7 +445,7 @@ class AutoOptimizer:
             else:
                 return {"success": False, "error": "Failed to configure auto-scaling"}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"success": False, "error": str(e)}
 
     def _calculate_confidence_score(
@@ -641,7 +641,7 @@ class AutoOptimizer:
                 )
                 return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error deploying CUCo kernels: {str(e)}")
             return False
 
@@ -674,7 +674,7 @@ class AutoOptimizer:
 
         except subprocess.TimeoutExpired:
             return {"success": False, "error": "Compilation timeout"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"success": False, "error": str(e)}
 
     async def _update_deployment_config(

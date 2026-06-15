@@ -166,7 +166,7 @@ class InferenceSpotManager:
             )
             if result.returncode == 0:
                 return True
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         # GCP preempted
@@ -186,7 +186,7 @@ class InferenceSpotManager:
             )
             if result.returncode == 0 and result.stdout.strip() == "TRUE":
                 return True
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         # Azure scheduled events
@@ -206,7 +206,7 @@ class InferenceSpotManager:
             )
             if result.returncode == 0 and "Preempt" in result.stdout:
                 return True
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         return False
@@ -248,7 +248,7 @@ class InferenceSpotManager:
             if self.config.auto_reprovision:
                 await self._trigger_reprovision()
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to handle spot termination: {e}")
             self.active_state.state = "failed"
 
@@ -267,7 +267,7 @@ class InferenceSpotManager:
                         logger.info("vLLM sleep mode triggered successfully")
                     else:
                         logger.warning(f"vLLM sleep mode failed: {resp.status}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to trigger vLLM sleep mode: {e}")
 
     async def _snapshot_kv_cache(self) -> Optional[KVCacheCheckpoint]:
@@ -294,7 +294,7 @@ class InferenceSpotManager:
             logger.info(f"KV cache checkpoint saved: {checkpoint.checkpoint_id}")
             return checkpoint
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to snapshot KV cache: {e}")
             return None
 
@@ -317,7 +317,7 @@ class InferenceSpotManager:
 
             return None
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to snapshot model state: {e}")
             return None
 
@@ -349,7 +349,7 @@ class InferenceSpotManager:
             # In production, this would call:
             # api.provision(..., restore_from_checkpoint=self.active_state.checkpoint_id)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to trigger re-provisioning: {e}")
 
     async def restore_checkpoint(self, checkpoint_id: str) -> bool:
@@ -371,7 +371,7 @@ class InferenceSpotManager:
             logger.info(f"Inference checkpoint restored: {checkpoint_id}")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to restore checkpoint: {e}")
             return False
 
@@ -391,7 +391,7 @@ class InferenceSpotManager:
 
             logger.info(f"KV cache restored to {nvme_kv_path}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to restore KV cache: {e}")
 
     async def _trigger_vllm_wake_mode(self):
@@ -407,7 +407,7 @@ class InferenceSpotManager:
                         logger.info("vLLM wake mode triggered successfully")
                     else:
                         logger.warning(f"vLLM wake mode failed: {resp.status}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to trigger vLLM wake mode: {e}")
 
     async def _restore_model_state(self, checkpoint_id: str):
@@ -417,7 +417,7 @@ class InferenceSpotManager:
                 checkpoint_id, target_path="/mnt/nvme/adapters"
             )
             logger.info(f"Model state restored: {checkpoint_id}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to restore model state: {e}")
 
     async def _replay_in_flight_requests(self, checkpoint_id: str):
@@ -447,7 +447,7 @@ class InferenceSpotManager:
             )
             if result.returncode == 0:
                 return result.stdout.strip()
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         return "unknown"

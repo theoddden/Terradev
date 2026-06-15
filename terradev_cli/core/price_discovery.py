@@ -127,7 +127,7 @@ class PriceDiscoveryEngine:
 
             return list(latest_prices.values())
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error getting real price data: {e}")
             # Fallback to mock data if database is empty
             return await self._get_fallback_prices(gpu_type, region)
@@ -238,7 +238,7 @@ class PriceDiscoveryEngine:
 
             return "Unknown"
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Error checking capacity: {e}")
             return "Unknown"
 
@@ -276,7 +276,7 @@ class PriceDiscoveryEngine:
 
             return confidence * age_factor
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error calculating confidence: {e}")
             return 0.5  # Default confidence
 
@@ -324,7 +324,7 @@ class PriceDiscoveryEngine:
 
             return trends
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error getting price trends: {e}")
             return {}
 
@@ -350,7 +350,7 @@ class PriceDiscoveryEngine:
 
             return hours_old > max_age_hours
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error checking staleness: {e}")
             return True  # Assume stale if we can't check
 

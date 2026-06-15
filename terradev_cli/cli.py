@@ -24,13 +24,13 @@ try:
     from terradev_cli.core.telemetry import get_mandatory_telemetry
 
     _telemetry = get_mandatory_telemetry()
-except Exception:
+except Exception:  # noqa: BLE001
     _telemetry = None
 
 # Import Kubernetes wrapper
 try:
     from terradev_cli.k8s.terraform_wrapper import TerraformWrapper
-except Exception:
+except Exception:  # noqa: BLE001
     TerraformWrapper = None
 
 # Import enterprise auth - OPTIONAL FOR ENTERPRISE TIERS
@@ -94,7 +94,7 @@ class TerradevAPI:
         if EnterpriseAuthManager:
             try:
                 self.enterprise_auth = EnterpriseAuthManager()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to initialize enterprise auth: {e}")
 
         # Initialize usage tracking
@@ -149,7 +149,7 @@ class TerradevAPI:
                     self.credentials = json.load(f)
             else:
                 self.credentials = {}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             import sys
 
             print(
@@ -173,7 +173,7 @@ class TerradevAPI:
                 os.chmod(self.credentials_file, 0o600)
             except OSError:
                 pass
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             import sys
 
             print(f"ERROR: Failed to save credentials: {e}", file=sys.stderr)
@@ -511,7 +511,7 @@ class TerradevAPI:
                     }
                 )
             return quotes
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def get_runpod_quotes(self, gpu_type: str):
@@ -1653,7 +1653,7 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
                             )
                 if local_quotes:
                     print(f"Included {len(local_quotes)} local GPU(s) from your pool")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"Warning: Could not load local pool: {e}")
 
     # ── Fetch quotes from all providers in parallel ──
@@ -1668,7 +1668,7 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             ("gcp", api.get_gcp_quotes),
             ("azure", api.get_azure_quotes),
             ("tensordock", api.get_tensordock_quotes),
-            ("lambda", api.get_lambda_quotes),
+            ("lambda_labs", api.get_lambda_quotes),
             ("coreweave", api.get_coreweave_quotes),
             ("oracle", api.get_oracle_quotes),
             ("crusoe", api.get_crusoe_quotes),
@@ -1761,7 +1761,7 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
         [
             "runpod",
             "vastai",
-            "lambda",
+            "lambda_labs",
             "tensordock",
             "crusoe",
             "baseten",
@@ -1820,7 +1820,7 @@ def setup(provider, quick):
             ],
             "env_vars": ["VAST_API_KEY"],
         },
-        "lambda": {
+        "lambda_labs": {
             "name": "Lambda Labs",
             "time": "5 minutes",
             "difficulty": "EASIEST",
@@ -1830,7 +1830,7 @@ def setup(provider, quick):
                 "Add payment: Dashboard → Billing → Add Card",
                 'Get API key: Dashboard → API Keys → "Generate API Key" (save immediately!)',
                 'Copy and run:\nexport LAMBDA_API_KEY="paste-your-key-here"\necho \'export LAMBDA_API_KEY="paste-your-key-here"\' >> ~/.bashrc\nsource ~/.bashrc',
-                "Test it:\nterradev quote --providers lambda --gpu a100",
+                "Test it:\nterradev quote --providers lambda_labs --gpu a100",
             ],
             "env_vars": ["LAMBDA_API_KEY"],
         },
@@ -2064,7 +2064,7 @@ def load_profiles(path, override):
     except ImportError as e:
         print(f"Error: {e}")
         print("Install PyYAML for YAML support: pip install pyyaml")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error loading profiles: {e}")
 
 
@@ -2559,7 +2559,7 @@ def provision(
 
         except ImportError as exc:
             print(f"  WARNING: KV planner unavailable ({exc}). Falling through to standard provision.")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             print(f"  ERROR in KV planner: {exc}")
             import traceback
             traceback.print_exc()
@@ -2681,7 +2681,7 @@ def provision(
                         f"Your local pool is registered. Use: terradev train --script train.py --pool {matching_local[0]['pool_name']}"
                     )
                     return
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"Warning: Could not load local pool: {e}")
         else:
             print(
@@ -2719,7 +2719,7 @@ def provision(
             "gcp": api.get_gcp_quotes,
             "azure": api.get_azure_quotes,
             "tensordock": api.get_tensordock_quotes,
-            "lambda": api.get_lambda_quotes,
+            "lambda_labs": api.get_lambda_quotes,
             "coreweave": api.get_coreweave_quotes,
             "oracle": api.get_oracle_quotes,
             "crusoe": api.get_crusoe_quotes,
@@ -2935,7 +2935,7 @@ def provision(
         from terradev_cli.core.cost_tracker import record_quotes
 
         record_quotes(all_quotes)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # ── Step 2: Build allocation plan (cheapest-spread across clouds) ──
@@ -2958,7 +2958,7 @@ def provision(
             for q in all_quotes
         ]
         record_price_ticks_batch(ticks)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     if max_price:
@@ -3038,7 +3038,7 @@ def provision(
 
         _ssh_priv_path, _provision_ssh_pubkey = generate_provision_keypair(group_id)
         print(f"   SSH keypair generated for {group_id} (Ed25519, encrypted at rest)")
-    except Exception as _ssh_err:
+    except Exception as _ssh_err:  # noqa: BLE001
         print(
             f"   Warning: SSH key generation failed ({_ssh_err})  manual --ssh-key needed for train"
         )
@@ -3069,7 +3069,7 @@ def provision(
                         return False, actual
                     # Exponential backoff
                     delay = min(delay * 1.5, max_delay)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     # Provider error, continue trying
                     delay = min(delay * 1.5, max_delay)
             return None, "timeout"
@@ -3118,7 +3118,7 @@ def provision(
                         "elapsed_ms": round(elapsed, 1),
                         "verify_task": verify_task,  # track for later if needed
                     }
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     elapsed = (time.monotonic() - t0) * 1000
                     return {
                         "status": "failed",
@@ -3162,7 +3162,7 @@ def provision(
                     _prov = _factory.create_provider(_pname, _creds)
                     await _prov.terminate_instance(r["instance_id"])
                     print(f"   [+] Terminated {r['instance_id']} on {r['provider']}")
-                except Exception as _e:
+                except Exception as _e:  # noqa: BLE001
                     print(
                         f"   [!] FAILED to terminate {r['instance_id']} on {r['provider']}: {_e}"
                     )
@@ -3220,7 +3220,7 @@ def provision(
                 response_ms=r.get("elapsed_ms"),
                 error=r.get("error", "")[:200],
             )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # Increment monthly provision counter for each successful provision
@@ -3241,7 +3241,7 @@ def provision(
                 spot=r["spot"],
                 parallel_group=group_id,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         # Local usage file
@@ -3287,7 +3287,7 @@ def provision(
                     "success": True,
                 },
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass  # Telemetry is best-effort
 
     api.save_usage()
@@ -3301,7 +3301,7 @@ def provision(
             ssh_path = _get_ssh_path(group_id)
             if ssh_path:
                 set_ssh_key_path(group_id, ssh_path)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     # Silent: governance audit log for every provision
@@ -3326,7 +3326,7 @@ def provision(
             }
             with open(gov._audit_file, "a") as af:
                 af.write(_json.dumps(entry) + "\n")
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # ── Step 5: Integration hooks (W&B + Prometheus) ──
@@ -3348,7 +3348,7 @@ def provision(
                     price_per_hour=r["price"],
                 )
                 push_metrics(api.credentials, payload)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # W&B: show env var injection status
@@ -3360,7 +3360,7 @@ def provision(
 
         if wandb_configured(api.credentials) and succeeded:
             wandb_injected = True
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # ── Step 6: Print results ──
@@ -3491,7 +3491,7 @@ def manage(instance_id, action):
                 from terradev_cli.core.cost_tracker import end_provision
 
                 end_provision(instance_id)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             # BYOAPI: Billing disabled - no GPU-hour reporting
             # Prometheus: push terminate metrics
@@ -3512,7 +3512,7 @@ def manage(instance_id, action):
                             duration = (
                                 _dt.now() - _dt.fromisoformat(created)
                             ).total_seconds()
-                        except Exception:
+                        except Exception:  # noqa: BLE001
                             pass
                     total_cost = instance.get("price", 0) * (duration / 3600)
                     payload = build_terminate_metrics(
@@ -3522,7 +3522,7 @@ def manage(instance_id, action):
                         duration_seconds=round(duration, 1),
                     )
                     push_metrics(api.credentials, payload)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             print(f"Terminated {instance_id}")
         elif action == "stop":
@@ -3555,14 +3555,14 @@ def manage(instance_id, action):
                         tmp_key = decrypt_private_key(group_id)
                         if tmp_key:
                             ssh_cmd += f" -i {tmp_key}"
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
                 print(f"   SSH: {ssh_cmd}")
             for k in ("gpu_utilization", "uptime"):
                 if result.get(k):
                     print(f"   {k}: {result[k]}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Warning  Provider API error: {e}")
         print("   (Action may still have succeeded  check provider dashboard)")
 
@@ -3629,7 +3629,7 @@ def status(format, live):
             print(f"   By provider: {', '.join(parts)}")
         if summary["egress_cost"] > 0:
             print(f"   Egress cost: ${summary['egress_cost']:.2f}")
-    except Exception:
+    except Exception:  # noqa: BLE001
         print(
             f"\nProvisions this month: {api.usage.get('provisions_this_month', 0)} (unlimited)"
         )
@@ -3668,13 +3668,13 @@ def status(format, live):
                     results[inst["id"]] = (
                         st.get("status", "?") if isinstance(st, dict) else "?"
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     results[inst["id"]] = "unknown"
             return results
 
         try:
             live_statuses = asyncio.run(_query_all())
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     print(
@@ -3777,7 +3777,7 @@ def stage(dataset, target_regions, compression, plan_only):
                 result["chunks"],
                 regions,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         # Silent: governance audit log for dataset staging
@@ -3799,7 +3799,7 @@ def stage(dataset, target_regions, compression, plan_only):
             }
             with open(gov._audit_file, "a") as af:
                 af.write(_json.dumps(entry) + "\n")
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     except ImportError:
@@ -3894,7 +3894,7 @@ def execute(instance_id, cmd, async_exec):
             if stderr:
                 print(f"Warning  Stderr:\n{stderr}")
             print(f"Exit code: {exit_code}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Warning  Execution error: {e}")
 
 
@@ -3958,10 +3958,10 @@ def analytics(days, format):
                         else "░"
                     )
                     print(f"   {row['date']}  ${row['cost']:>7.2f}  {bar}")
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # Fallback to local usage file
         api = TerradevAPI()
         total_cost = sum(
@@ -4025,13 +4025,13 @@ def optimize(instance_id, auto_apply):
                     if quotes:
                         quotes.sort(key=lambda q: q["price"])
                         all_q[gt] = quotes
-                except Exception:
+                except Exception:  # noqa: BLE001
                     # Handle individual GPU type failures gracefully
                     continue
             return all_q
 
         market = asyncio.run(_fetch())
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # Handle complete market fetch failure gracefully
         market = {}
         print(f"Warning: Could not fetch market data: {e}")
@@ -4086,7 +4086,7 @@ def optimize(instance_id, auto_apply):
                         }
                         all_optimizations.append(optimization)
                         recommendations.append(optimization)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     # Handle individual cost optimization failure
                     continue
 
@@ -4120,7 +4120,7 @@ def optimize(instance_id, auto_apply):
                     }
                     all_optimizations.append(optimization)
                     recommendations.append(optimization)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # Handle CUCo optimization failure
                 continue
 
@@ -4139,7 +4139,7 @@ def optimize(instance_id, auto_apply):
                     }
                     all_optimizations.append(optimization)
                     recommendations.append(optimization)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # Handle warm pool optimization failure
                 continue
 
@@ -4157,11 +4157,11 @@ def optimize(instance_id, auto_apply):
                     }
                     all_optimizations.append(optimization)
                     recommendations.append(optimization)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # Handle semantic routing optimization failure
                 continue
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Handle individual instance processing failure
             continue
 
@@ -4296,7 +4296,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
             dashboard = generate_grafana_dashboard_json()
             print(_json.dumps(dashboard, indent=2))
             print("\nImport this JSON into Grafana → Dashboards → Import")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error generating dashboard: {e}", file=sys.stderr)
             sys.exit(1)
         return
@@ -4307,7 +4307,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
 
             print("# Add this to your prometheus.yml under scrape_configs:")
             print(generate_scrape_config())
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error generating config: {e}")
         return
 
@@ -4322,7 +4322,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
                 print("W&B not configured. Run: terradev configure --provider wandb")
                 return
             print(generate_setup_script(api.credentials))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error generating script: {e}")
         return
 
@@ -4349,7 +4349,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
                 "   Setup:       terradev configure --provider wandb --api-key YOUR_KEY"
             )
             print("   Get key:     https://wandb.ai/settings → API Keys")
-    except Exception:
+    except Exception:  # noqa: BLE001
         print("\nWeights & Biases          Module not available")
 
     # Prometheus
@@ -4373,7 +4373,7 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
                 "   Setup:       terradev configure --provider prometheus --api-key PUSHGATEWAY_URL"
             )
             print("   Requires:    A running Prometheus Pushgateway")
-    except Exception:
+    except Exception:  # noqa: BLE001
         print("\nPrometheus                Module not available")
 
     # Existing infra hooks
@@ -4449,7 +4449,7 @@ def job(job_file, optimize):
         # This would integrate with the provision command
         print("OK: Job completed successfully!")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Error loading job file: {e}")
 
 
@@ -4461,7 +4461,7 @@ def job(job_file, optimize):
 @click.option(
     "--provider",
     "-p",
-    type=click.Choice(["runpod", "vastai", "lambda", "baseten"]),
+    type=click.Choice(["runpod", "vastai", "lambda_labs", "baseten"]),
     help="Provider preference",
 )
 @click.option("--gpu-type", "-g", help="GPU type preference")
@@ -4509,7 +4509,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
                             "region": q.get("region", ""),
                         }
                     )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         return all_q
 
@@ -4540,7 +4540,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
             for q in quotes
         ]
         record_price_ticks_batch(ticks)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     if not quotes:
@@ -4578,7 +4578,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
         endpoint_url = prov_result.get(
             "endpoint_url", f"https://{pname}.api/inference/{endpoint_id}"
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Warning  Provisioning error: {e}")
         endpoint_id = f"inf_{pname}_{int(time.time())}"
         endpoint_url = ""
@@ -4618,7 +4618,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
             price_per_hour=best_quote["price"],
         )
         print("SHIELD:  Registered for health monitoring & auto-failover")
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
 
@@ -4628,8 +4628,8 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
 @click.option(
     "--provider",
     "-p",
-    type=click.Choice(["runpod", "vastai", "lambda", "baseten"]),
-    help="Provider (runpod|vastai|lambda|baseten)",
+    type=click.Choice(["runpod", "vastai", "lambda_labs", "baseten"]),
+    help="Provider (runpod|vastai|lambda_labs|baseten)",
 )
 @click.option("--gpu-type", "-g", help="GPU type (A100|H100|RTX4090)")
 @click.option("--min-workers", type=int, default=1, help="Minimum workers")
@@ -4687,7 +4687,7 @@ def infer_deploy(
                             "region": q.get("region", "us-east-1"),
                             "instance_type": q.get("instance_type", ""),
                         }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         return best
 
@@ -4724,7 +4724,7 @@ def infer_deploy(
         endpoint_url = prov_result.get(
             "endpoint_url", f"https://{pname}.api/inference/{endpoint_id}"
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Deployment failed: {e}")
         return
 
@@ -4748,7 +4748,7 @@ def infer_deploy(
             workload_type="inference",
             source="infer_deploy",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # Save to usage tracking (reuse existing api instance)
@@ -4783,7 +4783,7 @@ def infer_deploy(
             price_per_hour=best["price"],
         )
         print("SHIELD:  Registered for health monitoring & auto-failover")
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
 
@@ -4910,7 +4910,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
             ("gcp", api.get_gcp_quotes),
             ("azure", api.get_azure_quotes),
             ("tensordock", api.get_tensordock_quotes),
-            ("lambda", api.get_lambda_quotes),
+            ("lambda_labs", api.get_lambda_quotes),
             ("coreweave", api.get_coreweave_quotes),
             ("oracle", api.get_oracle_quotes),
             ("crusoe", api.get_crusoe_quotes),
@@ -4947,7 +4947,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
             for q in all_quotes
         ]
         record_price_ticks_batch(ticks)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     all_quotes.sort(key=lambda q: q["price"])
@@ -4991,7 +4991,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
 
     try:
         prov_result, provider_obj, pname = asyncio.run(_provision())
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Provisioning failed: {e}")
         return
 
@@ -5028,7 +5028,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
             spot=best.get("availability") == "spot",
             parallel_group=inst_data["parallel_group"],
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # ── Step 3: Deploy Docker container ──
@@ -5054,7 +5054,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
             for k, v in wandb_env.items():
                 docker_cmd_parts.extend(["-e", f"{k}={v}"])
             print(f"   Status W&B env vars injected ({len(wandb_env)} vars)")
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     docker_cmd_parts.extend(["--name", f"terradev-{instance_id[:12]}"])
@@ -5090,7 +5090,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
         if stderr:
             print(f"Warning  Stderr:\n{stderr}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Warning  Container deployment error: {e}")
         print("   (Instance is still running  use 'terradev execute' to retry)")
         exit_code = 1
@@ -5127,11 +5127,11 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
                     from terradev_cli.core.cost_tracker import end_provision
 
                     end_provision(instance_id)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
                 # BYOAPI: Billing disabled - no termination billing
                 print("   OK: Terminated")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"   Warning  Auto-terminate failed: {e}")
                 print(f"    Manual: terradev manage -i {instance_id} -a terminate")
         else:
@@ -5218,7 +5218,7 @@ def infer_status(check):
                     print(
                         f"   {ev['timestamp']}  {ev['failed_provider']}/{ev['failed_endpoint'][:16]} → {ev['new_provider']}/{ev['new_primary'][:16]}"
                     )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
 
@@ -5937,7 +5937,7 @@ def smart_deploy(
                 print(f"OK: Deployment started: {result['deployment_id']}")
                 print(f"   Status: {result['status']}")
                 print(f"   Estimated ready: {result['estimated_ready_time']}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"ERROR: Deployment failed: {e}")
         else:
             # Show all recommendations
@@ -6204,7 +6204,7 @@ def helm_generate(
         print(f"   Chart README: {chart_path}/README.md")
         print("   Terradev docs: https://terradev.dev/docs")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Failed to generate Helm chart: {e}")
 
 
@@ -7796,7 +7796,7 @@ def up(
 
                 return result
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"ERROR: Error fixing drift: {e}")
                 return
 
@@ -7881,7 +7881,7 @@ def up(
             print(f"   Nodes: {len(nodes)}")
             print(f"   Fix drift: terradev up --job {job} --fix-drift")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"ERROR: Deployment failed: {e}")
 
     asyncio.run(_up())
@@ -7916,7 +7916,7 @@ def rollback(job_version, cache_dir):
             print(f"   Terminated: {result['terminated']} nodes")
             print(f"   Recreated: {result['recreated']} nodes")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"ERROR: Rollback failed: {e}")
             sys.exit(1)
 
@@ -7971,7 +7971,7 @@ def manifests(job, cache_dir, show_imported, show_recordings):
                             "created_at": manifest_data["created_at"],
                         }
                     )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 continue
 
         if imported_jobs:
@@ -8019,7 +8019,7 @@ def manifests(job, cache_dir, show_imported, show_recordings):
                         )
 
                         print(f"{name:<20} {status:<12} {started:<20} {stopped:<20}")
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         continue
             else:
                 print("   No recordings found")
@@ -8071,7 +8071,7 @@ def manifests(job, cache_dir, show_imported, show_recordings):
 
                     if manifest_data.get("metadata", {}).get("source") == "yaml-import":
                         imported_jobs.add(job_name)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     parts = file_path.stem.split(".")
                     if len(parts) >= 2:
                         jobs.add(parts[0])
@@ -8204,7 +8204,7 @@ def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret
             else:
                 print(f"ERROR: Failed to create space: {result['error']}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"ERROR: Deployment failed: {e}")
 
     asyncio.run(_hf_space())
@@ -8931,7 +8931,7 @@ def deploy(
                 f"Tip: Usage: curl -X POST {result['endpoint']} -H 'Authorization: Bearer YOUR_API_KEY'"
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Deployment failed: {e}")
     finally:
         asyncio.run(provider.close())
@@ -8968,7 +8968,7 @@ def inferx_status(model_id):
         print(f"PACKAGE: Models on GPU: {result.get('models_on_gpu', 0)}")
         print(f"ERROR: Error Rate: {result.get('error_rate', 0)}%")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to get status: {e}")
     finally:
         asyncio.run(provider.close())
@@ -9004,7 +9004,7 @@ def inferx_delete(model_id):
         else:
             print("ERROR: Failed to delete model")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to delete model: {e}")
     finally:
         asyncio.run(provider.close())
@@ -9047,7 +9047,7 @@ def inferx_list():
             print(f"   Created: {model.get('created_at', 'Unknown')}")
             print()
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to list models: {e}")
     finally:
         asyncio.run(provider.close())
@@ -9084,7 +9084,7 @@ def usage():
         print(f" Average Latency: {stats.get('average_latency', 0):.0f}ms")
         print(f" GPU Utilization: {stats.get('gpu_utilization', 0):.1f}%")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to get usage stats: {e}")
     finally:
         asyncio.run(provider.close())
@@ -9136,7 +9136,7 @@ def inferx_quote(gpu_type, region):
         for feature in quote["features"]:
             print(f"   OK: {feature.replace('_', ' ').title()}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to get quotes: {e}")
     finally:
         asyncio.run(provider.close())
@@ -9325,7 +9325,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
                         or inst["instance_id"]
                     )
                     results[inst["instance_id"]] = ip
-                except Exception:
+                except Exception:  # noqa: BLE001
                     # Fallback: use instance_id (some providers like RunPod
                     # use IDs that double as SSH hostnames)
                     results[inst["instance_id"]] = inst["instance_id"]
@@ -9341,7 +9341,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
             # Cache for next time
             try:
                 set_instance_ip(inst["instance_id"], ip)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
     if fmt != "json":
@@ -9358,7 +9358,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
                 print(
                     "  SSH key auto-resolved from provision group (ephemeral decrypt)"
                 )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass  # Fall back to manual --ssh-key
 
     return node_ips, resolved_ssh_key
@@ -9587,7 +9587,7 @@ def train(
                         )
                     else:
                         sys.exit(1)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"ERROR: Could not load local pool: {e}")
                 if overflow_to_cloud:
                     print(
@@ -10218,7 +10218,7 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
                     f"    cpu: \"{optimized.get('cpu_cores', 2) + 4}\"  # Extra headroom"
                 )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"ERROR: Error during auto-optimization: {e}")
 
     asyncio.run(run_optimization())
@@ -10294,7 +10294,7 @@ def vllm_analyze(endpoint, duration):
 
                 print(f" Analysis completed at {result.get('timestamp')}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"ERROR: Error during analysis: {e}")
 
     asyncio.run(run_analysis())
@@ -11119,7 +11119,7 @@ def peft_import_cmd(adapter_id, local_name, token, register, base_model, rank):
             print(f"  Version ID: {version.version_id}")
             print(f"  Adapter name: {version.adapter_name}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to import adapter: {e}")
 
 
@@ -11636,7 +11636,7 @@ def sso_configure(
         api.enterprise_auth.enable_sso_provider(provider, config)
         print(f"OK: {provider} SSO provider configured successfully")
         print("   Test the configuration with: terradev sso test")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to configure {provider}: {e}")
 
 
@@ -13445,7 +13445,7 @@ def migration(from_provider, to_provider, instance_id, workload, dry_run):
             print("    Restoring from checkpoint")
             print("    Validating migration success")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Migration planning failed: {e}")
         return 1
 
@@ -13498,7 +13498,7 @@ def list_workloads(provider, fmt):
                     f"   {w.job_id:<20} {w.name:<15} {w.provider:<12} {w.gpu_type:<8} {progress:<12} {size:<8}"
                 )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to list workloads: {e}")
         return 1
 
@@ -13627,7 +13627,7 @@ def evaluation(
             orchestrator.save_result(result, output)
             print(f"\n Results saved to {output}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Evaluation failed: {e}")
         return 1
 
@@ -13693,7 +13693,7 @@ def compare_models(model_a, model_b, dataset, metrics, output):
             output_file.write_text(json.dumps(comparison, indent=2))
             print(f"\n Comparison saved to {output}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Model comparison failed: {e}")
         return 1
 
@@ -13871,7 +13871,7 @@ def export(output, job, cache_dir, output_format):
                 f"   Provider: {manifest.nodes[0].provider if manifest.nodes else 'N/A'}"
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Export failed: {e}")
         return 1
 
@@ -13981,7 +13981,7 @@ def import_cmd(yaml_file, name, force, validate_only, cache_dir):
 
         print(f"Tip: Run 'terradev job {yaml_file}' to execute this pipeline")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Import failed: {e}")
         return 1
 
@@ -14023,7 +14023,7 @@ def record_start(name, output_dir):
             f"Tip: Run 'terradev record stop --name {name} --export pipeline.yaml' when done"
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to start recording: {e}")
         return 1
 
@@ -14106,7 +14106,7 @@ def record_stop(name, export, output_dir):
 
             print(f"UPLOAD: Exported recording as pipeline: {export}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to stop recording: {e}")
         return 1
 
@@ -14198,7 +14198,7 @@ def create_trigger(
         if condition:
             print(f"   Condition: {condition}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to create trigger: {e}")
         return 1
 
@@ -14226,7 +14226,7 @@ def list_triggers():
                 f"{trigger.target_environment.value:<12} {enabled:<8} {trigger.trigger_count:<6}"
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to list triggers: {e}")
         return 1
 
@@ -14247,7 +14247,7 @@ def enable_trigger(name):
         print(f"ERROR: Trigger '{name}' not found")
         return 1
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to enable trigger: {e}")
         return 1
 
@@ -14268,7 +14268,7 @@ def disable_trigger(name):
         print(f"ERROR: Trigger '{name}' not found")
         return 1
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to disable trigger: {e}")
         return 1
 
@@ -14293,7 +14293,7 @@ def fire_event(event_type, data, source):
         event_bus.publish(event)
         print(f" Fired event: {event_type}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to fire event: {e}")
         return 1
 
@@ -14337,7 +14337,7 @@ def list_environments(environment):
                 f"{artifact.version:<8} {created:<20}"
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to list environments: {e}")
         return 1
 
@@ -14383,7 +14383,7 @@ def promote_artifact(artifact_name, from_env, to_env, user):
         print(f"   Status: {promotion.status}")
         print(f"Tip: Use 'terradev environments approve {promotion.id}' to complete")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to request promotion: {e}")
         return 1
 
@@ -14404,7 +14404,7 @@ def approve_promotion(promotion_id, user):
             print(f"ERROR: Promotion not found or failed: {promotion_id}")
             return 1
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to approve promotion: {e}")
         return 1
 
@@ -14446,7 +14446,7 @@ def promotion_history(artifact):
                 f"{promo.to_env.value:<10} {promo.status:<12} {requested:<20}"
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to get promotion history: {e}")
         return 1
 
@@ -14517,7 +14517,7 @@ def register_artifact(type, name, uri, environment, artifact_hash, size, user, p
         print(f"   Environment: {environment}")
         print(f"   URI: {uri}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to register artifact: {e}")
         return 1
 
@@ -14550,7 +14550,7 @@ def lineage_graph(artifact_id, direction):
             for child in graph["children"]:
                 print(f"   {child.type.value} {child.name} ({child.environment.value})")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to get lineage: {e}")
         return 1
 
@@ -14585,7 +14585,7 @@ def production_artifacts(artifact_type):
                 f"{created:<20} {artifact.created_by:<15}"
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to get production artifacts: {e}")
         return 1
 
@@ -14663,7 +14663,7 @@ def show_model_lineage(model_identifier, environment):
                 for model_id in latest.output_models:
                     print(f"      {model_id[:12]}...")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to show lineage: {e}")
         return 1
 
@@ -14720,7 +14720,7 @@ def diff_lineage(version1, version2):
             for resource, values in diff["differences"]["resources"].items():
                 print(f"   {resource}: {values['exec1']} → {values['exec2']}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to diff lineage: {e}")
         return 1
 
@@ -14755,7 +14755,7 @@ def export_lineage(format, model, environment, output):
         else:
             print(data)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to export lineage: {e}")
         return 1
 
@@ -14852,7 +14852,7 @@ def trace_artifacts(checkpoint, execution):
             print("ERROR: Must specify either --checkpoint or --execution")
             return 1
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to trace artifacts: {e}")
         return 1
 
@@ -14891,7 +14891,7 @@ def start_auto_lineage(pipeline, environment, triggered_by):
         print(f"   terradev lineage add-output {execution.id} model <model-id>")
         print(f"   terradev lineage complete {execution.id}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to start lineage tracking: {e}")
         return 1
 
@@ -14914,7 +14914,7 @@ def add_input_artifact(execution_id, artifact_type, artifact_id):
         print(f"OK: Added input {artifact_type}: {artifact_id}")
         print(f"   Execution: {execution_id}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to add input artifact: {e}")
         return 1
 
@@ -14937,7 +14937,7 @@ def add_output_artifact(execution_id, artifact_type, artifact_id):
         print(f"OK: Added output {artifact_type}: {artifact_id}")
         print(f"   Execution: {execution_id}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to add output artifact: {e}")
         return 1
 
@@ -14956,7 +14956,7 @@ def complete_execution(execution_id, status):
         print(f"   Status: {status}")
         print("   Lineage record finalized and available for queries")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to complete execution: {e}")
         return 1
 
@@ -15108,7 +15108,7 @@ def local_scan(host, user, key, detailed, register, name):
                     ssh_args, capture_output=True, text=True, timeout=15
                 )
                 return result.stdout.strip(), result.returncode
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return "", 1
         else:
             # Local execution - use list-args for injection safety
@@ -15118,7 +15118,7 @@ def local_scan(host, user, key, detailed, register, name):
                     cmd, capture_output=True, text=True, timeout=15
                 )
                 return result.stdout.strip(), result.returncode
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return "", 1
 
     # Try Rust NVML first (local only), then nvidia-smi
@@ -15134,7 +15134,7 @@ def local_scan(host, user, key, detailed, register, name):
                 use_rust = True
                 for g in state.get("gpus", []):
                     gpus.append(g)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     if not use_rust:
@@ -15217,7 +15217,7 @@ def _register_local_pool(gpus, pool_name, host=None, user=None, key=None):
         try:
             with open(pool_path) as f:
                 pool = json.load(f)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pool = {}
     pool[pool_name] = {
         "name": pool_name,
@@ -15287,7 +15287,7 @@ def local_register(name, host, user, key):
                 ssh_args, capture_output=True, text=True, timeout=15
             )
             raw = result.stdout.strip()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             click.echo(f"Error scanning {target}: {e}", err=True)
             return
     else:
@@ -15298,7 +15298,7 @@ def local_register(name, host, user, key):
                 cmd, capture_output=True, text=True, timeout=15
             )
             raw = result.stdout.strip()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             click.echo(f"Error scanning {target}: {e}", err=True)
             return
     if not raw:
@@ -15355,7 +15355,7 @@ def local_pool(fmt, remove):
         try:
             with open(pool_path) as f:
                 pool = json.load(f)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pool = {}
 
     if remove:

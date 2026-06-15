@@ -143,7 +143,7 @@ class WeightStreamingManager:
 
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to initialize weight streaming: {e}")
             self.state = StreamingState.FAILED
             self.metrics.errors.append(str(e))
@@ -193,7 +193,7 @@ class WeightStreamingManager:
 
             return self.state == StreamingState.COMPLETED
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Weight streaming failed: {e}")
             self.state = StreamingState.FAILED
             self.metrics.errors.append(str(e))
@@ -278,7 +278,7 @@ class WeightStreamingManager:
                     self.logger.error(f"Failed to download chunk {chunk.chunk_id}")
                     self.metrics.errors.append(f"Download failed: {chunk.chunk_id}")
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.error(f"Download worker error: {e}")
                 self.metrics.errors.append(str(e))
                 await asyncio.sleep(1.0)
@@ -320,7 +320,7 @@ class WeightStreamingManager:
                     self.logger.error(f"Failed to load chunk {chunk.chunk_id}")
                     self.metrics.errors.append(f"Load failed: {chunk.chunk_id}")
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.error(f"Compute worker error: {e}")
                 self.metrics.errors.append(str(e))
                 await asyncio.sleep(1.0)
@@ -339,7 +339,7 @@ class WeightStreamingManager:
 
                 await asyncio.sleep(1.0)
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.error(f"Orchestrator error: {e}")
                 self.metrics.errors.append(str(e))
                 await asyncio.sleep(1.0)
@@ -355,7 +355,7 @@ class WeightStreamingManager:
                 return await self._download_from_vast(chunk)
             else:
                 return await self._download_from_http(chunk)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Download chunk {chunk.chunk_id} failed: {e}")
             return False
 
@@ -385,7 +385,7 @@ class WeightStreamingManager:
 
                 return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"HTTP download error for {chunk.chunk_id}: {e}")
             return False
 
@@ -413,7 +413,7 @@ class WeightStreamingManager:
 
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"S3 download error for {chunk.chunk_id}: {e}")
             return False
 
@@ -443,7 +443,7 @@ class WeightStreamingManager:
 
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"VAST download error for {chunk.chunk_id}: {e}")
             return False
 
@@ -456,7 +456,7 @@ class WeightStreamingManager:
                 return await self._load_chunk_sglang(chunk)
             else:
                 return await self._load_chunk_custom(chunk)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Load chunk {chunk.chunk_id} failed: {e}")
             return False
 
@@ -487,7 +487,7 @@ class WeightStreamingManager:
 
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"vLLM load error: {e}")
             return False
 
@@ -502,7 +502,7 @@ class WeightStreamingManager:
 
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"SGLang load error: {e}")
             return False
 
@@ -568,7 +568,7 @@ class WeightStreamingManager:
             with open(chunk.local_path, "rb") as f:
                 file_hash = hashlib.sha256(f.read()).hexdigest()
             return file_hash == chunk.checksum
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
     def _parse_s3_url(self, url: str) -> Tuple[str, str]:

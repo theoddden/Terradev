@@ -450,7 +450,7 @@ class CostAttributionService:
                         event.timestamp = datetime.fromisoformat(event_data["timestamp"])
                         self.cost_events.append(event)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Failed to load cost data: {e}")
 
     def _save_cost_data(self):
@@ -482,5 +482,5 @@ class CostAttributionService:
             }
             with open(self.cost_db_file, "w") as f:
                 json.dump(data, f, indent=2)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Failed to save cost data: {e}")

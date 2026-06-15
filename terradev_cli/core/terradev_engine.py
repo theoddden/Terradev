@@ -103,7 +103,7 @@ class TerradevEngine:
             from .dataset_stager import DatasetStager
 
             self.dataset_stager = DatasetStager()
-        except Exception:
+        except Exception:  # noqa: BLE001
             self.dataset_stager = None
 
         # Initialize providers
@@ -122,7 +122,7 @@ class TerradevEngine:
                 )
                 providers[provider_name] = provider
                 logger.info(f"Provider {provider_name} initialized successfully")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Failed to initialize provider {provider_name}: {e}")
 
         return providers
@@ -185,7 +185,7 @@ class TerradevEngine:
                 errors=[],
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Provisioning failed: {e}")
             return ProvisioningResult(
                 success=False,
@@ -281,7 +281,7 @@ class TerradevEngine:
 
             return quotes
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to get quotes from {provider.name}: {e}")
             return []
 
@@ -462,7 +462,7 @@ class TerradevEngine:
             try:
                 instances = await provider.list_instances()
                 all_instances.extend(instances)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Failed to get instances from {provider_name}: {e}")
 
         return all_instances
@@ -495,7 +495,7 @@ class TerradevEngine:
             from .cost_tracker import get_spend_summary
 
             return get_spend_summary(days)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Analytics failed: {e}")
             return {"error": str(e)}
 
@@ -516,7 +516,7 @@ class TerradevEngine:
                         }
                     )
             return recommendations
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Optimization failed: {e}")
             return []
 
@@ -529,7 +529,7 @@ class TerradevEngine:
             # Implementation would go here
             cleanup_results["resources_cleaned"] += 1
             cleanup_results["space_freed"] = "10 MB"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             cleanup_results["errors"].append(str(e))
 
         return cleanup_results

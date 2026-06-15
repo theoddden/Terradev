@@ -25,7 +25,7 @@ class InferXK8sSetup:
                 config.load_kube_config(config_file=kubeconfig)
             else:
                 config.load_kube_config()
-        except Exception:
+        except Exception:  # noqa: BLE001
             config.load_incluster_config()
 
         self.v1 = client.CoreV1Api()
@@ -94,7 +94,7 @@ class InferXK8sSetup:
 
             return results
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"❌ Deployment failed: {e}")
             results["errors"].append(str(e))
             return results
@@ -259,7 +259,7 @@ class InferXK8sSetup:
 
                 await asyncio.sleep(10)
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"⚠️  Error checking deployment status: {e}")
                 await asyncio.sleep(10)
 
@@ -286,7 +286,7 @@ class InferXK8sSetup:
                 else:
                     endpoints[name] = f"{name}:{port}"
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"⚠️  Error getting service endpoints: {e}")
 
         return endpoints
@@ -304,7 +304,7 @@ class InferXK8sSetup:
                 ):
                     ingress = service.status.load_balancer.ingress[0]
                     return ingress.ip or ingress.hostname
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
             await asyncio.sleep(10)
@@ -373,12 +373,12 @@ class InferXK8sSetup:
                     plural="modelfunctions",
                 )
                 status["models_deployed"] = len(model_functions.get("items", []))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
             return status
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"error": str(e)}
 
     def _is_gpu_node(self, node) -> bool:
@@ -421,7 +421,7 @@ class InferXK8sSetup:
 
             return results
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             results["errors"].append(str(e))
             return results
 
@@ -437,7 +437,7 @@ class InferXK8sSetup:
 
             return results
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             results["errors"].append(str(e))
             return results
 
@@ -491,7 +491,7 @@ def deploy(
             for error in results["errors"]:
                 print(f"   - {error}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Deployment failed: {e}")
 
 
@@ -524,7 +524,7 @@ def status(namespace, kubeconfig):
             external_ip = f" ({info['external_ip']})" if info["external_ip"] else ""
             print(f"   {name}: {info['type']}{external_ip}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Failed to get status: {e}")
 
 
@@ -552,7 +552,7 @@ def scale(namespace, replicas, gpu_nodes, kubeconfig):
         for error in results.get("errors", []):
             print(f"   ❌ {error}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Scaling failed: {e}")
 
 
@@ -577,7 +577,7 @@ def delete(namespace, kubeconfig):
         for error in results.get("errors", []):
             print(f"   ❌ {error}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Deletion failed: {e}")
 
 

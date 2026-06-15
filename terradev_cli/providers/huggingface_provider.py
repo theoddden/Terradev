@@ -59,7 +59,7 @@ class HuggingFaceProvider(BaseProvider):
                 # If we have live endpoints, extract pricing info
                 if isinstance(data, list) and data:
                     logger.info(f"Retrieved {len(data)} live HF endpoints")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         return [
@@ -122,8 +122,8 @@ class HuggingFaceProvider(BaseProvider):
                 "provider": "huggingface",
                 "endpoint_url": data.get("status", {}).get("url", ""),
             }
-        except Exception as e:
-            raise Exception(f"HuggingFace provision failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"HuggingFace provision failed: {e}") from e
 
     async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key or not self.namespace:
@@ -147,8 +147,8 @@ class HuggingFaceProvider(BaseProvider):
                 "provider": "huggingface",
                 "endpoint_url": data.get("status", {}).get("url", ""),
             }
-        except Exception as e:
-            raise Exception(f"HuggingFace status failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"HuggingFace status failed: {e}") from e
 
     async def stop_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key or not self.namespace:
@@ -202,7 +202,7 @@ class HuggingFaceProvider(BaseProvider):
                 }
                 for ep in endpoints
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -237,7 +237,7 @@ class HuggingFaceProvider(BaseProvider):
                 "output": str(data),
                 "async": async_exec,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,
@@ -268,7 +268,7 @@ class HuggingFaceProvider(BaseProvider):
                 "result": data,
                 "inference_time": round(elapsed, 3),
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"model_id": model_id, "status": "error", "error": str(e)}
 
     def _get_auth_headers(self) -> Dict[str, str]:

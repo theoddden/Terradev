@@ -52,7 +52,7 @@ class MLA_VRAM_Tests:
                 result = await test_method()
                 self.test_results.append(result)
                 logger.info(f"✅ {result['test_name']}: {result['status']}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"❌ {test_method.__name__}: {e}")
                 self.test_results.append(
                     {
@@ -426,7 +426,7 @@ class MLA_VRAM_Tests:
                         {"case": case, "failed_as_expected": True, "estimate": estimate}
                     )
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 if case["should_fail"]:
                     results.append(
                         {"case": case, "failed_as_expected": True, "error": str(e)}

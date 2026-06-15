@@ -129,7 +129,7 @@ class YottaLabsProvider(BaseProvider):
             live = await self._get_live_gpu_types(gpu_type, yotta_gpu_type, region)
             if live:
                 return live
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Yotta Labs API error: {e}")
 
         # Static fallback
@@ -323,7 +323,7 @@ class YottaLabsProvider(BaseProvider):
                 }
                 for pod in (pods if isinstance(pods, list) else [])
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -376,7 +376,7 @@ class YottaLabsProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,

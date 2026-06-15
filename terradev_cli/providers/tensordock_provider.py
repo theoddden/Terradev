@@ -61,7 +61,7 @@ class TensorDockProvider(BaseProvider):
             live = await self._get_live_availability(gpu_type)
             if live:
                 return live
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         info = self.GPU_PRICING.get(gpu_type)
@@ -142,7 +142,7 @@ class TensorDockProvider(BaseProvider):
                         break
                 if location_id:
                     break
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         # Read SSH public key from terradev keystore
@@ -263,7 +263,7 @@ class TensorDockProvider(BaseProvider):
                 }
                 for vm in (instances if isinstance(instances, list) else [])
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -319,7 +319,7 @@ class TensorDockProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,

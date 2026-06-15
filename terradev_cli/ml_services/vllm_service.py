@@ -441,7 +441,7 @@ class VLLMService:
                         "error": f"vLLM server not responding: {response.status}",
                     }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "status": "failed",
                 "error": f"Failed to connect to vLLM server: {str(e)}",
@@ -482,7 +482,7 @@ python3 -c "import vllm; print('vLLM installed successfully')"
                     "error": f"Installation failed: {result.stderr}",
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to install vLLM: {str(e)}"}
 
     def _build_ssh_args(self, ip: str, user: str, key: Optional[str]) -> List[str]:
@@ -587,7 +587,7 @@ systemctl status vllm
                     "error": f"Failed to start server: {result.stderr}",
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "status": "failed",
                 "error": f"Failed to start vLLM server: {str(e)}",
@@ -639,7 +639,7 @@ systemctl status vllm
                         "error": f"Inference failed: {response.status} - {error_text}",
                     }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to test inference: {str(e)}"}
 
     async def test_chat_completion(
@@ -688,7 +688,7 @@ systemctl status vllm
                         "error": f"Chat completion failed: {response.status} - {error_text}",
                     }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "status": "failed",
                 "error": f"Failed to test chat completion: {str(e)}",
@@ -721,7 +721,7 @@ systemctl status vllm
                         "error": f"Failed to get server info: {response.status} - {error_text}",
                     }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to get server info: {str(e)}"}
 
     async def stop_server(
@@ -759,7 +759,7 @@ systemctl daemon-reload
                     "error": f"Failed to stop server: {result.stderr}",
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "status": "failed",
                 "error": f"Failed to stop vLLM server: {str(e)}",
@@ -930,7 +930,7 @@ systemctl daemon-reload
                         "lora_adapters": adapters,
                     }
                 return {"status": "failed", "error": f"HTTP {resp.status}"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def lora_load(self, adapter: LoRAModule, version_id: Optional[str] = None) -> Dict[str, Any]:
@@ -967,7 +967,7 @@ systemctl daemon-reload
                     return {"status": "loaded", "adapter": adapter.name}
                 body = await resp.text()
                 return {"status": "failed", "error": f"HTTP {resp.status}: {body}"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def lora_unload(self, adapter_name: str) -> Dict[str, Any]:
@@ -997,7 +997,7 @@ systemctl daemon-reload
                     return {"status": "unloaded", "adapter": adapter_name}
                 body = await resp.text()
                 return {"status": "failed", "error": f"HTTP {resp.status}: {body}"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def lora_broadcast_load(
@@ -1031,7 +1031,7 @@ systemctl daemon-reload
                 "status": "failed",
                 "error": "LoRAConsistencyManager not available. Install terradev with full dependencies.",
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     # ═══════════════════════════════════════════════════════════════════
@@ -1060,7 +1060,7 @@ systemctl daemon-reload
                     }
                 body = await resp.text()
                 return {"status": "failed", "error": f"HTTP {resp.status}: {body}"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     async def wake(self) -> Dict[str, Any]:
@@ -1115,7 +1115,7 @@ systemctl daemon-reload
                 "model": self.config.model_name,
                 "level": self.config.sleep_level,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     def get_deployment_script(
@@ -1218,7 +1218,7 @@ echo "🔗 Test with: curl http://{instance_ip}:{self.config.port}/v1/models"
 
             return analysis
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Workload analysis failed: {str(e)}"}
 
     def _parse_vllm_metrics(self, metrics_text: str) -> Dict[str, Any]:
@@ -1370,7 +1370,7 @@ echo "🔗 Test with: curl http://{instance_ip}:{self.config.port}/v1/models"
                 "recommendations": "Apply optimized configuration for better performance",
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Auto-optimization failed: {str(e)}"}
 
     def _compare_configurations(

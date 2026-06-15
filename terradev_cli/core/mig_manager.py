@@ -239,7 +239,7 @@ class MIGManager:
                     "exit_code": result.get("exit_code"),
                 }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "success": False,
                 "reason": f"Failed to enable MIG: {str(e)}",
@@ -277,7 +277,7 @@ class MIGManager:
                 "enabled": mig_mode == "Enabled",
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "mode": "Unknown",
                 "devices": [],
@@ -339,7 +339,7 @@ class MIGManager:
                 "total_instances": len(created_instances),
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "success": False,
                 "reason": f"Failed to create MIG instances: {str(e)}",

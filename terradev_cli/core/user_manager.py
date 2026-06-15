@@ -127,7 +127,7 @@ class UserManager:
                     )
                     self.invites[invite.invite_id] = invite
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Failed to load user management data: {e}")
 
     def _save_data(self):
@@ -456,7 +456,7 @@ class UserManager:
                 results["imported"] += 1
                 available_slots -= 1
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 results["errors"].append(
                     f"Failed to import {user_data.get('email', 'unknown')}: {e}"
                 )

@@ -403,7 +403,7 @@ def _fetch_live_rates(provider: str) -> Optional[Dict[str, float]]:
                                     "cross_continent": usd,
                                     "internet": usd,
                                 }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug("AWS live pricing unavailable: %s", e)
         return None
 
@@ -429,7 +429,7 @@ def _fetch_live_rates(provider: str) -> Optional[Dict[str, float]]:
                         "cross_continent": usd,
                         "internet": usd,
                     }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug("GCP live pricing unavailable: %s", e)
         return None
 
@@ -450,7 +450,7 @@ def get_cached_rate(provider: str, dest_class: str) -> float:
         conn.close()
         if row:
             return row["rate_per_gb"]
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     # Fallback to static
     rates = _STATIC_EGRESS_RATES.get(

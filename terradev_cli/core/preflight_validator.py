@@ -169,7 +169,7 @@ def _run_on(
             return r.returncode, r.stdout.strip(), r.stderr.strip()
         except subprocess.TimeoutExpired:
             return -1, "", "SSH timed out"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return -1, "", str(e)
     # SECURITY: shell=True is used but command is validated above
     try:
@@ -179,7 +179,7 @@ def _run_on(
         return r.returncode, r.stdout.strip(), r.stderr.strip()
     except subprocess.TimeoutExpired:
         return -1, "", "Command timed out"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return -1, "", str(e)
 
 
@@ -1185,7 +1185,7 @@ def _check_data_integrity(ctx: Dict[str, Any]) -> List[CheckResult]:
                             node=node,
                         )
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             results.append(
                 CheckResult(
                     "data_checksum", CheckStatus.WARN, f"Manifest error: {e}", node=node
@@ -1221,7 +1221,7 @@ def _check_data_integrity(ctx: Dict[str, Any]) -> List[CheckResult]:
                             node=node,
                         )
                     )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 results.append(
                     CheckResult(
                         "data_samples",

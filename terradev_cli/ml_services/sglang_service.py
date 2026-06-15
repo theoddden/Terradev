@@ -295,7 +295,7 @@ class SGLangOptimizer:
                 # Default to H100 profile if unknown
                 logger.warning(f"Unknown GPU {gpu_name}, defaulting to H100 profile")
                 return self.hardware_profiles["h100"]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Hardware detection failed: {e}")
 
         # Fallback to H100
@@ -924,7 +924,7 @@ class SGLangService:
                 }
         except FileNotFoundError:
             return {"status": "failed", "error": "python3 not found"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": str(e)}
 
     # ── SSH helpers ──
@@ -974,7 +974,7 @@ python3 -c "import sglang; print('SGLang', sglang.__version__, 'installed')"
                     "status": "failed",
                     "error": f"Installation failed: {result.stderr}",
                 }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to install SGLang: {e}"}
 
     # ── Server Lifecycle ──
@@ -1087,7 +1087,7 @@ systemctl status sglang
                     "status": "failed",
                     "error": f"Failed to start server: {result.stderr}",
                 }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to start SGLang server: {e}"}
 
     async def stop_server(
@@ -1124,7 +1124,7 @@ systemctl daemon-reload
                     "status": "failed",
                     "error": f"Failed to stop server: {result.stderr}",
                 }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to stop SGLang server: {e}"}
 
     # ── Inference API (OpenAI-compatible) ──
@@ -1172,7 +1172,7 @@ systemctl daemon-reload
                         "status": "failed",
                         "error": f"Inference failed: {response.status} - {error_text}",
                     }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to test inference: {e}"}
 
     async def test_chat_completion(
@@ -1220,7 +1220,7 @@ systemctl daemon-reload
                         "status": "failed",
                         "error": f"Chat failed: {response.status} - {error_text}",
                     }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to test chat completion: {e}"}
 
     # ── Server Info & Metrics ──
@@ -1250,7 +1250,7 @@ systemctl daemon-reload
                         "status": "failed",
                         "error": f"Server info failed: {response.status} - {error_text}",
                     }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to get server info: {e}"}
 
     async def get_server_metrics(self) -> Dict[str, Any]:
@@ -1288,7 +1288,7 @@ systemctl daemon-reload
                         "status": "failed",
                         "error": f"Metrics endpoint returned {response.status}",
                     }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"status": "failed", "error": f"Failed to get metrics: {e}"}
 
     # ── Deployment Script Generation ──

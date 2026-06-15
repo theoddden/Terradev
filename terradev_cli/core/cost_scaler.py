@@ -412,7 +412,7 @@ class CostScaler:
             try:
                 await self._record_hourly_cost()
                 await asyncio.sleep(300)  # Record every 5 minutes
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Cost monitor error: {e}")
                 await asyncio.sleep(60)
 
@@ -504,7 +504,7 @@ class CostScaler:
                 with open(self.metrics_file, "r") as f:
                     data = json.load(f)
                     self.metrics = CostMetrics(**data)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to load cost metrics: {e}")
 
     def _save_metrics(self):
@@ -532,7 +532,7 @@ class CostScaler:
                     self.hourly_cost_history = [
                         (datetime.fromisoformat(ts), cost) for ts, cost in data
                     ]
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to load cost history: {e}")
                 self.hourly_cost_history = []
 

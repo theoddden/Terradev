@@ -92,7 +92,7 @@ class BaseSignal(ABC):
             elapsed_ms = (time.perf_counter() - start) * 1000
             result.latency_ms = elapsed_ms
             return result
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             elapsed_ms = (time.perf_counter() - start) * 1000
             logger.warning(f"Signal {self.name} failed in {elapsed_ms:.2f}ms: {e}")
             return SignalResult(

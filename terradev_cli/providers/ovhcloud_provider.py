@@ -142,7 +142,7 @@ class OVHcloudProvider(BaseProvider):
                 body = await resp.text()
                 server_time = int(body.strip())
             self._time_delta = server_time - int(time.time())
-        except Exception:
+        except Exception:  # noqa: BLE001
             self._time_delta = 0
         return self._time_delta
 
@@ -236,7 +236,7 @@ class OVHcloudProvider(BaseProvider):
                 live = await self._get_live_flavors(gpu_type, region)
                 if live:
                     return live
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug(f"OVHcloud live flavors error: {e}")
 
         # Static fallback
@@ -422,7 +422,7 @@ class OVHcloudProvider(BaseProvider):
                 }
                 for inst in (data if isinstance(data, list) else [])
             ]
-        except Exception:
+        except Exception:  # noqa: BLE001
             return []
 
     async def execute_command(
@@ -479,7 +479,7 @@ class OVHcloudProvider(BaseProvider):
                 "stderr": result.stderr,
                 "async": False,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "instance_id": instance_id,
                 "command": command,
