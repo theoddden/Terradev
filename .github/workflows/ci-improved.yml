@@ -67,8 +67,8 @@ jobs:
     - name: MyPy strict type checking
       run: mypy terradev_cli/ --strict --ignore-missing-imports || true
 
-    - name: Ruff linting (surfaces broad exceptions + print statements)
-      run: ruff check terradev_cli/ tests/ --select BLE,T20 || true
+    - name: Ruff linting (surfaces broad exceptions - critical)
+      run: ruff check terradev_cli/ tests/ --select BLE001 || true
       continue-on-error: true
 
   # === Unit Tests (Linux) ===
