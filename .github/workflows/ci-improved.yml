@@ -17,6 +17,10 @@ on:
         required: false
         default: 'all'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   COVERAGE_THRESHOLD: 25
   PYTHONUNBUFFERED: 1
