@@ -9,6 +9,7 @@ CRITICAL FIXES v4.0.0:
 - Cold start SLA monitoring
 """
 
+import asyncio
 import logging
 import os
 from typing import Dict, List, Any, Optional
