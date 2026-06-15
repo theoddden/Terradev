@@ -22,6 +22,7 @@ class RealGPUPricing:
     async def close(self):
         if self.session:
             await self.session.close()
+            self.session = None
 
     async def get_aws_pricing(
         self, gpu_type: str, region: str = "us-east-1"
