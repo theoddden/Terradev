@@ -94,6 +94,10 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
 
+    - name: Clear pip cache
+      run: |
+        pip cache purge
+
     - name: Install package + test deps
       run: |
         pip install -e ".[dev]"
