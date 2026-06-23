@@ -171,8 +171,7 @@ class BaseProvider(ABC):
             else:
                 # No dedicated endpoint — fall back to list_instances() but
                 # bound to a 5-second timeout so we don't block for long.
-                async with asyncio.timeout(5):
-                    await self.list_instances()
+                await asyncio.wait_for(self.list_instances(), timeout=5)
                 latency_ms = (time.time() - start) * 1000
                 return HealthStatus(
                     healthy=True,
