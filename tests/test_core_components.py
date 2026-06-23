@@ -279,8 +279,14 @@ class TestAuthManager:
         assert "my-secret-api-key" not in raw, "Credential stored in plaintext!"
 
     def test_key_file_permissions(self, tmp_config_dir):
-        from terradev_cli.core.auth import AuthManager
+        import sys
         import stat
+
+        # Skip on Windows - file permissions work differently
+        if sys.platform == "win32":
+            return
+
+        from terradev_cli.core.auth import AuthManager
 
         auth_file = str(tmp_config_dir / "credentials.json")
         AuthManager.load(auth_file)
