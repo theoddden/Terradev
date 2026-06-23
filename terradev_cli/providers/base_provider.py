@@ -25,6 +25,7 @@ from .types import (
     ProviderEvent,
     HealthStatus,
 )
+from .gpu_catalog import normalize as _catalog_normalize
 
 
 class BaseProvider(ABC):
@@ -134,21 +135,50 @@ class BaseProvider(ABC):
 
     # ── Optional Health & Event Methods (default implementations) ──────────
 
+    # Override this in providers that expose a dedicated health/ping endpoint.
+    _health_endpoint: Optional[str] = None
+
     async def check_health(self) -> HealthStatus:
         """
-        Default health check: lightweight API call.
+        Default health check: lightweight HEAD request against the provider
+        base URL using the provider's own auth headers.
 
-        Providers can override with custom health endpoints.
+        Intentionally avoids calling list_instances() — that may deserialise
+        hundreds of records just to confirm the provider is reachable.
+
+        Providers with a dedicated health endpoint should set _health_endpoint
+        or override this method.
         """
+        if not self.session or self.session.closed:
+            connector = await self._get_shared_connector()
+            self.session = aiohttp.ClientSession(connector=connector)
+            self._owns_session = True
+
         try:
             start = time.time()
-            await self.list_instances()
-            latency_ms = (time.time() - start) * 1000
-            return HealthStatus(
-                healthy=True,
-                latency_ms=latency_ms,
-                timestamp=time.time(),
-            )
+            headers = self._get_auth_headers()
+            target = self._health_endpoint
+            if target:
+                async with self.session.head(
+                    target, headers=headers, timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    latency_ms = (time.time() - start) * 1000
+                    return HealthStatus(
+                        healthy=resp.status < 500,
+                        latency_ms=latency_ms,
+                        timestamp=time.time(),
+                    )
+            else:
+                # No dedicated endpoint — fall back to list_instances() but
+                # bound to a 5-second timeout so we don't block for long.
+                async with asyncio.timeout(5):
+                    await self.list_instances()
+                latency_ms = (time.time() - start) * 1000
+                return HealthStatus(
+                    healthy=True,
+                    latency_ms=latency_ms,
+                    timestamp=time.time(),
+                )
         except Exception as e:  # noqa: BLE001
             return HealthStatus(
                 healthy=False,
@@ -284,7 +314,6 @@ class BaseProvider(ABC):
 
     def _calculate_latency(self, region: str) -> float:
         """Calculate estimated latency to region"""
-        # Simplified latency calculation based on region
         latency_map = {
             "us-east-1": 10.0,
             "us-west-2": 25.0,
@@ -296,86 +325,38 @@ class BaseProvider(ABC):
         return latency_map.get(region, 50.0)
 
     def _get_gpu_specs(self, gpu_type: str) -> Dict[str, Any]:
-        """Get GPU specifications"""
-        gpu_specs = {
-            "A100": {
-                "memory_gb": 40,
-                "compute_capability": "8.0",
-                "tflops": 19.5,
-                "bandwidth_gb_s": 1555,
-            },
-            "V100": {
-                "memory_gb": 32,
-                "compute_capability": "7.0",
-                "tflops": 15.7,
-                "bandwidth_gb_s": 900,
-            },
-            "RTX4090": {
-                "memory_gb": 24,
-                "compute_capability": "8.9",
-                "tflops": 82.6,
-                "bandwidth_gb_s": 1008,
-            },
-            "RTX3090": {
-                "memory_gb": 24,
-                "compute_capability": "8.6",
-                "tflops": 35.6,
-                "bandwidth_gb_s": 936,
-            },
-            "H100": {
-                "memory_gb": 80,
-                "compute_capability": "9.0",
-                "tflops": 1979.0,
-                "bandwidth_gb_s": 3350,
-            },
-            "H200": {
-                "memory_gb": 141,
-                "compute_capability": "9.0",
-                "tflops": 1979.0,
-                "bandwidth_gb_s": 4800,
-            },
-            "MI300X": {
-                "memory_gb": 192,
-                "compute_capability": "9.4",
-                "tflops": 1307.4,
-                "bandwidth_gb_s": 5300,
-            },
-            "A100-80GB": {
-                "memory_gb": 80,
-                "compute_capability": "8.0",
-                "tflops": 312.0,
-                "bandwidth_gb_s": 2000,
-            },
-            "B200": {
-                "memory_gb": 192,
-                "compute_capability": "10.0",
-                "tflops": 4500.0,
-                "bandwidth_gb_s": 8000,
-            },
-        }
-        return gpu_specs.get(gpu_type, {})
+        """
+        Return GPU specifications from the canonical gpu_catalog.
 
-    def _estimate_price(self, instance_type: str, gpu_type: str, region: str) -> float:
-        """Estimate price for instance"""
-        # Simplified pricing model
-        base_prices = {
-            "A100": 2.5,
-            "V100": 2.0,
-            "RTX4090": 1.5,
-            "RTX3090": 1.2,
-            "H100": 4.0,
+        This is the single source of truth — do not maintain a separate
+        hardcoded dict here.  Returns an empty dict if the GPU is unknown.
+        """
+        descriptor = _catalog_normalize(gpu_type)
+        if descriptor is None:
+            return {}
+        return {
+            "memory_gb": descriptor.vram_gb,
+            "compute_capability": descriptor.compute_capability or "unknown",
+            "tflops_bf16": descriptor.tflops_bf16,
+            "tflops_fp16": descriptor.tflops_fp16,
+            "tflops_fp32": descriptor.tflops_fp32,
+            "bandwidth_gb_s": descriptor.bandwidth_gb_s,
+            "nvlink": descriptor.nvlink,
+            "vendor": descriptor.vendor.value,
         }
 
-        base_price = base_prices.get(gpu_type, 1.0)
+    def _estimate_price(self, instance_type: str, gpu_type: str, region: str) -> Optional[float]:
+        """
+        Intentionally returns None — there is no reliable static price table.
 
-        # Region multiplier
-        region_multipliers = {
-            "us-east-1": 1.0,
-            "us-west-2": 1.1,
-            "eu-west-1": 1.2,
-            "asia-east-1": 1.3,
-        }
-
-        region_multiplier = region_multipliers.get(region, 1.0)
-
-        return base_price * region_multiplier
+        Callers should use live provider quotes.  This method exists only for
+        backward compatibility with subclasses that call super()._estimate_price().
+        If you need a price fallback, implement it in the concrete provider using
+        its own API documentation.
+        """
+        logger.warning(
+            "_estimate_price() called for gpu_type=%s region=%s — returning None. "
+            "Use live provider quotes instead of static fallback prices.",
+            gpu_type, region,
+        )
+        return None

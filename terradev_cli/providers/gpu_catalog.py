@@ -66,16 +66,16 @@ GPU_ALIASES: Dict[str, str] = {
     "A100-SXM4-80G": "A100-80GB",
 
     # ── A100 PCIe variants ───────────────────────────────────────────────
-    "NVIDIA_A100_PCIe_80G": "A100-40GB",  # PCIe variant often 40GB in practice
+    "NVIDIA_A100_PCIe_80G": "A100-80GB",  # 80 GB PCIe exists on AWS p4de, DigitalOcean
     "NVIDIA_A100_PCIe_40G": "A100-40GB",
-    "A100-PCIe": "A100-40GB",
-    "A100-PCIe-80G": "A100-40GB",
+    "A100-PCIe": "A100-40GB",             # ambiguous: default to 40 GB (most common PCIe)
+    "A100-PCIe-80G": "A100-80GB",
     "A100-PCIe-40G": "A100-40GB",
     "A100-40GB": "A100-40GB",
     "a100-40gb": "A100-40GB",
     "A100-40G": "A100-40GB",
 
-    # ── A100 80GB PCIe (less common but exists) ───────────────────────────
+    # ── A100 80GB PCIe (explicit) ────────────────────────────────────────
     "A100-PCIe-80GB": "A100-80GB",
 
     # ── RTX 4090 ─────────────────────────────────────────────────────────

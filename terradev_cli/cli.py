@@ -141,19 +141,28 @@ class TerradevAPI:
     #     return False  # No tiers
 
     def load_credentials(self):
-        """Load user's cloud provider credentials (simple JSON for BYOAPI)"""
+        """Load cloud provider credentials via AuthManager (Fernet-encrypted).
+
+        Migration: if a plain-JSON credentials file exists without the
+        companion .keyfile, the flat-format contents are read, converted to
+        the nested {provider: {key: val}} schema and re-saved encrypted so
+        that subsequent runs use the secure path.
+        """
+        from terradev_cli.core.auth import AuthManager
+
+        key_file = self.config_dir / ".keyfile"
+
+        if self.credentials_file.exists() and not key_file.exists():
+            self._migrate_plaintext_credentials(key_file)
+
         try:
-            # Simple direct loading for BYOAPI
-            if self.credentials_file.exists():
-                with open(self.credentials_file, "r") as f:
-                    self.credentials = json.load(f)
-            else:
-                self.credentials = {}
+            auth = AuthManager.load(str(self.credentials_file))
+            self._auth_manager = auth
+            self.credentials = auth.credentials  # nested {provider: {key: val}}
         except Exception as e:  # noqa: BLE001
             import sys
-
             print(
-                f"Warning  WARNING: Failed to load credentials ({e}). "
+                f"Warning: Failed to load credentials via AuthManager ({e}). "
                 f"Your credentials file may be corrupted.",
                 file=sys.stderr,
             )
@@ -164,18 +173,58 @@ class TerradevAPI:
             self.credentials = {}
             self._auth_manager = None
 
-    def save_credentials(self):
-        """Save user's cloud provider credentials (simple JSON for BYOAPI)"""
+    def _migrate_plaintext_credentials(self, key_file: Path) -> None:
+        """One-time migration: convert flat plain-JSON credentials to encrypted nested format."""
         try:
-            with open(self.credentials_file, "w") as f:
-                json.dump(self.credentials, f, indent=2)
-            try:
-                os.chmod(self.credentials_file, 0o600)
-            except OSError:
-                pass
+            with open(self.credentials_file, "r") as f:
+                flat: dict = json.load(f)
+        except Exception:  # noqa: BLE001
+            return
+
+        if not isinstance(flat, dict) or not flat:
+            return
+
+        from terradev_cli.core.auth import AuthManager
+
+        auth = AuthManager()
+        auth._create_new_auth_file(self.credentials_file, key_file)
+
+        # Convert flat keys like "runpod_api_key" → {"runpod": {"api_key": value}}
+        nested: dict = {}
+        for raw_key, value in flat.items():
+            if isinstance(value, dict):
+                # Already nested (from a previous configure --provider run)
+                nested[raw_key] = {k: str(v) for k, v in value.items() if v}
+            elif "_" in raw_key:
+                parts = raw_key.split("_", 1)
+                provider, field = parts[0], parts[1]
+                nested.setdefault(provider, {})[field] = str(value) if value else ""
+
+        auth.credentials = nested
+        try:
+            auth.save(str(self.credentials_file))
+            import sys
+            print(
+                "[terradev] Credentials migrated to encrypted storage.",
+                file=sys.stderr,
+            )
         except Exception as e:  # noqa: BLE001
             import sys
+            print(f"Warning: credential migration failed ({e})", file=sys.stderr)
 
+    def save_credentials(self):
+        """Save cloud provider credentials via AuthManager (Fernet-encrypted)."""
+        from terradev_cli.core.auth import AuthManager
+        import sys
+
+        try:
+            if self._auth_manager is None:
+                key_file = self.config_dir / ".keyfile"
+                self._auth_manager = AuthManager.load(str(self.credentials_file))
+
+            self._auth_manager.credentials = self.credentials
+            self._auth_manager.save(str(self.credentials_file))
+        except Exception as e:  # noqa: BLE001
             print(f"ERROR: Failed to save credentials: {e}", file=sys.stderr)
 
     def load_usage(self):

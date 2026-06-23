@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "terradev-credential-vault"
+version = "0.1.0"
+description = "Rust-backed memory-safe credential vault for Terradev"
+requires-python = ">=3.9"
+
+[tool.maturin]
+module-name = "terradev_credential_vault"
+python-packages = []
+features = ["pyo3/extension-module"]

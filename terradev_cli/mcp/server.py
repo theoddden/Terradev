@@ -24,10 +24,17 @@ import subprocess
 import sys
 import time
 
-# Import new feature tools
+# Import new feature tools from the sibling module (relative import).
+# If the module is absent a WARNING is emitted so operators know which tools
+# are missing, rather than silently dropping them.
 try:
-    from mcp_new_features_tools import ALL_NEW_TOOLS, COMMAND_MAP as NEW_COMMAND_MAP
-except ImportError:
+    from .new_feature_tools import ALL_NEW_TOOLS, COMMAND_MAP as NEW_COMMAND_MAP
+except ImportError as _nft_err:
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        "new_feature_tools module not found (%s) — extended MCP tools will be unavailable.",
+        _nft_err,
+    )
     ALL_NEW_TOOLS = []
     NEW_COMMAND_MAP = {}
 try:

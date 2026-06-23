@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "terradev_gpu_topology"
-crate-type = ["rlib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { workspace = true }

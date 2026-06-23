@@ -45,11 +45,20 @@ class ProviderRegistry:
 
     def __init__(self, factory: Optional[ProviderFactory] = None):
         self.factory = factory or ProviderFactory()
-        self._health: Dict[str, ProviderHealth] = defaultdict(
-            lambda: ProviderHealth(provider="")
-        )
+        self._health: Dict[str, ProviderHealth] = {}
         self._spot_preemptions: Dict[str, List[float]] = defaultdict(list)  # provider → timestamps
         self._lock: Optional[asyncio.Lock] = None
+
+    def _get_health(self, provider: str) -> ProviderHealth:
+        """Return the ProviderHealth entry for *provider*, creating it if absent.
+
+        Using an explicit helper instead of a defaultdict avoids the footgun
+        where ``_health[provider]`` creates a ProviderHealth(provider="") and
+        every caller must remember to patch the name afterwards.
+        """
+        if provider not in self._health:
+            self._health[provider] = ProviderHealth(provider=provider)
+        return self._health[provider]
 
     def is_healthy(self, provider: str) -> bool:
         """
@@ -58,8 +67,7 @@ class ProviderRegistry:
         Circuit breaker opens after FAILURE_THRESHOLD consecutive failures
         and closes after RECOVERY_WINDOW_S of recovery time.
         """
-        health = self._health[provider]
-        health.provider = provider  # ensure name is set
+        health = self._get_health(provider)
 
         # If circuit is open, check if recovery window has passed
         if health.consecutive_failures >= self.FAILURE_THRESHOLD:
@@ -83,8 +91,7 @@ class ProviderRegistry:
             self._lock = asyncio.Lock()
 
         async with self._lock:
-            health = self._health[provider]
-            health.provider = provider
+            health = self._get_health(provider)
             health.consecutive_failures = 0
             health.last_success_ts = time.time()
             health.total_provisions += 1
@@ -107,8 +114,7 @@ class ProviderRegistry:
             self._lock = asyncio.Lock()
 
         async with self._lock:
-            health = self._health[provider]
-            health.provider = provider
+            health = self._get_health(provider)
             health.consecutive_failures += 1
             health.last_failure_ts = time.time()
             health.total_failures += 1
@@ -132,6 +138,7 @@ class ProviderRegistry:
         async with self._lock:
             now = time.time()
             self._spot_preemptions[provider].append(now)
+            self._get_health(provider)  # ensure entry exists
 
             # Clean old preemptions (older than 24 hours)
             cutoff = now - 86400
@@ -168,9 +175,7 @@ class ProviderRegistry:
 
     def get_health(self, provider: str) -> ProviderHealth:
         """Get current health metrics for a provider."""
-        health = self._health[provider]
-        health.provider = provider
-        return health
+        return self._get_health(provider)
 
     def get_all_health(self) -> Dict[str, ProviderHealth]:
         """Get health metrics for all tracked providers."""
@@ -209,9 +214,8 @@ class ProviderRegistry:
         # Score each provider
         scored = []
         for provider in healthy_providers:
-            health = self._health[provider]
-            health.provider = provider
-            
+            health = self._get_health(provider)
+
             # Get provider profile for quirk-aware scoring
             profile = get_profile(provider)
 
@@ -247,7 +251,7 @@ class ProviderRegistry:
 
     def reset_health(self, provider: str):
         """Reset health metrics for a provider (manual recovery)."""
-        self._health[provider] = ProviderHealth(provider=provider)
+        self._health[provider] = ProviderHealth(provider=provider)  # explicit name
         self._spot_preemptions[provider] = []
         logger.info(f"Reset health metrics for provider: {provider}")
 
@@ -258,7 +262,7 @@ class ProviderRegistry:
         Useful for monitoring and debugging.
         """
         total_providers = len(self._health)
-        healthy_providers = sum(1 for p in self._health.values() if self.is_healthy(p.provider))
+        healthy_providers = sum(1 for p in self._health if self.is_healthy(p))
         total_provisions = sum(h.total_provisions for h in self._health.values())
         total_failures = sum(h.total_failures for h in self._health.values())
 
