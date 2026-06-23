@@ -260,7 +260,12 @@ class TestTerradevAPI:
                 assert creds_file.exists()
                 with open(creds_file, "r") as f:
                     loaded = json.load(f)
-                assert loaded == {"runpod": {"api_key": "test_key"}}
+                # AuthManager encrypts credentials and wraps them under 'credentials' key
+                assert "credentials" in loaded
+                assert "version" in loaded
+                assert loaded["version"] == "2.0"
+                # Verify the nested structure exists (encrypted value, not plaintext)
+                assert "runpod" in loaded["credentials"]
 
     def test_save_credentials_sets_permissions(self):
         """Save credentials sets file permissions to 0600"""

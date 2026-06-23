@@ -129,18 +129,14 @@ class TestProviderRegistry:
     def test_new_provider_starts_healthy(self, registry):
         assert registry.is_healthy("runpod") is True
 
-    def test_circuit_breaker_opens_after_threshold(self, registry):
+    async def test_circuit_breaker_opens_after_threshold(self, registry):
         for _ in range(registry.FAILURE_THRESHOLD):
-            asyncio.get_event_loop().run_until_complete(
-                registry.record_failure("runpod", "connection timeout")
-            )
+            await registry.record_failure("runpod", "connection timeout")
         assert registry.is_healthy("runpod") is False
 
-    def test_circuit_breaker_recovers_after_window(self, registry):
+    async def test_circuit_breaker_recovers_after_window(self, registry):
         for _ in range(registry.FAILURE_THRESHOLD):
-            asyncio.get_event_loop().run_until_complete(
-                registry.record_failure("runpod", "timeout")
-            )
+            await registry.record_failure("runpod", "timeout")
         health = registry._get_health("runpod")
         health.last_failure_ts = time.time() - registry.RECOVERY_WINDOW_S - 1
         assert registry.is_healthy("runpod") is True
@@ -150,33 +146,29 @@ class TestProviderRegistry:
         health = registry._get_health("lambda_labs")
         assert health.provider == "lambda_labs"
 
-    def test_record_success_resets_failures(self, registry):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(registry.record_failure("runpod", "err"))
-        loop.run_until_complete(registry.record_success("runpod", latency_ms=50.0))
+    async def test_record_success_resets_failures(self, registry):
+        await registry.record_failure("runpod", "err")
+        await registry.record_success("runpod", latency_ms=50.0)
         health = registry._get_health("runpod")
         assert health.consecutive_failures == 0
 
-    def test_latency_ema(self, registry):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(registry.record_success("vastai", latency_ms=100.0))
-        loop.run_until_complete(registry.record_success("vastai", latency_ms=200.0))
+    async def test_latency_ema(self, registry):
+        await registry.record_success("vastai", latency_ms=100.0)
+        await registry.record_success("vastai", latency_ms=200.0)
         health = registry._get_health("vastai")
         assert 100.0 <= health.avg_latency_ms <= 200.0
 
     def test_spot_score_zero_with_no_preemptions(self, registry):
         assert registry.get_spot_score("runpod") == 0.0
 
-    def test_spot_score_increases_after_preemptions(self, registry):
-        loop = asyncio.get_event_loop()
+    async def test_spot_score_increases_after_preemptions(self, registry):
         for _ in range(5):
-            loop.run_until_complete(registry.record_preemption("runpod"))
+            await registry.record_preemption("runpod")
         assert registry.get_spot_score("runpod") > 0.0
 
-    def test_ranked_providers_excludes_unhealthy(self, registry):
-        loop = asyncio.get_event_loop()
+    async def test_ranked_providers_excludes_unhealthy(self, registry):
         for _ in range(registry.FAILURE_THRESHOLD):
-            loop.run_until_complete(registry.record_failure("runpod", "down"))
+            await registry.record_failure("runpod", "down")
         ranked = registry.ranked_providers("H100-80GB")
         assert "runpod" not in ranked
 
@@ -186,10 +178,9 @@ class TestProviderRegistry:
         assert "overall_success_rate" in stats
         assert stats["overall_success_rate"] == 1.0
 
-    def test_reset_health(self, registry):
-        loop = asyncio.get_event_loop()
+    async def test_reset_health(self, registry):
         for _ in range(registry.FAILURE_THRESHOLD):
-            loop.run_until_complete(registry.record_failure("runpod", "err"))
+            await registry.record_failure("runpod", "err")
         registry.reset_health("runpod")
         assert registry.is_healthy("runpod") is True
         assert registry._get_health("runpod").consecutive_failures == 0

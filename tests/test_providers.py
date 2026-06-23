@@ -78,7 +78,8 @@ class TestBaseProviderContract:
         for gpu in ["A100", "V100", "H100", "RTX4090", "RTX3090"]:
             specs = p._get_gpu_specs(gpu)
             assert "memory_gb" in specs, f"Missing memory_gb for {gpu}"
-            assert "tflops" in specs, f"Missing tflops for {gpu}"
+            # _get_gpu_specs now returns tflops_bf16/tflops_fp16/tflops_fp32 instead of generic 'tflops'
+            assert any(k in specs for k in ("tflops_bf16", "tflops_fp16", "tflops_fp32")), f"Missing tflops fields for {gpu}"
             assert specs["memory_gb"] > 0
 
     def test_unknown_gpu_returns_empty(self):
