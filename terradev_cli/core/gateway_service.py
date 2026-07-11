@@ -143,7 +143,7 @@ class GatewayService:
                 from terradev_cli.core.inference_router import InferenceRouter
                 self.inference_router = InferenceRouter()
                 logger.info("Inference router integration enabled")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to initialize inference router: {e}")
     
     def _setup_middleware(self):
@@ -325,7 +325,7 @@ class GatewayService:
                 
                 return JSONResponse(content=response_data)
             
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Custom workflow error: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
@@ -351,7 +351,7 @@ class GatewayService:
                 
                 return JSONResponse(content=response_data)
             
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Custom exit point error: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
     

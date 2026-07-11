@@ -16012,7 +16012,7 @@ def gateway(host, port, openai, no_openai, anthropic, no_anthropic, custom, no_c
         sys.exit(1)
     except KeyboardInterrupt:
         print("\n\nGateway server stopped.")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to start gateway server: {e}")
         sys.exit(1)
 
