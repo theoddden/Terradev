@@ -1,4 +1,4 @@
-# Terradev CLI v5.6.0
+# Terradev CLI v5.6.1
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -15,6 +15,18 @@ Combines quoting, provisioning, topology optimization, training orchestration, i
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
+
+**NOTES ON 5.6.1**
+
+Added **Database Connection System** and **Unified Observability & Scheduling** commands:
+
+- **Database Connection System** (`core/database_connection.py`): SQLite and PostgreSQL support with in-memory connection storage, connection ID system, auto-table creation for 4 standard metadata tables (dataset_versions, workflow_runs, idempotency_keys, node_executions), and database operations (query, upsert, get connection).
+
+- **Observe Command** (`terradev observe`): Unified monitoring pipeline that wires API Gateway traffic into W&B, Phoenix, and Cost Analytics with a shared trace ID across all three destinations. Commands: `terradev observe gateway`, `terradev observe status`.
+
+- **Schedule Command** (`terradev schedule`): Spot-aware scheduling for cost-optimized job execution with pricing window awareness (not just generic cron). Commands: `terradev schedule job`, `terradev schedule list`, `terradev schedule windows`.
+
+- **MCP Tools**: 5 new database tools for connection management and queries (create_sqlite_connection, create_postgresql_connection, query_database, upsert_database, get_database_connection).
 
 **NOTES ON 5.6.0**
 
