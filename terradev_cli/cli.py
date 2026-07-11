@@ -16017,6 +16017,168 @@ def gateway(host, port, openai, no_openai, anthropic, no_anthropic, custom, no_c
         sys.exit(1)
 
 
+# Observe Command - Unified Monitoring Pipeline
+@cli.group()
+def observe():
+    """Unified observability pipeline - W&B, Phoenix, Cost Analytics with shared trace ID"""
+    pass
+
+
+@observe.command("gateway")
+@click.argument("gateway_endpoint")
+@click.option("--wandb-project", help="W&B project name")
+@click.option("--wandb-entity", help="W&B entity/team")
+@click.option("--phoenix-endpoint", help="Phoenix endpoint URL")
+@click.option("--enable-cost-analytics/--disable-cost-analytics", default=True, help="Enable cost analytics tracking")
+@click.option("--duration", default=3600, help="Observation duration in seconds")
+@click.option("--sample-rate", default=1.0, help="Sampling rate (0.0-1.0)")
+def observe_gateway(
+    gateway_endpoint,
+    wandb_project,
+    wandb_entity,
+    phoenix_endpoint,
+    enable_cost_analytics,
+    duration,
+    sample_rate
+):
+    """Observe API Gateway traffic across W&B, Phoenix, and Cost Analytics"""
+    import asyncio
+    
+    async def run_observe():
+        from terradev_cli.core.observe import observe_gateway_traffic
+        
+        result = await observe_gateway_traffic(
+            gateway_endpoint=gateway_endpoint,
+            wandb_project=wandb_project,
+            wandb_entity=wandb_entity,
+            phoenix_endpoint=phoenix_endpoint,
+            enable_cost_analytics=enable_cost_analytics,
+            duration_seconds=duration,
+            sample_rate=sample_rate
+        )
+        
+        print(f"\n📊 Observability Summary:")
+        print(f"   Trace ID: {result['trace_id']}")
+        print(f"   Active Destinations: {', '.join(result['active_destinations'])}")
+        print(f"   Start Time: {result['start_time']}")
+        
+        return result
+    
+    try:
+        result = asyncio.run(run_observe())
+        return 0 if result else 1
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: Observability pipeline failed: {e}")
+        return 1
+
+
+@observe.command("status")
+@click.argument("trace_id")
+def observe_status(trace_id):
+    """Get status of an observability trace"""
+    import asyncio
+    
+    async def run_status():
+        from terradev_cli.core.observe import observe_status
+        
+        result = await observe_status(trace_id)
+        
+        print(f"\n📊 Trace Status: {trace_id}")
+        print(f"   Overall Status: {result['status']}")
+        
+        for dest, info in result.items():
+            if dest != "trace_id" and dest != "status":
+                print(f"   {dest.upper()}: {info}")
+        
+        return result
+    
+    try:
+        result = asyncio.run(run_status())
+        return 0 if result else 1
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: Failed to get trace status: {e}")
+        return 1
+
+
+# Schedule Command - Spot-Aware Scheduling
+@cli.group()
+def schedule():
+    """Spot-aware scheduling for cost-optimized job execution"""
+    pass
+
+
+@schedule.command("job")
+@click.argument("command")
+@click.argument("gpu_type")
+@click.option("--cron", help="Cron expression for recurring jobs")
+@click.option("--max-wait-hours", default=24, help="Maximum hours to wait for optimal pricing")
+@click.option("--job-name", help="Custom job name")
+@click.option("--prefer-current/--no-prefer-current", default=True, help="Prefer currently active pricing window")
+def schedule_job(command, gpu_type, cron, max_wait_hours, job_name, prefer_current):
+    """Schedule a job with spot pricing awareness"""
+    import asyncio
+    
+    async def run_schedule():
+        from terradev_cli.core.schedule import schedule_spot_job
+        
+        result = await schedule_spot_job(
+            command=command,
+            gpu_type=gpu_type,
+            cron_expression=cron,
+            max_wait_hours=max_wait_hours,
+            job_name=job_name,
+            prefer_current_window=prefer_current
+        )
+        
+        return result
+    
+    try:
+        result = asyncio.run(run_schedule())
+        return 0 if result.get("status") == "success" else 1
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: Failed to schedule job: {e}")
+        return 1
+
+
+@schedule.command("list")
+def schedule_list_cmd():
+    """List all scheduled jobs"""
+    import asyncio
+    
+    async def run_list():
+        from terradev_cli.core.schedule import schedule_list
+        
+        result = await schedule_list()
+        return result
+    
+    try:
+        result = asyncio.run(run_list())
+        return 0
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: Failed to list jobs: {e}")
+        return 1
+
+
+@schedule.command("windows")
+@click.option("--gpu-type", help="Filter by GPU type")
+def schedule_windows(gpu_type):
+    """Show available spot pricing windows"""
+    import asyncio
+    
+    async def run_windows():
+        from terradev_cli.core.schedule import schedule_pricing_windows
+        
+        result = await schedule_pricing_windows(gpu_type)
+        return result
+    
+    try:
+        result = asyncio.run(run_windows())
+        return 0
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: Failed to get pricing windows: {e}")
+        return 1
+
+
 if __name__ == "__main__":
     cli()
 

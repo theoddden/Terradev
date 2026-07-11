@@ -5683,6 +5683,20 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             # Build command arguments
             cmd_args = command_map[tool_name].copy()
 
+            # Handle database tools via new_feature_tools handlers
+            if tool_name in ["create_sqlite_connection", "create_postgresql_connection", "query_database", "upsert_database", "get_database_connection"]:
+                if tool_name in NEW_COMMAND_MAP:
+                    handler = NEW_COMMAND_MAP[tool_name]
+                    result = await handler(arguments)
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=result[0]["text"])]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"Database tool handler not found: {tool_name}")],
+                        isError=True
+                    )
+
             # Handle local_scan tool separately (doesn't use terradev CLI)
             if tool_name == "local_scan":
                 local_info = await discover_local_gpus()
