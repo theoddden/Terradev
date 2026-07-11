@@ -1,4 +1,4 @@
-# Terradev CLI v5.5.6
+# Terradev CLI v5.6.0
 
 **An imperative command-line-interface for AI workload orchestration.**
 
@@ -15,6 +15,42 @@ Combines quoting, provisioning, topology optimization, training orchestration, i
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
+
+**NOTES ON 5.6.0**
+
+Added **API Gateway for inference serving** with OpenAI/Anthropic/custom API entry and exit points:
+
+- **Gateway Service** (`core/gateway_service.py`): FastAPI-based gateway that provides OpenAI-compatible, Anthropic-compatible, and custom workflow API endpoints for inference serving. Integrates with Terradev's inference router and KV cache management for intelligent routing.
+
+- **Gateway CLI command** (`terradev gateway`):
+  ```bash
+  terradev gateway
+  terradev gateway --host 0.0.0.0 --port 8080
+  terradev gateway --no-anthropic --max-concurrent 50
+  terradev gateway --model meta-llama/Llama-3.1-8B-Instruct
+  ```
+
+- **OpenAI-compatible endpoints**:
+  - POST /v1/chat/completions
+  - POST /v1/completions
+
+- **Anthropic-compatible endpoints**:
+  - POST /v1/messages
+  - POST /v1/messages/batches
+
+- **Custom workflow endpoints**:
+  - POST /v1/custom/entry/{workflow_id}
+  - POST /v1/custom/exit/{workflow_id}
+
+- **Management endpoints**:
+  - GET /health
+  - GET /v1/gateway/status
+
+- **Features**:
+  - Streaming response support
+  - Configurable CORS, concurrent requests, timeouts
+  - Integration with inference router for intelligent routing
+  - Request/response transformation and validation
 
 **NOTES ON 5.3.9**
 
