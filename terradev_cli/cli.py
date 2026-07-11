@@ -15892,6 +15892,131 @@ def agent_teardown(fleet_id, yes):
 cli.add_command(agent)
 
 
+# Gateway command for inference serving
+@cli.command()
+@click.option("--host", "-h", default="0.0.0.0", help="Host to bind the gateway server")
+@click.option("--port", "-p", default=8000, type=int, help="Port for the gateway server")
+@click.option("--openai", is_flag=True, default=True, help="Enable OpenAI-compatible endpoints")
+@click.option("--no-openai", is_flag=True, help="Disable OpenAI-compatible endpoints")
+@click.option("--anthropic", is_flag=True, default=True, help="Enable Anthropic-compatible endpoints")
+@click.option("--no-anthropic", is_flag=True, help="Disable Anthropic-compatible endpoints")
+@click.option("--custom", is_flag=True, default=True, help="Enable custom workflow endpoints")
+@click.option("--no-custom", is_flag=True, help="Disable custom workflow endpoints")
+@click.option("--max-concurrent", type=int, default=100, help="Maximum concurrent requests")
+@click.option("--timeout", type=int, default=120, help="Request timeout in seconds")
+@click.option("--cors", is_flag=True, default=True, help="Enable CORS")
+@click.option("--no-cors", is_flag=True, help="Disable CORS")
+@click.option("--cors-origins", multiple=True, help="CORS allowed origins")
+@click.option("--model", default="meta-llama/Llama-3.1-70B-Instruct", help="Default model for inference")
+@click.option("--no-inference-router", is_flag=True, help="Disable inference router integration")
+def gateway(host, port, openai, no_openai, anthropic, no_anthropic, custom, no_custom, 
+            max_concurrent, timeout, cors, no_cors, cors_origins, model, no_inference_router):
+    """Launch an API gateway for inference serving.
+
+    Provides OpenAI/Anthropic/custom API entry and exit points for inference workflows.
+    Integrates with Terradev's inference routing and KV cache management.
+
+    \b
+    OpenAI-compatible endpoints:
+      - POST /v1/chat/completions
+      - POST /v1/completions
+
+    \b
+    Anthropic-compatible endpoints:
+      - POST /v1/messages
+      - POST /v1/messages/batches
+
+    \b
+    Custom workflow endpoints:
+      - POST /v1/custom/entry/{workflow_id}
+      - POST /v1/custom/exit/{workflow_id}
+
+    \b
+    Management endpoints:
+      - GET /health
+      - GET /v1/gateway/status
+
+    \b
+    Examples:
+      terradev gateway
+      terradev gateway --host 0.0.0.0 --port 8080
+      terradev gateway --no-anthropic --max-concurrent 50
+      terradev gateway --model meta-llama/Llama-3.1-8B-Instruct
+
+    \b
+    Testing the gateway:
+      curl http://localhost:8000/health
+      curl http://localhost:8000/v1/gateway/status
+    """
+    import asyncio
+    
+    # Resolve boolean flags
+    enable_openai = openai and not no_openai
+    enable_anthropic = anthropic and not no_anthropic
+    enable_custom = custom and not no_custom
+    enable_cors = cors and not no_cors
+    enable_inference_router = not no_inference_router
+    
+    # Resolve CORS origins
+    origins_list = list(cors_origins) if cors_origins else ["*"]
+    
+    print(f"\n{'='*70}")
+    print(f"TERRADEV INFERENCE GATEWAY")
+    print(f"{'='*70}")
+    print(f"Host: {host}:{port}")
+    print(f"OpenAI API: {'ENABLED' if enable_openai else 'DISABLED'}")
+    print(f"Anthropic API: {'ENABLED' if enable_anthropic else 'DISABLED'}")
+    print(f"Custom Workflows: {'ENABLED' if enable_custom else 'DISABLED'}")
+    print(f"CORS: {'ENABLED' if enable_cors else 'DISABLED'}")
+    print(f"Inference Router: {'ENABLED' if enable_inference_router else 'DISABLED'}")
+    print(f"Max Concurrent Requests: {max_concurrent}")
+    print(f"Request Timeout: {timeout}s")
+    print(f"Default Model: {model}")
+    print(f"{'='*70}\n")
+    
+    try:
+        from terradev_cli.core.gateway_service import (
+            GatewayService,
+            create_gateway_config
+        )
+        
+        config = create_gateway_config(
+            host=host,
+            port=port,
+            enable_openai=enable_openai,
+            enable_anthropic=enable_anthropic,
+            enable_custom=enable_custom,
+            max_concurrent_requests=max_concurrent,
+            request_timeout=timeout,
+            enable_cors=enable_cors,
+            cors_origins=origins_list,
+            enable_inference_router=enable_inference_router,
+            default_model=model,
+        )
+        
+        gateway = GatewayService(config)
+        
+        print("Starting gateway server...")
+        print(f"OpenAI endpoint: http://{host}:{port}/v1/chat/completions")
+        print(f"Anthropic endpoint: http://{host}:{port}/v1/messages")
+        print(f"Health check: http://{host}:{port}/health")
+        print(f"Gateway status: http://{host}:{port}/v1/gateway/status")
+        print("\nPress Ctrl+C to stop the server\n")
+        
+        gateway.run_sync()
+        
+    except ImportError as e:
+        print(f"ERROR: {e}")
+        print("\nTo install required dependencies:")
+        print("  pip install fastapi uvicorn")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\n\nGateway server stopped.")
+    except Exception as e:
+        print(f"ERROR: Failed to start gateway server: {e}")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     cli()
 
