@@ -18,9 +18,11 @@ from unittest.mock import Mock, AsyncMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-# Skip entire test file if mcp is not installed
+# Skip entire test file if mcp is not properly installed
 try:
     import mcp
+    from mcp.server import Server as _MCPServer
+    from mcp.types import Tool as _MCPTool
 except ImportError:
     pytest.skip("mcp package not installed - skipping MCP tests", allow_module_level=True)
 
