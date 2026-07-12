@@ -1049,6 +1049,7 @@ async def _ensure_tools_loaded():
 
         # Load tools on first request
         logger.info("Loading MCP tools (lazy loading)...")
+        _build_all_tools()
         _tools_loaded = True
         logger.info(f"Loaded {len(_ALL_TOOLS)} tools successfully")
 
@@ -1069,87 +1070,454 @@ except ImportError:
     )
 
 # ── Pre-compiled Tool Schemas (built once at module load) ────────────────────
-_ALL_TOOLS = []
+_ALL_TOOLS = None
 
-if MCP_AVAILABLE:
-    _ALL_TOOLS = [
+def _build_all_tools():
+    _ALL_TOOLS = []
+
+    if MCP_AVAILABLE:
+        _ALL_TOOLS = [
+            Tool(
+                name="quote_gpu",
+                description="Get real-time GPU prices across 21+ cloud providers (incl. Alibaba, OVHcloud, FluidStack, Hetzner, SiliconFlow, Latitude.sh, Oracle, Crusoe, DigitalOcean)",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type (H100, H200, H800, A100, A10G, L40S, L4, T4, RTX4090, RTX3090, V100, V100S, A6000)",
+                        "enum": [
+                            "H100",
+                            "H200",
+                            "H800",
+                            "A100",
+                            "A10G",
+                            "L40S",
+                            "L4",
+                            "T4",
+                            "RTX4090",
+                            "RTX3090",
+                            "V100",
+                            "V100S",
+                            "A6000",
+                        ],
+                    },
+                    "providers": {
+                        "type": "string",
+                        "description": "Optional comma-separated list of providers to filter",
+                        "pattern": "^[a-z,-]*$",
+                    },
+                    "quick": {
+                        "type": "boolean",
+                        "description": "Quick-provision the cheapest option",
+                    },
+                },
+                "required": ["gpu_type"],
+            },
+        ),
         Tool(
-            name="quote_gpu",
-            description="Get real-time GPU prices across 21+ cloud providers (incl. Alibaba, OVHcloud, FluidStack, Hetzner, SiliconFlow, Latitude.sh, Oracle, Crusoe, DigitalOcean)",
+            name="provision_gpu",
+            description="Provision GPU instances using Terraform for optimal parallel efficiency",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type (H100, H200, H800, A100, A10G, L40S, L4, T4, RTX4090, RTX3090, V100, V100S, A6000)",
-                    "enum": [
-                        "H100",
-                        "H200",
-                        "H800",
-                        "A100",
-                        "A10G",
-                        "L40S",
-                        "L4",
-                        "T4",
-                        "RTX4090",
-                        "RTX3090",
-                        "V100",
-                        "V100S",
-                        "A6000",
-                    ],
+                        "type": "string",
+                        "description": "GPU type to provision",
+                        "enum": [
+                            "H100",
+                            "A100",
+                            "A10G",
+                            "L40S",
+                            "L4",
+                            "T4",
+                            "RTX4090",
+                            "RTX3090",
+                            "V100",
+                        ],
+                    },
+                    "count": {
+                        "type": "integer",
+                        "description": "Number of GPUs to provision",
+                        "minimum": 1,
+                        "default": 1,
+                    },
+                    "providers": {
+                        "type": "array",
+                        "description": "Cloud providers for parallel distribution",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "runpod",
+                                "vastai",
+                                "lambda",
+                                "aws",
+                                "gcp",
+                                "azure",
+                                "coreweave",
+                                "tensordock",
+                                "oracle",
+                                "crusoe",
+                                "digitalocean",
+                                "hyperstack",
+                                "alibaba",
+                                "ovhcloud",
+                                "fluidstack",
+                                "hetzner",
+                                "siliconflow",
+                                "latitude",
+                                "huggingface",
+                                "baseten",
+                                "inferx",
+                            ],
+                        },
+                    },
+                    "max_price": {
+                        "type": "number",
+                        "description": "Maximum price per hour",
+                        "minimum": 0,
+                    },
+                    "plan_only": {
+                        "type": "boolean",
+                        "description": "Generate Terraform plan without applying",
+                        "default": False,
+                    },
+                    "state_file": {
+                        "type": "string",
+                        "description": "Terraform state file path (optional)",
+                        "default": None,
+                    },
                 },
-                "providers": {
-                    "type": "string",
-                    "description": "Optional comma-separated list of providers to filter",
-                    "pattern": "^[a-z,-]*$",
+                "required": ["gpu_type"],
+            },
+        ),
+        Tool(
+            name="terraform_plan",
+            description="Generate Terraform execution plan for GPU provisioning",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "config_dir": {
+                        "type": "string",
+                        "description": "Directory containing Terraform configuration",
+                    },
+                    "var_file": {
+                        "type": "string",
+                        "description": "Terraform variables file path (optional)",
+                    },
+                    "destroy": {
+                        "type": "boolean",
+                        "description": "Generate destroy plan",
+                        "default": False,
+                    },
                 },
-                "quick": {
-                    "type": "boolean",
-                    "description": "Quick-provision the cheapest option",
+                "required": ["config_dir"],
+            },
+        ),
+        Tool(
+            name="terraform_apply",
+            description="Apply Terraform configuration for GPU provisioning",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "config_dir": {
+                        "type": "string",
+                        "description": "Directory containing Terraform configuration",
+                    },
+                    "plan_file": {
+                        "type": "string",
+                        "description": "Terraform plan file to apply (optional)",
+                    },
+                    "var_file": {
+                        "type": "string",
+                        "description": "Terraform variables file path (optional)",
+                    },
+                    "auto_approve": {
+                        "type": "boolean",
+                        "description": "Auto-approve the apply",
+                        "default": True,
+                    },
+                },
+                "required": ["config_dir"],
+            },
+        ),
+        Tool(
+            name="terraform_destroy",
+            description="Destroy Terraform-managed GPU infrastructure",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "config_dir": {
+                        "type": "string",
+                        "description": "Directory containing Terraform configuration",
+                    },
+                    "var_file": {
+                        "type": "string",
+                        "description": "Terraform variables file path (optional)",
+                    },
+                    "auto_approve": {
+                        "type": "boolean",
+                        "description": "Auto-approve the destroy",
+                        "default": True,
+                    },
+                },
+                "required": ["config_dir"],
+            },
+        ),
+        Tool(
+            name="local_scan",
+            description="Scan local machine and network for available GPU devices. Returns total VRAM pool for local-first provisioning.",
+            inputSchema={"type": "object", "properties": {}, "required": []},
+        ),
+        Tool(
+            name="k8s_create",
+            description="Create Kubernetes cluster with GPU nodes using Terraform for optimal multi-cloud deployment",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_name": {
+                        "type": "string",
+                        "description": "Name of the cluster",
+                    },
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type for nodes",
+                        "enum": [
+                            "H100",
+                            "A100",
+                            "A10G",
+                            "L40S",
+                            "L4",
+                            "T4",
+                            "RTX4090",
+                            "RTX3090",
+                            "V100",
+                        ],
+                    },
+                    "count": {
+                        "type": "integer",
+                        "description": "Number of GPU nodes",
+                        "minimum": 1,
+                        "default": 1,
+                    },
+                    "multi_cloud": {
+                        "type": "boolean",
+                        "description": "Use multi-cloud node pools for resilience",
+                        "default": False,
+                    },
+                    "prefer_spot": {
+                        "type": "boolean",
+                        "description": "Prefer spot instances for cost savings",
+                        "default": True,
+                    },
+                    "use_terraform": {
+                        "type": "boolean",
+                        "description": "Use Terraform for infrastructure as code",
+                        "default": True,
+                    },
+                },
+                "required": ["cluster_name", "gpu_type"],
+            },
+        ),
+        Tool(
+            name="k8s_list",
+            description="List Kubernetes clusters",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="k8s_info",
+            description="Get information about a specific cluster",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_name": {"type": "string", "description": "Name of the cluster"}
+                },
+                "required": ["cluster_name"],
+            },
+        ),
+        Tool(
+            name="k8s_destroy",
+            description="Destroy a Kubernetes cluster",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_name": {
+                        "type": "string",
+                        "description": "Name of the cluster to destroy",
+                    }
+                },
+                "required": ["cluster_name"],
+            },
+        ),
+        Tool(
+            name="inferx_deploy",
+            description="Deploy model to InferX serverless platform using Terraform for infrastructure as code",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model": {
+                        "type": "string",
+                        "description": "Model ID (e.g., meta-llama/Llama-2-7b-hf)",
+                    },
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type for inference",
+                        "enum": [
+                            "H100",
+                            "A100",
+                            "A10G",
+                            "L40S",
+                            "L4",
+                            "T4",
+                            "RTX4090",
+                            "RTX3090",
+                            "V100",
+                        ],
+                    },
+                    "endpoint_name": {
+                        "type": "string",
+                        "description": "Custom endpoint name (optional)",
+                    },
+                    "use_terraform": {
+                        "type": "boolean",
+                        "description": "Use Terraform for infrastructure as code",
+                        "default": True,
+                    },
+                },
+                "required": ["model", "gpu_type"],
+            },
+        ),
+        Tool(
+            name="inferx_status",
+            description="Check InferX endpoint status",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="inferx_list",
+            description="List deployed InferX models",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="inferx_optimize",
+            description="Get cost analysis for inference endpoints",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="hf_space_deploy",
+            description="Deploy model to HuggingFace Spaces",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "space_name": {"type": "string", "description": "Name of the Space"},
+                    "model_id": {"type": "string", "description": "HuggingFace model ID"},
+                    "template": {
+                        "type": "string",
+                        "description": "Template type",
+                        "enum": ["llm", "embedding", "image"],
+                    },
+                    "hardware": {"type": "string", "description": "Hardware specification"},
+                    "sdk": {
+                        "type": "string",
+                        "description": "SDK to use (e.g., gradio, streamlit)",
+                    },
+                },
+                "required": ["space_name", "model_id", "template"],
+            },
+        ),
+        Tool(
+            name="status",
+            description="View all instances and costs with Terraform state optimization",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "live": {
+                        "type": "boolean",
+                        "description": "Show live status vs cached Terraform state",
+                        "default": False,
+                    },
+                    "use_terraform_state": {
+                        "type": "boolean",
+                        "description": "Use Terraform state for faster queries",
+                        "default": True,
+                    },
+                    "state_file": {
+                        "type": "string",
+                        "description": "Path to Terraform state file (optional)",
+                    },
                 },
             },
-            "required": ["gpu_type"],
-        },
-    ),
-    Tool(
-        name="provision_gpu",
-        description="Provision GPU instances using Terraform for optimal parallel efficiency",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type to provision",
-                    "enum": [
-                        "H100",
-                        "A100",
-                        "A10G",
-                        "L40S",
-                        "L4",
-                        "T4",
-                        "RTX4090",
-                        "RTX3090",
-                        "V100",
-                    ],
-                },
-                "count": {
-                    "type": "integer",
-                    "description": "Number of GPUs to provision",
-                    "minimum": 1,
-                    "default": 1,
-                },
-                "providers": {
-                    "type": "array",
-                    "description": "Cloud providers for parallel distribution",
-                    "items": {
+        ),
+        Tool(
+            name="terraform_status",
+            description="Fast status query using Terraform state",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "config_dir": {
                         "type": "string",
+                        "description": "Directory containing Terraform configuration",
+                    },
+                    "show_outputs": {
+                        "type": "boolean",
+                        "description": "Show Terraform outputs",
+                        "default": True,
+                    },
+                },
+                "required": ["config_dir"],
+            },
+        ),
+        Tool(
+            name="manage_instance",
+            description="Manage GPU instances (stop/start/terminate)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "instance_id": {"type": "string", "description": "Instance ID"},
+                    "action": {
+                        "type": "string",
+                        "description": "Action to perform",
+                        "enum": ["stop", "start", "terminate"],
+                    },
+                },
+                "required": ["instance_id", "action"],
+            },
+        ),
+        Tool(
+            name="analytics",
+            description="Get cost analytics",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer",
+                        "description": "Number of days to analyze",
+                        "minimum": 1,
+                        "default": 30,
+                    }
+                },
+            },
+        ),
+        Tool(
+            name="optimize",
+            description="Find cheaper alternatives for running instances",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="setup_provider",
+            description="Get setup instructions for a provider",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider name",
                         "enum": [
                             "runpod",
-                            "vastai",
-                            "lambda",
                             "aws",
+                            "vastai",
                             "gcp",
                             "azure",
+                            "lambda",
                             "coreweave",
                             "tensordock",
                             "oracle",
@@ -1167,4208 +1535,3853 @@ if MCP_AVAILABLE:
                             "inferx",
                         ],
                     },
-                },
-                "max_price": {
-                    "type": "number",
-                    "description": "Maximum price per hour",
-                    "minimum": 0,
-                },
-                "plan_only": {
-                    "type": "boolean",
-                    "description": "Generate Terraform plan without applying",
-                    "default": False,
-                },
-                "state_file": {
-                    "type": "string",
-                    "description": "Terraform state file path (optional)",
-                    "default": None,
-                },
-            },
-            "required": ["gpu_type"],
-        },
-    ),
-    Tool(
-        name="terraform_plan",
-        description="Generate Terraform execution plan for GPU provisioning",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "config_dir": {
-                    "type": "string",
-                    "description": "Directory containing Terraform configuration",
-                },
-                "var_file": {
-                    "type": "string",
-                    "description": "Terraform variables file path (optional)",
-                },
-                "destroy": {
-                    "type": "boolean",
-                    "description": "Generate destroy plan",
-                    "default": False,
-                },
-            },
-            "required": ["config_dir"],
-        },
-    ),
-    Tool(
-        name="terraform_apply",
-        description="Apply Terraform configuration for GPU provisioning",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "config_dir": {
-                    "type": "string",
-                    "description": "Directory containing Terraform configuration",
-                },
-                "plan_file": {
-                    "type": "string",
-                    "description": "Terraform plan file to apply (optional)",
-                },
-                "var_file": {
-                    "type": "string",
-                    "description": "Terraform variables file path (optional)",
-                },
-                "auto_approve": {
-                    "type": "boolean",
-                    "description": "Auto-approve the apply",
-                    "default": True,
-                },
-            },
-            "required": ["config_dir"],
-        },
-    ),
-    Tool(
-        name="terraform_destroy",
-        description="Destroy Terraform-managed GPU infrastructure",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "config_dir": {
-                    "type": "string",
-                    "description": "Directory containing Terraform configuration",
-                },
-                "var_file": {
-                    "type": "string",
-                    "description": "Terraform variables file path (optional)",
-                },
-                "auto_approve": {
-                    "type": "boolean",
-                    "description": "Auto-approve the destroy",
-                    "default": True,
-                },
-            },
-            "required": ["config_dir"],
-        },
-    ),
-    Tool(
-        name="local_scan",
-        description="Scan local machine and network for available GPU devices. Returns total VRAM pool for local-first provisioning.",
-        inputSchema={"type": "object", "properties": {}, "required": []},
-    ),
-    Tool(
-        name="k8s_create",
-        description="Create Kubernetes cluster with GPU nodes using Terraform for optimal multi-cloud deployment",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "cluster_name": {
-                    "type": "string",
-                    "description": "Name of the cluster",
-                },
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type for nodes",
-                    "enum": [
-                        "H100",
-                        "A100",
-                        "A10G",
-                        "L40S",
-                        "L4",
-                        "T4",
-                        "RTX4090",
-                        "RTX3090",
-                        "V100",
-                    ],
-                },
-                "count": {
-                    "type": "integer",
-                    "description": "Number of GPU nodes",
-                    "minimum": 1,
-                    "default": 1,
-                },
-                "multi_cloud": {
-                    "type": "boolean",
-                    "description": "Use multi-cloud node pools for resilience",
-                    "default": False,
-                },
-                "prefer_spot": {
-                    "type": "boolean",
-                    "description": "Prefer spot instances for cost savings",
-                    "default": True,
-                },
-                "use_terraform": {
-                    "type": "boolean",
-                    "description": "Use Terraform for infrastructure as code",
-                    "default": True,
-                },
-            },
-            "required": ["cluster_name", "gpu_type"],
-        },
-    ),
-    Tool(
-        name="k8s_list",
-        description="List Kubernetes clusters",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="k8s_info",
-        description="Get information about a specific cluster",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "cluster_name": {"type": "string", "description": "Name of the cluster"}
-            },
-            "required": ["cluster_name"],
-        },
-    ),
-    Tool(
-        name="k8s_destroy",
-        description="Destroy a Kubernetes cluster",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "cluster_name": {
-                    "type": "string",
-                    "description": "Name of the cluster to destroy",
-                }
-            },
-            "required": ["cluster_name"],
-        },
-    ),
-    Tool(
-        name="inferx_deploy",
-        description="Deploy model to InferX serverless platform using Terraform for infrastructure as code",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model": {
-                    "type": "string",
-                    "description": "Model ID (e.g., meta-llama/Llama-2-7b-hf)",
-                },
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type for inference",
-                    "enum": [
-                        "H100",
-                        "A100",
-                        "A10G",
-                        "L40S",
-                        "L4",
-                        "T4",
-                        "RTX4090",
-                        "RTX3090",
-                        "V100",
-                    ],
-                },
-                "endpoint_name": {
-                    "type": "string",
-                    "description": "Custom endpoint name (optional)",
-                },
-                "use_terraform": {
-                    "type": "boolean",
-                    "description": "Use Terraform for infrastructure as code",
-                    "default": True,
-                },
-            },
-            "required": ["model", "gpu_type"],
-        },
-    ),
-    Tool(
-        name="inferx_status",
-        description="Check InferX endpoint status",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="inferx_list",
-        description="List deployed InferX models",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="inferx_optimize",
-        description="Get cost analysis for inference endpoints",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="hf_space_deploy",
-        description="Deploy model to HuggingFace Spaces",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "space_name": {"type": "string", "description": "Name of the Space"},
-                "model_id": {"type": "string", "description": "HuggingFace model ID"},
-                "template": {
-                    "type": "string",
-                    "description": "Template type",
-                    "enum": ["llm", "embedding", "image"],
-                },
-                "hardware": {"type": "string", "description": "Hardware specification"},
-                "sdk": {
-                    "type": "string",
-                    "description": "SDK to use (e.g., gradio, streamlit)",
-                },
-            },
-            "required": ["space_name", "model_id", "template"],
-        },
-    ),
-    Tool(
-        name="status",
-        description="View all instances and costs with Terraform state optimization",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "live": {
-                    "type": "boolean",
-                    "description": "Show live status vs cached Terraform state",
-                    "default": False,
-                },
-                "use_terraform_state": {
-                    "type": "boolean",
-                    "description": "Use Terraform state for faster queries",
-                    "default": True,
-                },
-                "state_file": {
-                    "type": "string",
-                    "description": "Path to Terraform state file (optional)",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="terraform_status",
-        description="Fast status query using Terraform state",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "config_dir": {
-                    "type": "string",
-                    "description": "Directory containing Terraform configuration",
-                },
-                "show_outputs": {
-                    "type": "boolean",
-                    "description": "Show Terraform outputs",
-                    "default": True,
-                },
-            },
-            "required": ["config_dir"],
-        },
-    ),
-    Tool(
-        name="manage_instance",
-        description="Manage GPU instances (stop/start/terminate)",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "instance_id": {"type": "string", "description": "Instance ID"},
-                "action": {
-                    "type": "string",
-                    "description": "Action to perform",
-                    "enum": ["stop", "start", "terminate"],
-                },
-            },
-            "required": ["instance_id", "action"],
-        },
-    ),
-    Tool(
-        name="analytics",
-        description="Get cost analytics",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "days": {
-                    "type": "integer",
-                    "description": "Number of days to analyze",
-                    "minimum": 1,
-                    "default": 30,
-                }
-            },
-        },
-    ),
-    Tool(
-        name="optimize",
-        description="Find cheaper alternatives for running instances",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="setup_provider",
-        description="Get setup instructions for a provider",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "provider": {
-                    "type": "string",
-                    "description": "Provider name",
-                    "enum": [
-                        "runpod",
-                        "aws",
-                        "vastai",
-                        "gcp",
-                        "azure",
-                        "lambda",
-                        "coreweave",
-                        "tensordock",
-                        "oracle",
-                        "crusoe",
-                        "digitalocean",
-                        "hyperstack",
-                        "alibaba",
-                        "ovhcloud",
-                        "fluidstack",
-                        "hetzner",
-                        "siliconflow",
-                        "latitude",
-                        "huggingface",
-                        "baseten",
-                        "inferx",
-                    ],
-                },
-                "quick": {
-                    "type": "boolean",
-                    "description": "Quick setup instructions",
-                    "default": True,
-                },
-            },
-            "required": ["provider"],
-        },
-    ),
-    Tool(
-        name="configure_provider",
-        description="Configure provider credentials",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "provider": {
-                    "type": "string",
-                    "description": "Provider to configure",
-                    "enum": [
-                        "runpod",
-                        "aws",
-                        "vastai",
-                        "gcp",
-                        "azure",
-                        "lambda",
-                        "coreweave",
-                        "tensordock",
-                        "oracle",
-                        "crusoe",
-                        "digitalocean",
-                        "hyperstack",
-                        "alibaba",
-                        "ovhcloud",
-                        "fluidstack",
-                        "hetzner",
-                        "siliconflow",
-                        "latitude",
-                        "huggingface",
-                        "baseten",
-                        "inferx",
-                    ],
-                }
-            },
-            "required": ["provider"],
-        },
-    ),
-    # ── v3.2.0 Tools: Semantic Routing, Disaggregated Inference, GPU Topology, Price Intelligence ──
-    Tool(
-        name="infer_route",
-        description="Semantic-aware inference routing. Analyzes query content across 6 signal dimensions (modality, complexity, domain, language, safety, keywords), applies NUMA-aware endpoint scoring, and selects the optimal inference endpoint. Uses Terraform-style DAG parallel execution for signal extraction.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model": {
-                    "type": "string",
-                    "description": "Filter by model name (e.g., llama-3-70b, deepseek-coder-33b)",
-                },
-                "strategy": {
-                    "type": "string",
-                    "description": "Routing strategy",
-                    "enum": ["latency", "cost", "score"],
-                    "default": "latency",
-                },
-                "measure": {
-                    "type": "boolean",
-                    "description": "Run fresh latency measurements (HTTP TTFB / WebPageTest) before routing",
-                    "default": False,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="infer_route_disagg",
-        description="Disaggregated Prefill/Decode routing (DistServe architecture). Splits LLM inference into compute-bound prefill phase (routed to FLOPS-optimized GPUs like H100 SXM) and memory-bound decode phase (routed to bandwidth-optimized GPUs like MI300X). Tracks KV cache handoffs between endpoint pairs.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model": {
-                    "type": "string",
-                    "description": "Model name for disaggregated pair selection (e.g., llama-3-70b)",
-                },
-                "check_health": {
-                    "type": "boolean",
-                    "description": "Run health probes before selecting pairs",
-                    "default": True,
-                },
-            },
-            "required": ["model"],
-        },
-    ),
-    Tool(
-        name="infer_status",
-        description="Show inference endpoint health, latency, failover status, and disaggregated phase assignments (PREFILL/DECODE/MIXED). Includes KV cache warm status per endpoint.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "check": {
-                    "type": "boolean",
-                    "description": "Run live health probes before showing status",
-                    "default": False,
-                }
-            },
-        },
-    ),
-    Tool(
-        name="infer_failover",
-        description="Run health checks and auto-failover for inference endpoints. If a primary endpoint is unhealthy and has a backup configured, traffic automatically shifts to the backup provider.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "dry_run": {
-                    "type": "boolean",
-                    "description": "Show what would happen without executing failover",
-                    "default": False,
-                }
-            },
-        },
-    ),
-    Tool(
-        name="gpu_topology",
-        description="GPU NUMA topology report with intra-GPU XCD (Accelerated Compute Die) awareness. Models MI300X (8 XCDs, 192GB HBM3), MI300A (6 XCDs, 128GB), H200 (unified 141GB HBM3e), H100 (80GB). Reports PCIe locality (PIX/PXB/PHB/SYS), GPU-NIC pairing, SR-IOV VF status, and generates XCD-aware NCCL/AITER environment variables.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "gpu_arch": {
-                    "type": "string",
-                    "description": "Filter by GPU architecture",
-                    "enum": ["mi300x", "mi300a", "h200", "h100", "a100", "auto"],
-                },
-                "generate_env": {
-                    "type": "boolean",
-                    "description": "Generate XCD-aware NCCL/AITER/CK env vars for optimal attention kernel performance",
-                    "default": True,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="price_intel",
-        description="GPU price intelligence with quantitative analytics. Computes delta (rate of change), gamma (acceleration), and annualized realized volatility on GPU spot/on-demand prices across 21+ providers. Identifies cheapest time windows and provider arbitrage opportunities.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type to analyze",
-                    "enum": [
-                        "H100",
-                        "H200",
-                        "H800",
-                        "A100",
-                        "A10G",
-                        "L40S",
-                        "L4",
-                        "T4",
-                        "RTX4090",
-                        "RTX3090",
-                        "V100",
-                        "V100S",
-                        "A6000",
-                        "MI300X",
-                    ],
-                },
-                "days": {
-                    "type": "integer",
-                    "description": "Number of days of history to analyze",
-                    "minimum": 1,
-                    "default": 7,
-                },
-                "provider": {
-                    "type": "string",
-                    "description": "Filter to specific provider (optional)",
-                },
-            },
-            "required": ["gpu_type"],
-        },
-    ),
-    Tool(
-        name="moe_deploy",
-        description="Deploy Mixture-of-Experts models with production-ready cluster templates. Auto-applies vLLM cost optimizations (KV cache offloading for up to 9x throughput, MTP speculative decoding for up to 2.8x speed, sleep mode for 18-200x faster restarts). Supports GLM-5, Qwen 3.5, Mistral Large 3, DeepSeek V4, Llama 5. Configures NVLink topology, tensor parallelism, FP8 quantization, vLLM/SGLang backends, and GPU-aware HPA autoscaling.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {
-                    "type": "string",
-                    "description": "HuggingFace model ID (e.g., zai-org/GLM-5-FP8, Qwen/Qwen3.5-397B-A17B)",
-                },
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type for MoE serving",
-                    "enum": ["H100", "H200", "H800", "A100", "MI300X"],
-                },
-                "tp_size": {
-                    "type": "integer",
-                    "description": "Tensor parallelism size (must match NVLink domain)",
-                    "enum": [1, 2, 4, 8],
-                    "default": 8,
-                },
-                "backend": {
-                    "type": "string",
-                    "description": "Serving backend",
-                    "enum": ["vllm", "sglang"],
-                    "default": "vllm",
-                },
-                "quantization": {
-                    "type": "string",
-                    "description": "Quantization method",
-                    "enum": ["fp8", "bf16", "awq", "gptq"],
-                    "default": "fp8",
-                },
-                "dry_run": {
-                    "type": "boolean",
-                    "description": "Show deployment plan without executing",
-                    "default": False,
-                },
-            },
-            "required": ["model_id", "gpu_type"],
-        },
-    ),
-    Tool(
-        name="gitops_init",
-        description="Initialize GitOps repository with ArgoCD or Flux CD. Creates cluster manifests, app definitions, policy-as-code templates, and multi-environment structure. Supports GitHub, GitLab, Bitbucket, Azure DevOps.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "repo": {
-                    "type": "string",
-                    "description": "Git repository (e.g., my-org/infra)",
-                },
-                "tool": {
-                    "type": "string",
-                    "description": "GitOps tool to use",
-                    "enum": ["argocd", "flux"],
-                    "default": "argocd",
-                },
-                "provider": {
-                    "type": "string",
-                    "description": "Git provider",
-                    "enum": ["github", "gitlab", "bitbucket", "azure-devops"],
-                    "default": "github",
-                },
-                "cluster": {"type": "string", "description": "Target cluster name"},
-            },
-            "required": ["repo"],
-        },
-    ),
-    # ── v3.4.0 Tools: Training Pipeline, Checkpoints, Monitoring ──
-    Tool(
-        name="train",
-        description="Launch distributed training on provisioned GPU nodes. Supports torchrun, deepspeed, accelerate, and megatron. Use from_provision='latest' to auto-resolve node IPs from your last provision command.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "script": {
-                    "type": "string",
-                    "description": "Training script path (e.g., train.py)",
-                },
-                "framework": {
-                    "type": "string",
-                    "description": "Training framework",
-                    "enum": ["torchrun", "deepspeed", "accelerate", "megatron"],
-                    "default": "torchrun",
-                },
-                "from_provision": {
-                    "type": "string",
-                    "description": "Resolve nodes from provision. Use 'latest' or a parallel_group_id.",
-                },
-                "nodes": {
-                    "type": "array",
-                    "description": "Manual node IPs",
-                    "items": {"type": "string"},
-                },
-                "gpus_per_node": {
-                    "type": "integer",
-                    "description": "GPUs per node",
-                    "default": 8,
-                },
-                "script_args": {
-                    "type": "string",
-                    "description": "Extra args for training script",
-                },
-            },
-            "required": ["script"],
-        },
-    ),
-    Tool(
-        name="train_status",
-        description="List all training jobs and their state (created, running, completed, failed).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {
-                    "type": "string",
-                    "description": "Filter to a specific job ID",
-                }
-            },
-        },
-    ),
-    Tool(
-        name="train_monitor",
-        description="Real-time GPU monitoring for training jobs. Shows utilization, memory, temperature, power, and cost.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {"type": "string", "description": "Job ID to monitor"},
-                "cost_rate": {
-                    "type": "number",
-                    "description": "$/GPU-hr for cost estimation",
-                    "default": 2.0,
-                },
-            },
-            "required": ["job_id"],
-        },
-    ),
-    Tool(
-        name="checkpoint_list",
-        description="List all checkpoints for a training job.",
-        inputSchema={
-            "type": "object",
-            "properties": {"job_id": {"type": "string", "description": "Job ID"}},
-            "required": ["job_id"],
-        },
-    ),
-    Tool(
-        name="checkpoint_save",
-        description="Manually trigger a checkpoint save for a running training job.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {"type": "string", "description": "Job ID"},
-                "step": {"type": "integer", "description": "Step number"},
-            },
-            "required": ["job_id"],
-        },
-    ),
-    Tool(
-        name="preflight",
-        description="Pre-training validation: GPU availability, NCCL, RDMA, drivers across all nodes.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "nodes": {
-                    "type": "array",
-                    "description": "Node IPs to validate",
-                    "items": {"type": "string"},
-                },
-                "from_provision": {
-                    "type": "string",
-                    "description": "Resolve nodes from provision. 'latest' or a group ID.",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="price_discovery",
-        description="Enhanced price discovery with capacity scoring, confidence intervals, and trend analysis.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type",
-                    "enum": [
-                        "H100",
-                        "H200",
-                        "H800",
-                        "A100",
-                        "A10G",
-                        "L40S",
-                        "L4",
-                        "T4",
-                        "RTX4090",
-                        "V100S",
-                        "A6000",
-                        "MI300X",
-                    ],
-                },
-                "region": {"type": "string", "description": "Filter by region"},
-                "hours": {
-                    "type": "integer",
-                    "description": "Hours of history",
-                    "default": 24,
-                },
-            },
-            "required": ["gpu_type"],
-        },
-    ),
-    # ── v2.0.0 Tools: Complete Agentic Loop ─────────────────────────────
-    # Training pipeline completion
-    Tool(
-        name="train_stop",
-        description="Stop a running training job. Kills training processes on all nodes in parallel.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {"type": "string", "description": "Job ID to stop"}
-            },
-            "required": ["job_id"],
-        },
-    ),
-    Tool(
-        name="train_resume",
-        description="Resume a training job from its latest checkpoint. Rebuilds config with topology revalidation.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {"type": "string", "description": "Job ID to resume"},
-                "checkpoint_id": {
-                    "type": "string",
-                    "description": "Specific checkpoint to resume from (default: latest)",
-                },
-            },
-            "required": ["job_id"],
-        },
-    ),
-    Tool(
-        name="checkpoint_restore",
-        description="Restore a specific checkpoint for a training job.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {"type": "string", "description": "Job ID"},
-                "step": {
-                    "type": "integer",
-                    "description": "Checkpoint step to restore",
-                },
-                "checkpoint_id": {
-                    "type": "string",
-                    "description": "Checkpoint ID to restore",
-                },
-            },
-            "required": ["job_id"],
-        },
-    ),
-    Tool(
-        name="checkpoint_promote",
-        description="Promote a checkpoint to a final model path for serving.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {"type": "string", "description": "Job ID"},
-                "checkpoint_id": {
-                    "type": "string",
-                    "description": "Checkpoint ID to promote",
-                },
-                "dest": {
-                    "type": "string",
-                    "description": "Destination path (e.g., /models/final)",
-                },
-            },
-            "required": ["job_id", "checkpoint_id", "dest"],
-        },
-    ),
-    Tool(
-        name="checkpoint_delete",
-        description="Delete a checkpoint.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {"type": "string", "description": "Job ID"},
-                "checkpoint_id": {
-                    "type": "string",
-                    "description": "Checkpoint ID to delete",
-                },
-            },
-            "required": ["job_id", "checkpoint_id"],
-        },
-    ),
-    # Data staging
-    Tool(
-        name="stage",
-        description="Compress, chunk, checksum, and position datasets near compute. Supports local paths, S3/GCS URIs, HTTP URLs, and HuggingFace dataset names. Returns staging plan with agent recommendations.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "dataset": {
-                    "type": "string",
-                    "description": "Dataset path, S3 URI, GCS URI, HTTP URL, or HuggingFace name",
-                },
-                "target_regions": {
-                    "type": "string",
-                    "description": "Comma-separated target regions",
-                },
-                "compression": {
-                    "type": "string",
-                    "description": "Compression algorithm",
-                    "enum": ["auto", "zstd", "gzip", "none"],
-                    "default": "auto",
-                },
-                "plan_only": {
-                    "type": "boolean",
-                    "description": "Show staging plan without executing",
-                    "default": False,
-                },
-            },
-            "required": ["dataset"],
-        },
-    ),
-    # Inference deployment
-    Tool(
-        name="infer_deploy",
-        description="Deploy an inference endpoint with auto-scaling, idle shutdown, and cost optimization. Returns estimated cost and requires_confirmation for expensive deployments.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_path": {
-                    "type": "string",
-                    "description": "Model path or HuggingFace model ID",
-                },
-                "name": {"type": "string", "description": "Endpoint name"},
-                "provider": {
-                    "type": "string",
-                    "description": "Provider for deployment",
-                    "enum": [
-                        "runpod",
-                        "vastai",
-                        "lambda",
-                        "aws",
-                        "gcp",
-                        "coreweave",
-                        "alibaba",
-                        "ovhcloud",
-                        "fluidstack",
-                        "hetzner",
-                        "siliconflow",
-                        "latitude",
-                    ],
-                },
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type",
-                    "enum": [
-                        "H100",
-                        "H200",
-                        "H800",
-                        "A100",
-                        "A10G",
-                        "L40S",
-                        "L4",
-                        "T4",
-                        "V100S",
-                        "A6000",
-                        "MI300X",
-                    ],
-                },
-                "min_workers": {
-                    "type": "integer",
-                    "description": "Minimum workers",
-                    "default": 0,
-                },
-                "max_workers": {
-                    "type": "integer",
-                    "description": "Maximum workers",
-                    "default": 3,
-                },
-                "idle_timeout": {
-                    "type": "integer",
-                    "description": "Idle timeout in seconds",
-                    "default": 300,
-                },
-                "cost_optimize": {
-                    "type": "boolean",
-                    "description": "Enable cost optimization",
-                    "default": True,
-                },
-                "dry_run": {
-                    "type": "boolean",
-                    "description": "Show deployment plan without deploying",
-                    "default": False,
-                },
-            },
-            "required": ["model_path", "name"],
-        },
-    ),
-    # Manifest cache & drift detection
-    Tool(
-        name="up",
-        description="CLI-native provisioning with manifest cache and drift detection. Use --fix-drift to detect and auto-fix drifted infrastructure.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job": {
-                    "type": "string",
-                    "description": "Job name for manifest tracking",
-                },
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type",
-                    "default": "A100",
-                },
-                "gpu_count": {
-                    "type": "integer",
-                    "description": "Number of GPUs",
-                    "default": 1,
-                },
-                "hours": {
-                    "type": "number",
-                    "description": "Estimated runtime in hours",
-                    "default": 1.0,
-                },
-                "budget": {"type": "number", "description": "Budget constraint ($/hr)"},
-                "region": {"type": "string", "description": "Preferred region"},
-                "ttl": {
-                    "type": "string",
-                    "description": "Time to live for nodes",
-                    "default": "1h",
-                },
-                "fix_drift": {
-                    "type": "boolean",
-                    "description": "Detect and fix drift automatically",
-                    "default": False,
-                },
-            },
-            "required": ["job"],
-        },
-    ),
-    Tool(
-        name="rollback",
-        description="Explicit versioned rollback. Format: job@version (e.g., llama3@v3).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_version": {
-                    "type": "string",
-                    "description": "Job@version string (e.g., llama3@v3)",
-                }
-            },
-            "required": ["job_version"],
-        },
-    ),
-    Tool(
-        name="manifests",
-        description="List cached manifests and versions for jobs.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job": {
-                    "type": "string",
-                    "description": "Show versions for specific job (optional)",
-                }
-            },
-        },
-    ),
-    # Smart deployment
-    Tool(
-        name="smart_deploy",
-        description="AI-ranked deployment options with confidence/risk scoring. Returns recommendations with cost estimates and requires_confirmation for execution.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "image": {"type": "string", "description": "Container image"},
-                "workload": {
-                    "type": "string",
-                    "description": "Workload type",
-                    "enum": ["training", "inference", "batch"],
-                },
-                "gpu_type": {"type": "string", "description": "GPU type"},
-                "budget": {"type": "number", "description": "Max $/hr budget"},
-                "option": {
-                    "type": "integer",
-                    "description": "Execute a specific recommended option by index",
-                },
-            },
-            "required": ["image", "workload"],
-        },
-    ),
-    Tool(
-        name="helm_generate",
-        description="Generate Helm charts from workload specifications.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "workload": {
-                    "type": "string",
-                    "description": "Workload type",
-                    "enum": ["training", "inference", "batch"],
-                },
-                "image": {"type": "string", "description": "Container image"},
-                "gpu_type": {"type": "string", "description": "GPU type"},
-                "replicas": {
-                    "type": "integer",
-                    "description": "Number of replicas",
-                    "default": 1,
-                },
-            },
-            "required": ["workload", "image"],
-        },
-    ),
-    # GitOps complete
-    Tool(
-        name="gitops_bootstrap",
-        description="Bootstrap ArgoCD or Flux on the cluster.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "tool": {
-                    "type": "string",
-                    "description": "GitOps tool",
-                    "enum": ["argocd", "flux"],
-                },
-                "cluster": {"type": "string", "description": "Cluster name"},
-                "namespace": {
-                    "type": "string",
-                    "description": "Namespace",
-                    "default": "gitops-system",
-                },
-            },
-            "required": ["tool", "cluster"],
-        },
-    ),
-    Tool(
-        name="gitops_sync",
-        description="Sync cluster with Git repository.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "cluster": {"type": "string", "description": "Cluster name"},
-                "environment": {
-                    "type": "string",
-                    "description": "Environment to sync",
-                    "default": "prod",
-                },
-                "tool": {
-                    "type": "string",
-                    "description": "GitOps tool",
-                    "enum": ["argocd", "flux"],
-                    "default": "argocd",
-                },
-            },
-            "required": ["cluster"],
-        },
-    ),
-    Tool(
-        name="gitops_validate",
-        description="Validate GitOps configuration.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "cluster": {"type": "string", "description": "Cluster name"},
-                "dry_run": {
-                    "type": "boolean",
-                    "description": "Dry run validation",
-                    "default": True,
-                },
-            },
-        },
-    ),
-    # Orchestrator tools
-    Tool(
-        name="orchestrator_start",
-        description="Start the model orchestrator for multi-model GPU sharing with eviction policies.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "gpu_id": {"type": "integer", "description": "GPU ID", "default": 0},
-                "memory_gb": {
-                    "type": "number",
-                    "description": "Total GPU memory in GB",
-                    "default": 80.0,
-                },
-                "policy": {
-                    "type": "string",
-                    "description": "Scaling policy",
-                    "enum": ["billing_optimized", "latency_optimized", "hybrid"],
-                    "default": "billing_optimized",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="orchestrator_register",
-        description="Register a model with the orchestrator.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {"type": "string", "description": "Model identifier"},
-                "model_path": {
-                    "type": "string",
-                    "description": "Path to model weights",
-                },
-                "framework": {
-                    "type": "string",
-                    "description": "Framework",
-                    "enum": ["pytorch", "vllm", "sglang"],
-                    "default": "pytorch",
-                },
-            },
-            "required": ["model_id", "model_path"],
-        },
-    ),
-    Tool(
-        name="orchestrator_load",
-        description="Load a model into GPU memory.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {"type": "string", "description": "Model to load"},
-                "force": {
-                    "type": "boolean",
-                    "description": "Force loading even if memory is full",
-                    "default": False,
-                },
-            },
-            "required": ["model_id"],
-        },
-    ),
-    Tool(
-        name="orchestrator_evict",
-        description="Evict a model from GPU memory.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {"type": "string", "description": "Model to evict"}
-            },
-            "required": ["model_id"],
-        },
-    ),
-    Tool(
-        name="orchestrator_status",
-        description="Get orchestrator and model status including GPU memory utilization.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {
-                    "type": "string",
-                    "description": "Get details for specific model (optional)",
-                }
-            },
-        },
-    ),
-    Tool(
-        name="orchestrator_infer",
-        description="Test inference with a model via the orchestrator.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {
-                    "type": "string",
-                    "description": "Model to run inference on",
-                }
-            },
-            "required": ["model_id"],
-        },
-    ),
-    # Warm pool tools
-    Tool(
-        name="warm_pool_start",
-        description="Start the warm pool manager for intelligent model pre-warming. 5 strategies: traffic_based, time_based, priority_based, cost_optimized, latency_optimized.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "strategy": {
-                    "type": "string",
-                    "description": "Warm pool strategy",
-                    "enum": [
-                        "traffic_based",
-                        "time_based",
-                        "priority_based",
-                        "cost_optimized",
-                        "latency_optimized",
-                    ],
-                    "default": "traffic_based",
-                },
-                "max_warm": {
-                    "type": "integer",
-                    "description": "Max models to keep warm",
-                    "default": 10,
-                },
-                "min_warm": {
-                    "type": "integer",
-                    "description": "Min models to keep warm",
-                    "default": 3,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="warm_pool_status",
-        description="Get warm pool status: hit rate, cold starts, memory saved, cost saved.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    # Cost scaler tools
-    Tool(
-        name="cost_scaler_start",
-        description="Start the budget-aware auto-scaling manager. 4 strategies: minimize_cost, balance_cost_latency, latency_critical, budget_constrained.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "strategy": {
-                    "type": "string",
-                    "description": "Cost strategy",
-                    "enum": [
-                        "minimize_cost",
-                        "balance_cost_latency",
-                        "latency_critical",
-                        "budget_constrained",
-                    ],
-                    "default": "balance_cost_latency",
-                },
-                "budget": {
-                    "type": "number",
-                    "description": "Hourly budget in USD",
-                    "default": 15.0,
-                },
-                "cost_per_gb": {
-                    "type": "number",
-                    "description": "Cost per GB per hour",
-                    "default": 0.10,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="cost_scaler_status",
-        description="Get cost scaler status with budget utilization, predictions, and optimization recommendations.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    # InferX complete
-    Tool(
-        name="inferx_configure",
-        description="Configure InferX serverless platform credentials.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "InferX API key"},
-                "endpoint": {
-                    "type": "string",
-                    "description": "InferX API endpoint",
-                    "default": "https://api.inferx.net",
-                },
-                "region": {
-                    "type": "string",
-                    "description": "Region",
-                    "default": "us-west-2",
-                },
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="inferx_delete",
-        description="Delete an InferX model deployment.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {
-                    "type": "string",
-                    "description": "Model deployment ID to delete",
-                }
-            },
-            "required": ["model_id"],
-        },
-    ),
-    Tool(
-        name="inferx_usage",
-        description="Get InferX account usage statistics: requests, cost, GPU hours, latency.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="inferx_quote",
-        description="Get InferX pricing quotes for a GPU type.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type to quote",
-                    "default": "A100",
-                },
-                "region": {"type": "string", "description": "Region for quote"},
-            },
-        },
-    ),
-    # HF Space deploy (already exists above)
-    Tool(
-        name="hf_space_status",
-        description="Get HuggingFace Space deployment status.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "space_name": {"type": "string", "description": "Space name to check"}
-            },
-            "required": ["space_name"],
-        },
-    ),
-    # Workflow primitives
-    Tool(
-        name="run_workflow",
-        description="Run a declarative YAML workflow that chains multiple Terradev commands (provision → preflight → train → monitor → checkpoint). Returns step-by-step execution status with cost estimates and confirmation gates for expensive operations.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "workflow": {
-                    "type": "string",
-                    "description": "Workflow YAML path or inline YAML string",
-                },
-                "dry_run": {
-                    "type": "boolean",
-                    "description": "Show execution plan without running",
-                    "default": False,
-                },
-                "template": {
-                    "type": "string",
-                    "description": "Use built-in template",
-                    "enum": [
-                        "finetune-llama",
-                        "inference-deploy",
-                        "benchmark-gpu",
-                        "cost-optimize",
-                    ],
-                },
-            },
-        },
-    ),
-    # Active context — session-start awareness
-    Tool(
-        name="active_context",
-        description="Get current Terradev state: running training jobs, active instances, spend-to-date, alerts. Call this on session start to resume context from previous sessions.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    # ── v3.5.0: Multi-LoRA adapter management ────────────────────────
-    Tool(
-        name="lora_list",
-        description="List LoRA adapters loaded on a running vLLM endpoint. Shows base models and hot-loaded fine-tuned adapters.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "vLLM endpoint URL (e.g. http://10.0.0.1:8000)",
-                },
-                "api_key": {"type": "string", "description": "vLLM API key (if set)"},
-            },
-            "required": ["endpoint"],
-        },
-    ),
-    Tool(
-        name="lora_add",
-        description="Hot-load a LoRA adapter onto a running vLLM endpoint. The adapter becomes immediately available as a model name for inference requests. Uses vLLM's fused_moe_lora kernel for 454% higher output tokens/sec on MoE models.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "vLLM endpoint URL (e.g. http://10.0.0.1:8000)",
-                },
-                "name": {
-                    "type": "string",
-                    "description": "Adapter name (becomes the model name in API requests)",
-                },
-                "path": {
-                    "type": "string",
-                    "description": "Path to adapter weights (local path or HuggingFace ID)",
-                },
-                "api_key": {"type": "string", "description": "vLLM API key (if set)"},
-            },
-            "required": ["endpoint", "name", "path"],
-        },
-    ),
-    Tool(
-        name="lora_remove",
-        description="Hot-unload a LoRA adapter from a running vLLM endpoint. Frees GPU memory for other adapters.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "vLLM endpoint URL (e.g. http://10.0.0.1:8000)",
-                },
-                "name": {"type": "string", "description": "Adapter name to unload"},
-                "api_key": {"type": "string", "description": "vLLM API key (if set)"},
-            },
-            "required": ["endpoint", "name"],
-        },
-    ),
-    # ── v4.0.0: ML Services — Ray ──────────────────────────────────────
-    Tool(
-        name="ray_status",
-        description="Get Ray cluster status including node count, resources, memory, and running jobs.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "detailed": {
-                    "type": "boolean",
-                    "description": "Include detailed memory and resource info",
-                    "default": True,
-                }
-            },
-            "required": [],
-        },
-    ),
-    Tool(
-        name="ray_start",
-        description="Start a Ray cluster (head node or worker). For distributed ML training and inference.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "head": {
-                    "type": "boolean",
-                    "description": "Start as head node (true) or worker (false)",
-                    "default": True,
-                },
-                "port": {
-                    "type": "integer",
-                    "description": "Ray head port",
-                    "default": 6379,
-                },
-                "num_gpus": {
-                    "type": "integer",
-                    "description": "Number of GPUs to expose",
-                },
-                "head_address": {
-                    "type": "string",
-                    "description": "Head node address for worker nodes (e.g. 10.0.0.1:6379)",
-                },
-            },
-            "required": [],
-        },
-    ),
-    Tool(
-        name="ray_stop",
-        description="Stop the Ray cluster on the current node.",
-        inputSchema={"type": "object", "properties": {}, "required": []},
-    ),
-    Tool(
-        name="ray_submit_job",
-        description="Submit a job script to the Ray cluster for distributed execution.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "script": {
-                    "type": "string",
-                    "description": "Path to the Python script to submit",
-                },
-                "job_name": {"type": "string", "description": "Optional job name"},
-                "num_gpus": {
-                    "type": "integer",
-                    "description": "GPU resources to request",
-                },
-                "num_cpus": {
-                    "type": "integer",
-                    "description": "CPU resources to request",
-                },
-            },
-            "required": ["script"],
-        },
-    ),
-    Tool(
-        name="ray_list_jobs",
-        description="List all running Ray jobs and tasks.",
-        inputSchema={"type": "object", "properties": {}, "required": []},
-    ),
-    Tool(
-        name="ray_wide_ep_deploy",
-        description="Generate a Ray Serve LLM Wide-EP (Expert Parallel) deployment for MoE models. Returns Python script and config for distributed MoE serving with EPLB and DeepEP.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {
-                    "type": "string",
-                    "description": "HuggingFace model ID (e.g. zai-org/GLM-5-FP8, deepseek-ai/DeepSeek-V3)",
-                },
-                "tp_size": {
-                    "type": "integer",
-                    "description": "Tensor parallel size per EP rank",
-                    "default": 1,
-                },
-                "dp_size": {
-                    "type": "integer",
-                    "description": "Data parallel / EP degree",
-                    "default": 8,
-                },
-                "gpu_memory_utilization": {
-                    "type": "number",
-                    "description": "GPU memory fraction",
-                    "default": 0.85,
-                },
-                "max_model_len": {
-                    "type": "integer",
-                    "description": "Max sequence length",
-                    "default": 32768,
-                },
-                "generate_script": {
-                    "type": "boolean",
-                    "description": "Also generate executable Python script",
-                    "default": True,
-                },
-            },
-            "required": ["model_id"],
-        },
-    ),
-    Tool(
-        name="ray_disagg_pd_deploy",
-        description="Generate a Ray Serve LLM disaggregated Prefill/Decode deployment. Splits inference into compute-bound prefill and memory-bound decode phases with KV cache transfer via NIXL.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {"type": "string", "description": "HuggingFace model ID"},
-                "prefill_tp": {
-                    "type": "integer",
-                    "description": "Prefill tensor parallel size",
-                    "default": 1,
-                },
-                "prefill_dp": {
-                    "type": "integer",
-                    "description": "Prefill data parallel size",
-                    "default": 4,
-                },
-                "decode_tp": {
-                    "type": "integer",
-                    "description": "Decode tensor parallel size",
-                    "default": 1,
-                },
-                "decode_dp": {
-                    "type": "integer",
-                    "description": "Decode data parallel size",
-                    "default": 4,
-                },
-                "kv_connector": {
-                    "type": "string",
-                    "description": "KV transfer connector",
-                    "enum": ["NixlConnector", "LMCacheConnector"],
-                    "default": "NixlConnector",
-                },
-                "generate_script": {
-                    "type": "boolean",
-                    "description": "Also generate executable Python script",
-                    "default": True,
-                },
-            },
-            "required": ["model_id"],
-        },
-    ),
-    Tool(
-        name="ray_parallelism_strategy",
-        description="Compute optimal TP/DP/EP parallelism strategy for a given MoE model and GPU count. Returns recommended configuration with rationale.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {
-                    "type": "string",
-                    "description": "HuggingFace model ID (e.g. zai-org/GLM-5-FP8)",
-                },
-                "gpu_count": {
-                    "type": "integer",
-                    "description": "Number of available GPUs",
-                    "default": 8,
-                },
-                "gpu_memory_gb": {
-                    "type": "number",
-                    "description": "GPU memory per device in GB",
-                    "default": 80.0,
-                },
-            },
-            "required": ["model_id"],
-        },
-    ),
-    # ── v4.0.0: ML Services — vLLM Lifecycle ──────────────────────────
-    Tool(
-        name="vllm_start",
-        description="Start a vLLM inference server on a remote instance via SSH/systemd. Supports Multi-LoRA, Sleep Mode, KV Offloading, Speculative Decoding.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "instance_ip": {"type": "string", "description": "Target instance IP"},
-                "model": {"type": "string", "description": "HuggingFace model ID"},
-                "port": {
-                    "type": "integer",
-                    "description": "Server port",
-                    "default": 8000,
-                },
-                "tp_size": {
-                    "type": "integer",
-                    "description": "Tensor parallel size",
-                    "default": 1,
-                },
-                "gpu_memory_utilization": {
-                    "type": "number",
-                    "description": "GPU memory fraction",
-                    "default": 0.9,
-                },
-                "ssh_user": {
-                    "type": "string",
-                    "description": "SSH user",
-                    "default": "root",
-                },
-                "ssh_key": {"type": "string", "description": "Path to SSH private key"},
-                "api_key": {"type": "string", "description": "vLLM API key to set"},
-            },
-            "required": ["instance_ip", "model"],
-        },
-    ),
-    Tool(
-        name="vllm_stop",
-        description="Stop a vLLM server on a remote instance.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "instance_ip": {"type": "string", "description": "Target instance IP"},
-                "ssh_user": {
-                    "type": "string",
-                    "description": "SSH user",
-                    "default": "root",
-                },
-                "ssh_key": {"type": "string", "description": "Path to SSH private key"},
-            },
-            "required": ["instance_ip"],
-        },
-    ),
-    Tool(
-        name="vllm_inference",
-        description="Test inference against a running vLLM endpoint (completions or chat).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "vLLM endpoint URL (e.g. http://10.0.0.1:8000)",
-                },
-                "prompt": {
-                    "type": "string",
-                    "description": "Prompt text (for completions mode)",
-                },
-                "messages": {
-                    "type": "array",
-                    "description": "Chat messages array (for chat mode)",
-                    "items": {"type": "object"},
-                },
-                "model": {"type": "string", "description": "Model name to use"},
-                "max_tokens": {
-                    "type": "integer",
-                    "description": "Max tokens to generate",
-                    "default": 100,
-                },
-                "api_key": {"type": "string", "description": "vLLM API key"},
-            },
-            "required": ["endpoint", "model"],
-        },
-    ),
-    Tool(
-        name="vllm_info",
-        description="Get vLLM server info: loaded models, config, and health status.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "vLLM endpoint URL (e.g. http://10.0.0.1:8000)",
-                },
-                "api_key": {"type": "string", "description": "vLLM API key"},
-            },
-            "required": ["endpoint"],
-        },
-    ),
-    Tool(
-        name="vllm_sleep",
-        description="Put a vLLM server to sleep. Level 1: offload to CPU (fast wake). Level 2: discard weights (minimal RAM).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {"type": "string", "description": "vLLM endpoint URL"},
-                "level": {
-                    "type": "integer",
-                    "description": "Sleep level (1=CPU offload, 2=discard)",
-                    "default": 1,
-                    "enum": [1, 2],
-                },
-            },
-            "required": ["endpoint"],
-        },
-    ),
-    Tool(
-        name="vllm_wake",
-        description="Wake a sleeping vLLM server. For Level 2 sleep, also reloads weights and resets prefix cache.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {"type": "string", "description": "vLLM endpoint URL"},
-                "sleep_level": {
-                    "type": "integer",
-                    "description": "The sleep level the server is at (affects wake procedure)",
-                    "default": 1,
-                },
-            },
-            "required": ["endpoint"],
-        },
-    ),
-    # ── v5.0.0: ML Services — SGLang Optimization Stack ──────────────────────────────────
-    Tool(
-        name="sglang",
-        description="Complete SGLang optimization stack with workload-specific auto-tuning for 7 workload types: agentic chat, batch inference, low latency, MoE models, PD disaggregated, structured output, and RAG.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "SGLang action to perform",
-                    "enum": [
-                        "optimize",
-                        "detect",
-                        "router",
-                        "install",
-                        "start",
-                        "stop",
-                        "inference",
-                        "metrics",
-                        "test",
-                    ],
-                },
-                "model_path": {
-                    "type": "string",
-                    "description": "HuggingFace model ID or path",
-                },
-                "workload_type": {
-                    "type": "string",
-                    "description": "Workload type for optimization",
-                    "enum": [
-                        "agentic_chat",
-                        "batch_inference",
-                        "low_latency",
-                        "moe_model",
-                        "pd_disaggregated",
-                        "structured_output",
-                        "rag_workload",
-                    ],
-                },
-                "user_description": {
-                    "type": "string",
-                    "description": "Natural language description of workload",
-                },
-                "host": {
-                    "type": "string",
-                    "description": "Server host",
-                    "default": "0.0.0.0",
-                },
-                "port": {
-                    "type": "integer",
-                    "description": "Server port",
-                    "default": 8000,
-                },
-                "dry_run": {
-                    "type": "boolean",
-                    "description": "Show optimization plan without launching",
-                    "default": False,
-                },
-                "dp_size": {
-                    "type": "integer",
-                    "description": "Data parallel size for multi-replica",
-                    "default": 8,
-                },
-                "instance_ip": {
-                    "type": "string",
-                    "description": "Remote instance IP for installation/deployment",
-                },
-                "ssh_user": {
-                    "type": "string",
-                    "description": "SSH user for remote operations",
-                    "default": "root",
-                },
-                "ssh_key": {"type": "string", "description": "Path to SSH private key"},
-                "endpoint": {
-                    "type": "string",
-                    "description": "SGLang endpoint URL for inference/metrics",
-                },
-                "prompt": {
-                    "type": "string",
-                    "description": "Prompt text for inference testing",
-                },
-                "messages": {
-                    "type": "array",
-                    "description": "Chat messages array",
-                    "items": {"type": "object"},
-                },
-                "max_tokens": {
-                    "type": "integer",
-                    "description": "Max tokens to generate",
-                    "default": 100,
-                },
-                "api_key": {"type": "string", "description": "API key for inference"},
-                "tp_size": {
-                    "type": "integer",
-                    "description": "Tensor parallel size",
-                    "default": 1,
-                },
-                "enable_expert_parallel": {
-                    "type": "boolean",
-                    "description": "Enable MoE Expert Parallelism",
-                    "default": False,
-                },
-            },
-            "required": ["action"],
-        },
-    ),
-    # ── v4.0.0: ML Services — Legacy SGLang (deprecated) ──────────────────────────────────
-    Tool(
-        name="sglang_start",
-        description="[DEPRECATED] Use sglang action='start' instead. Start an SGLang inference server on a remote instance.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "instance_ip": {"type": "string", "description": "Target instance IP"},
-                "model": {"type": "string", "description": "HuggingFace model ID"},
-                "port": {
-                    "type": "integer",
-                    "description": "Server port",
-                    "default": 8000,
-                },
-                "tp_size": {
-                    "type": "integer",
-                    "description": "Tensor parallel size",
-                    "default": 1,
-                },
-                "dp_size": {
-                    "type": "integer",
-                    "description": "Data parallel size",
-                    "default": 8,
-                },
-                "enable_expert_parallel": {
-                    "type": "boolean",
-                    "description": "Enable MoE Expert Parallelism",
-                    "default": False,
-                },
-                "ssh_user": {
-                    "type": "string",
-                    "description": "SSH user",
-                    "default": "root",
-                },
-                "ssh_key": {"type": "string", "description": "Path to SSH private key"},
-            },
-            "required": ["instance_ip", "model"],
-        },
-    ),
-    Tool(
-        name="sglang_stop",
-        description="[DEPRECATED] Use sglang action='stop' instead. Stop an SGLang server on a remote instance.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "instance_ip": {"type": "string", "description": "Target instance IP"},
-                "ssh_user": {
-                    "type": "string",
-                    "description": "SSH user",
-                    "default": "root",
-                },
-                "ssh_key": {"type": "string", "description": "Path to SSH private key"},
-            },
-            "required": ["instance_ip"],
-        },
-    ),
-    Tool(
-        name="sglang_inference",
-        description="[DEPRECATED] Use sglang action='inference' instead. Test inference against a running SGLang endpoint.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "SGLang endpoint URL (e.g. http://10.0.0.1:8000)",
-                },
-                "prompt": {
-                    "type": "string",
-                    "description": "Prompt text (for completions mode)",
-                },
-                "messages": {
-                    "type": "array",
-                    "description": "Chat messages array (for chat mode)",
-                    "items": {"type": "object"},
-                },
-                "model": {"type": "string", "description": "Model name to use"},
-                "max_tokens": {
-                    "type": "integer",
-                    "description": "Max tokens to generate",
-                    "default": 100,
-                },
-                "api_key": {"type": "string", "description": "API key"},
-            },
-            "required": ["endpoint", "model"],
-        },
-    ),
-    Tool(
-        name="sglang_metrics",
-        description="[DEPRECATED] Use sglang action='metrics' instead. Get SGLang server metrics from the Prometheus endpoint.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "SGLang endpoint URL (e.g. http://10.0.0.1:8000)",
-                }
-            },
-            "required": ["endpoint"],
-        },
-    ),
-    # ── v4.0.0: ML Services — Ollama ──────────────────────────────────
-    Tool(
-        name="ollama_list",
-        description="List models available on an Ollama server.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "Ollama endpoint URL",
-                    "default": "http://localhost:11434",
-                }
-            },
-            "required": [],
-        },
-    ),
-    Tool(
-        name="ollama_pull",
-        description="Pull a model to an Ollama server on a remote instance.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model": {
-                    "type": "string",
-                    "description": "Model name (e.g. llama3.2, deepseek-r1, codellama)",
-                },
-                "instance_ip": {"type": "string", "description": "Target instance IP"},
-                "ssh_user": {
-                    "type": "string",
-                    "description": "SSH user",
-                    "default": "root",
-                },
-                "ssh_key": {"type": "string", "description": "Path to SSH private key"},
-            },
-            "required": ["model", "instance_ip"],
-        },
-    ),
-    Tool(
-        name="ollama_generate",
-        description="Generate text using an Ollama model (non-chat completions).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "Ollama endpoint URL",
-                    "default": "http://localhost:11434",
-                },
-                "model": {"type": "string", "description": "Model name"},
-                "prompt": {"type": "string", "description": "Prompt text"},
-            },
-            "required": ["model", "prompt"],
-        },
-    ),
-    Tool(
-        name="ollama_chat",
-        description="Chat with an Ollama model using the chat/completions API.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "Ollama endpoint URL",
-                    "default": "http://localhost:11434",
-                },
-                "model": {"type": "string", "description": "Model name"},
-                "messages": {
-                    "type": "array",
-                    "description": "Chat messages [{role, content}]",
-                    "items": {"type": "object"},
-                },
-            },
-            "required": ["model", "messages"],
-        },
-    ),
-    Tool(
-        name="ollama_model_info",
-        description="Get detailed information about an Ollama model (parameters, template, license).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "Ollama endpoint URL",
-                    "default": "http://localhost:11434",
-                },
-                "model": {"type": "string", "description": "Model name"},
-            },
-            "required": ["model"],
-        },
-    ),
-    # ── v4.0.0: ML Services — Weights & Biases ───────────────────────
-    Tool(
-        name="wandb_list_projects",
-        description="List all Weights & Biases projects for the configured entity.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "W&B API key"},
-                "entity": {
-                    "type": "string",
-                    "description": "W&B entity (team/username)",
-                },
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="wandb_list_runs",
-        description="List runs in a W&B project with status, metrics summary, and config.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "W&B API key"},
-                "entity": {"type": "string", "description": "W&B entity"},
-                "project": {"type": "string", "description": "W&B project name"},
-                "limit": {
-                    "type": "integer",
-                    "description": "Max runs to return",
-                    "default": 50,
-                },
-            },
-            "required": ["api_key", "project"],
-        },
-    ),
-    Tool(
-        name="wandb_run_details",
-        description="Get detailed info, metrics, and artifacts for a specific W&B run.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "W&B API key"},
-                "run_id": {"type": "string", "description": "W&B run ID"},
-            },
-            "required": ["api_key", "run_id"],
-        },
-    ),
-    # ── v4.0.0: ML Services — LangSmith ──────────────────────────────
-    Tool(
-        name="langsmith_list_runs",
-        description="List LangSmith runs with tracing data. Optionally correlate with Terradev GPU cost metrics.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "LangSmith API key"},
-                "project": {"type": "string", "description": "LangSmith project name"},
-                "limit": {"type": "integer", "description": "Max runs", "default": 50},
-                "correlate_gpu": {
-                    "type": "boolean",
-                    "description": "Join with cost_tracking.db for cost-per-run",
-                    "default": False,
-                },
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="langsmith_list_projects",
-        description="List LangSmith projects.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "LangSmith API key"}
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="langsmith_gpu_correlate",
-        description="Correlate LangSmith runs with Terradev GPU provisioning data. Returns cost-per-run, GPU utilization, and provider breakdown.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "LangSmith API key"},
-                "project": {"type": "string", "description": "LangSmith project name"},
-                "days": {
-                    "type": "integer",
-                    "description": "Lookback period in days",
-                    "default": 7,
-                },
-            },
-            "required": ["api_key"],
-        },
-    ),
-    # ── v4.0.0: ML Services — MLflow ─────────────────────────────────
-    Tool(
-        name="mlflow_list_experiments",
-        description="List MLflow experiments on the configured tracking server.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "tracking_uri": {
-                    "type": "string",
-                    "description": "MLflow tracking server URI",
-                },
-                "username": {"type": "string", "description": "Basic auth username"},
-                "password": {"type": "string", "description": "Basic auth password"},
-            },
-            "required": ["tracking_uri"],
-        },
-    ),
-    Tool(
-        name="mlflow_log_run",
-        description="Log a Terradev training run to MLflow with auto-injected GPU type, provider, cost/hr, and duration as params.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "tracking_uri": {
-                    "type": "string",
-                    "description": "MLflow tracking server URI",
-                },
-                "experiment_name": {
-                    "type": "string",
-                    "description": "MLflow experiment name",
-                },
-                "run_name": {"type": "string", "description": "Run display name"},
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type used (e.g. H100)",
-                },
-                "provider": {"type": "string", "description": "Cloud provider"},
-                "cost_per_hour": {
-                    "type": "number",
-                    "description": "Cost per hour in USD",
-                },
-                "duration_seconds": {
-                    "type": "number",
-                    "description": "Training duration in seconds",
-                },
-                "metrics": {
-                    "type": "object",
-                    "description": "Additional metrics to log",
-                },
-                "username": {"type": "string", "description": "Basic auth username"},
-                "password": {"type": "string", "description": "Basic auth password"},
-            },
-            "required": ["tracking_uri", "experiment_name", "run_name"],
-        },
-    ),
-    Tool(
-        name="mlflow_register_model",
-        description="Register a trained model in the MLflow model registry with Terradev provenance tags.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "tracking_uri": {
-                    "type": "string",
-                    "description": "MLflow tracking server URI",
-                },
-                "model_name": {"type": "string", "description": "Model registry name"},
-                "run_id": {
-                    "type": "string",
-                    "description": "MLflow run ID that produced the model",
-                },
-                "model_uri": {
-                    "type": "string",
-                    "description": "Model artifact URI (e.g. runs:/<run_id>/model)",
-                },
-                "tags": {
-                    "type": "object",
-                    "description": "Additional tags to set on the model version",
-                },
-                "username": {"type": "string", "description": "Basic auth username"},
-                "password": {"type": "string", "description": "Basic auth password"},
-            },
-            "required": ["tracking_uri", "model_name", "run_id"],
-        },
-    ),
-    # ── v4.0.0: ML Services — DVC ────────────────────────────────────
-    Tool(
-        name="dvc_status",
-        description="Get DVC repository status: tracked files, remotes, and changes since last commit.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "repo_path": {
-                    "type": "string",
-                    "description": "Path to the DVC repository",
-                }
-            },
-            "required": ["repo_path"],
-        },
-    ),
-    Tool(
-        name="dvc_diff",
-        description="Show DVC diff between two revisions (e.g. training checkpoints). Shows added, modified, deleted files.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "repo_path": {
-                    "type": "string",
-                    "description": "Path to the DVC repository",
-                },
-                "rev_a": {"type": "string", "description": "Base revision (git ref)"},
-                "rev_b": {
-                    "type": "string",
-                    "description": "Target revision (git ref, default: HEAD)",
-                },
-            },
-            "required": ["repo_path"],
-        },
-    ),
-    Tool(
-        name="dvc_stage_checkpoint",
-        description="Atomic checkpoint staging: DVC add + push + git commit in one operation. Promotes a training checkpoint to versioned storage.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "repo_path": {
-                    "type": "string",
-                    "description": "Path to the DVC repository",
-                },
-                "checkpoint_path": {
-                    "type": "string",
-                    "description": "Path to the checkpoint file/directory to stage",
-                },
-                "message": {
-                    "type": "string",
-                    "description": "Git commit message",
-                    "default": "Stage checkpoint via Terradev",
-                },
-                "remote": {
-                    "type": "string",
-                    "description": "DVC remote name to push to",
-                },
-            },
-            "required": ["repo_path", "checkpoint_path"],
-        },
-    ),
-    Tool(
-        name="dvc_push",
-        description="Push DVC-tracked data to the configured remote storage.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "repo_path": {
-                    "type": "string",
-                    "description": "Path to the DVC repository",
-                },
-                "remote": {
-                    "type": "string",
-                    "description": "DVC remote name (optional, uses default)",
-                },
-            },
-            "required": ["repo_path"],
-        },
-    ),
-    # ── v4.0.0: ML Services — KServe ─────────────────────────────────
-    Tool(
-        name="kserve_generate_yaml",
-        description="Generate a GPU-aware KServe InferenceService YAML manifest with NUMA pinning, resource limits derived from model size and VRAM, and topology hints.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_name": {
-                    "type": "string",
-                    "description": "Model name for the InferenceService",
-                },
-                "model_uri": {
-                    "type": "string",
-                    "description": "Model storage URI (e.g. s3://bucket/model or gs://bucket/model)",
-                },
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type (e.g. A100, H100)",
-                },
-                "gpu_count": {
-                    "type": "integer",
-                    "description": "Number of GPUs",
-                    "default": 1,
-                },
-                "namespace": {
-                    "type": "string",
-                    "description": "Kubernetes namespace",
-                    "default": "default",
-                },
-                "runtime": {
-                    "type": "string",
-                    "description": "Serving runtime",
-                    "enum": ["vllm", "triton", "huggingface"],
-                    "default": "vllm",
-                },
-                "min_replicas": {
-                    "type": "integer",
-                    "description": "Min replicas for autoscaling",
-                    "default": 1,
-                },
-                "max_replicas": {
-                    "type": "integer",
-                    "description": "Max replicas for autoscaling",
-                    "default": 3,
-                },
-            },
-            "required": ["model_name", "model_uri", "gpu_type"],
-        },
-    ),
-    Tool(
-        name="kserve_list",
-        description="List KServe InferenceServices in a Kubernetes namespace.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "namespace": {
-                    "type": "string",
-                    "description": "Kubernetes namespace",
-                    "default": "default",
-                }
-            },
-            "required": [],
-        },
-    ),
-    Tool(
-        name="kserve_status",
-        description="Get detailed status of a KServe InferenceService including readiness, traffic split, and URL.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "InferenceService name"},
-                "namespace": {
-                    "type": "string",
-                    "description": "Kubernetes namespace",
-                    "default": "default",
-                },
-            },
-            "required": ["name"],
-        },
-    ),
-    # ── v4.0.0: Egress Optimizer ─────────────────────────────────────
-    Tool(
-        name="egress_cheapest_route",
-        description="Find the cheapest egress route between cloud providers/regions for model weights or dataset transfer. Supports multi-hop routing.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "source_provider": {
-                    "type": "string",
-                    "description": "Source cloud provider (e.g. aws, gcp, azure)",
-                },
-                "source_region": {
-                    "type": "string",
-                    "description": "Source region (e.g. us-east-1)",
-                },
-                "dest_provider": {
-                    "type": "string",
-                    "description": "Destination cloud provider",
-                },
-                "dest_region": {"type": "string", "description": "Destination region"},
-                "size_gb": {"type": "number", "description": "Transfer size in GB"},
-            },
-            "required": [
-                "source_provider",
-                "source_region",
-                "dest_provider",
-                "dest_region",
-                "size_gb",
-            ],
-        },
-    ),
-    Tool(
-        name="egress_optimize_staging",
-        description="Optimize dataset or model staging across regions by finding the cheapest transfer plan. Integrates with the dataset stager for parallel uploads.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "source_uri": {
-                    "type": "string",
-                    "description": "Source data URI (s3://, gs://, local path, or HF dataset ID)",
-                },
-                "target_regions": {
-                    "type": "array",
-                    "description": "Target regions as provider:region strings",
-                    "items": {"type": "string"},
-                },
-                "size_gb": {
-                    "type": "number",
-                    "description": "Approximate data size in GB",
-                },
-            },
-            "required": ["source_uri", "target_regions", "size_gb"],
-        },
-    ),
-    # ── v5.0.0: HuggingFace Hub Full Service ─────────────────────────
-    Tool(
-        name="hf_list_models",
-        description="Search and browse HuggingFace Hub models. Filter by author, task, library. Returns model ID, downloads, likes, and tags.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "author": {
-                    "type": "string",
-                    "description": "Filter by author/org (e.g. meta-llama, mistralai)",
-                },
-                "search": {
-                    "type": "string",
-                    "description": "Search query (e.g. 'code generation', 'llama')",
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Max results",
-                    "default": 20,
-                },
-                "api_key": {"type": "string", "description": "HuggingFace API token"},
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="hf_list_datasets",
-        description="Search and browse HuggingFace Hub datasets. Filter by author and search query.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "author": {"type": "string", "description": "Filter by author/org"},
-                "search": {"type": "string", "description": "Search query"},
-                "limit": {
-                    "type": "integer",
-                    "description": "Max results",
-                    "default": 20,
-                },
-                "api_key": {"type": "string", "description": "HuggingFace API token"},
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="hf_model_info",
-        description="Get detailed model info: architecture, size, downloads, license, tags, pipeline_tag, and model card.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {
-                    "type": "string",
-                    "description": "HuggingFace model ID (e.g. meta-llama/Llama-3.3-70B-Instruct)",
-                },
-                "api_key": {"type": "string", "description": "HuggingFace API token"},
-            },
-            "required": ["model_id", "api_key"],
-        },
-    ),
-    Tool(
-        name="hf_create_endpoint",
-        description="Create a HuggingFace Inference Endpoint (paid GPU endpoint). Supports custom GPU types, regions, and scaling.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {"type": "string", "description": "HuggingFace model ID"},
-                "endpoint_name": {"type": "string", "description": "Endpoint name"},
-                "instance_type": {
-                    "type": "string",
-                    "description": "Instance type (e.g. nvidia-a100, nvidia-l4)",
-                },
-                "instance_size": {
-                    "type": "string",
-                    "description": "Instance size (e.g. x1, x2, x4)",
-                },
-                "region": {
-                    "type": "string",
-                    "description": "Region (e.g. us-east-1, eu-west-1)",
-                    "default": "us-east-1",
-                },
-                "min_replicas": {
-                    "type": "integer",
-                    "description": "Min replicas (0 for scale-to-zero)",
-                    "default": 0,
-                },
-                "max_replicas": {
-                    "type": "integer",
-                    "description": "Max replicas",
-                    "default": 1,
-                },
-                "api_key": {"type": "string", "description": "HuggingFace API token"},
-            },
-            "required": ["model_id", "endpoint_name", "instance_type", "api_key"],
-        },
-    ),
-    Tool(
-        name="hf_list_endpoints",
-        description="List all active HuggingFace Inference Endpoints with status, URL, and cost.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "HuggingFace API token"}
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="hf_endpoint_info",
-        description="Get detailed info about a specific HuggingFace Inference Endpoint: status, URL, scaling config, cost.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint_name": {"type": "string", "description": "Endpoint name"},
-                "api_key": {"type": "string", "description": "HuggingFace API token"},
-            },
-            "required": ["endpoint_name", "api_key"],
-        },
-    ),
-    Tool(
-        name="hf_delete_endpoint",
-        description="Delete a HuggingFace Inference Endpoint.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint_name": {
-                    "type": "string",
-                    "description": "Endpoint name to delete",
-                },
-                "api_key": {"type": "string", "description": "HuggingFace API token"},
-            },
-            "required": ["endpoint_name", "api_key"],
-        },
-    ),
-    Tool(
-        name="hf_endpoint_infer",
-        description="Run inference on a HuggingFace Inference Endpoint. Supports text generation, embeddings, and custom inputs.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint_name": {"type": "string", "description": "Endpoint name"},
-                "inputs": {"type": "string", "description": "Input text or prompt"},
-                "parameters": {
-                    "type": "object",
-                    "description": "Generation parameters (max_new_tokens, temperature, etc.)",
-                },
-                "api_key": {"type": "string", "description": "HuggingFace API token"},
-            },
-            "required": ["endpoint_name", "inputs", "api_key"],
-        },
-    ),
-    # ── v5.0.0: HF Smart Templates ───────────────────────────────────
-    Tool(
-        name="hf_smart_template",
-        description="Auto-generate an optimized deployment template for any HuggingFace model. Analyzes model size, architecture, and quantization to select optimal hardware and generate ready-to-deploy configs.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {
-                    "type": "string",
-                    "description": "HuggingFace model ID (e.g. meta-llama/Llama-3.3-70B-Instruct)",
-                },
-                "template_type": {
-                    "type": "string",
-                    "description": "Template type",
-                    "enum": ["auto", "chat", "embedding", "vision", "audio"],
-                    "default": "auto",
-                },
-                "space_name": {
-                    "type": "string",
-                    "description": "Optional HF Space name for deployment",
-                },
-            },
-            "required": ["model_id"],
-        },
-    ),
-    Tool(
-        name="hf_hardware_recommend",
-        description="Get hardware recommendation with cost breakdown for any HuggingFace model. Returns optimal GPU type, estimated cost, and performance score.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {"type": "string", "description": "HuggingFace model ID"},
-                "budget_constraint": {
-                    "type": "number",
-                    "description": "Max $/hr budget (optional)",
-                },
-            },
-            "required": ["model_id"],
-        },
-    ),
-    Tool(
-        name="hf_hardware_compare",
-        description="Compare all hardware options for a HuggingFace model. Returns side-by-side cost, performance, and compatibility analysis.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model_id": {"type": "string", "description": "HuggingFace model ID"}
-            },
-            "required": ["model_id"],
-        },
-    ),
-    # ── v5.0.0: LangChain / LangGraph / LangSmith ────────────────────
-    Tool(
-        name="langchain_create_workflow",
-        description="Create a LangChain workflow with LangSmith monitoring integration.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "workflow_config": {
-                    "type": "object",
-                    "description": "Workflow configuration (name, steps, model, tools)",
-                },
-                "api_key": {
-                    "type": "string",
-                    "description": "LangChain/LangSmith API key",
-                },
-                "langsmith_api_key": {
-                    "type": "string",
-                    "description": "LangSmith API key for tracing",
-                },
-            },
-            "required": ["workflow_config", "api_key"],
-        },
-    ),
-    Tool(
-        name="langchain_create_sglang_pipeline",
-        description="Create an SGLang model-serving pipeline via LangChain. Connects LangChain agents to SGLang inference endpoints.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "pipeline_config": {
-                    "type": "object",
-                    "description": "Pipeline config (model, endpoint, temperature, max_tokens)",
-                },
-                "api_key": {"type": "string", "description": "LangChain API key"},
-            },
-            "required": ["pipeline_config", "api_key"],
-        },
-    ),
-    Tool(
-        name="langsmith_create_project",
-        description="Create a new LangSmith project for tracing and evaluation.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "Project name"},
-                "description": {"type": "string", "description": "Project description"},
-                "api_key": {"type": "string", "description": "LangSmith API key"},
-            },
-            "required": ["name", "api_key"],
-        },
-    ),
-    Tool(
-        name="langsmith_get_workspaces",
-        description="List all LangSmith workspaces.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "LangSmith API key"}
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="langsmith_create_trace",
-        description="Create a trace in LangSmith for observability. Tracks input/output, latency, token usage, and cost.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "run_id": {
-                    "type": "string",
-                    "description": "Run ID to attach trace to",
-                },
-                "trace_data": {
-                    "type": "object",
-                    "description": "Trace data (name, inputs, outputs, metadata)",
-                },
-                "api_key": {"type": "string", "description": "LangSmith API key"},
-            },
-            "required": ["run_id", "trace_data", "api_key"],
-        },
-    ),
-    Tool(
-        name="langgraph_create_workflow",
-        description="Create a LangGraph stateful workflow with monitoring. Supports agent graphs, tool calling, and state persistence.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "graph_config": {
-                    "type": "object",
-                    "description": "Graph configuration (nodes, edges, state_schema)",
-                },
-                "api_key": {"type": "string", "description": "LangChain API key"},
-                "langsmith_api_key": {
-                    "type": "string",
-                    "description": "LangSmith API key for tracing",
-                },
-            },
-            "required": ["graph_config", "api_key"],
-        },
-    ),
-    Tool(
-        name="langgraph_orchestrator_worker",
-        description="Create an orchestrator-worker pattern workflow in LangGraph. The orchestrator delegates tasks to specialized worker agents.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "workflow_config": {
-                    "type": "object",
-                    "description": "Orchestrator-worker config (orchestrator_prompt, workers, routing_strategy)",
-                },
-                "api_key": {"type": "string", "description": "LangChain API key"},
-            },
-            "required": ["workflow_config", "api_key"],
-        },
-    ),
-    Tool(
-        name="langgraph_evaluation_workflow",
-        description="Create an evaluator-optimizer workflow in LangGraph. Generates outputs, evaluates quality, and iteratively improves.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "evaluation_config": {
-                    "type": "object",
-                    "description": "Evaluation config (generator_prompt, evaluator_criteria, max_iterations)",
-                },
-                "api_key": {"type": "string", "description": "LangChain API key"},
-            },
-            "required": ["evaluation_config", "api_key"],
-        },
-    ),
-    Tool(
-        name="langgraph_workflow_status",
-        description="Get the status and metrics of a LangGraph workflow execution.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "workflow_id": {
-                    "type": "string",
-                    "description": "Workflow ID to check",
-                },
-                "api_key": {"type": "string", "description": "LangChain API key"},
-            },
-            "required": ["workflow_id", "api_key"],
-        },
-    ),
-    # ── v5.0.0: W&B Enhanced ─────────────────────────────────────────
-    Tool(
-        name="wandb_create_dashboard",
-        description="Create a custom W&B dashboard with GPU metrics, training loss, and cost panels.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "dashboard_config": {
-                    "type": "object",
-                    "description": "Dashboard config (name, panels, metrics)",
-                },
-                "api_key": {"type": "string", "description": "W&B API key"},
-                "entity": {"type": "string", "description": "W&B entity"},
-            },
-            "required": ["dashboard_config", "api_key"],
-        },
-    ),
-    Tool(
-        name="wandb_create_terradev_dashboard",
-        description="Auto-create a Terradev-specific W&B dashboard with GPU utilization, cost tracking, training metrics, and infrastructure panels.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "W&B API key"},
-                "entity": {"type": "string", "description": "W&B entity"},
-                "project": {"type": "string", "description": "W&B project name"},
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="wandb_create_report",
-        description="Create a W&B report with custom sections, charts, and narrative text.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "report_config": {
-                    "type": "object",
-                    "description": "Report config (title, sections, metrics, description)",
-                },
-                "api_key": {"type": "string", "description": "W&B API key"},
-                "entity": {"type": "string", "description": "W&B entity"},
-            },
-            "required": ["report_config", "api_key"],
-        },
-    ),
-    Tool(
-        name="wandb_create_terradev_report",
-        description="Auto-generate a Terradev infrastructure report: GPU costs, provider comparison, training efficiency, and recommendations.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "metrics_data": {
-                    "type": "object",
-                    "description": "Metrics data to include (gpu_costs, training_runs, provider_stats)",
-                },
-                "api_key": {"type": "string", "description": "W&B API key"},
-                "entity": {"type": "string", "description": "W&B entity"},
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="wandb_setup_alerts",
-        description="Set up custom W&B alerts for GPU metrics: cost thresholds, utilization drops, training anomalies.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "alert_config": {
-                    "type": "object",
-                    "description": "Alert config (metric, threshold, condition, notification_channel)",
-                },
-                "api_key": {"type": "string", "description": "W&B API key"},
-                "entity": {"type": "string", "description": "W&B entity"},
-            },
-            "required": ["alert_config", "api_key"],
-        },
-    ),
-    Tool(
-        name="wandb_create_terradev_alerts",
-        description="Auto-create standard Terradev alerts: GPU cost > budget, utilization < 50%, training loss spike, straggler detection.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "W&B API key"},
-                "entity": {"type": "string", "description": "W&B entity"},
-            },
-            "required": ["api_key"],
-        },
-    ),
-    Tool(
-        name="wandb_dashboard_status",
-        description="Get comprehensive W&B monitoring overview: dashboards, reports, alerts, active runs.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "api_key": {"type": "string", "description": "W&B API key"},
-                "entity": {"type": "string", "description": "W&B entity"},
-            },
-            "required": ["api_key"],
-        },
-    ),
-    # ── v5.0.0: Data Governance ───────────────────────────────────────
-    Tool(
-        name="governance_request_consent",
-        description="Request user consent for data movement across cloud regions. GDPR/SOC2 compliant consent tracking with audit trail.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "user_id": {
-                    "type": "string",
-                    "description": "User ID requesting consent",
-                },
-                "consent_type": {
-                    "type": "string",
-                    "description": "Consent type",
-                    "enum": [
-                        "data_staging",
-                        "cross_region",
-                        "third_party",
-                        "model_training",
-                    ],
-                },
-                "dataset_name": {
-                    "type": "string",
-                    "description": "Dataset being moved",
-                },
-                "source_location": {
-                    "type": "string",
-                    "description": "Source region/provider",
-                },
-                "target_location": {
-                    "type": "string",
-                    "description": "Target region/provider",
-                },
-                "purpose": {
-                    "type": "string",
-                    "description": "Purpose of data movement",
-                },
-            },
-            "required": ["user_id", "consent_type", "dataset_name", "purpose"],
-        },
-    ),
-    Tool(
-        name="governance_record_consent",
-        description="Record a consent response (granted or denied) for a pending consent request.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "request_id": {"type": "string", "description": "Consent request ID"},
-                "user_id": {"type": "string", "description": "User ID"},
-                "granted": {
-                    "type": "boolean",
-                    "description": "Whether consent was granted",
-                },
-                "conditions": {
-                    "type": "array",
-                    "description": "Conditions attached to consent",
-                    "items": {"type": "string"},
-                },
-            },
-            "required": ["request_id", "user_id", "granted"],
-        },
-    ),
-    Tool(
-        name="governance_evaluate_opa",
-        description="Evaluate OPA (Open Policy Agent) policies for data access. Checks region restrictions, classification rules, and compliance requirements.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "user_id": {"type": "string", "description": "User ID to evaluate"},
-                "dataset_name": {"type": "string", "description": "Dataset name"},
-                "action": {
-                    "type": "string",
-                    "description": "Action to evaluate",
-                    "enum": ["read", "write", "move", "delete", "train"],
-                },
-                "target_location": {
-                    "type": "string",
-                    "description": "Target location for the action",
-                },
-            },
-            "required": ["user_id", "dataset_name", "action"],
-        },
-    ),
-    Tool(
-        name="governance_move_data",
-        description="Move data with full governance audit trail. Requires prior consent and OPA policy approval. Tracks integrity, encryption, and compliance.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "user_id": {"type": "string", "description": "User ID"},
-                "consent_request_id": {
-                    "type": "string",
-                    "description": "Approved consent request ID",
-                },
-                "dataset_name": {"type": "string", "description": "Dataset to move"},
-                "source_location": {"type": "string", "description": "Source location"},
-                "target_location": {"type": "string", "description": "Target location"},
-            },
-            "required": [
-                "user_id",
-                "consent_request_id",
-                "dataset_name",
-                "source_location",
-                "target_location",
-            ],
-        },
-    ),
-    Tool(
-        name="governance_movement_history",
-        description="Get data movement audit log. Filter by user, dataset, or time range.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "user_id": {"type": "string", "description": "Filter by user ID"},
-                "dataset_name": {"type": "string", "description": "Filter by dataset"},
-                "limit": {
-                    "type": "integer",
-                    "description": "Max records",
-                    "default": 50,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="governance_compliance_report",
-        description="Generate comprehensive compliance report: consent stats, policy evaluations, data movements, violations. For GDPR/SOC2/HIPAA audits.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "start_date": {
-                    "type": "string",
-                    "description": "Start date (ISO format, e.g. 2025-01-01)",
-                },
-                "end_date": {
-                    "type": "string",
-                    "description": "End date (ISO format, e.g. 2025-12-31)",
-                },
-            },
-            "required": ["start_date", "end_date"],
-        },
-    ),
-    # ── v5.0.0: Cost Optimizer Deep ───────────────────────────────────
-    Tool(
-        name="cost_analyze",
-        description="Deep cost analysis of current GPU infrastructure: per-provider breakdown, utilization efficiency, waste identification, and optimization potential.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "days": {
-                    "type": "integer",
-                    "description": "Lookback period in days",
-                    "default": 30,
-                }
-            },
-        },
-    ),
-    Tool(
-        name="cost_optimize_recommend",
-        description="Generate actionable cost optimization recommendations: spot migration, GPU right-sizing, provider arbitrage, idle shutdown, and density packing.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "target_savings": {
-                    "type": "number",
-                    "description": "Target savings percentage (e.g. 0.3 for 30%)",
-                },
-                "constraints": {
-                    "type": "object",
-                    "description": "Constraints (min_gpus, max_latency_ms, required_providers)",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="cost_simulate",
-        description="Simulate cost optimization scenarios with ROI projections. Compare current vs optimized infrastructure costs.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "scenario": {
-                    "type": "object",
-                    "description": "Scenario config (gpu_type, provider, count, spot, hours)",
-                },
-                "compare_with": {
-                    "type": "object",
-                    "description": "Current config to compare against",
-                },
-            },
-            "required": ["scenario"],
-        },
-    ),
-    Tool(
-        name="cost_budget_optimize",
-        description="Find optimal GPU deployment under a strict budget constraint. Uses ML-based cost prediction and spot risk assessment.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "budget": {"type": "number", "description": "Total budget in USD"},
-                "gpu_type": {"type": "string", "description": "Required GPU type"},
-                "gpu_count": {
-                    "type": "integer",
-                    "description": "Required GPU count",
-                    "default": 1,
-                },
-                "hours": {
-                    "type": "number",
-                    "description": "Required runtime in hours",
-                    "default": 1.0,
-                },
-                "allow_spot": {
-                    "type": "boolean",
-                    "description": "Allow spot instances",
-                    "default": True,
-                },
-            },
-            "required": ["budget"],
-        },
-    ),
-    # ── v5.0.0: Price Intelligence Extended ──────────────────────────
-    Tool(
-        name="price_trends",
-        description="Get GPU price trend analysis with delta (rate of change), gamma (acceleration), and annualized volatility. Identifies cheapest time windows.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "gpu_type": {
-                    "type": "string",
-                    "description": "GPU type",
-                    "enum": [
-                        "H100",
-                        "H200",
-                        "H800",
-                        "A100",
-                        "A10G",
-                        "L40S",
-                        "L4",
-                        "T4",
-                        "RTX4090",
-                        "V100S",
-                        "A6000",
-                        "MI300X",
-                    ],
-                },
-                "hours": {
-                    "type": "integer",
-                    "description": "Hours of history",
-                    "default": 24,
-                },
-            },
-            "required": ["gpu_type"],
-        },
-    ),
-    Tool(
-        name="price_budget_optimize",
-        description="Budget-first price optimization with ML-based cost prediction. Finds cheapest deployment plan under budget.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "budget": {"type": "number", "description": "Budget in USD"},
-                "gpu_type": {"type": "string", "description": "Required GPU type"},
-                "gpu_count": {
-                    "type": "integer",
-                    "description": "GPU count",
-                    "default": 1,
-                },
-                "hours": {
-                    "type": "number",
-                    "description": "Runtime hours",
-                    "default": 1.0,
-                },
-            },
-            "required": ["budget", "gpu_type"],
-        },
-    ),
-    Tool(
-        name="price_spot_risk",
-        description="Spot instance risk assessment per provider. Returns interruption probability, mean time to interruption, and recommended mitigation.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "gpu_type": {"type": "string", "description": "GPU type"},
-                "provider": {
-                    "type": "string",
-                    "description": "Provider to assess (or 'all')",
-                },
-            },
-            "required": ["gpu_type"],
-        },
-    ),
-    # ── v5.0.0: Training Orchestrator Extended ────────────────────────
-    Tool(
-        name="training_config_generate",
-        description="Generate a complete training configuration from a declarative spec. Auto-detects framework, sets optimal parallelism, and configures distributed training.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "Training job name"},
-                "framework": {
-                    "type": "string",
-                    "description": "Training framework",
-                    "enum": ["torchrun", "deepspeed", "accelerate", "megatron"],
-                    "default": "torchrun",
-                },
-                "script": {"type": "string", "description": "Training script path"},
-                "nodes": {
-                    "type": "array",
-                    "description": "Node IPs",
-                    "items": {"type": "string"},
-                },
-                "gpus_per_node": {
-                    "type": "integer",
-                    "description": "GPUs per node",
-                    "default": 8,
-                },
-                "from_provision": {
-                    "type": "string",
-                    "description": "Resolve from provision ('latest' or group ID)",
-                },
-                "deepspeed_config": {
-                    "type": "object",
-                    "description": "DeepSpeed config overrides",
-                },
-                "script_args": {
-                    "type": "string",
-                    "description": "Extra script arguments",
-                },
-            },
-            "required": ["name", "script"],
-        },
-    ),
-    Tool(
-        name="training_launch_distributed",
-        description="Full distributed training launch with framework auto-detection, topology validation, and monitoring. Combines preflight + train + monitor in one operation.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "Job name"},
-                "script": {"type": "string", "description": "Training script"},
-                "framework": {
-                    "type": "string",
-                    "description": "Framework",
-                    "enum": ["torchrun", "deepspeed", "accelerate", "megatron"],
-                    "default": "torchrun",
-                },
-                "from_provision": {
-                    "type": "string",
-                    "description": "Resolve nodes from provision ('latest' or group ID)",
-                },
-                "nodes": {
-                    "type": "array",
-                    "description": "Manual node IPs",
-                    "items": {"type": "string"},
-                },
-                "gpus_per_node": {
-                    "type": "integer",
-                    "description": "GPUs per node",
-                    "default": 8,
-                },
-                "skip_preflight": {
-                    "type": "boolean",
-                    "description": "Skip preflight validation",
-                    "default": False,
-                },
-            },
-            "required": ["name", "script"],
-        },
-    ),
-    # ── v5.0.0: Training Monitor Extended ─────────────────────────────
-    Tool(
-        name="train_snapshot",
-        description="Get complete training monitoring snapshot: GPU metrics (utilization, memory, temp, power), training metrics (loss, grad_norm, lr, throughput), straggler detection, and cost estimate.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {"type": "string", "description": "Training job ID"},
-                "cost_rate": {
-                    "type": "number",
-                    "description": "$/GPU-hr for cost estimation",
-                    "default": 2.0,
-                },
-            },
-            "required": ["job_id"],
-        },
-    ),
-    Tool(
-        name="train_detect_stragglers",
-        description="Detect straggler nodes in distributed training. Identifies GPUs with significantly lower utilization that slow the whole job.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {"type": "string", "description": "Training job ID"},
-                "threshold": {
-                    "type": "number",
-                    "description": "Straggler threshold (0-1, default 0.7 = 70% of mean)",
-                    "default": 0.7,
-                },
-            },
-            "required": ["job_id"],
-        },
-    ),
-    # ── v5.0.0: Preflight Validator Extended ──────────────────────────
-    Tool(
-        name="preflight_report",
-        description="Generate full preflight validation report with pass/warn/fail per check. Covers GPU drivers, CUDA, NCCL, RDMA, network, disk, and Docker.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "nodes": {
-                    "type": "array",
-                    "description": "Node IPs",
-                    "items": {"type": "string"},
-                },
-                "from_provision": {
-                    "type": "string",
-                    "description": "Resolve nodes from provision ('latest' or group ID)",
-                },
-                "checks": {
-                    "type": "array",
-                    "description": "Specific checks to run",
-                    "items": {"type": "string"},
-                },
-            },
-        },
-    ),
-    Tool(
-        name="preflight_gpu_check",
-        description="GPU-specific preflight validation: NVIDIA drivers, CUDA version, GPU count, NCCL, NVLink topology, NCU stall-signature profiling, and adversarial config verification (V1-V3).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "nodes": {
-                    "type": "array",
-                    "description": "Node IPs",
-                    "items": {"type": "string"},
-                },
-                "from_provision": {
-                    "type": "string",
-                    "description": "Resolve nodes from provision",
-                },
-                "tensor_parallel_size": {
-                    "type": "integer",
-                    "description": "TP size for V1 adversarial check (vs GPU count)",
-                },
-                "model_precision": {
-                    "type": "string",
-                    "description": "Model precision (fp8, bf16, fp16) for V2 FP8 wall check",
-                },
-                "fp8_quant_scheme": {
-                    "type": "string",
-                    "description": "FP8 quant scheme (per_tensor, per_token) for Blackwell K-slab check",
-                },
-                "gpu_arch": {
-                    "type": "string",
-                    "description": "GPU architecture string (e.g. blackwell, hopper) for precision wall detection",
-                },
-                "max_batch_size": {
-                    "type": "integer",
-                    "description": "Max batch size for V3 launch-overhead dominance check",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="preflight_network_check",
-        description="Network-specific preflight validation: RDMA availability, InfiniBand status, inter-node bandwidth, latency matrix, firewall rules.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "nodes": {
-                    "type": "array",
-                    "description": "Node IPs",
-                    "items": {"type": "string"},
-                },
-                "from_provision": {
-                    "type": "string",
-                    "description": "Resolve nodes from provision",
-                },
-            },
-        },
-    ),
-    # ── v5.0.0: Kubernetes Enhanced ───────────────────────────────────
-    Tool(
-        name="k8s_gpu_operator_install",
-        description="Install NVIDIA GPU Operator on a Kubernetes cluster. Configures driver containers, device plugin, DCGM exporter, and GPU Feature Discovery.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "cluster_name": {
-                    "type": "string",
-                    "description": "Target cluster name",
-                },
-                "driver_version": {
-                    "type": "string",
-                    "description": "NVIDIA driver version (default: auto-detect)",
-                },
-                "namespace": {
-                    "type": "string",
-                    "description": "Install namespace",
-                    "default": "gpu-operator",
-                },
-            },
-            "required": ["cluster_name"],
-        },
-    ),
-    Tool(
-        name="k8s_device_plugin",
-        description="Configure Kubernetes GPU device plugin settings: time-slicing, MIG strategy, and resource naming.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "cluster_name": {
-                    "type": "string",
-                    "description": "Target cluster name",
-                },
-                "strategy": {
-                    "type": "string",
-                    "description": "Device plugin strategy",
-                    "enum": ["none", "time-slicing", "mig-single", "mig-mixed"],
-                    "default": "none",
-                },
-                "replicas": {
-                    "type": "integer",
-                    "description": "Time-slicing replicas per GPU",
-                    "default": 2,
-                },
-            },
-            "required": ["cluster_name"],
-        },
-    ),
-    Tool(
-        name="k8s_mig_configure",
-        description="Configure Multi-Instance GPU (MIG) partitioning on A100/H100 GPUs. Splits a single GPU into isolated instances for multi-tenant workloads.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "cluster_name": {
-                    "type": "string",
-                    "description": "Target cluster name",
-                },
-                "mig_profile": {
-                    "type": "string",
-                    "description": "MIG profile",
-                    "enum": [
-                        "1g.5gb",
-                        "1g.10gb",
-                        "2g.10gb",
-                        "3g.20gb",
-                        "4g.20gb",
-                        "7g.40gb",
-                        "7g.80gb",
-                    ],
-                },
-                "gpu_indices": {
-                    "type": "array",
-                    "description": "GPU indices to configure",
-                    "items": {"type": "integer"},
-                },
-            },
-            "required": ["cluster_name", "mig_profile"],
-        },
-    ),
-    Tool(
-        name="k8s_time_slicing",
-        description="Configure GPU time-slicing for Kubernetes. Allows multiple pods to share a single GPU with configurable oversubscription.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "cluster_name": {
-                    "type": "string",
-                    "description": "Target cluster name",
-                },
-                "replicas": {
-                    "type": "integer",
-                    "description": "Virtual GPUs per physical GPU",
-                    "default": 4,
-                },
-                "oversubscribe": {
-                    "type": "boolean",
-                    "description": "Allow oversubscription",
-                    "default": True,
-                },
-            },
-            "required": ["cluster_name"],
-        },
-    ),
-    Tool(
-        name="k8s_monitoring_stack",
-        description="Deploy Prometheus + Grafana GPU monitoring stack with DCGM dashboards, Karpenter metrics, and GPU utilization alerts.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "cluster_name": {
-                    "type": "string",
-                    "description": "Target cluster name",
-                },
-                "namespace": {
-                    "type": "string",
-                    "description": "Monitoring namespace",
-                    "default": "monitoring",
-                },
-                "grafana_password": {
-                    "type": "string",
-                    "description": "Grafana admin password",
-                },
-                "enable_alerting": {
-                    "type": "boolean",
-                    "description": "Enable GPU utilization alerts",
-                    "default": True,
-                },
-            },
-            "required": ["cluster_name"],
-        },
-    ),
-    # ── v5.1.0: Datadog Integration ──────────────────────────────────
-    Tool(
-        name="datadog_status",
-        description="Check Datadog integration status: configured, site, API key presence.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="datadog_push_metrics",
-        description="Push current GPU cost snapshot to Datadog: active instances, cost/hr, projected monthly, provider reliability, quote latency.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="datadog_send_event",
-        description="Send a custom event to Datadog with title, text, and alert type.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "title": {"type": "string", "description": "Event title"},
-                "text": {
-                    "type": "string",
-                    "description": "Event body (markdown supported)",
-                },
-                "alert_type": {
-                    "type": "string",
-                    "description": "Alert type",
-                    "enum": ["info", "warning", "error", "success"],
-                    "default": "info",
-                },
-            },
-            "required": ["title", "text"],
-        },
-    ),
-    Tool(
-        name="datadog_create_monitors",
-        description="Create all Terradev GPU FinOps monitors in Datadog: budget alert, cost spike, idle GPU, spot volatility, provider degraded, egress anomaly.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "template": {
-                    "type": "string",
-                    "description": "Single template name (or omit for all)",
-                    "enum": [
-                        "budget_alert",
-                        "cost_spike",
-                        "idle_gpu",
-                        "spot_risk",
-                        "provider_degraded",
-                        "egress_anomaly",
-                    ],
-                },
-            },
-        },
-    ),
-    Tool(
-        name="datadog_list_monitors",
-        description="List all Terradev-tagged monitors in Datadog with their current status.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="datadog_create_dashboard",
-        description="Create the Terradev GPU FinOps dashboard in Datadog with 12 widgets: cost/hr, projected monthly, active GPUs, budget, provider reliability, volatility, latency, training util, egress, events.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Custom dashboard title (default: Terradev GPU FinOps)",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="datadog_list_dashboards",
-        description="List Terradev-related dashboards in Datadog.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="datadog_query",
-        description="Query Datadog metrics using the metrics query language. Returns time series data.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Datadog metric query (e.g. avg:terradev.gpu.cost_per_hour{*} by {provider})",
-                },
-                "from_seconds": {
-                    "type": "integer",
-                    "description": "Lookback window in seconds",
-                    "default": 3600,
-                },
-            },
-            "required": ["query"],
-        },
-    ),
-    Tool(
-        name="datadog_terraform_export",
-        description="Generate a complete Terraform module for the Datadog integration: provider.tf, monitors.tf, dashboard.tf, versions.tf. Run `terraform apply` to deploy all monitors and dashboards as IaC.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "output_dir": {
-                    "type": "string",
-                    "description": "Directory to write .tf files (default: ./datadog-terraform)",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="datadog_metric_catalog",
-        description="List all Terradev metrics that can be pushed to Datadog with their types, units, and tags.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    # ── v5.2.0: Arize Phoenix — LLM Trace Observability (ELv2) ──
-    Tool(
-        name="phoenix_test",
-        description="Test connection to Arize Phoenix server. Returns collector endpoint and project count.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="phoenix_projects",
-        description="List Phoenix projects (trace namespaces).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "Max projects to return",
-                    "default": 50,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="phoenix_spans",
-        description="List recent spans for a Phoenix project. Supports SpanQuery DSL filters like \"span_kind == 'RETRIEVER'\" or \"status_code == 'ERROR'\".",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "project": {"type": "string", "description": "Project ID or name"},
-                "filter": {
-                    "type": "string",
-                    "description": "SpanQuery DSL filter expression",
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Max spans to return",
-                    "default": 20,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="phoenix_trace",
-        description="View full execution tree for a specific trace ID. Shows span hierarchy, latencies, and token counts.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "trace_id": {"type": "string", "description": "Trace ID to inspect"},
-                "project": {"type": "string", "description": "Project ID or name"},
-            },
-            "required": ["trace_id"],
-        },
-    ),
-    Tool(
-        name="phoenix_otel_env",
-        description="Generate OpenTelemetry environment variables for instrumenting serving pods with Phoenix tracing.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "project": {"type": "string", "description": "Project name"},
-            },
-        },
-    ),
-    Tool(
-        name="phoenix_snippet",
-        description="Generate Python instrumentation snippet for adding Phoenix tracing to LLM applications.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "project": {"type": "string", "description": "Project name"},
-            },
-        },
-    ),
-    Tool(
-        name="phoenix_k8s",
-        description="Generate Kubernetes deployment manifest for self-hosted Arize Phoenix server.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "namespace": {
-                    "type": "string",
-                    "description": "K8s namespace",
-                    "default": "observability",
-                },
-            },
-        },
-    ),
-    # ── v5.2.0: NeMo Guardrails — LLM Output Safety (Apache 2.0) ──
-    Tool(
-        name="guardrails_test",
-        description="Test connection to NeMo Guardrails server.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="guardrails_chat",
-        description="Send a message through NeMo Guardrails and return the safety-filtered response. Applies topical, jailbreak, PII, and factcheck rails.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "description": "Message to send through guardrails",
-                },
-                "config_id": {
-                    "type": "string",
-                    "description": "Guardrails config_id to use",
-                },
-            },
-            "required": ["message"],
-        },
-    ),
-    Tool(
-        name="guardrails_generate_config",
-        description="Generate default Colang 2.x guardrails configuration files (topical, jailbreak, PII, factcheck rails).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "config_id": {"type": "string", "description": "Config ID name"},
-                "output_dir": {
-                    "type": "string",
-                    "description": "Output directory",
-                    "default": "./guardrails",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="guardrails_k8s",
-        description="Generate Kubernetes deployment manifest for NeMo Guardrails server (standalone or sidecar mode).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "namespace": {
-                    "type": "string",
-                    "description": "K8s namespace",
-                    "default": "guardrails",
-                },
-            },
-        },
-    ),
-    # ── v5.2.0: Qdrant — Vector Database for RAG (Apache 2.0) ──
-    Tool(
-        name="qdrant_test",
-        description="Test connection to Qdrant vector database. Returns cluster info and collection count.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="qdrant_collections",
-        description="List all Qdrant vector collections with their point counts and configurations.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="qdrant_create_collection",
-        description="Create a Qdrant vector collection. Auto-configures vector dimensions from embedding model name.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "Collection name"},
-                "embedding_model": {
-                    "type": "string",
-                    "description": "Embedding model (auto-sets vector size, e.g. BAAI/bge-large-en-v1.5)",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="qdrant_info",
-        description="Get detailed info and stats for a Qdrant collection.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "Collection name"},
-            },
-        },
-    ),
-    Tool(
-        name="qdrant_count",
-        description="Count points (vectors) in a Qdrant collection.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "Collection name"},
-            },
-        },
-    ),
-    Tool(
-        name="qdrant_k8s",
-        description="Generate Kubernetes StatefulSet manifest for self-hosted Qdrant vector database.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "namespace": {
-                    "type": "string",
-                    "description": "K8s namespace",
-                    "default": "vector-db",
-                },
-            },
-        },
-    ),
-    # ── v5.3.0: New v4.0.11 Features - Karpenter, Triggers, Environments, Lineage, Migration ──
-    # Note: ALL_NEW_TOOLS removed - mcp_new_features_tools module not available
-    # ── v5.4.0: Langfuse LLM Observability ────────────────────────────────────
-    Tool(
-        name="langfuse_configure",
-        description="Configure Langfuse credentials (public key, secret key, host URL).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "public_key": {
-                    "type": "string",
-                    "description": "Langfuse public key (pk-lf-...)",
-                },
-                "secret_key": {
-                    "type": "string",
-                    "description": "Langfuse secret key (sk-lf-...)",
-                },
-                "host": {
-                    "type": "string",
-                    "description": "Langfuse host URL",
-                    "default": "https://cloud.langfuse.com",
-                },
-            },
-            "required": ["public_key", "secret_key"],
-        },
-    ),
-    Tool(
-        name="langfuse_test",
-        description="Test Langfuse connectivity and list accessible projects.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="langfuse_traces",
-        description="List recent LLM traces from Langfuse.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "Max traces to return",
-                    "default": 20,
-                },
-                "name": {"type": "string", "description": "Filter by trace name"},
-            },
-        },
-    ),
-    Tool(
-        name="langfuse_trace",
-        description="Get a single Langfuse trace with all observations/spans.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "trace_id": {"type": "string", "description": "Trace ID"},
-            },
-            "required": ["trace_id"],
-        },
-    ),
-    Tool(
-        name="langfuse_scores",
-        description="List evaluation scores from Langfuse, optionally filtered by trace or score name.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "trace_id": {"type": "string", "description": "Filter by trace ID"},
-                "name": {"type": "string", "description": "Filter by score name"},
-                "limit": {
-                    "type": "integer",
-                    "description": "Max scores to return",
-                    "default": 50,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="langfuse_score",
-        description="Create an evaluation score for a Langfuse trace (e.g. quality, accuracy, relevance).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "trace_id": {"type": "string", "description": "Trace ID to score"},
-                "name": {
-                    "type": "string",
-                    "description": "Score name (e.g. quality, accuracy)",
-                },
-                "value": {"type": "number", "description": "Numeric score value"},
-                "observation_id": {
-                    "type": "string",
-                    "description": "Specific observation to score",
-                },
-                "comment": {"type": "string", "description": "Optional comment"},
-            },
-            "required": ["trace_id", "name", "value"],
-        },
-    ),
-    Tool(
-        name="langfuse_datasets",
-        description="List Langfuse datasets for evaluation and fine-tuning.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "Max datasets to return",
-                    "default": 20,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="langfuse_export_training_data",
-        description="Export Langfuse traces as instruction/response pairs for LoRA fine-tuning. Filters by quality score.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "Max pairs to export",
-                    "default": 500,
-                },
-                "name": {"type": "string", "description": "Filter traces by name"},
-                "min_score": {
-                    "type": "number",
-                    "description": "Minimum quality score (0.0-1.0)",
-                },
-                "score_name": {
-                    "type": "string",
-                    "description": "Score name to filter on",
-                    "default": "quality",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="langfuse_quality",
-        description="Get aggregated quality metrics from Langfuse scores for drift detection.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "score_name": {
-                    "type": "string",
-                    "description": "Score name to aggregate",
-                    "default": "quality",
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Sample size",
-                    "default": 200,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="langfuse_otel_env",
-        description="Print OTEL environment variables for instrumenting LLM apps to send traces to Langfuse.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "project": {
-                    "type": "string",
-                    "description": "Langfuse project name",
-                    "default": "default",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="langfuse_k8s",
-        description="Generate Kubernetes deployment manifest for self-hosted Langfuse.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "namespace": {
-                    "type": "string",
-                    "description": "K8s namespace",
-                    "default": "observability",
-                },
-            },
-        },
-    ),
-    # ── v5.4.0: Databricks MLOps ──────────────────────────────────────────────
-    Tool(
-        name="databricks_configure",
-        description="Configure Databricks credentials (workspace URL and personal access token).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Databricks workspace URL (e.g. https://adb-xxx.azuredatabricks.net)",
-                },
-                "token": {
-                    "type": "string",
-                    "description": "Databricks personal access token (dapi...)",
-                },
-            },
-            "required": ["host", "token"],
-        },
-    ),
-    Tool(
-        name="databricks_test",
-        description="Test Databricks connectivity and show cluster count.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="databricks_jobs",
-        description="List Databricks jobs in the workspace.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "Max jobs to return",
-                    "default": 25,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="databricks_run",
-        description="Trigger a Databricks job run by job ID.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "job_id": {"type": "integer", "description": "Databricks job ID"},
-            },
-            "required": ["job_id"],
-        },
-    ),
-    Tool(
-        name="databricks_run_status",
-        description="Get status of a Databricks job run by run ID.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "run_id": {"type": "integer", "description": "Databricks run ID"},
-            },
-            "required": ["run_id"],
-        },
-    ),
-    Tool(
-        name="databricks_clusters",
-        description="List all Databricks clusters with state and node type.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="databricks_serving_endpoints",
-        description="List Databricks model serving endpoints.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="databricks_deploy_model",
-        description="Deploy a registered MLflow model to a Databricks serving endpoint.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint_name": {
-                    "type": "string",
-                    "description": "Serving endpoint name",
-                },
-                "model_name": {
-                    "type": "string",
-                    "description": "Registered model name",
-                },
-                "model_version": {
-                    "type": "string",
-                    "description": "Model version",
-                    "default": "1",
-                },
-                "workload_size": {
-                    "type": "string",
-                    "enum": ["Small", "Medium", "Large"],
-                    "default": "Small",
-                },
-                "scale_to_zero": {"type": "boolean", "default": True},
-            },
-            "required": ["endpoint_name", "model_name"],
-        },
-    ),
-    Tool(
-        name="databricks_query",
-        description="Query a Databricks model serving endpoint with a prompt.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {"type": "string", "description": "Serving endpoint name"},
-                "prompt": {"type": "string", "description": "Prompt text"},
-            },
-            "required": ["endpoint", "prompt"],
-        },
-    ),
-    Tool(
-        name="databricks_mlflow_experiments",
-        description="List MLflow experiments in Databricks workspace.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "Max experiments to return",
-                    "default": 50,
-                },
-            },
-        },
-    ),
-    Tool(
-        name="databricks_mlflow_models",
-        description="List registered models in the Databricks MLflow Model Registry.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "Max models to return",
-                    "default": 50,
-                },
-            },
-        },
-    ),
-    # ── v5.4.0: vLLM Extended ─────────────────────────────────────────────────
-    Tool(
-        name="vllm_auto_optimize",
-        description="Automatically optimize vLLM configuration by analyzing workload patterns. Selects optimal settings for the 6 critical knobs based on live endpoint metrics or sample request files.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "model": {"type": "string", "description": "Model name"},
-                "endpoint": {
-                    "type": "string",
-                    "description": "Running vLLM endpoint to analyze (e.g. http://localhost:8000)",
-                },
-                "gpu_count": {
-                    "type": "integer",
-                    "description": "Number of GPUs available",
-                    "default": 1,
-                },
-                "output": {
-                    "type": "string",
-                    "enum": ["config", "args", "helm"],
-                    "default": "config",
-                },
-            },
-            "required": ["model"],
-        },
-    ),
-    Tool(
-        name="vllm_analyze",
-        description="Analyze a running vLLM server's workload and return specific optimization recommendations with before/after comparisons.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {
-                    "type": "string",
-                    "description": "vLLM endpoint URL (e.g. http://localhost:8000)",
-                },
-                "duration": {
-                    "type": "integer",
-                    "description": "Analysis duration in seconds",
-                    "default": 60,
-                },
-            },
-            "required": ["endpoint"],
-        },
-    ),
-    Tool(
-        name="vllm_benchmark",
-        description="Benchmark a vLLM endpoint with concurrent requests. Returns throughput (req/s), success rate, and total latency.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "endpoint": {"type": "string", "description": "vLLM endpoint URL"},
-                "concurrent": {
-                    "type": "integer",
-                    "description": "Number of concurrent requests",
-                    "default": 1,
-                },
-                "prompt": {
-                    "type": "string",
-                    "description": "Test prompt",
-                    "default": "Explain quantum computing in simple terms.",
-                },
-                "api_key": {
-                    "type": "string",
-                    "description": "vLLM API key (if auth enabled)",
-                },
-            },
-            "required": ["endpoint"],
-        },
-    ),
-]
+                    "quick": {
+                        "type": "boolean",
+                        "description": "Quick setup instructions",
+                        "default": True,
+                    },
+                },
+                "required": ["provider"],
+            },
+        ),
+        Tool(
+            name="configure_provider",
+            description="Configure provider credentials",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider to configure",
+                        "enum": [
+                            "runpod",
+                            "aws",
+                            "vastai",
+                            "gcp",
+                            "azure",
+                            "lambda",
+                            "coreweave",
+                            "tensordock",
+                            "oracle",
+                            "crusoe",
+                            "digitalocean",
+                            "hyperstack",
+                            "alibaba",
+                            "ovhcloud",
+                            "fluidstack",
+                            "hetzner",
+                            "siliconflow",
+                            "latitude",
+                            "huggingface",
+                            "baseten",
+                            "inferx",
+                        ],
+                    }
+                },
+                "required": ["provider"],
+            },
+        ),
+        # ── v3.2.0 Tools: Semantic Routing, Disaggregated Inference, GPU Topology, Price Intelligence ──
+        Tool(
+            name="infer_route",
+            description="Semantic-aware inference routing. Analyzes query content across 6 signal dimensions (modality, complexity, domain, language, safety, keywords), applies NUMA-aware endpoint scoring, and selects the optimal inference endpoint. Uses Terraform-style DAG parallel execution for signal extraction.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model": {
+                        "type": "string",
+                        "description": "Filter by model name (e.g., llama-3-70b, deepseek-coder-33b)",
+                    },
+                    "strategy": {
+                        "type": "string",
+                        "description": "Routing strategy",
+                        "enum": ["latency", "cost", "score"],
+                        "default": "latency",
+                    },
+                    "measure": {
+                        "type": "boolean",
+                        "description": "Run fresh latency measurements (HTTP TTFB / WebPageTest) before routing",
+                        "default": False,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="infer_route_disagg",
+            description="Disaggregated Prefill/Decode routing (DistServe architecture). Splits LLM inference into compute-bound prefill phase (routed to FLOPS-optimized GPUs like H100 SXM) and memory-bound decode phase (routed to bandwidth-optimized GPUs like MI300X). Tracks KV cache handoffs between endpoint pairs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model": {
+                        "type": "string",
+                        "description": "Model name for disaggregated pair selection (e.g., llama-3-70b)",
+                    },
+                    "check_health": {
+                        "type": "boolean",
+                        "description": "Run health probes before selecting pairs",
+                        "default": True,
+                    },
+                },
+                "required": ["model"],
+            },
+        ),
+        Tool(
+            name="infer_status",
+            description="Show inference endpoint health, latency, failover status, and disaggregated phase assignments (PREFILL/DECODE/MIXED). Includes KV cache warm status per endpoint.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "check": {
+                        "type": "boolean",
+                        "description": "Run live health probes before showing status",
+                        "default": False,
+                    }
+                },
+            },
+        ),
+        Tool(
+            name="infer_failover",
+            description="Run health checks and auto-failover for inference endpoints. If a primary endpoint is unhealthy and has a backup configured, traffic automatically shifts to the backup provider.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Show what would happen without executing failover",
+                        "default": False,
+                    }
+                },
+            },
+        ),
+        Tool(
+            name="gpu_topology",
+            description="GPU NUMA topology report with intra-GPU XCD (Accelerated Compute Die) awareness. Models MI300X (8 XCDs, 192GB HBM3), MI300A (6 XCDs, 128GB), H200 (unified 141GB HBM3e), H100 (80GB). Reports PCIe locality (PIX/PXB/PHB/SYS), GPU-NIC pairing, SR-IOV VF status, and generates XCD-aware NCCL/AITER environment variables.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "gpu_arch": {
+                        "type": "string",
+                        "description": "Filter by GPU architecture",
+                        "enum": ["mi300x", "mi300a", "h200", "h100", "a100", "auto"],
+                    },
+                    "generate_env": {
+                        "type": "boolean",
+                        "description": "Generate XCD-aware NCCL/AITER/CK env vars for optimal attention kernel performance",
+                        "default": True,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="price_intel",
+            description="GPU price intelligence with quantitative analytics. Computes delta (rate of change), gamma (acceleration), and annualized realized volatility on GPU spot/on-demand prices across 21+ providers. Identifies cheapest time windows and provider arbitrage opportunities.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type to analyze",
+                        "enum": [
+                            "H100",
+                            "H200",
+                            "H800",
+                            "A100",
+                            "A10G",
+                            "L40S",
+                            "L4",
+                            "T4",
+                            "RTX4090",
+                            "RTX3090",
+                            "V100",
+                            "V100S",
+                            "A6000",
+                            "MI300X",
+                        ],
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Number of days of history to analyze",
+                        "minimum": 1,
+                        "default": 7,
+                    },
+                    "provider": {
+                        "type": "string",
+                        "description": "Filter to specific provider (optional)",
+                    },
+                },
+                "required": ["gpu_type"],
+            },
+        ),
+        Tool(
+            name="moe_deploy",
+            description="Deploy Mixture-of-Experts models with production-ready cluster templates. Auto-applies vLLM cost optimizations (KV cache offloading for up to 9x throughput, MTP speculative decoding for up to 2.8x speed, sleep mode for 18-200x faster restarts). Supports GLM-5, Qwen 3.5, Mistral Large 3, DeepSeek V4, Llama 5. Configures NVLink topology, tensor parallelism, FP8 quantization, vLLM/SGLang backends, and GPU-aware HPA autoscaling.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "HuggingFace model ID (e.g., zai-org/GLM-5-FP8, Qwen/Qwen3.5-397B-A17B)",
+                    },
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type for MoE serving",
+                        "enum": ["H100", "H200", "H800", "A100", "MI300X"],
+                    },
+                    "tp_size": {
+                        "type": "integer",
+                        "description": "Tensor parallelism size (must match NVLink domain)",
+                        "enum": [1, 2, 4, 8],
+                        "default": 8,
+                    },
+                    "backend": {
+                        "type": "string",
+                        "description": "Serving backend",
+                        "enum": ["vllm", "sglang"],
+                        "default": "vllm",
+                    },
+                    "quantization": {
+                        "type": "string",
+                        "description": "Quantization method",
+                        "enum": ["fp8", "bf16", "awq", "gptq"],
+                        "default": "fp8",
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Show deployment plan without executing",
+                        "default": False,
+                    },
+                },
+                "required": ["model_id", "gpu_type"],
+            },
+        ),
+        Tool(
+            name="gitops_init",
+            description="Initialize GitOps repository with ArgoCD or Flux CD. Creates cluster manifests, app definitions, policy-as-code templates, and multi-environment structure. Supports GitHub, GitLab, Bitbucket, Azure DevOps.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Git repository (e.g., my-org/infra)",
+                    },
+                    "tool": {
+                        "type": "string",
+                        "description": "GitOps tool to use",
+                        "enum": ["argocd", "flux"],
+                        "default": "argocd",
+                    },
+                    "provider": {
+                        "type": "string",
+                        "description": "Git provider",
+                        "enum": ["github", "gitlab", "bitbucket", "azure-devops"],
+                        "default": "github",
+                    },
+                    "cluster": {"type": "string", "description": "Target cluster name"},
+                },
+                "required": ["repo"],
+            },
+        ),
+        # ── v3.4.0 Tools: Training Pipeline, Checkpoints, Monitoring ──
+        Tool(
+            name="train",
+            description="Launch distributed training on provisioned GPU nodes. Supports torchrun, deepspeed, accelerate, and megatron. Use from_provision='latest' to auto-resolve node IPs from your last provision command.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "script": {
+                        "type": "string",
+                        "description": "Training script path (e.g., train.py)",
+                    },
+                    "framework": {
+                        "type": "string",
+                        "description": "Training framework",
+                        "enum": ["torchrun", "deepspeed", "accelerate", "megatron"],
+                        "default": "torchrun",
+                    },
+                    "from_provision": {
+                        "type": "string",
+                        "description": "Resolve nodes from provision. Use 'latest' or a parallel_group_id.",
+                    },
+                    "nodes": {
+                        "type": "array",
+                        "description": "Manual node IPs",
+                        "items": {"type": "string"},
+                    },
+                    "gpus_per_node": {
+                        "type": "integer",
+                        "description": "GPUs per node",
+                        "default": 8,
+                    },
+                    "script_args": {
+                        "type": "string",
+                        "description": "Extra args for training script",
+                    },
+                },
+                "required": ["script"],
+            },
+        ),
+        Tool(
+            name="train_status",
+            description="List all training jobs and their state (created, running, completed, failed).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {
+                        "type": "string",
+                        "description": "Filter to a specific job ID",
+                    }
+                },
+            },
+        ),
+        Tool(
+            name="train_monitor",
+            description="Real-time GPU monitoring for training jobs. Shows utilization, memory, temperature, power, and cost.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "string", "description": "Job ID to monitor"},
+                    "cost_rate": {
+                        "type": "number",
+                        "description": "$/GPU-hr for cost estimation",
+                        "default": 2.0,
+                    },
+                },
+                "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="checkpoint_list",
+            description="List all checkpoints for a training job.",
+            inputSchema={
+                "type": "object",
+                "properties": {"job_id": {"type": "string", "description": "Job ID"}},
+                "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="checkpoint_save",
+            description="Manually trigger a checkpoint save for a running training job.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "string", "description": "Job ID"},
+                    "step": {"type": "integer", "description": "Step number"},
+                },
+                "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="preflight",
+            description="Pre-training validation: GPU availability, NCCL, RDMA, drivers across all nodes.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "nodes": {
+                        "type": "array",
+                        "description": "Node IPs to validate",
+                        "items": {"type": "string"},
+                    },
+                    "from_provision": {
+                        "type": "string",
+                        "description": "Resolve nodes from provision. 'latest' or a group ID.",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="price_discovery",
+            description="Enhanced price discovery with capacity scoring, confidence intervals, and trend analysis.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type",
+                        "enum": [
+                            "H100",
+                            "H200",
+                            "H800",
+                            "A100",
+                            "A10G",
+                            "L40S",
+                            "L4",
+                            "T4",
+                            "RTX4090",
+                            "V100S",
+                            "A6000",
+                            "MI300X",
+                        ],
+                    },
+                    "region": {"type": "string", "description": "Filter by region"},
+                    "hours": {
+                        "type": "integer",
+                        "description": "Hours of history",
+                        "default": 24,
+                    },
+                },
+                "required": ["gpu_type"],
+            },
+        ),
+        # ── v2.0.0 Tools: Complete Agentic Loop ─────────────────────────────
+        # Training pipeline completion
+        Tool(
+            name="train_stop",
+            description="Stop a running training job. Kills training processes on all nodes in parallel.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "string", "description": "Job ID to stop"}
+                },
+                "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="train_resume",
+            description="Resume a training job from its latest checkpoint. Rebuilds config with topology revalidation.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "string", "description": "Job ID to resume"},
+                    "checkpoint_id": {
+                        "type": "string",
+                        "description": "Specific checkpoint to resume from (default: latest)",
+                    },
+                },
+                "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="checkpoint_restore",
+            description="Restore a specific checkpoint for a training job.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "string", "description": "Job ID"},
+                    "step": {
+                        "type": "integer",
+                        "description": "Checkpoint step to restore",
+                    },
+                    "checkpoint_id": {
+                        "type": "string",
+                        "description": "Checkpoint ID to restore",
+                    },
+                },
+                "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="checkpoint_promote",
+            description="Promote a checkpoint to a final model path for serving.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "string", "description": "Job ID"},
+                    "checkpoint_id": {
+                        "type": "string",
+                        "description": "Checkpoint ID to promote",
+                    },
+                    "dest": {
+                        "type": "string",
+                        "description": "Destination path (e.g., /models/final)",
+                    },
+                },
+                "required": ["job_id", "checkpoint_id", "dest"],
+            },
+        ),
+        Tool(
+            name="checkpoint_delete",
+            description="Delete a checkpoint.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "string", "description": "Job ID"},
+                    "checkpoint_id": {
+                        "type": "string",
+                        "description": "Checkpoint ID to delete",
+                    },
+                },
+                "required": ["job_id", "checkpoint_id"],
+            },
+        ),
+        # Data staging
+        Tool(
+            name="stage",
+            description="Compress, chunk, checksum, and position datasets near compute. Supports local paths, S3/GCS URIs, HTTP URLs, and HuggingFace dataset names. Returns staging plan with agent recommendations.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dataset": {
+                        "type": "string",
+                        "description": "Dataset path, S3 URI, GCS URI, HTTP URL, or HuggingFace name",
+                    },
+                    "target_regions": {
+                        "type": "string",
+                        "description": "Comma-separated target regions",
+                    },
+                    "compression": {
+                        "type": "string",
+                        "description": "Compression algorithm",
+                        "enum": ["auto", "zstd", "gzip", "none"],
+                        "default": "auto",
+                    },
+                    "plan_only": {
+                        "type": "boolean",
+                        "description": "Show staging plan without executing",
+                        "default": False,
+                    },
+                },
+                "required": ["dataset"],
+            },
+        ),
+        # Inference deployment
+        Tool(
+            name="infer_deploy",
+            description="Deploy an inference endpoint with auto-scaling, idle shutdown, and cost optimization. Returns estimated cost and requires_confirmation for expensive deployments.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_path": {
+                        "type": "string",
+                        "description": "Model path or HuggingFace model ID",
+                    },
+                    "name": {"type": "string", "description": "Endpoint name"},
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider for deployment",
+                        "enum": [
+                            "runpod",
+                            "vastai",
+                            "lambda",
+                            "aws",
+                            "gcp",
+                            "coreweave",
+                            "alibaba",
+                            "ovhcloud",
+                            "fluidstack",
+                            "hetzner",
+                            "siliconflow",
+                            "latitude",
+                        ],
+                    },
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type",
+                        "enum": [
+                            "H100",
+                            "H200",
+                            "H800",
+                            "A100",
+                            "A10G",
+                            "L40S",
+                            "L4",
+                            "T4",
+                            "V100S",
+                            "A6000",
+                            "MI300X",
+                        ],
+                    },
+                    "min_workers": {
+                        "type": "integer",
+                        "description": "Minimum workers",
+                        "default": 0,
+                    },
+                    "max_workers": {
+                        "type": "integer",
+                        "description": "Maximum workers",
+                        "default": 3,
+                    },
+                    "idle_timeout": {
+                        "type": "integer",
+                        "description": "Idle timeout in seconds",
+                        "default": 300,
+                    },
+                    "cost_optimize": {
+                        "type": "boolean",
+                        "description": "Enable cost optimization",
+                        "default": True,
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Show deployment plan without deploying",
+                        "default": False,
+                    },
+                },
+                "required": ["model_path", "name"],
+            },
+        ),
+        # Manifest cache & drift detection
+        Tool(
+            name="up",
+            description="CLI-native provisioning with manifest cache and drift detection. Use --fix-drift to detect and auto-fix drifted infrastructure.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job": {
+                        "type": "string",
+                        "description": "Job name for manifest tracking",
+                    },
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type",
+                        "default": "A100",
+                    },
+                    "gpu_count": {
+                        "type": "integer",
+                        "description": "Number of GPUs",
+                        "default": 1,
+                    },
+                    "hours": {
+                        "type": "number",
+                        "description": "Estimated runtime in hours",
+                        "default": 1.0,
+                    },
+                    "budget": {"type": "number", "description": "Budget constraint ($/hr)"},
+                    "region": {"type": "string", "description": "Preferred region"},
+                    "ttl": {
+                        "type": "string",
+                        "description": "Time to live for nodes",
+                        "default": "1h",
+                    },
+                    "fix_drift": {
+                        "type": "boolean",
+                        "description": "Detect and fix drift automatically",
+                        "default": False,
+                    },
+                },
+                "required": ["job"],
+            },
+        ),
+        Tool(
+            name="rollback",
+            description="Explicit versioned rollback. Format: job@version (e.g., llama3@v3).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_version": {
+                        "type": "string",
+                        "description": "Job@version string (e.g., llama3@v3)",
+                    }
+                },
+                "required": ["job_version"],
+            },
+        ),
+        Tool(
+            name="manifests",
+            description="List cached manifests and versions for jobs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job": {
+                        "type": "string",
+                        "description": "Show versions for specific job (optional)",
+                    }
+                },
+            },
+        ),
+        # Smart deployment
+        Tool(
+            name="smart_deploy",
+            description="AI-ranked deployment options with confidence/risk scoring. Returns recommendations with cost estimates and requires_confirmation for execution.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "image": {"type": "string", "description": "Container image"},
+                    "workload": {
+                        "type": "string",
+                        "description": "Workload type",
+                        "enum": ["training", "inference", "batch"],
+                    },
+                    "gpu_type": {"type": "string", "description": "GPU type"},
+                    "budget": {"type": "number", "description": "Max $/hr budget"},
+                    "option": {
+                        "type": "integer",
+                        "description": "Execute a specific recommended option by index",
+                    },
+                },
+                "required": ["image", "workload"],
+            },
+        ),
+        Tool(
+            name="helm_generate",
+            description="Generate Helm charts from workload specifications.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "workload": {
+                        "type": "string",
+                        "description": "Workload type",
+                        "enum": ["training", "inference", "batch"],
+                    },
+                    "image": {"type": "string", "description": "Container image"},
+                    "gpu_type": {"type": "string", "description": "GPU type"},
+                    "replicas": {
+                        "type": "integer",
+                        "description": "Number of replicas",
+                        "default": 1,
+                    },
+                },
+                "required": ["workload", "image"],
+            },
+        ),
+        # GitOps complete
+        Tool(
+            name="gitops_bootstrap",
+            description="Bootstrap ArgoCD or Flux on the cluster.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "tool": {
+                        "type": "string",
+                        "description": "GitOps tool",
+                        "enum": ["argocd", "flux"],
+                    },
+                    "cluster": {"type": "string", "description": "Cluster name"},
+                    "namespace": {
+                        "type": "string",
+                        "description": "Namespace",
+                        "default": "gitops-system",
+                    },
+                },
+                "required": ["tool", "cluster"],
+            },
+        ),
+        Tool(
+            name="gitops_sync",
+            description="Sync cluster with Git repository.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster": {"type": "string", "description": "Cluster name"},
+                    "environment": {
+                        "type": "string",
+                        "description": "Environment to sync",
+                        "default": "prod",
+                    },
+                    "tool": {
+                        "type": "string",
+                        "description": "GitOps tool",
+                        "enum": ["argocd", "flux"],
+                        "default": "argocd",
+                    },
+                },
+                "required": ["cluster"],
+            },
+        ),
+        Tool(
+            name="gitops_validate",
+            description="Validate GitOps configuration.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster": {"type": "string", "description": "Cluster name"},
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Dry run validation",
+                        "default": True,
+                    },
+                },
+            },
+        ),
+        # Orchestrator tools
+        Tool(
+            name="orchestrator_start",
+            description="Start the model orchestrator for multi-model GPU sharing with eviction policies.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "gpu_id": {"type": "integer", "description": "GPU ID", "default": 0},
+                    "memory_gb": {
+                        "type": "number",
+                        "description": "Total GPU memory in GB",
+                        "default": 80.0,
+                    },
+                    "policy": {
+                        "type": "string",
+                        "description": "Scaling policy",
+                        "enum": ["billing_optimized", "latency_optimized", "hybrid"],
+                        "default": "billing_optimized",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="orchestrator_register",
+            description="Register a model with the orchestrator.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "Model identifier"},
+                    "model_path": {
+                        "type": "string",
+                        "description": "Path to model weights",
+                    },
+                    "framework": {
+                        "type": "string",
+                        "description": "Framework",
+                        "enum": ["pytorch", "vllm", "sglang"],
+                        "default": "pytorch",
+                    },
+                },
+                "required": ["model_id", "model_path"],
+            },
+        ),
+        Tool(
+            name="orchestrator_load",
+            description="Load a model into GPU memory.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "Model to load"},
+                    "force": {
+                        "type": "boolean",
+                        "description": "Force loading even if memory is full",
+                        "default": False,
+                    },
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="orchestrator_evict",
+            description="Evict a model from GPU memory.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "Model to evict"}
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="orchestrator_status",
+            description="Get orchestrator and model status including GPU memory utilization.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "Get details for specific model (optional)",
+                    }
+                },
+            },
+        ),
+        Tool(
+            name="orchestrator_infer",
+            description="Test inference with a model via the orchestrator.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "Model to run inference on",
+                    }
+                },
+                "required": ["model_id"],
+            },
+        ),
+        # Warm pool tools
+        Tool(
+            name="warm_pool_start",
+            description="Start the warm pool manager for intelligent model pre-warming. 5 strategies: traffic_based, time_based, priority_based, cost_optimized, latency_optimized.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "strategy": {
+                        "type": "string",
+                        "description": "Warm pool strategy",
+                        "enum": [
+                            "traffic_based",
+                            "time_based",
+                            "priority_based",
+                            "cost_optimized",
+                            "latency_optimized",
+                        ],
+                        "default": "traffic_based",
+                    },
+                    "max_warm": {
+                        "type": "integer",
+                        "description": "Max models to keep warm",
+                        "default": 10,
+                    },
+                    "min_warm": {
+                        "type": "integer",
+                        "description": "Min models to keep warm",
+                        "default": 3,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="warm_pool_status",
+            description="Get warm pool status: hit rate, cold starts, memory saved, cost saved.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        # Cost scaler tools
+        Tool(
+            name="cost_scaler_start",
+            description="Start the budget-aware auto-scaling manager. 4 strategies: minimize_cost, balance_cost_latency, latency_critical, budget_constrained.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "strategy": {
+                        "type": "string",
+                        "description": "Cost strategy",
+                        "enum": [
+                            "minimize_cost",
+                            "balance_cost_latency",
+                            "latency_critical",
+                            "budget_constrained",
+                        ],
+                        "default": "balance_cost_latency",
+                    },
+                    "budget": {
+                        "type": "number",
+                        "description": "Hourly budget in USD",
+                        "default": 15.0,
+                    },
+                    "cost_per_gb": {
+                        "type": "number",
+                        "description": "Cost per GB per hour",
+                        "default": 0.10,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="cost_scaler_status",
+            description="Get cost scaler status with budget utilization, predictions, and optimization recommendations.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        # InferX complete
+        Tool(
+            name="inferx_configure",
+            description="Configure InferX serverless platform credentials.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "InferX API key"},
+                    "endpoint": {
+                        "type": "string",
+                        "description": "InferX API endpoint",
+                        "default": "https://api.inferx.net",
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "Region",
+                        "default": "us-west-2",
+                    },
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="inferx_delete",
+            description="Delete an InferX model deployment.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "Model deployment ID to delete",
+                    }
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="inferx_usage",
+            description="Get InferX account usage statistics: requests, cost, GPU hours, latency.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="inferx_quote",
+            description="Get InferX pricing quotes for a GPU type.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type to quote",
+                        "default": "A100",
+                    },
+                    "region": {"type": "string", "description": "Region for quote"},
+                },
+            },
+        ),
+        # HF Space deploy (already exists above)
+        Tool(
+            name="hf_space_status",
+            description="Get HuggingFace Space deployment status.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "space_name": {"type": "string", "description": "Space name to check"}
+                },
+                "required": ["space_name"],
+            },
+        ),
+        # Workflow primitives
+        Tool(
+            name="run_workflow",
+            description="Run a declarative YAML workflow that chains multiple Terradev commands (provision → preflight → train → monitor → checkpoint). Returns step-by-step execution status with cost estimates and confirmation gates for expensive operations.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "workflow": {
+                        "type": "string",
+                        "description": "Workflow YAML path or inline YAML string",
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Show execution plan without running",
+                        "default": False,
+                    },
+                    "template": {
+                        "type": "string",
+                        "description": "Use built-in template",
+                        "enum": [
+                            "finetune-llama",
+                            "inference-deploy",
+                            "benchmark-gpu",
+                            "cost-optimize",
+                        ],
+                    },
+                },
+            },
+        ),
+        # Active context — session-start awareness
+        Tool(
+            name="active_context",
+            description="Get current Terradev state: running training jobs, active instances, spend-to-date, alerts. Call this on session start to resume context from previous sessions.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        # ── v3.5.0: Multi-LoRA adapter management ────────────────────────
+        Tool(
+            name="lora_list",
+            description="List LoRA adapters loaded on a running vLLM endpoint. Shows base models and hot-loaded fine-tuned adapters.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "vLLM endpoint URL (e.g. http://10.0.0.1:8000)",
+                    },
+                    "api_key": {"type": "string", "description": "vLLM API key (if set)"},
+                },
+                "required": ["endpoint"],
+            },
+        ),
+        Tool(
+            name="lora_add",
+            description="Hot-load a LoRA adapter onto a running vLLM endpoint. The adapter becomes immediately available as a model name for inference requests. Uses vLLM's fused_moe_lora kernel for 454% higher output tokens/sec on MoE models.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "vLLM endpoint URL (e.g. http://10.0.0.1:8000)",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Adapter name (becomes the model name in API requests)",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Path to adapter weights (local path or HuggingFace ID)",
+                    },
+                    "api_key": {"type": "string", "description": "vLLM API key (if set)"},
+                },
+                "required": ["endpoint", "name", "path"],
+            },
+        ),
+        Tool(
+            name="lora_remove",
+            description="Hot-unload a LoRA adapter from a running vLLM endpoint. Frees GPU memory for other adapters.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "vLLM endpoint URL (e.g. http://10.0.0.1:8000)",
+                    },
+                    "name": {"type": "string", "description": "Adapter name to unload"},
+                    "api_key": {"type": "string", "description": "vLLM API key (if set)"},
+                },
+                "required": ["endpoint", "name"],
+            },
+        ),
+        # ── v4.0.0: ML Services — Ray ──────────────────────────────────────
+        Tool(
+            name="ray_status",
+            description="Get Ray cluster status including node count, resources, memory, and running jobs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "detailed": {
+                        "type": "boolean",
+                        "description": "Include detailed memory and resource info",
+                        "default": True,
+                    }
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="ray_start",
+            description="Start a Ray cluster (head node or worker). For distributed ML training and inference.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "head": {
+                        "type": "boolean",
+                        "description": "Start as head node (true) or worker (false)",
+                        "default": True,
+                    },
+                    "port": {
+                        "type": "integer",
+                        "description": "Ray head port",
+                        "default": 6379,
+                    },
+                    "num_gpus": {
+                        "type": "integer",
+                        "description": "Number of GPUs to expose",
+                    },
+                    "head_address": {
+                        "type": "string",
+                        "description": "Head node address for worker nodes (e.g. 10.0.0.1:6379)",
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="ray_stop",
+            description="Stop the Ray cluster on the current node.",
+            inputSchema={"type": "object", "properties": {}, "required": []},
+        ),
+        Tool(
+            name="ray_submit_job",
+            description="Submit a job script to the Ray cluster for distributed execution.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "script": {
+                        "type": "string",
+                        "description": "Path to the Python script to submit",
+                    },
+                    "job_name": {"type": "string", "description": "Optional job name"},
+                    "num_gpus": {
+                        "type": "integer",
+                        "description": "GPU resources to request",
+                    },
+                    "num_cpus": {
+                        "type": "integer",
+                        "description": "CPU resources to request",
+                    },
+                },
+                "required": ["script"],
+            },
+        ),
+        Tool(
+            name="ray_list_jobs",
+            description="List all running Ray jobs and tasks.",
+            inputSchema={"type": "object", "properties": {}, "required": []},
+        ),
+        Tool(
+            name="ray_wide_ep_deploy",
+            description="Generate a Ray Serve LLM Wide-EP (Expert Parallel) deployment for MoE models. Returns Python script and config for distributed MoE serving with EPLB and DeepEP.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "HuggingFace model ID (e.g. zai-org/GLM-5-FP8, deepseek-ai/DeepSeek-V3)",
+                    },
+                    "tp_size": {
+                        "type": "integer",
+                        "description": "Tensor parallel size per EP rank",
+                        "default": 1,
+                    },
+                    "dp_size": {
+                        "type": "integer",
+                        "description": "Data parallel / EP degree",
+                        "default": 8,
+                    },
+                    "gpu_memory_utilization": {
+                        "type": "number",
+                        "description": "GPU memory fraction",
+                        "default": 0.85,
+                    },
+                    "max_model_len": {
+                        "type": "integer",
+                        "description": "Max sequence length",
+                        "default": 32768,
+                    },
+                    "generate_script": {
+                        "type": "boolean",
+                        "description": "Also generate executable Python script",
+                        "default": True,
+                    },
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="ray_disagg_pd_deploy",
+            description="Generate a Ray Serve LLM disaggregated Prefill/Decode deployment. Splits inference into compute-bound prefill and memory-bound decode phases with KV cache transfer via NIXL.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "HuggingFace model ID"},
+                    "prefill_tp": {
+                        "type": "integer",
+                        "description": "Prefill tensor parallel size",
+                        "default": 1,
+                    },
+                    "prefill_dp": {
+                        "type": "integer",
+                        "description": "Prefill data parallel size",
+                        "default": 4,
+                    },
+                    "decode_tp": {
+                        "type": "integer",
+                        "description": "Decode tensor parallel size",
+                        "default": 1,
+                    },
+                    "decode_dp": {
+                        "type": "integer",
+                        "description": "Decode data parallel size",
+                        "default": 4,
+                    },
+                    "kv_connector": {
+                        "type": "string",
+                        "description": "KV transfer connector",
+                        "enum": ["NixlConnector", "LMCacheConnector"],
+                        "default": "NixlConnector",
+                    },
+                    "generate_script": {
+                        "type": "boolean",
+                        "description": "Also generate executable Python script",
+                        "default": True,
+                    },
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="ray_parallelism_strategy",
+            description="Compute optimal TP/DP/EP parallelism strategy for a given MoE model and GPU count. Returns recommended configuration with rationale.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "HuggingFace model ID (e.g. zai-org/GLM-5-FP8)",
+                    },
+                    "gpu_count": {
+                        "type": "integer",
+                        "description": "Number of available GPUs",
+                        "default": 8,
+                    },
+                    "gpu_memory_gb": {
+                        "type": "number",
+                        "description": "GPU memory per device in GB",
+                        "default": 80.0,
+                    },
+                },
+                "required": ["model_id"],
+            },
+        ),
+        # ── v4.0.0: ML Services — vLLM Lifecycle ──────────────────────────
+        Tool(
+            name="vllm_start",
+            description="Start a vLLM inference server on a remote instance via SSH/systemd. Supports Multi-LoRA, Sleep Mode, KV Offloading, Speculative Decoding.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "instance_ip": {"type": "string", "description": "Target instance IP"},
+                    "model": {"type": "string", "description": "HuggingFace model ID"},
+                    "port": {
+                        "type": "integer",
+                        "description": "Server port",
+                        "default": 8000,
+                    },
+                    "tp_size": {
+                        "type": "integer",
+                        "description": "Tensor parallel size",
+                        "default": 1,
+                    },
+                    "gpu_memory_utilization": {
+                        "type": "number",
+                        "description": "GPU memory fraction",
+                        "default": 0.9,
+                    },
+                    "ssh_user": {
+                        "type": "string",
+                        "description": "SSH user",
+                        "default": "root",
+                    },
+                    "ssh_key": {"type": "string", "description": "Path to SSH private key"},
+                    "api_key": {"type": "string", "description": "vLLM API key to set"},
+                },
+                "required": ["instance_ip", "model"],
+            },
+        ),
+        Tool(
+            name="vllm_stop",
+            description="Stop a vLLM server on a remote instance.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "instance_ip": {"type": "string", "description": "Target instance IP"},
+                    "ssh_user": {
+                        "type": "string",
+                        "description": "SSH user",
+                        "default": "root",
+                    },
+                    "ssh_key": {"type": "string", "description": "Path to SSH private key"},
+                },
+                "required": ["instance_ip"],
+            },
+        ),
+        Tool(
+            name="vllm_inference",
+            description="Test inference against a running vLLM endpoint (completions or chat).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "vLLM endpoint URL (e.g. http://10.0.0.1:8000)",
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Prompt text (for completions mode)",
+                    },
+                    "messages": {
+                        "type": "array",
+                        "description": "Chat messages array (for chat mode)",
+                        "items": {"type": "object"},
+                    },
+                    "model": {"type": "string", "description": "Model name to use"},
+                    "max_tokens": {
+                        "type": "integer",
+                        "description": "Max tokens to generate",
+                        "default": 100,
+                    },
+                    "api_key": {"type": "string", "description": "vLLM API key"},
+                },
+                "required": ["endpoint", "model"],
+            },
+        ),
+        Tool(
+            name="vllm_info",
+            description="Get vLLM server info: loaded models, config, and health status.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "vLLM endpoint URL (e.g. http://10.0.0.1:8000)",
+                    },
+                    "api_key": {"type": "string", "description": "vLLM API key"},
+                },
+                "required": ["endpoint"],
+            },
+        ),
+        Tool(
+            name="vllm_sleep",
+            description="Put a vLLM server to sleep. Level 1: offload to CPU (fast wake). Level 2: discard weights (minimal RAM).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {"type": "string", "description": "vLLM endpoint URL"},
+                    "level": {
+                        "type": "integer",
+                        "description": "Sleep level (1=CPU offload, 2=discard)",
+                        "default": 1,
+                        "enum": [1, 2],
+                    },
+                },
+                "required": ["endpoint"],
+            },
+        ),
+        Tool(
+            name="vllm_wake",
+            description="Wake a sleeping vLLM server. For Level 2 sleep, also reloads weights and resets prefix cache.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {"type": "string", "description": "vLLM endpoint URL"},
+                    "sleep_level": {
+                        "type": "integer",
+                        "description": "The sleep level the server is at (affects wake procedure)",
+                        "default": 1,
+                    },
+                },
+                "required": ["endpoint"],
+            },
+        ),
+        # ── v5.0.0: ML Services — SGLang Optimization Stack ──────────────────────────────────
+        Tool(
+            name="sglang",
+            description="Complete SGLang optimization stack with workload-specific auto-tuning for 7 workload types: agentic chat, batch inference, low latency, MoE models, PD disaggregated, structured output, and RAG.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "SGLang action to perform",
+                        "enum": [
+                            "optimize",
+                            "detect",
+                            "router",
+                            "install",
+                            "start",
+                            "stop",
+                            "inference",
+                            "metrics",
+                            "test",
+                        ],
+                    },
+                    "model_path": {
+                        "type": "string",
+                        "description": "HuggingFace model ID or path",
+                    },
+                    "workload_type": {
+                        "type": "string",
+                        "description": "Workload type for optimization",
+                        "enum": [
+                            "agentic_chat",
+                            "batch_inference",
+                            "low_latency",
+                            "moe_model",
+                            "pd_disaggregated",
+                            "structured_output",
+                            "rag_workload",
+                        ],
+                    },
+                    "user_description": {
+                        "type": "string",
+                        "description": "Natural language description of workload",
+                    },
+                    "host": {
+                        "type": "string",
+                        "description": "Server host",
+                        "default": "0.0.0.0",
+                    },
+                    "port": {
+                        "type": "integer",
+                        "description": "Server port",
+                        "default": 8000,
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Show optimization plan without launching",
+                        "default": False,
+                    },
+                    "dp_size": {
+                        "type": "integer",
+                        "description": "Data parallel size for multi-replica",
+                        "default": 8,
+                    },
+                    "instance_ip": {
+                        "type": "string",
+                        "description": "Remote instance IP for installation/deployment",
+                    },
+                    "ssh_user": {
+                        "type": "string",
+                        "description": "SSH user for remote operations",
+                        "default": "root",
+                    },
+                    "ssh_key": {"type": "string", "description": "Path to SSH private key"},
+                    "endpoint": {
+                        "type": "string",
+                        "description": "SGLang endpoint URL for inference/metrics",
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Prompt text for inference testing",
+                    },
+                    "messages": {
+                        "type": "array",
+                        "description": "Chat messages array",
+                        "items": {"type": "object"},
+                    },
+                    "max_tokens": {
+                        "type": "integer",
+                        "description": "Max tokens to generate",
+                        "default": 100,
+                    },
+                    "api_key": {"type": "string", "description": "API key for inference"},
+                    "tp_size": {
+                        "type": "integer",
+                        "description": "Tensor parallel size",
+                        "default": 1,
+                    },
+                    "enable_expert_parallel": {
+                        "type": "boolean",
+                        "description": "Enable MoE Expert Parallelism",
+                        "default": False,
+                    },
+                },
+                "required": ["action"],
+            },
+        ),
+        # ── v4.0.0: ML Services — Legacy SGLang (deprecated) ──────────────────────────────────
+        Tool(
+            name="sglang_start",
+            description="[DEPRECATED] Use sglang action='start' instead. Start an SGLang inference server on a remote instance.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "instance_ip": {"type": "string", "description": "Target instance IP"},
+                    "model": {"type": "string", "description": "HuggingFace model ID"},
+                    "port": {
+                        "type": "integer",
+                        "description": "Server port",
+                        "default": 8000,
+                    },
+                    "tp_size": {
+                        "type": "integer",
+                        "description": "Tensor parallel size",
+                        "default": 1,
+                    },
+                    "dp_size": {
+                        "type": "integer",
+                        "description": "Data parallel size",
+                        "default": 8,
+                    },
+                    "enable_expert_parallel": {
+                        "type": "boolean",
+                        "description": "Enable MoE Expert Parallelism",
+                        "default": False,
+                    },
+                    "ssh_user": {
+                        "type": "string",
+                        "description": "SSH user",
+                        "default": "root",
+                    },
+                    "ssh_key": {"type": "string", "description": "Path to SSH private key"},
+                },
+                "required": ["instance_ip", "model"],
+            },
+        ),
+        Tool(
+            name="sglang_stop",
+            description="[DEPRECATED] Use sglang action='stop' instead. Stop an SGLang server on a remote instance.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "instance_ip": {"type": "string", "description": "Target instance IP"},
+                    "ssh_user": {
+                        "type": "string",
+                        "description": "SSH user",
+                        "default": "root",
+                    },
+                    "ssh_key": {"type": "string", "description": "Path to SSH private key"},
+                },
+                "required": ["instance_ip"],
+            },
+        ),
+        Tool(
+            name="sglang_inference",
+            description="[DEPRECATED] Use sglang action='inference' instead. Test inference against a running SGLang endpoint.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "SGLang endpoint URL (e.g. http://10.0.0.1:8000)",
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Prompt text (for completions mode)",
+                    },
+                    "messages": {
+                        "type": "array",
+                        "description": "Chat messages array (for chat mode)",
+                        "items": {"type": "object"},
+                    },
+                    "model": {"type": "string", "description": "Model name to use"},
+                    "max_tokens": {
+                        "type": "integer",
+                        "description": "Max tokens to generate",
+                        "default": 100,
+                    },
+                    "api_key": {"type": "string", "description": "API key"},
+                },
+                "required": ["endpoint", "model"],
+            },
+        ),
+        Tool(
+            name="sglang_metrics",
+            description="[DEPRECATED] Use sglang action='metrics' instead. Get SGLang server metrics from the Prometheus endpoint.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "SGLang endpoint URL (e.g. http://10.0.0.1:8000)",
+                    }
+                },
+                "required": ["endpoint"],
+            },
+        ),
+        # ── v4.0.0: ML Services — Ollama ──────────────────────────────────
+        Tool(
+            name="ollama_list",
+            description="List models available on an Ollama server.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "Ollama endpoint URL",
+                        "default": "http://localhost:11434",
+                    }
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="ollama_pull",
+            description="Pull a model to an Ollama server on a remote instance.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model": {
+                        "type": "string",
+                        "description": "Model name (e.g. llama3.2, deepseek-r1, codellama)",
+                    },
+                    "instance_ip": {"type": "string", "description": "Target instance IP"},
+                    "ssh_user": {
+                        "type": "string",
+                        "description": "SSH user",
+                        "default": "root",
+                    },
+                    "ssh_key": {"type": "string", "description": "Path to SSH private key"},
+                },
+                "required": ["model", "instance_ip"],
+            },
+        ),
+        Tool(
+            name="ollama_generate",
+            description="Generate text using an Ollama model (non-chat completions).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "Ollama endpoint URL",
+                        "default": "http://localhost:11434",
+                    },
+                    "model": {"type": "string", "description": "Model name"},
+                    "prompt": {"type": "string", "description": "Prompt text"},
+                },
+                "required": ["model", "prompt"],
+            },
+        ),
+        Tool(
+            name="ollama_chat",
+            description="Chat with an Ollama model using the chat/completions API.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "Ollama endpoint URL",
+                        "default": "http://localhost:11434",
+                    },
+                    "model": {"type": "string", "description": "Model name"},
+                    "messages": {
+                        "type": "array",
+                        "description": "Chat messages [{role, content}]",
+                        "items": {"type": "object"},
+                    },
+                },
+                "required": ["model", "messages"],
+            },
+        ),
+        Tool(
+            name="ollama_model_info",
+            description="Get detailed information about an Ollama model (parameters, template, license).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "Ollama endpoint URL",
+                        "default": "http://localhost:11434",
+                    },
+                    "model": {"type": "string", "description": "Model name"},
+                },
+                "required": ["model"],
+            },
+        ),
+        # ── v4.0.0: ML Services — Weights & Biases ───────────────────────
+        Tool(
+            name="wandb_list_projects",
+            description="List all Weights & Biases projects for the configured entity.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "W&B API key"},
+                    "entity": {
+                        "type": "string",
+                        "description": "W&B entity (team/username)",
+                    },
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="wandb_list_runs",
+            description="List runs in a W&B project with status, metrics summary, and config.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "W&B API key"},
+                    "entity": {"type": "string", "description": "W&B entity"},
+                    "project": {"type": "string", "description": "W&B project name"},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max runs to return",
+                        "default": 50,
+                    },
+                },
+                "required": ["api_key", "project"],
+            },
+        ),
+        Tool(
+            name="wandb_run_details",
+            description="Get detailed info, metrics, and artifacts for a specific W&B run.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "W&B API key"},
+                    "run_id": {"type": "string", "description": "W&B run ID"},
+                },
+                "required": ["api_key", "run_id"],
+            },
+        ),
+        # ── v4.0.0: ML Services — LangSmith ──────────────────────────────
+        Tool(
+            name="langsmith_list_runs",
+            description="List LangSmith runs with tracing data. Optionally correlate with Terradev GPU cost metrics.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "LangSmith API key"},
+                    "project": {"type": "string", "description": "LangSmith project name"},
+                    "limit": {"type": "integer", "description": "Max runs", "default": 50},
+                    "correlate_gpu": {
+                        "type": "boolean",
+                        "description": "Join with cost_tracking.db for cost-per-run",
+                        "default": False,
+                    },
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="langsmith_list_projects",
+            description="List LangSmith projects.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "LangSmith API key"}
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="langsmith_gpu_correlate",
+            description="Correlate LangSmith runs with Terradev GPU provisioning data. Returns cost-per-run, GPU utilization, and provider breakdown.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "LangSmith API key"},
+                    "project": {"type": "string", "description": "LangSmith project name"},
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days",
+                        "default": 7,
+                    },
+                },
+                "required": ["api_key"],
+            },
+        ),
+        # ── v4.0.0: ML Services — MLflow ─────────────────────────────────
+        Tool(
+            name="mlflow_list_experiments",
+            description="List MLflow experiments on the configured tracking server.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "tracking_uri": {
+                        "type": "string",
+                        "description": "MLflow tracking server URI",
+                    },
+                    "username": {"type": "string", "description": "Basic auth username"},
+                    "password": {"type": "string", "description": "Basic auth password"},
+                },
+                "required": ["tracking_uri"],
+            },
+        ),
+        Tool(
+            name="mlflow_log_run",
+            description="Log a Terradev training run to MLflow with auto-injected GPU type, provider, cost/hr, and duration as params.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "tracking_uri": {
+                        "type": "string",
+                        "description": "MLflow tracking server URI",
+                    },
+                    "experiment_name": {
+                        "type": "string",
+                        "description": "MLflow experiment name",
+                    },
+                    "run_name": {"type": "string", "description": "Run display name"},
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type used (e.g. H100)",
+                    },
+                    "provider": {"type": "string", "description": "Cloud provider"},
+                    "cost_per_hour": {
+                        "type": "number",
+                        "description": "Cost per hour in USD",
+                    },
+                    "duration_seconds": {
+                        "type": "number",
+                        "description": "Training duration in seconds",
+                    },
+                    "metrics": {
+                        "type": "object",
+                        "description": "Additional metrics to log",
+                    },
+                    "username": {"type": "string", "description": "Basic auth username"},
+                    "password": {"type": "string", "description": "Basic auth password"},
+                },
+                "required": ["tracking_uri", "experiment_name", "run_name"],
+            },
+        ),
+        Tool(
+            name="mlflow_register_model",
+            description="Register a trained model in the MLflow model registry with Terradev provenance tags.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "tracking_uri": {
+                        "type": "string",
+                        "description": "MLflow tracking server URI",
+                    },
+                    "model_name": {"type": "string", "description": "Model registry name"},
+                    "run_id": {
+                        "type": "string",
+                        "description": "MLflow run ID that produced the model",
+                    },
+                    "model_uri": {
+                        "type": "string",
+                        "description": "Model artifact URI (e.g. runs:/<run_id>/model)",
+                    },
+                    "tags": {
+                        "type": "object",
+                        "description": "Additional tags to set on the model version",
+                    },
+                    "username": {"type": "string", "description": "Basic auth username"},
+                    "password": {"type": "string", "description": "Basic auth password"},
+                },
+                "required": ["tracking_uri", "model_name", "run_id"],
+            },
+        ),
+        # ── v4.0.0: ML Services — DVC ────────────────────────────────────
+        Tool(
+            name="dvc_status",
+            description="Get DVC repository status: tracked files, remotes, and changes since last commit.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Path to the DVC repository",
+                    }
+                },
+                "required": ["repo_path"],
+            },
+        ),
+        Tool(
+            name="dvc_diff",
+            description="Show DVC diff between two revisions (e.g. training checkpoints). Shows added, modified, deleted files.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Path to the DVC repository",
+                    },
+                    "rev_a": {"type": "string", "description": "Base revision (git ref)"},
+                    "rev_b": {
+                        "type": "string",
+                        "description": "Target revision (git ref, default: HEAD)",
+                    },
+                },
+                "required": ["repo_path"],
+            },
+        ),
+        Tool(
+            name="dvc_stage_checkpoint",
+            description="Atomic checkpoint staging: DVC add + push + git commit in one operation. Promotes a training checkpoint to versioned storage.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Path to the DVC repository",
+                    },
+                    "checkpoint_path": {
+                        "type": "string",
+                        "description": "Path to the checkpoint file/directory to stage",
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Git commit message",
+                        "default": "Stage checkpoint via Terradev",
+                    },
+                    "remote": {
+                        "type": "string",
+                        "description": "DVC remote name to push to",
+                    },
+                },
+                "required": ["repo_path", "checkpoint_path"],
+            },
+        ),
+        Tool(
+            name="dvc_push",
+            description="Push DVC-tracked data to the configured remote storage.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Path to the DVC repository",
+                    },
+                    "remote": {
+                        "type": "string",
+                        "description": "DVC remote name (optional, uses default)",
+                    },
+                },
+                "required": ["repo_path"],
+            },
+        ),
+        # ── v4.0.0: ML Services — KServe ─────────────────────────────────
+        Tool(
+            name="kserve_generate_yaml",
+            description="Generate a GPU-aware KServe InferenceService YAML manifest with NUMA pinning, resource limits derived from model size and VRAM, and topology hints.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_name": {
+                        "type": "string",
+                        "description": "Model name for the InferenceService",
+                    },
+                    "model_uri": {
+                        "type": "string",
+                        "description": "Model storage URI (e.g. s3://bucket/model or gs://bucket/model)",
+                    },
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type (e.g. A100, H100)",
+                    },
+                    "gpu_count": {
+                        "type": "integer",
+                        "description": "Number of GPUs",
+                        "default": 1,
+                    },
+                    "namespace": {
+                        "type": "string",
+                        "description": "Kubernetes namespace",
+                        "default": "default",
+                    },
+                    "runtime": {
+                        "type": "string",
+                        "description": "Serving runtime",
+                        "enum": ["vllm", "triton", "huggingface"],
+                        "default": "vllm",
+                    },
+                    "min_replicas": {
+                        "type": "integer",
+                        "description": "Min replicas for autoscaling",
+                        "default": 1,
+                    },
+                    "max_replicas": {
+                        "type": "integer",
+                        "description": "Max replicas for autoscaling",
+                        "default": 3,
+                    },
+                },
+                "required": ["model_name", "model_uri", "gpu_type"],
+            },
+        ),
+        Tool(
+            name="kserve_list",
+            description="List KServe InferenceServices in a Kubernetes namespace.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "description": "Kubernetes namespace",
+                        "default": "default",
+                    }
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="kserve_status",
+            description="Get detailed status of a KServe InferenceService including readiness, traffic split, and URL.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "InferenceService name"},
+                    "namespace": {
+                        "type": "string",
+                        "description": "Kubernetes namespace",
+                        "default": "default",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        # ── v4.0.0: Egress Optimizer ─────────────────────────────────────
+        Tool(
+            name="egress_cheapest_route",
+            description="Find the cheapest egress route between cloud providers/regions for model weights or dataset transfer. Supports multi-hop routing.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source_provider": {
+                        "type": "string",
+                        "description": "Source cloud provider (e.g. aws, gcp, azure)",
+                    },
+                    "source_region": {
+                        "type": "string",
+                        "description": "Source region (e.g. us-east-1)",
+                    },
+                    "dest_provider": {
+                        "type": "string",
+                        "description": "Destination cloud provider",
+                    },
+                    "dest_region": {"type": "string", "description": "Destination region"},
+                    "size_gb": {"type": "number", "description": "Transfer size in GB"},
+                },
+                "required": [
+                    "source_provider",
+                    "source_region",
+                    "dest_provider",
+                    "dest_region",
+                    "size_gb",
+                ],
+            },
+        ),
+        Tool(
+            name="egress_optimize_staging",
+            description="Optimize dataset or model staging across regions by finding the cheapest transfer plan. Integrates with the dataset stager for parallel uploads.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source_uri": {
+                        "type": "string",
+                        "description": "Source data URI (s3://, gs://, local path, or HF dataset ID)",
+                    },
+                    "target_regions": {
+                        "type": "array",
+                        "description": "Target regions as provider:region strings",
+                        "items": {"type": "string"},
+                    },
+                    "size_gb": {
+                        "type": "number",
+                        "description": "Approximate data size in GB",
+                    },
+                },
+                "required": ["source_uri", "target_regions", "size_gb"],
+            },
+        ),
+        # ── v5.0.0: HuggingFace Hub Full Service ─────────────────────────
+        Tool(
+            name="hf_list_models",
+            description="Search and browse HuggingFace Hub models. Filter by author, task, library. Returns model ID, downloads, likes, and tags.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "author": {
+                        "type": "string",
+                        "description": "Filter by author/org (e.g. meta-llama, mistralai)",
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "Search query (e.g. 'code generation', 'llama')",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results",
+                        "default": 20,
+                    },
+                    "api_key": {"type": "string", "description": "HuggingFace API token"},
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="hf_list_datasets",
+            description="Search and browse HuggingFace Hub datasets. Filter by author and search query.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "author": {"type": "string", "description": "Filter by author/org"},
+                    "search": {"type": "string", "description": "Search query"},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results",
+                        "default": 20,
+                    },
+                    "api_key": {"type": "string", "description": "HuggingFace API token"},
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="hf_model_info",
+            description="Get detailed model info: architecture, size, downloads, license, tags, pipeline_tag, and model card.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "HuggingFace model ID (e.g. meta-llama/Llama-3.3-70B-Instruct)",
+                    },
+                    "api_key": {"type": "string", "description": "HuggingFace API token"},
+                },
+                "required": ["model_id", "api_key"],
+            },
+        ),
+        Tool(
+            name="hf_create_endpoint",
+            description="Create a HuggingFace Inference Endpoint (paid GPU endpoint). Supports custom GPU types, regions, and scaling.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "HuggingFace model ID"},
+                    "endpoint_name": {"type": "string", "description": "Endpoint name"},
+                    "instance_type": {
+                        "type": "string",
+                        "description": "Instance type (e.g. nvidia-a100, nvidia-l4)",
+                    },
+                    "instance_size": {
+                        "type": "string",
+                        "description": "Instance size (e.g. x1, x2, x4)",
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "Region (e.g. us-east-1, eu-west-1)",
+                        "default": "us-east-1",
+                    },
+                    "min_replicas": {
+                        "type": "integer",
+                        "description": "Min replicas (0 for scale-to-zero)",
+                        "default": 0,
+                    },
+                    "max_replicas": {
+                        "type": "integer",
+                        "description": "Max replicas",
+                        "default": 1,
+                    },
+                    "api_key": {"type": "string", "description": "HuggingFace API token"},
+                },
+                "required": ["model_id", "endpoint_name", "instance_type", "api_key"],
+            },
+        ),
+        Tool(
+            name="hf_list_endpoints",
+            description="List all active HuggingFace Inference Endpoints with status, URL, and cost.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "HuggingFace API token"}
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="hf_endpoint_info",
+            description="Get detailed info about a specific HuggingFace Inference Endpoint: status, URL, scaling config, cost.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint_name": {"type": "string", "description": "Endpoint name"},
+                    "api_key": {"type": "string", "description": "HuggingFace API token"},
+                },
+                "required": ["endpoint_name", "api_key"],
+            },
+        ),
+        Tool(
+            name="hf_delete_endpoint",
+            description="Delete a HuggingFace Inference Endpoint.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint_name": {
+                        "type": "string",
+                        "description": "Endpoint name to delete",
+                    },
+                    "api_key": {"type": "string", "description": "HuggingFace API token"},
+                },
+                "required": ["endpoint_name", "api_key"],
+            },
+        ),
+        Tool(
+            name="hf_endpoint_infer",
+            description="Run inference on a HuggingFace Inference Endpoint. Supports text generation, embeddings, and custom inputs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint_name": {"type": "string", "description": "Endpoint name"},
+                    "inputs": {"type": "string", "description": "Input text or prompt"},
+                    "parameters": {
+                        "type": "object",
+                        "description": "Generation parameters (max_new_tokens, temperature, etc.)",
+                    },
+                    "api_key": {"type": "string", "description": "HuggingFace API token"},
+                },
+                "required": ["endpoint_name", "inputs", "api_key"],
+            },
+        ),
+        # ── v5.0.0: HF Smart Templates ───────────────────────────────────
+        Tool(
+            name="hf_smart_template",
+            description="Auto-generate an optimized deployment template for any HuggingFace model. Analyzes model size, architecture, and quantization to select optimal hardware and generate ready-to-deploy configs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "HuggingFace model ID (e.g. meta-llama/Llama-3.3-70B-Instruct)",
+                    },
+                    "template_type": {
+                        "type": "string",
+                        "description": "Template type",
+                        "enum": ["auto", "chat", "embedding", "vision", "audio"],
+                        "default": "auto",
+                    },
+                    "space_name": {
+                        "type": "string",
+                        "description": "Optional HF Space name for deployment",
+                    },
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="hf_hardware_recommend",
+            description="Get hardware recommendation with cost breakdown for any HuggingFace model. Returns optimal GPU type, estimated cost, and performance score.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "HuggingFace model ID"},
+                    "budget_constraint": {
+                        "type": "number",
+                        "description": "Max $/hr budget (optional)",
+                    },
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="hf_hardware_compare",
+            description="Compare all hardware options for a HuggingFace model. Returns side-by-side cost, performance, and compatibility analysis.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string", "description": "HuggingFace model ID"}
+                },
+                "required": ["model_id"],
+            },
+        ),
+        # ── v5.0.0: LangChain / LangGraph / LangSmith ────────────────────
+        Tool(
+            name="langchain_create_workflow",
+            description="Create a LangChain workflow with LangSmith monitoring integration.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "workflow_config": {
+                        "type": "object",
+                        "description": "Workflow configuration (name, steps, model, tools)",
+                    },
+                    "api_key": {
+                        "type": "string",
+                        "description": "LangChain/LangSmith API key",
+                    },
+                    "langsmith_api_key": {
+                        "type": "string",
+                        "description": "LangSmith API key for tracing",
+                    },
+                },
+                "required": ["workflow_config", "api_key"],
+            },
+        ),
+        Tool(
+            name="langchain_create_sglang_pipeline",
+            description="Create an SGLang model-serving pipeline via LangChain. Connects LangChain agents to SGLang inference endpoints.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pipeline_config": {
+                        "type": "object",
+                        "description": "Pipeline config (model, endpoint, temperature, max_tokens)",
+                    },
+                    "api_key": {"type": "string", "description": "LangChain API key"},
+                },
+                "required": ["pipeline_config", "api_key"],
+            },
+        ),
+        Tool(
+            name="langsmith_create_project",
+            description="Create a new LangSmith project for tracing and evaluation.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Project name"},
+                    "description": {"type": "string", "description": "Project description"},
+                    "api_key": {"type": "string", "description": "LangSmith API key"},
+                },
+                "required": ["name", "api_key"],
+            },
+        ),
+        Tool(
+            name="langsmith_get_workspaces",
+            description="List all LangSmith workspaces.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "LangSmith API key"}
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="langsmith_create_trace",
+            description="Create a trace in LangSmith for observability. Tracks input/output, latency, token usage, and cost.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "run_id": {
+                        "type": "string",
+                        "description": "Run ID to attach trace to",
+                    },
+                    "trace_data": {
+                        "type": "object",
+                        "description": "Trace data (name, inputs, outputs, metadata)",
+                    },
+                    "api_key": {"type": "string", "description": "LangSmith API key"},
+                },
+                "required": ["run_id", "trace_data", "api_key"],
+            },
+        ),
+        Tool(
+            name="langgraph_create_workflow",
+            description="Create a LangGraph stateful workflow with monitoring. Supports agent graphs, tool calling, and state persistence.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "graph_config": {
+                        "type": "object",
+                        "description": "Graph configuration (nodes, edges, state_schema)",
+                    },
+                    "api_key": {"type": "string", "description": "LangChain API key"},
+                    "langsmith_api_key": {
+                        "type": "string",
+                        "description": "LangSmith API key for tracing",
+                    },
+                },
+                "required": ["graph_config", "api_key"],
+            },
+        ),
+        Tool(
+            name="langgraph_orchestrator_worker",
+            description="Create an orchestrator-worker pattern workflow in LangGraph. The orchestrator delegates tasks to specialized worker agents.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "workflow_config": {
+                        "type": "object",
+                        "description": "Orchestrator-worker config (orchestrator_prompt, workers, routing_strategy)",
+                    },
+                    "api_key": {"type": "string", "description": "LangChain API key"},
+                },
+                "required": ["workflow_config", "api_key"],
+            },
+        ),
+        Tool(
+            name="langgraph_evaluation_workflow",
+            description="Create an evaluator-optimizer workflow in LangGraph. Generates outputs, evaluates quality, and iteratively improves.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "evaluation_config": {
+                        "type": "object",
+                        "description": "Evaluation config (generator_prompt, evaluator_criteria, max_iterations)",
+                    },
+                    "api_key": {"type": "string", "description": "LangChain API key"},
+                },
+                "required": ["evaluation_config", "api_key"],
+            },
+        ),
+        Tool(
+            name="langgraph_workflow_status",
+            description="Get the status and metrics of a LangGraph workflow execution.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "workflow_id": {
+                        "type": "string",
+                        "description": "Workflow ID to check",
+                    },
+                    "api_key": {"type": "string", "description": "LangChain API key"},
+                },
+                "required": ["workflow_id", "api_key"],
+            },
+        ),
+        # ── v5.0.0: W&B Enhanced ─────────────────────────────────────────
+        Tool(
+            name="wandb_create_dashboard",
+            description="Create a custom W&B dashboard with GPU metrics, training loss, and cost panels.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dashboard_config": {
+                        "type": "object",
+                        "description": "Dashboard config (name, panels, metrics)",
+                    },
+                    "api_key": {"type": "string", "description": "W&B API key"},
+                    "entity": {"type": "string", "description": "W&B entity"},
+                },
+                "required": ["dashboard_config", "api_key"],
+            },
+        ),
+        Tool(
+            name="wandb_create_terradev_dashboard",
+            description="Auto-create a Terradev-specific W&B dashboard with GPU utilization, cost tracking, training metrics, and infrastructure panels.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "W&B API key"},
+                    "entity": {"type": "string", "description": "W&B entity"},
+                    "project": {"type": "string", "description": "W&B project name"},
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="wandb_create_report",
+            description="Create a W&B report with custom sections, charts, and narrative text.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "report_config": {
+                        "type": "object",
+                        "description": "Report config (title, sections, metrics, description)",
+                    },
+                    "api_key": {"type": "string", "description": "W&B API key"},
+                    "entity": {"type": "string", "description": "W&B entity"},
+                },
+                "required": ["report_config", "api_key"],
+            },
+        ),
+        Tool(
+            name="wandb_create_terradev_report",
+            description="Auto-generate a Terradev infrastructure report: GPU costs, provider comparison, training efficiency, and recommendations.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "metrics_data": {
+                        "type": "object",
+                        "description": "Metrics data to include (gpu_costs, training_runs, provider_stats)",
+                    },
+                    "api_key": {"type": "string", "description": "W&B API key"},
+                    "entity": {"type": "string", "description": "W&B entity"},
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="wandb_setup_alerts",
+            description="Set up custom W&B alerts for GPU metrics: cost thresholds, utilization drops, training anomalies.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "alert_config": {
+                        "type": "object",
+                        "description": "Alert config (metric, threshold, condition, notification_channel)",
+                    },
+                    "api_key": {"type": "string", "description": "W&B API key"},
+                    "entity": {"type": "string", "description": "W&B entity"},
+                },
+                "required": ["alert_config", "api_key"],
+            },
+        ),
+        Tool(
+            name="wandb_create_terradev_alerts",
+            description="Auto-create standard Terradev alerts: GPU cost > budget, utilization < 50%, training loss spike, straggler detection.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "W&B API key"},
+                    "entity": {"type": "string", "description": "W&B entity"},
+                },
+                "required": ["api_key"],
+            },
+        ),
+        Tool(
+            name="wandb_dashboard_status",
+            description="Get comprehensive W&B monitoring overview: dashboards, reports, alerts, active runs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_key": {"type": "string", "description": "W&B API key"},
+                    "entity": {"type": "string", "description": "W&B entity"},
+                },
+                "required": ["api_key"],
+            },
+        ),
+        # ── v5.0.0: Data Governance ───────────────────────────────────────
+        Tool(
+            name="governance_request_consent",
+            description="Request user consent for data movement across cloud regions. GDPR/SOC2 compliant consent tracking with audit trail.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {
+                        "type": "string",
+                        "description": "User ID requesting consent",
+                    },
+                    "consent_type": {
+                        "type": "string",
+                        "description": "Consent type",
+                        "enum": [
+                            "data_staging",
+                            "cross_region",
+                            "third_party",
+                            "model_training",
+                        ],
+                    },
+                    "dataset_name": {
+                        "type": "string",
+                        "description": "Dataset being moved",
+                    },
+                    "source_location": {
+                        "type": "string",
+                        "description": "Source region/provider",
+                    },
+                    "target_location": {
+                        "type": "string",
+                        "description": "Target region/provider",
+                    },
+                    "purpose": {
+                        "type": "string",
+                        "description": "Purpose of data movement",
+                    },
+                },
+                "required": ["user_id", "consent_type", "dataset_name", "purpose"],
+            },
+        ),
+        Tool(
+            name="governance_record_consent",
+            description="Record a consent response (granted or denied) for a pending consent request.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "request_id": {"type": "string", "description": "Consent request ID"},
+                    "user_id": {"type": "string", "description": "User ID"},
+                    "granted": {
+                        "type": "boolean",
+                        "description": "Whether consent was granted",
+                    },
+                    "conditions": {
+                        "type": "array",
+                        "description": "Conditions attached to consent",
+                        "items": {"type": "string"},
+                    },
+                },
+                "required": ["request_id", "user_id", "granted"],
+            },
+        ),
+        Tool(
+            name="governance_evaluate_opa",
+            description="Evaluate OPA (Open Policy Agent) policies for data access. Checks region restrictions, classification rules, and compliance requirements.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "string", "description": "User ID to evaluate"},
+                    "dataset_name": {"type": "string", "description": "Dataset name"},
+                    "action": {
+                        "type": "string",
+                        "description": "Action to evaluate",
+                        "enum": ["read", "write", "move", "delete", "train"],
+                    },
+                    "target_location": {
+                        "type": "string",
+                        "description": "Target location for the action",
+                    },
+                },
+                "required": ["user_id", "dataset_name", "action"],
+            },
+        ),
+        Tool(
+            name="governance_move_data",
+            description="Move data with full governance audit trail. Requires prior consent and OPA policy approval. Tracks integrity, encryption, and compliance.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "string", "description": "User ID"},
+                    "consent_request_id": {
+                        "type": "string",
+                        "description": "Approved consent request ID",
+                    },
+                    "dataset_name": {"type": "string", "description": "Dataset to move"},
+                    "source_location": {"type": "string", "description": "Source location"},
+                    "target_location": {"type": "string", "description": "Target location"},
+                },
+                "required": [
+                    "user_id",
+                    "consent_request_id",
+                    "dataset_name",
+                    "source_location",
+                    "target_location",
+                ],
+            },
+        ),
+        Tool(
+            name="governance_movement_history",
+            description="Get data movement audit log. Filter by user, dataset, or time range.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "string", "description": "Filter by user ID"},
+                    "dataset_name": {"type": "string", "description": "Filter by dataset"},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max records",
+                        "default": 50,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="governance_compliance_report",
+            description="Generate comprehensive compliance report: consent stats, policy evaluations, data movements, violations. For GDPR/SOC2/HIPAA audits.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "start_date": {
+                        "type": "string",
+                        "description": "Start date (ISO format, e.g. 2025-01-01)",
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "End date (ISO format, e.g. 2025-12-31)",
+                    },
+                },
+                "required": ["start_date", "end_date"],
+            },
+        ),
+        # ── v5.0.0: Cost Optimizer Deep ───────────────────────────────────
+        Tool(
+            name="cost_analyze",
+            description="Deep cost analysis of current GPU infrastructure: per-provider breakdown, utilization efficiency, waste identification, and optimization potential.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days",
+                        "default": 30,
+                    }
+                },
+            },
+        ),
+        Tool(
+            name="cost_optimize_recommend",
+            description="Generate actionable cost optimization recommendations: spot migration, GPU right-sizing, provider arbitrage, idle shutdown, and density packing.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "target_savings": {
+                        "type": "number",
+                        "description": "Target savings percentage (e.g. 0.3 for 30%)",
+                    },
+                    "constraints": {
+                        "type": "object",
+                        "description": "Constraints (min_gpus, max_latency_ms, required_providers)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="cost_simulate",
+            description="Simulate cost optimization scenarios with ROI projections. Compare current vs optimized infrastructure costs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "scenario": {
+                        "type": "object",
+                        "description": "Scenario config (gpu_type, provider, count, spot, hours)",
+                    },
+                    "compare_with": {
+                        "type": "object",
+                        "description": "Current config to compare against",
+                    },
+                },
+                "required": ["scenario"],
+            },
+        ),
+        Tool(
+            name="cost_budget_optimize",
+            description="Find optimal GPU deployment under a strict budget constraint. Uses ML-based cost prediction and spot risk assessment.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "budget": {"type": "number", "description": "Total budget in USD"},
+                    "gpu_type": {"type": "string", "description": "Required GPU type"},
+                    "gpu_count": {
+                        "type": "integer",
+                        "description": "Required GPU count",
+                        "default": 1,
+                    },
+                    "hours": {
+                        "type": "number",
+                        "description": "Required runtime in hours",
+                        "default": 1.0,
+                    },
+                    "allow_spot": {
+                        "type": "boolean",
+                        "description": "Allow spot instances",
+                        "default": True,
+                    },
+                },
+                "required": ["budget"],
+            },
+        ),
+        # ── v5.0.0: Price Intelligence Extended ──────────────────────────
+        Tool(
+            name="price_trends",
+            description="Get GPU price trend analysis with delta (rate of change), gamma (acceleration), and annualized volatility. Identifies cheapest time windows.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type",
+                        "enum": [
+                            "H100",
+                            "H200",
+                            "H800",
+                            "A100",
+                            "A10G",
+                            "L40S",
+                            "L4",
+                            "T4",
+                            "RTX4090",
+                            "V100S",
+                            "A6000",
+                            "MI300X",
+                        ],
+                    },
+                    "hours": {
+                        "type": "integer",
+                        "description": "Hours of history",
+                        "default": 24,
+                    },
+                },
+                "required": ["gpu_type"],
+            },
+        ),
+        Tool(
+            name="price_budget_optimize",
+            description="Budget-first price optimization with ML-based cost prediction. Finds cheapest deployment plan under budget.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "budget": {"type": "number", "description": "Budget in USD"},
+                    "gpu_type": {"type": "string", "description": "Required GPU type"},
+                    "gpu_count": {
+                        "type": "integer",
+                        "description": "GPU count",
+                        "default": 1,
+                    },
+                    "hours": {
+                        "type": "number",
+                        "description": "Runtime hours",
+                        "default": 1.0,
+                    },
+                },
+                "required": ["budget", "gpu_type"],
+            },
+        ),
+        Tool(
+            name="price_spot_risk",
+            description="Spot instance risk assessment per provider. Returns interruption probability, mean time to interruption, and recommended mitigation.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "gpu_type": {"type": "string", "description": "GPU type"},
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider to assess (or 'all')",
+                    },
+                },
+                "required": ["gpu_type"],
+            },
+        ),
+        # ── v5.0.0: Training Orchestrator Extended ────────────────────────
+        Tool(
+            name="training_config_generate",
+            description="Generate a complete training configuration from a declarative spec. Auto-detects framework, sets optimal parallelism, and configures distributed training.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Training job name"},
+                    "framework": {
+                        "type": "string",
+                        "description": "Training framework",
+                        "enum": ["torchrun", "deepspeed", "accelerate", "megatron"],
+                        "default": "torchrun",
+                    },
+                    "script": {"type": "string", "description": "Training script path"},
+                    "nodes": {
+                        "type": "array",
+                        "description": "Node IPs",
+                        "items": {"type": "string"},
+                    },
+                    "gpus_per_node": {
+                        "type": "integer",
+                        "description": "GPUs per node",
+                        "default": 8,
+                    },
+                    "from_provision": {
+                        "type": "string",
+                        "description": "Resolve from provision ('latest' or group ID)",
+                    },
+                    "deepspeed_config": {
+                        "type": "object",
+                        "description": "DeepSpeed config overrides",
+                    },
+                    "script_args": {
+                        "type": "string",
+                        "description": "Extra script arguments",
+                    },
+                },
+                "required": ["name", "script"],
+            },
+        ),
+        Tool(
+            name="training_launch_distributed",
+            description="Full distributed training launch with framework auto-detection, topology validation, and monitoring. Combines preflight + train + monitor in one operation.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Job name"},
+                    "script": {"type": "string", "description": "Training script"},
+                    "framework": {
+                        "type": "string",
+                        "description": "Framework",
+                        "enum": ["torchrun", "deepspeed", "accelerate", "megatron"],
+                        "default": "torchrun",
+                    },
+                    "from_provision": {
+                        "type": "string",
+                        "description": "Resolve nodes from provision ('latest' or group ID)",
+                    },
+                    "nodes": {
+                        "type": "array",
+                        "description": "Manual node IPs",
+                        "items": {"type": "string"},
+                    },
+                    "gpus_per_node": {
+                        "type": "integer",
+                        "description": "GPUs per node",
+                        "default": 8,
+                    },
+                    "skip_preflight": {
+                        "type": "boolean",
+                        "description": "Skip preflight validation",
+                        "default": False,
+                    },
+                },
+                "required": ["name", "script"],
+            },
+        ),
+        # ── v5.0.0: Training Monitor Extended ─────────────────────────────
+        Tool(
+            name="train_snapshot",
+            description="Get complete training monitoring snapshot: GPU metrics (utilization, memory, temp, power), training metrics (loss, grad_norm, lr, throughput), straggler detection, and cost estimate.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "string", "description": "Training job ID"},
+                    "cost_rate": {
+                        "type": "number",
+                        "description": "$/GPU-hr for cost estimation",
+                        "default": 2.0,
+                    },
+                },
+                "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="train_detect_stragglers",
+            description="Detect straggler nodes in distributed training. Identifies GPUs with significantly lower utilization that slow the whole job.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "string", "description": "Training job ID"},
+                    "threshold": {
+                        "type": "number",
+                        "description": "Straggler threshold (0-1, default 0.7 = 70% of mean)",
+                        "default": 0.7,
+                    },
+                },
+                "required": ["job_id"],
+            },
+        ),
+        # ── v5.0.0: Preflight Validator Extended ──────────────────────────
+        Tool(
+            name="preflight_report",
+            description="Generate full preflight validation report with pass/warn/fail per check. Covers GPU drivers, CUDA, NCCL, RDMA, network, disk, and Docker.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "nodes": {
+                        "type": "array",
+                        "description": "Node IPs",
+                        "items": {"type": "string"},
+                    },
+                    "from_provision": {
+                        "type": "string",
+                        "description": "Resolve nodes from provision ('latest' or group ID)",
+                    },
+                    "checks": {
+                        "type": "array",
+                        "description": "Specific checks to run",
+                        "items": {"type": "string"},
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="preflight_gpu_check",
+            description="GPU-specific preflight validation: NVIDIA drivers, CUDA version, GPU count, NCCL, NVLink topology, NCU stall-signature profiling, and adversarial config verification (V1-V3).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "nodes": {
+                        "type": "array",
+                        "description": "Node IPs",
+                        "items": {"type": "string"},
+                    },
+                    "from_provision": {
+                        "type": "string",
+                        "description": "Resolve nodes from provision",
+                    },
+                    "tensor_parallel_size": {
+                        "type": "integer",
+                        "description": "TP size for V1 adversarial check (vs GPU count)",
+                    },
+                    "model_precision": {
+                        "type": "string",
+                        "description": "Model precision (fp8, bf16, fp16) for V2 FP8 wall check",
+                    },
+                    "fp8_quant_scheme": {
+                        "type": "string",
+                        "description": "FP8 quant scheme (per_tensor, per_token) for Blackwell K-slab check",
+                    },
+                    "gpu_arch": {
+                        "type": "string",
+                        "description": "GPU architecture string (e.g. blackwell, hopper) for precision wall detection",
+                    },
+                    "max_batch_size": {
+                        "type": "integer",
+                        "description": "Max batch size for V3 launch-overhead dominance check",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="preflight_network_check",
+            description="Network-specific preflight validation: RDMA availability, InfiniBand status, inter-node bandwidth, latency matrix, firewall rules.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "nodes": {
+                        "type": "array",
+                        "description": "Node IPs",
+                        "items": {"type": "string"},
+                    },
+                    "from_provision": {
+                        "type": "string",
+                        "description": "Resolve nodes from provision",
+                    },
+                },
+            },
+        ),
+        # ── v5.0.0: Kubernetes Enhanced ───────────────────────────────────
+        Tool(
+            name="k8s_gpu_operator_install",
+            description="Install NVIDIA GPU Operator on a Kubernetes cluster. Configures driver containers, device plugin, DCGM exporter, and GPU Feature Discovery.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_name": {
+                        "type": "string",
+                        "description": "Target cluster name",
+                    },
+                    "driver_version": {
+                        "type": "string",
+                        "description": "NVIDIA driver version (default: auto-detect)",
+                    },
+                    "namespace": {
+                        "type": "string",
+                        "description": "Install namespace",
+                        "default": "gpu-operator",
+                    },
+                },
+                "required": ["cluster_name"],
+            },
+        ),
+        Tool(
+            name="k8s_device_plugin",
+            description="Configure Kubernetes GPU device plugin settings: time-slicing, MIG strategy, and resource naming.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_name": {
+                        "type": "string",
+                        "description": "Target cluster name",
+                    },
+                    "strategy": {
+                        "type": "string",
+                        "description": "Device plugin strategy",
+                        "enum": ["none", "time-slicing", "mig-single", "mig-mixed"],
+                        "default": "none",
+                    },
+                    "replicas": {
+                        "type": "integer",
+                        "description": "Time-slicing replicas per GPU",
+                        "default": 2,
+                    },
+                },
+                "required": ["cluster_name"],
+            },
+        ),
+        Tool(
+            name="k8s_mig_configure",
+            description="Configure Multi-Instance GPU (MIG) partitioning on A100/H100 GPUs. Splits a single GPU into isolated instances for multi-tenant workloads.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_name": {
+                        "type": "string",
+                        "description": "Target cluster name",
+                    },
+                    "mig_profile": {
+                        "type": "string",
+                        "description": "MIG profile",
+                        "enum": [
+                            "1g.5gb",
+                            "1g.10gb",
+                            "2g.10gb",
+                            "3g.20gb",
+                            "4g.20gb",
+                            "7g.40gb",
+                            "7g.80gb",
+                        ],
+                    },
+                    "gpu_indices": {
+                        "type": "array",
+                        "description": "GPU indices to configure",
+                        "items": {"type": "integer"},
+                    },
+                },
+                "required": ["cluster_name", "mig_profile"],
+            },
+        ),
+        Tool(
+            name="k8s_time_slicing",
+            description="Configure GPU time-slicing for Kubernetes. Allows multiple pods to share a single GPU with configurable oversubscription.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_name": {
+                        "type": "string",
+                        "description": "Target cluster name",
+                    },
+                    "replicas": {
+                        "type": "integer",
+                        "description": "Virtual GPUs per physical GPU",
+                        "default": 4,
+                    },
+                    "oversubscribe": {
+                        "type": "boolean",
+                        "description": "Allow oversubscription",
+                        "default": True,
+                    },
+                },
+                "required": ["cluster_name"],
+            },
+        ),
+        Tool(
+            name="k8s_monitoring_stack",
+            description="Deploy Prometheus + Grafana GPU monitoring stack with DCGM dashboards, Karpenter metrics, and GPU utilization alerts.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_name": {
+                        "type": "string",
+                        "description": "Target cluster name",
+                    },
+                    "namespace": {
+                        "type": "string",
+                        "description": "Monitoring namespace",
+                        "default": "monitoring",
+                    },
+                    "grafana_password": {
+                        "type": "string",
+                        "description": "Grafana admin password",
+                    },
+                    "enable_alerting": {
+                        "type": "boolean",
+                        "description": "Enable GPU utilization alerts",
+                        "default": True,
+                    },
+                },
+                "required": ["cluster_name"],
+            },
+        ),
+        # ── v5.1.0: Datadog Integration ──────────────────────────────────
+        Tool(
+            name="datadog_status",
+            description="Check Datadog integration status: configured, site, API key presence.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="datadog_push_metrics",
+            description="Push current GPU cost snapshot to Datadog: active instances, cost/hr, projected monthly, provider reliability, quote latency.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="datadog_send_event",
+            description="Send a custom event to Datadog with title, text, and alert type.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Event title"},
+                    "text": {
+                        "type": "string",
+                        "description": "Event body (markdown supported)",
+                    },
+                    "alert_type": {
+                        "type": "string",
+                        "description": "Alert type",
+                        "enum": ["info", "warning", "error", "success"],
+                        "default": "info",
+                    },
+                },
+                "required": ["title", "text"],
+            },
+        ),
+        Tool(
+            name="datadog_create_monitors",
+            description="Create all Terradev GPU FinOps monitors in Datadog: budget alert, cost spike, idle GPU, spot volatility, provider degraded, egress anomaly.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "template": {
+                        "type": "string",
+                        "description": "Single template name (or omit for all)",
+                        "enum": [
+                            "budget_alert",
+                            "cost_spike",
+                            "idle_gpu",
+                            "spot_risk",
+                            "provider_degraded",
+                            "egress_anomaly",
+                        ],
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="datadog_list_monitors",
+            description="List all Terradev-tagged monitors in Datadog with their current status.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="datadog_create_dashboard",
+            description="Create the Terradev GPU FinOps dashboard in Datadog with 12 widgets: cost/hr, projected monthly, active GPUs, budget, provider reliability, volatility, latency, training util, egress, events.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Custom dashboard title (default: Terradev GPU FinOps)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="datadog_list_dashboards",
+            description="List Terradev-related dashboards in Datadog.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="datadog_query",
+            description="Query Datadog metrics using the metrics query language. Returns time series data.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Datadog metric query (e.g. avg:terradev.gpu.cost_per_hour{*} by {provider})",
+                    },
+                    "from_seconds": {
+                        "type": "integer",
+                        "description": "Lookback window in seconds",
+                        "default": 3600,
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="datadog_terraform_export",
+            description="Generate a complete Terraform module for the Datadog integration: provider.tf, monitors.tf, dashboard.tf, versions.tf. Run `terraform apply` to deploy all monitors and dashboards as IaC.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "output_dir": {
+                        "type": "string",
+                        "description": "Directory to write .tf files (default: ./datadog-terraform)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="datadog_metric_catalog",
+            description="List all Terradev metrics that can be pushed to Datadog with their types, units, and tags.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        # ── v5.2.0: Arize Phoenix — LLM Trace Observability (ELv2) ──
+        Tool(
+            name="phoenix_test",
+            description="Test connection to Arize Phoenix server. Returns collector endpoint and project count.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="phoenix_projects",
+            description="List Phoenix projects (trace namespaces).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max projects to return",
+                        "default": 50,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="phoenix_spans",
+            description="List recent spans for a Phoenix project. Supports SpanQuery DSL filters like \"span_kind == 'RETRIEVER'\" or \"status_code == 'ERROR'\".",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project ID or name"},
+                    "filter": {
+                        "type": "string",
+                        "description": "SpanQuery DSL filter expression",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max spans to return",
+                        "default": 20,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="phoenix_trace",
+            description="View full execution tree for a specific trace ID. Shows span hierarchy, latencies, and token counts.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "trace_id": {"type": "string", "description": "Trace ID to inspect"},
+                    "project": {"type": "string", "description": "Project ID or name"},
+                },
+                "required": ["trace_id"],
+            },
+        ),
+        Tool(
+            name="phoenix_otel_env",
+            description="Generate OpenTelemetry environment variables for instrumenting serving pods with Phoenix tracing.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project name"},
+                },
+            },
+        ),
+        Tool(
+            name="phoenix_snippet",
+            description="Generate Python instrumentation snippet for adding Phoenix tracing to LLM applications.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project name"},
+                },
+            },
+        ),
+        Tool(
+            name="phoenix_k8s",
+            description="Generate Kubernetes deployment manifest for self-hosted Arize Phoenix server.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "description": "K8s namespace",
+                        "default": "observability",
+                    },
+                },
+            },
+        ),
+        # ── v5.2.0: NeMo Guardrails — LLM Output Safety (Apache 2.0) ──
+        Tool(
+            name="guardrails_test",
+            description="Test connection to NeMo Guardrails server.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="guardrails_chat",
+            description="Send a message through NeMo Guardrails and return the safety-filtered response. Applies topical, jailbreak, PII, and factcheck rails.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "Message to send through guardrails",
+                    },
+                    "config_id": {
+                        "type": "string",
+                        "description": "Guardrails config_id to use",
+                    },
+                },
+                "required": ["message"],
+            },
+        ),
+        Tool(
+            name="guardrails_generate_config",
+            description="Generate default Colang 2.x guardrails configuration files (topical, jailbreak, PII, factcheck rails).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "config_id": {"type": "string", "description": "Config ID name"},
+                    "output_dir": {
+                        "type": "string",
+                        "description": "Output directory",
+                        "default": "./guardrails",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="guardrails_k8s",
+            description="Generate Kubernetes deployment manifest for NeMo Guardrails server (standalone or sidecar mode).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "description": "K8s namespace",
+                        "default": "guardrails",
+                    },
+                },
+            },
+        ),
+        # ── v5.2.0: Qdrant — Vector Database for RAG (Apache 2.0) ──
+        Tool(
+            name="qdrant_test",
+            description="Test connection to Qdrant vector database. Returns cluster info and collection count.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="qdrant_collections",
+            description="List all Qdrant vector collections with their point counts and configurations.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="qdrant_create_collection",
+            description="Create a Qdrant vector collection. Auto-configures vector dimensions from embedding model name.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Collection name"},
+                    "embedding_model": {
+                        "type": "string",
+                        "description": "Embedding model (auto-sets vector size, e.g. BAAI/bge-large-en-v1.5)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="qdrant_info",
+            description="Get detailed info and stats for a Qdrant collection.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Collection name"},
+                },
+            },
+        ),
+        Tool(
+            name="qdrant_count",
+            description="Count points (vectors) in a Qdrant collection.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Collection name"},
+                },
+            },
+        ),
+        Tool(
+            name="qdrant_k8s",
+            description="Generate Kubernetes StatefulSet manifest for self-hosted Qdrant vector database.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "description": "K8s namespace",
+                        "default": "vector-db",
+                    },
+                },
+            },
+        ),
+        # ── v5.3.0: New v4.0.11 Features - Karpenter, Triggers, Environments, Lineage, Migration ──
+        # Note: ALL_NEW_TOOLS removed - mcp_new_features_tools module not available
+        # ── v5.4.0: Langfuse LLM Observability ────────────────────────────────────
+        Tool(
+            name="langfuse_configure",
+            description="Configure Langfuse credentials (public key, secret key, host URL).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "public_key": {
+                        "type": "string",
+                        "description": "Langfuse public key (pk-lf-...)",
+                    },
+                    "secret_key": {
+                        "type": "string",
+                        "description": "Langfuse secret key (sk-lf-...)",
+                    },
+                    "host": {
+                        "type": "string",
+                        "description": "Langfuse host URL",
+                        "default": "https://cloud.langfuse.com",
+                    },
+                },
+                "required": ["public_key", "secret_key"],
+            },
+        ),
+        Tool(
+            name="langfuse_test",
+            description="Test Langfuse connectivity and list accessible projects.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="langfuse_traces",
+            description="List recent LLM traces from Langfuse.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max traces to return",
+                        "default": 20,
+                    },
+                    "name": {"type": "string", "description": "Filter by trace name"},
+                },
+            },
+        ),
+        Tool(
+            name="langfuse_trace",
+            description="Get a single Langfuse trace with all observations/spans.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "trace_id": {"type": "string", "description": "Trace ID"},
+                },
+                "required": ["trace_id"],
+            },
+        ),
+        Tool(
+            name="langfuse_scores",
+            description="List evaluation scores from Langfuse, optionally filtered by trace or score name.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "trace_id": {"type": "string", "description": "Filter by trace ID"},
+                    "name": {"type": "string", "description": "Filter by score name"},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max scores to return",
+                        "default": 50,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="langfuse_score",
+            description="Create an evaluation score for a Langfuse trace (e.g. quality, accuracy, relevance).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "trace_id": {"type": "string", "description": "Trace ID to score"},
+                    "name": {
+                        "type": "string",
+                        "description": "Score name (e.g. quality, accuracy)",
+                    },
+                    "value": {"type": "number", "description": "Numeric score value"},
+                    "observation_id": {
+                        "type": "string",
+                        "description": "Specific observation to score",
+                    },
+                    "comment": {"type": "string", "description": "Optional comment"},
+                },
+                "required": ["trace_id", "name", "value"],
+            },
+        ),
+        Tool(
+            name="langfuse_datasets",
+            description="List Langfuse datasets for evaluation and fine-tuning.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max datasets to return",
+                        "default": 20,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="langfuse_export_training_data",
+            description="Export Langfuse traces as instruction/response pairs for LoRA fine-tuning. Filters by quality score.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max pairs to export",
+                        "default": 500,
+                    },
+                    "name": {"type": "string", "description": "Filter traces by name"},
+                    "min_score": {
+                        "type": "number",
+                        "description": "Minimum quality score (0.0-1.0)",
+                    },
+                    "score_name": {
+                        "type": "string",
+                        "description": "Score name to filter on",
+                        "default": "quality",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="langfuse_quality",
+            description="Get aggregated quality metrics from Langfuse scores for drift detection.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "score_name": {
+                        "type": "string",
+                        "description": "Score name to aggregate",
+                        "default": "quality",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Sample size",
+                        "default": 200,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="langfuse_otel_env",
+            description="Print OTEL environment variables for instrumenting LLM apps to send traces to Langfuse.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {
+                        "type": "string",
+                        "description": "Langfuse project name",
+                        "default": "default",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="langfuse_k8s",
+            description="Generate Kubernetes deployment manifest for self-hosted Langfuse.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "description": "K8s namespace",
+                        "default": "observability",
+                    },
+                },
+            },
+        ),
+        # ── v5.4.0: Databricks MLOps ──────────────────────────────────────────────
+        Tool(
+            name="databricks_configure",
+            description="Configure Databricks credentials (workspace URL and personal access token).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "host": {
+                        "type": "string",
+                        "description": "Databricks workspace URL (e.g. https://adb-xxx.azuredatabricks.net)",
+                    },
+                    "token": {
+                        "type": "string",
+                        "description": "Databricks personal access token (dapi...)",
+                    },
+                },
+                "required": ["host", "token"],
+            },
+        ),
+        Tool(
+            name="databricks_test",
+            description="Test Databricks connectivity and show cluster count.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="databricks_jobs",
+            description="List Databricks jobs in the workspace.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max jobs to return",
+                        "default": 25,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="databricks_run",
+            description="Trigger a Databricks job run by job ID.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "integer", "description": "Databricks job ID"},
+                },
+                "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="databricks_run_status",
+            description="Get status of a Databricks job run by run ID.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "run_id": {"type": "integer", "description": "Databricks run ID"},
+                },
+                "required": ["run_id"],
+            },
+        ),
+        Tool(
+            name="databricks_clusters",
+            description="List all Databricks clusters with state and node type.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="databricks_serving_endpoints",
+            description="List Databricks model serving endpoints.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="databricks_deploy_model",
+            description="Deploy a registered MLflow model to a Databricks serving endpoint.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint_name": {
+                        "type": "string",
+                        "description": "Serving endpoint name",
+                    },
+                    "model_name": {
+                        "type": "string",
+                        "description": "Registered model name",
+                    },
+                    "model_version": {
+                        "type": "string",
+                        "description": "Model version",
+                        "default": "1",
+                    },
+                    "workload_size": {
+                        "type": "string",
+                        "enum": ["Small", "Medium", "Large"],
+                        "default": "Small",
+                    },
+                    "scale_to_zero": {"type": "boolean", "default": True},
+                },
+                "required": ["endpoint_name", "model_name"],
+            },
+        ),
+        Tool(
+            name="databricks_query",
+            description="Query a Databricks model serving endpoint with a prompt.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {"type": "string", "description": "Serving endpoint name"},
+                    "prompt": {"type": "string", "description": "Prompt text"},
+                },
+                "required": ["endpoint", "prompt"],
+            },
+        ),
+        Tool(
+            name="databricks_mlflow_experiments",
+            description="List MLflow experiments in Databricks workspace.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max experiments to return",
+                        "default": 50,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="databricks_mlflow_models",
+            description="List registered models in the Databricks MLflow Model Registry.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max models to return",
+                        "default": 50,
+                    },
+                },
+            },
+        ),
+        # ── v5.4.0: vLLM Extended ─────────────────────────────────────────────────
+        Tool(
+            name="vllm_auto_optimize",
+            description="Automatically optimize vLLM configuration by analyzing workload patterns. Selects optimal settings for the 6 critical knobs based on live endpoint metrics or sample request files.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string", "description": "Model name"},
+                    "endpoint": {
+                        "type": "string",
+                        "description": "Running vLLM endpoint to analyze (e.g. http://localhost:8000)",
+                    },
+                    "gpu_count": {
+                        "type": "integer",
+                        "description": "Number of GPUs available",
+                        "default": 1,
+                    },
+                    "output": {
+                        "type": "string",
+                        "enum": ["config", "args", "helm"],
+                        "default": "config",
+                    },
+                },
+                "required": ["model"],
+            },
+        ),
+        Tool(
+            name="vllm_analyze",
+            description="Analyze a running vLLM server's workload and return specific optimization recommendations with before/after comparisons.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string",
+                        "description": "vLLM endpoint URL (e.g. http://localhost:8000)",
+                    },
+                    "duration": {
+                        "type": "integer",
+                        "description": "Analysis duration in seconds",
+                        "default": 60,
+                    },
+                },
+                "required": ["endpoint"],
+            },
+        ),
+        Tool(
+            name="vllm_benchmark",
+            description="Benchmark a vLLM endpoint with concurrent requests. Returns throughput (req/s), success rate, and total latency.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "endpoint": {"type": "string", "description": "vLLM endpoint URL"},
+                    "concurrent": {
+                        "type": "integer",
+                        "description": "Number of concurrent requests",
+                        "default": 1,
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Test prompt",
+                        "default": "Explain quantum computing in simple terms.",
+                    },
+                    "api_key": {
+                        "type": "string",
+                        "description": "vLLM API key (if auth enabled)",
+                    },
+                },
+                "required": ["endpoint"],
+            },
+        ),
+    ]
 
+    return _ALL_TOOLS
 # Pre-compress at module load — cached for all subsequent list_tools calls
-if optimizer and MCP_AVAILABLE:
-    _COMPRESSED_TOOLS = optimizer.compress_tools(_ALL_TOOLS)
-else:
+_COMPRESSED_TOOLS = None
+
+def _get_compressed_tools():
+    global _COMPRESSED_TOOLS
+    if _COMPRESSED_TOOLS is not None:
+        return _COMPRESSED_TOOLS
+    if _ALL_TOOLS is None:
+        _build_all_tools()
+    if optimizer and MCP_AVAILABLE:
+        _COMPRESSED_TOOLS = optimizer.compress_tools(_ALL_TOOLS)
+        return _COMPRESSED_TOOLS
     # Python fallback: strip optional fields
     def strip_optional_fields(tool):
         if isinstance(tool.inputSchema, dict):
@@ -5382,6 +5395,7 @@ else:
         return tool
 
     _COMPRESSED_TOOLS = [strip_optional_fields(tool) for tool in _ALL_TOOLS]
+    return _COMPRESSED_TOOLS
 
 
 @server.list_tools()
@@ -5402,7 +5416,7 @@ async def handle_list_tools() -> ListToolsResult:
             await _ensure_tools_loaded()
 
             # Return compressed tools
-            return ListToolsResult(tools=_COMPRESSED_TOOLS)
+            return ListToolsResult(tools=_get_compressed_tools())
         finally:
             _concurrent_requests -= 1
 
