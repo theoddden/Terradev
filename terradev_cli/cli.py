@@ -4519,7 +4519,13 @@ def job(job_file, optimize):
         print(f"ERROR: Error loading job file: {e}")
 
 
-@cli.command()
+@cli.group()
+def infer():
+    """Deploy and manage inference endpoints"""
+    pass
+
+
+@infer.command("deploy")
 @click.option("--model", "-m", required=True, help="Model name or path")
 @click.option(
     "--type", "-t", type=click.Choice(["llm", "embedding", "vision"]), help="Model type"
@@ -4534,7 +4540,7 @@ def job(job_file, optimize):
 @click.option("--region", "-r", help="Region preference")
 @click.option("--max-latency", type=float, help="Max latency in ms")
 @click.option("--max-cost", type=float, help="Max cost per request")
-def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
+def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_cost):
     """Deploy and manage inference endpoints"""
     print(f"Deploying inference for model: {model}")
 
@@ -4688,7 +4694,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
         pass
 
 
-@cli.command()
+@infer.command("endpoint")
 @click.argument("model_path")
 @click.option("--name", "-n", required=True, help="Endpoint name (required)")
 @click.option(
@@ -4703,7 +4709,7 @@ def infer(model, type, provider, gpu_type, region, max_latency, max_cost):
 @click.option("--idle-timeout", type=int, default=300, help="Idle timeout in seconds")
 @click.option("--cost-optimize", is_flag=True, help="Enable cost optimization")
 @click.option("--dry-run", is_flag=True, help="Show deployment plan without deploying")
-def infer_deploy(
+def infer_endpoint(
     model_path,
     name,
     provider,
@@ -5217,7 +5223,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@cli.command("infer-status")
+@infer.command("status")
 @click.option(
     "--check", is_flag=True, help="Run live health probes before showing status"
 )
@@ -5288,7 +5294,7 @@ def infer_status(check):
             pass
 
 
-@cli.command("infer-failover")
+@infer.command("failover")
 @click.option(
     "--dry-run", is_flag=True, help="Show what would happen without executing failover"
 )
@@ -5363,7 +5369,7 @@ def infer_failover(dry_run):
         print("   OK: All primary endpoints healthy  no failover needed.")
 
 
-@cli.command("infer-route")
+@infer.command("route")
 @click.option("--model", "-m", help="Filter by model name")
 @click.option(
     "--strategy",
@@ -8276,7 +8282,13 @@ def hf_space(space_name, model_id, hardware, sdk, private, template, env, secret
 
 
 # Model Orchestrator Commands
-@cli.command()
+@cli.group()
+def orchestrator():
+    """Model orchestrator for multi-model inference"""
+    pass
+
+
+@orchestrator.command("start")
 @click.option("--gpu-id", default=0, help="GPU ID to use for orchestration")
 @click.option("--memory-gb", default=80.0, help="Total GPU memory in GB")
 @click.option(
@@ -8324,7 +8336,7 @@ def orchestrator_start(gpu_id, memory_gb, policy):
     asyncio.run(run_orchestrator())
 
 
-@cli.command()
+@orchestrator.command("register")
 @click.argument("model-id")
 @click.argument("model-path")
 @click.option(
@@ -8361,7 +8373,7 @@ def orchestrator_register(model_id, model_path, framework, priority, tags):
     print(f"  Tags: {', '.join(tag_set) if tag_set else 'None'}")
 
 
-@cli.command()
+@orchestrator.command("load")
 @click.argument("model-id")
 @click.option("--force", is_flag=True, help="Force loading even if memory is full")
 def orchestrator_load(model_id, force):
@@ -8385,7 +8397,7 @@ def orchestrator_load(model_id, force):
     asyncio.run(load_model())
 
 
-@cli.command()
+@orchestrator.command("evict")
 @click.argument("model-id")
 def orchestrator_evict(model_id):
     """Evict a model from GPU memory"""
@@ -8403,7 +8415,7 @@ def orchestrator_evict(model_id):
     asyncio.run(evict_model())
 
 
-@cli.command()
+@orchestrator.command("status")
 @click.option("--model-id", help="Get details for specific model")
 def orchestrator_status(model_id):
     """Get orchestrator and model status"""
@@ -8447,7 +8459,7 @@ def orchestrator_status(model_id):
                 print(f"  {state}: {', '.join(model_ids)}")
 
 
-@cli.command()
+@orchestrator.command("infer")
 @click.argument("model-id")
 def orchestrator_infer(model_id):
     """Test inference with a model"""
@@ -8466,7 +8478,13 @@ def orchestrator_infer(model_id):
     asyncio.run(test_inference())
 
 
-@cli.command()
+@cli.group(name="warm-pool")
+def warm_pool():
+    """Warm pool manager for intelligent pre-warming"""
+    pass
+
+
+@warm_pool.command("start")
 @click.option(
     "--strategy",
     type=click.Choice(
@@ -8527,7 +8545,7 @@ def warm_pool_start(strategy, max_warm, min_warm):
     asyncio.run(run_warm_pool())
 
 
-@cli.command()
+@warm_pool.command("register")
 @click.argument("model-id")
 @click.option("--priority", default=0, help="Model priority for warming")
 def warm_pool_register(model_id, priority):
@@ -8541,7 +8559,7 @@ def warm_pool_register(model_id, priority):
     print(f"  Priority: {priority}")
 
 
-@cli.command()
+@warm_pool.command("status")
 def warm_pool_status():
     """Get warm pool manager status"""
     from terradev_cli.core.warm_pool_manager import WarmPoolManager, WarmPoolConfig
@@ -8563,7 +8581,13 @@ def warm_pool_status():
     print(f"  Cost saved: ${status['cost_saved_usd']:.2f}")
 
 
-@cli.command()
+@cli.group()
+def cost_scaler():
+    """Cost-aware scaling manager for inference optimization"""
+    pass
+
+
+@cost_scaler.command("start")
 @click.option(
     "--strategy",
     type=click.Choice(
@@ -8623,7 +8647,7 @@ def cost_scaler_start(strategy, budget, cost_per_gb):
     asyncio.run(run_cost_scaler())
 
 
-@cli.command()
+@cost_scaler.command("status")
 def cost_scaler_status():
     """Get cost scaler status and recommendations"""
     from terradev_cli.core.cost_scaler import CostScaler, CostConfig
@@ -8655,7 +8679,7 @@ def cost_scaler_status():
             print(f"    Potential savings: {rec['potential_savings']}")
 
 
-@cli.command()
+@cost_scaler.command("model-details")
 @click.argument("model-id")
 def cost_scaler_model_details(model_id):
     """Get cost details for a specific model"""
@@ -9499,7 +9523,13 @@ def preflight(nodes, ssh_user, ssh_key, provision_group, quick, fmt):
         print()
 
 
-@cli.command()
+@cli.group()
+def train():
+    """Launch distributed training jobs across provisioned GPU nodes"""
+    pass
+
+
+@train.command("start")
 @click.option(
     "--config",
     "-c",
@@ -9557,7 +9587,7 @@ def preflight(nodes, ssh_user, ssh_key, provision_group, quick, fmt):
     help="Output format: text (default) or json",
 )
 @click.argument("script_args", nargs=-1, type=click.UNPROCESSED)
-def train(
+def train_start(
     config_path,
     script,
     framework,
@@ -9880,7 +9910,7 @@ def checkpoint(action, job_id, step, checkpoint_id, dest, fmt):
         print(f"Deleted: {checkpoint_id}")
 
 
-@cli.command("train-status")
+@train.command("status")
 @click.option("--job-id", "-j", default="", help="Job ID (empty = all running)")
 @click.option(
     "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
@@ -9954,7 +9984,7 @@ def train_status(job_id, fmt):
             print(f"\nTotal cost across all jobs: ${total:.2f}\n")
 
 
-@cli.command("train-stop")
+@train.command("stop")
 @click.option("--job-id", "-j", required=True, help="Job ID to stop")
 @click.option(
     "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
@@ -9978,7 +10008,7 @@ def train_stop(job_id, fmt):
         print(f"Job {job_id}: {result.get('status', 'unknown')}")
 
 
-@cli.command("train-resume")
+@train.command("resume")
 @click.option("--job-id", "-j", required=True, help="Job ID to resume")
 @click.option(
     "--checkpoint-id", default="", help="Checkpoint to resume from (default: latest)"

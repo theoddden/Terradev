@@ -5442,8 +5442,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "moe_deploy": ["provision"],
                 "gitops_init": ["gitops", "init"],
                 # v2.0.0 tools — complete agentic loop
-                "train_stop": ["train-stop"],
-                "train_resume": ["train-resume"],
+                "train_stop": ["train", "stop"],
+                "train_resume": ["train", "resume"],
                 "checkpoint_restore": ["checkpoint", "restore"],
                 "checkpoint_promote": ["checkpoint", "promote"],
                 "checkpoint_delete": ["checkpoint", "delete"],
@@ -5457,16 +5457,16 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "gitops_bootstrap": ["gitops", "bootstrap"],
                 "gitops_sync": ["gitops", "sync"],
                 "gitops_validate": ["gitops", "validate"],
-                "orchestrator_start": ["orchestrator-start"],
-                "orchestrator_register": ["orchestrator-register"],
-                "orchestrator_load": ["orchestrator-load"],
-                "orchestrator_evict": ["orchestrator-evict"],
-                "orchestrator_status": ["orchestrator-status"],
-                "orchestrator_infer": ["orchestrator-infer"],
-                "warm_pool_start": ["warm-pool-start"],
-                "warm_pool_status": ["warm-pool-status"],
-                "cost_scaler_start": ["cost-scaler-start"],
-                "cost_scaler_status": ["cost-scaler-status"],
+                "orchestrator_start": ["orchestrator", "start"],
+                "orchestrator_register": ["orchestrator", "register"],
+                "orchestrator_load": ["orchestrator", "load"],
+                "orchestrator_evict": ["orchestrator", "evict"],
+                "orchestrator_status": ["orchestrator", "status"],
+                "orchestrator_infer": ["orchestrator", "infer"],
+                "warm_pool_start": ["warm-pool", "start"],
+                "warm_pool_status": ["warm-pool", "status"],
+                "cost_scaler_start": ["cost-scaler", "start"],
+                "cost_scaler_status": ["cost-scaler", "status"],
                 "inferx_configure": ["inferx", "configure"],
                 "inferx_delete": ["inferx", "delete"],
                 "inferx_usage": ["inferx", "usage"],
@@ -6525,7 +6525,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             # ── v3.4.0 Handlers ──────────────────────────────────────────────────
 
             elif tool_name == "train":
-                cmd_args = ["train", "--script", arguments["script"]]
+                cmd_args = ["train", "start", "--script", arguments["script"]]
                 if "framework" in arguments:
                     cmd_args.extend(["--framework", arguments["framework"]])
                 if "from_provision" in arguments:
@@ -6560,7 +6560,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 )
 
             elif tool_name == "train_status":
-                cmd_args = ["train-status"]
+                cmd_args = ["train", "status"]
                 if "job_id" in arguments and arguments["job_id"]:
                     cmd_args.extend(["--job", arguments["job_id"]])
                 result = await execute_terradev_command(cmd_args)
@@ -6682,7 +6682,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             # ── v2.0.0 Handlers — Complete Agentic Loop ────────────────────────
 
             elif tool_name == "train_stop":
-                cmd_args = ["train-stop", "--job-id", arguments["job_id"], "-f", "json"]
+                cmd_args = ["train", "stop", "--job-id", arguments["job_id"], "-f", "json"]
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]
                 output_text = "⏹️ **Training Stop**\n\n"
@@ -6698,7 +6698,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "train_resume":
                 cmd_args = [
-                    "train-resume",
+                    "train",
+                    "resume",
                     "--job-id",
                     arguments["job_id"],
                     "-f",
