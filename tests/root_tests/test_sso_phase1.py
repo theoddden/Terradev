@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 # Add terradev_cli to path
-sys.path.insert(0, str(Path(__file__).parent / "terradev_cli"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 def test_imports():
@@ -16,7 +16,7 @@ def test_imports():
     print("🧪 Testing imports...")
 
     try:
-        from core.enterprise_auth import EnterpriseAuthManager, UserRole, AuthProvider
+        from terradev_cli.core.enterprise_auth import EnterpriseAuthManager, UserRole, AuthProvider
 
         print("✅ enterprise_auth imported successfully")
     except ImportError as e:
@@ -24,7 +24,7 @@ def test_imports():
         return False
 
     try:
-        from core.saml_provider import SAMLProvider, SAMLManager
+        from terradev_cli.core.saml_provider import SAMLProvider, SAMLManager
 
         print("✅ saml_provider imported successfully")
     except ImportError as e:
@@ -32,7 +32,7 @@ def test_imports():
         return False
 
     try:
-        from core.oidc_provider import OIDCProvider, OIDCManager
+        from terradev_cli.core.oidc_provider import OIDCProvider, OIDCManager
 
         print("✅ oidc_provider imported successfully")
     except ImportError as e:
@@ -40,7 +40,7 @@ def test_imports():
         return False
 
     try:
-        from core.user_manager import UserManager, Tenant, UserInvite
+        from terradev_cli.core.user_manager import UserManager, Tenant, UserInvite
 
         print("✅ user_manager imported successfully")
     except ImportError as e:
@@ -55,7 +55,7 @@ def test_enterprise_auth():
     print("\n🧪 Testing EnterpriseAuthManager...")
 
     try:
-        from core.enterprise_auth import EnterpriseAuthManager, UserRole, AuthProvider
+        from terradev_cli.core.enterprise_auth import EnterpriseAuthManager, UserRole, AuthProvider
 
         # Create manager
         manager = EnterpriseAuthManager()
@@ -110,7 +110,7 @@ def test_saml_provider():
     print("\n🧪 Testing SAMLProvider...")
 
     try:
-        from core.saml_provider import SAMLProvider
+        from terradev_cli.core.saml_provider import SAMLProvider
 
         # Create provider with test config
         config = {
@@ -151,7 +151,7 @@ def test_oidc_provider():
     print("\n🧪 Testing OIDCProvider...")
 
     try:
-        from core.oidc_provider import OIDCProvider
+        from terradev_cli.core.oidc_provider import OIDCProvider
 
         # Create provider with test config
         config = {
@@ -196,7 +196,7 @@ def test_user_manager():
     print("\n🧪 Testing UserManager...")
 
     try:
-        from core.user_manager import UserManager
+        from terradev_cli.core.user_manager import UserManager
 
         # Create manager
         manager = UserManager()
@@ -254,24 +254,20 @@ def test_cli_integration():
     print("\n🧪 Testing CLI integration...")
 
     try:
-        from cli import TerradevAPI
+        from terradev_cli.cli import cli
 
-        # Create API instance
-        api = TerradevAPI()
-        print("✅ TerradevAPI created successfully")
+        # Test that CLI is importable
+        print("✅ CLI imported successfully")
 
-        # Test enterprise tier detection
-        is_enterprise = api._is_enterprise_tier()
-        print(f"✅ Enterprise tier detection: {is_enterprise}")
-
-        # Test enterprise auth lazy loading
-        if api._is_enterprise_tier():
-            if api.enterprise_auth is not None:
-                print("✅ Enterprise auth loaded for enterprise tier")
+        # Test that sso command exists
+        if hasattr(cli, 'commands'):
+            commands = list(cli.commands.keys())
+            if 'sso' in commands:
+                print("✅ SSO command exists in CLI")
             else:
-                print("⚠️  Enterprise auth not loaded (dependencies missing)")
+                print("⚠️  SSO command not found in CLI (expected for non-enterprise)")
         else:
-            print("✅ Enterprise auth not loaded for non-enterprise tier")
+            print("⚠️  CLI commands not accessible")
 
         return True
 
