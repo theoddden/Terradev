@@ -28,12 +28,20 @@ except ImportError:
     DATABASE_AVAILABLE = False
     logger.warning("Database connection module not available")
 
+# Import MCP types (optional)
+try:
+    from mcp.types import Tool
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+    Tool = None
+    logger.warning("mcp.types not available - MCP tools will be disabled")
+
 ALL_NEW_TOOLS: List[Any] = []
 COMMAND_MAP: Dict[str, Any] = {}
 
 # Database MCP Tools
-if DATABASE_AVAILABLE:
-    from mcp.types import Tool
+if DATABASE_AVAILABLE and MCP_AVAILABLE:
 
     # Tool: create_sqlite_connection
     ALL_NEW_TOOLS.append(

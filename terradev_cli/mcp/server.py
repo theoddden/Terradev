@@ -69,12 +69,31 @@ try:
         TextResourceContents,
         Tool,
     )
+    MCP_AVAILABLE = True
 except ImportError:
-    print(
-        "Error: mcp package not found. Please install it with: pip install 'mcp[cli]'",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    MCP_AVAILABLE = False
+    Server = None
+    InitializationOptions = None
+    stdio_server = None
+    SseServerTransport = None
+    NotificationOptions = None
+    TransportSecuritySettings = None
+    CallToolRequest = None
+    CallToolResult = None
+    GetPromptRequest = None
+    GetPromptResult = None
+    ListPromptsRequest = None
+    ListPromptsResult = None
+    ListResourcesRequest = None
+    ListResourcesResult = None
+    ListToolsRequest = None
+    ListToolsResult = None
+    ReadResourceRequest = None
+    ReadResourceResult = None
+    Resource = None
+    TextContent = None
+    TextResourceContents = None
+    Tool = None
 
 try:
     from starlette.applications import Starlette
