@@ -1002,8 +1002,11 @@ variable "max_price" {
 """
 
 
-# Create MCP server with enhanced scaling
-server = Server("terradev-mcp")
+# Create MCP server with enhanced scaling (only if MCP is available)
+if MCP_AVAILABLE:
+    server = Server("terradev-mcp")
+else:
+    server = None
 
 # Global state for lazy loading and scaling
 _tools_loaded = False
