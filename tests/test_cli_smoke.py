@@ -54,9 +54,6 @@ class TestTopLevel:
             "preflight",
             "monitor",
             "checkpoint",
-            "train-status",
-            "train-stop",
-            "train-resume",
         ]:
             assert cmd in result.output, f"Missing command in help: {cmd}"
 
@@ -90,26 +87,34 @@ class TestTrain:
     def test_train_help(self, runner):
         result = runner.invoke(cli, ["train", "--help"])
         assert result.exit_code == 0
+        assert "start" in result.output
+        assert "status" in result.output
+        assert "stop" in result.output
+        assert "resume" in result.output
+
+    def test_train_start_help(self, runner):
+        result = runner.invoke(cli, ["train", "start", "--help"])
+        assert result.exit_code == 0
         assert "--script" in result.output
         assert "--framework" in result.output
         assert "--backend" in result.output
         assert "--nodes" in result.output
         assert "--gpus-per-node" in result.output
 
-    def test_train_has_from_provision(self, runner):
-        """Verify --from-provision flag exists on train command."""
-        result = runner.invoke(cli, ["train", "--help"])
+    def test_train_start_has_from_provision(self, runner):
+        """Verify --from-provision flag exists on train start command."""
+        result = runner.invoke(cli, ["train", "start", "--help"])
         assert result.exit_code == 0
         assert "--from-provision" in result.output
 
-    def test_train_requires_script_or_config(self, runner):
-        """Train with no script/config should error."""
-        result = runner.invoke(cli, ["train"])
+    def test_train_start_requires_script_or_config(self, runner):
+        """Train start with no script/config should error."""
+        result = runner.invoke(cli, ["train", "start"])
         # Should fail because neither --script nor --config provided
         assert result.exit_code != 0 or "ERROR" in result.output
 
-    def test_train_framework_choices(self, runner):
-        result = runner.invoke(cli, ["train", "--help"])
+    def test_train_start_framework_choices(self, runner):
+        result = runner.invoke(cli, ["train", "start", "--help"])
         assert "torchrun" in result.output
         assert "deepspeed" in result.output
         assert "accelerate" in result.output
@@ -148,14 +153,14 @@ class TestCheckpoint:
 
 class TestTrainStatus:
     def test_train_status_help(self, runner):
-        result = runner.invoke(cli, ["train-status", "--help"])
+        result = runner.invoke(cli, ["train", "status", "--help"])
         assert result.exit_code == 0
         assert "--job-id" in result.output
         assert "--format" in result.output
 
     def test_train_status_json_no_jobs(self, runner):
-        """train-status with JSON format should return valid JSON even with no jobs."""
-        result = runner.invoke(cli, ["train-status", "-f", "json"])
+        """train status with JSON format should return valid JSON even with no jobs."""
+        result = runner.invoke(cli, ["train", "status", "-f", "json"])
         # May succeed with empty output or valid JSON
         if result.exit_code == 0 and result.output.strip():
             try:
@@ -170,22 +175,22 @@ class TestTrainStatus:
 
 class TestTrainStopResume:
     def test_train_stop_help(self, runner):
-        result = runner.invoke(cli, ["train-stop", "--help"])
+        result = runner.invoke(cli, ["train", "stop", "--help"])
         assert result.exit_code == 0
         assert "--job-id" in result.output
 
     def test_train_resume_help(self, runner):
-        result = runner.invoke(cli, ["train-resume", "--help"])
+        result = runner.invoke(cli, ["train", "resume", "--help"])
         assert result.exit_code == 0
         assert "--job-id" in result.output
         assert "--checkpoint-id" in result.output
 
     def test_train_stop_requires_job_id(self, runner):
-        result = runner.invoke(cli, ["train-stop"])
+        result = runner.invoke(cli, ["train", "stop"])
         assert result.exit_code != 0  # --job-id is required
 
     def test_train_resume_requires_job_id(self, runner):
-        result = runner.invoke(cli, ["train-resume"])
+        result = runner.invoke(cli, ["train", "resume"])
         assert result.exit_code != 0  # --job-id is required
 
 
