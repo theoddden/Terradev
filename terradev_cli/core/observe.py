@@ -51,7 +51,7 @@ class ObservabilityPipeline:
                 logger.warning("W&B integration not available")
                 return False
                 
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to initialize W&B: {e}")
             return False
     
@@ -73,7 +73,7 @@ class ObservabilityPipeline:
                 logger.warning("Phoenix integration not available")
                 return False
                 
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to initialize Phoenix: {e}")
             return False
     
@@ -94,7 +94,7 @@ class ObservabilityPipeline:
                 logger.warning("Cost analytics not available")
                 return False
                 
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to initialize Cost Analytics: {e}")
             return False
     
@@ -121,7 +121,7 @@ class ObservabilityPipeline:
             logger.info(f"✓ Tracked gateway traffic with trace ID: {self.trace_id}")
             return True
             
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to track gateway traffic: {e}")
             return False
     
@@ -132,7 +132,7 @@ class ObservabilityPipeline:
             wandb = WandbIntegration()
             await wandb.log_trace(data)
             return True
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to send to W&B: {e}")
             return False
     
@@ -143,7 +143,7 @@ class ObservabilityPipeline:
             phoenix = PhoenixIntegration()
             await phoenix.log_span(data)
             return True
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to send to Phoenix: {e}")
             return False
     
@@ -154,7 +154,7 @@ class ObservabilityPipeline:
             cost_analytics = CostOptimizer()
             await cost_analytics.track_request(data)
             return True
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to send to Cost Analytics: {e}")
             return False
     
@@ -185,7 +185,7 @@ class ObservabilityPipeline:
             logger.info("✓ Observability pipeline cleaned up")
             return True
             
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to cleanup: {e}")
             return False
     
@@ -196,7 +196,7 @@ class ObservabilityPipeline:
             wandb = WandbIntegration()
             await wandb.finish()
             return True
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to cleanup W&B: {e}")
             return False
     
@@ -207,7 +207,7 @@ class ObservabilityPipeline:
             phoenix = PhoenixIntegration()
             await phoenix.close()
             return True
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to cleanup Phoenix: {e}")
             return False
     
@@ -218,7 +218,7 @@ class ObservabilityPipeline:
             cost_analytics = CostOptimizer()
             await cost_analytics.flush()
             return True
-        except Exception as e:
+        except (RuntimeError, ImportError) as e:
             logger.error(f"Failed to cleanup Cost Analytics: {e}")
             return False
 

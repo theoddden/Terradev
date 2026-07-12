@@ -193,7 +193,7 @@ if DATABASE_AVAILABLE:
                 "type": "text",
                 "text": f"Created SQLite connection with ID: {connection_id}"
             }]
-        except Exception as e:
+        except (RuntimeError, ValueError, KeyError) as e:
             logger.error(f"Failed to create SQLite connection: {e}")
             return [{
                 "type": "text",
@@ -216,7 +216,7 @@ if DATABASE_AVAILABLE:
                 "type": "text",
                 "text": f"Created PostgreSQL connection with ID: {connection_id}"
             }]
-        except Exception as e:
+        except (RuntimeError, ValueError, KeyError) as e:
             logger.error(f"Failed to create PostgreSQL connection: {e}")
             return [{
                 "type": "text",
@@ -235,7 +235,7 @@ if DATABASE_AVAILABLE:
                 "type": "text",
                 "text": f"Query results: {results}"
             }]
-        except Exception as e:
+        except (RuntimeError, ValueError, KeyError) as e:
             logger.error(f"Failed to query database: {e}")
             return [{
                 "type": "text",
@@ -255,7 +255,7 @@ if DATABASE_AVAILABLE:
                 "type": "text",
                 "text": f"Upsert {'succeeded' if success else 'failed'}"
             }]
-        except Exception as e:
+        except (RuntimeError, ValueError, KeyError) as e:
             logger.error(f"Failed to upsert database: {e}")
             return [{
                 "type": "text",
@@ -276,7 +276,7 @@ if DATABASE_AVAILABLE:
                     "type": "text",
                     "text": f"Connection not found: {arguments['connection_id']}"
                 }]
-        except Exception as e:
+        except (RuntimeError, ValueError, KeyError) as e:
             logger.error(f"Failed to get database connection: {e}")
             return [{
                 "type": "text",

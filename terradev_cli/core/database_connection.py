@@ -114,7 +114,7 @@ class SQLiteConnection(DatabaseConnection):
                 await self.create_tables()
             
             return True
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             logger.error(f"Failed to connect to SQLite: {e}")
             return False
     
@@ -124,7 +124,7 @@ class SQLiteConnection(DatabaseConnection):
             logger.info(f"Disconnecting SQLite connection: {self.connection_id}")
             self._connected = False
             return True
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             logger.error(f"Failed to disconnect SQLite: {e}")
             return False
     
@@ -173,7 +173,7 @@ class SQLiteConnection(DatabaseConnection):
             
             logger.info(f"Created {len(tables)} standard metadata tables")
             return True
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             logger.error(f"Failed to create tables: {e}")
             return False
 
@@ -206,7 +206,7 @@ class PostgreSQLConnection(DatabaseConnection):
             await self.create_tables()
             
             return True
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             logger.error(f"Failed to connect to PostgreSQL: {e}")
             return False
     
@@ -216,7 +216,7 @@ class PostgreSQLConnection(DatabaseConnection):
             logger.info(f"Disconnecting PostgreSQL connection: {self.connection_id}")
             self._connected = False
             return True
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             logger.error(f"Failed to disconnect PostgreSQL: {e}")
             return False
     
@@ -265,7 +265,7 @@ class PostgreSQLConnection(DatabaseConnection):
             
             logger.info(f"Created {len(tables)} standard metadata tables")
             return True
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             logger.error(f"Failed to create tables: {e}")
             return False
 
