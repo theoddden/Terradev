@@ -1055,8 +1055,9 @@ except ImportError:
     )
 
 # ── Pre-compiled Tool Schemas (built once at module load) ────────────────────
-_ALL_TOOLS = [
-    Tool(
+if MCP_AVAILABLE:
+    _ALL_TOOLS = [
+        Tool(
         name="quote_gpu",
         description="Get real-time GPU prices across 21+ cloud providers (incl. Alibaba, OVHcloud, FluidStack, Hetzner, SiliconFlow, Latitude.sh, Oracle, Crusoe, DigitalOcean)",
         inputSchema={
@@ -5347,9 +5348,11 @@ _ALL_TOOLS = [
         },
     ),
 ]
+else:
+    _ALL_TOOLS = []
 
 # Pre-compress at module load — cached for all subsequent list_tools calls
-if optimizer:
+if optimizer and MCP_AVAILABLE:
     _COMPRESSED_TOOLS = optimizer.compress_tools(_ALL_TOOLS)
 else:
     # Python fallback: strip optional fields
