@@ -155,10 +155,10 @@ print('All Rust extensions imported successfully')
 
     - name: Install package + test deps
       run: |
+        pip install 'mcp[cli]'
         pip install -e ".[dev]"
         pip install pytest pytest-asyncio pytest-cov pytest-xdist
         pip install "maturin>=1.4,<2.0"
-        pip install 'mcp[cli]'
 
     - name: Build and install Rust extensions
       run: bash scripts/build_rust.sh --dev
@@ -216,8 +216,8 @@ print('All Rust extensions imported successfully')
 
     - name: Install package
       run: |
-        pip install -e ".[dev]"
         pip install 'mcp[cli]'
+        pip install -e ".[dev]"
 
     - name: Test CLI help commands
       run: |
@@ -282,8 +282,8 @@ print('All Rust extensions imported successfully')
 
     - name: Install package
       run: |
-        pip install -e ".[dev]"
         pip install 'mcp[cli]'
+        pip install -e ".[dev]"
 
     - name: Test missing credentials error message
       run: |
@@ -347,8 +347,8 @@ print('All Rust extensions imported successfully')
 
     - name: Install package
       run: |
-        pip install -e ".[dev]"
         pip install 'mcp[cli]'
+        pip install -e ".[dev]"
 
     - name: Test provider imports
       run: |
@@ -448,9 +448,9 @@ print('All Rust extensions imported successfully')
 
     - name: Install package + test deps
       run: |
-        pip install -e ".[dev]"
-        pip install pytest pytest-asyncio pytest-cov
         pip install 'mcp[cli]'
+        pip install pytest pytest-asyncio pytest-cov
+        pip install -e ".[dev]"
 
     - name: CLI smoke test
       run: |
@@ -480,9 +480,9 @@ print('All Rust extensions imported successfully')
 
     - name: Install package + test deps
       run: |
-        pip install -e ".[dev]"
-        pip install pytest pytest-asyncio pytest-cov
         pip install 'mcp[cli]'
+        pip install pytest pytest-asyncio pytest-cov
+        pip install -e ".[dev]"
 
     - name: CLI smoke test
       run: |
@@ -594,9 +594,9 @@ print('All Rust extensions imported successfully')
 
     - name: Install package + test deps
       run: |
-        pip install -e ".[dev]"
-        pip install pytest pytest-asyncio
         pip install 'mcp[cli]'
+        pip install pytest pytest-asyncio
+        pip install -e ".[dev]"
 
     - name: Run MCP server tests
       run: |
@@ -620,9 +620,9 @@ print('All Rust extensions imported successfully')
 
     - name: Install package + test deps
       run: |
-        pip install -e ".[dev]"
-        pip install pytest pytest-asyncio
         pip install 'mcp[cli]'
+        pip install pytest pytest-asyncio
+        pip install -e ".[dev]"
 
     - name: Run integration tests (mock)
       run: python tests/test_integration.py --mock --suite providers
@@ -649,9 +649,9 @@ print('All Rust extensions imported successfully')
 
     - name: Install package + test deps
       run: |
-        pip install -e ".[dev]"
-        pip install pytest pytest-asyncio
         pip install 'mcp[cli]'
+        pip install pytest pytest-asyncio
+        pip install -e ".[dev]"
 
     - name: Run live integration tests
       run: |
@@ -676,9 +676,9 @@ print('All Rust extensions imported successfully')
 
     - name: Install package + test deps
       run: |
-        pip install -e ".[dev]"
-        pip install pytest pytest-asyncio
         pip install 'mcp[cli]'
+        pip install pytest pytest-asyncio
+        pip install -e ".[dev]"
 
     - name: Run performance benchmarks
       run: python tests/test_integration.py --performance --suite performance
