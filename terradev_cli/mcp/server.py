@@ -1006,7 +1006,21 @@ variable "max_price" {
 if MCP_AVAILABLE:
     server = Server("terradev-mcp")
 else:
-    server = None
+    # Dummy server for when MCP is not installed - allows decorators to be defined
+    class _DummyServer:
+        def list_tools(self):
+            return lambda f: f
+        def call_tool(self):
+            return lambda f: f
+        def list_resources(self):
+            return lambda f: f
+        def read_resource(self):
+            return lambda f: f
+        def list_prompts(self):
+            return lambda f: f
+        def get_prompt(self):
+            return lambda f: f
+    server = _DummyServer()
 
 # Global state for lazy loading and scaling
 _tools_loaded = False
@@ -1055,15 +1069,17 @@ except ImportError:
     )
 
 # ── Pre-compiled Tool Schemas (built once at module load) ────────────────────
+_ALL_TOOLS = []
+
 if MCP_AVAILABLE:
     _ALL_TOOLS = [
         Tool(
-        name="quote_gpu",
-        description="Get real-time GPU prices across 21+ cloud providers (incl. Alibaba, OVHcloud, FluidStack, Hetzner, SiliconFlow, Latitude.sh, Oracle, Crusoe, DigitalOcean)",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "gpu_type": {
+            name="quote_gpu",
+            description="Get real-time GPU prices across 21+ cloud providers (incl. Alibaba, OVHcloud, FluidStack, Hetzner, SiliconFlow, Latitude.sh, Oracle, Crusoe, DigitalOcean)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "gpu_type": {
                     "type": "string",
                     "description": "GPU type (H100, H200, H800, A100, A10G, L40S, L4, T4, RTX4090, RTX3090, V100, V100S, A6000)",
                     "enum": [
@@ -5348,8 +5364,6 @@ if MCP_AVAILABLE:
         },
     ),
 ]
-else:
-    _ALL_TOOLS = []
 
 # Pre-compress at module load — cached for all subsequent list_tools calls
 if optimizer and MCP_AVAILABLE:

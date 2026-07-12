@@ -18,12 +18,11 @@ from unittest.mock import Mock, AsyncMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-# Check if mcp is available
+# Skip entire test file if mcp is not installed
 try:
     import mcp
-    MCP_AVAILABLE = True
 except ImportError:
-    MCP_AVAILABLE = False
+    pytest.skip("mcp package not installed - skipping MCP tests", allow_module_level=True)
 
 
 class TestMCPServerInitialization:
@@ -31,8 +30,6 @@ class TestMCPServerInitialization:
     
     def test_mcp_imports(self):
         """Test that MCP server imports work correctly"""
-        if not MCP_AVAILABLE:
-            pytest.skip("mcp package not installed")
         try:
             from terradev_cli.mcp.server import Server
             from mcp.server import Server as MCPServer
@@ -43,8 +40,6 @@ class TestMCPServerInitialization:
     
     def test_mcp_server_module_exists(self):
         """Test that the MCP server module exists and is importable"""
-        if not MCP_AVAILABLE:
-            pytest.skip("mcp package not installed")
         try:
             import terradev_cli.mcp.server as mcp_server
             assert hasattr(mcp_server, 'main')
@@ -59,8 +54,6 @@ class TestMCPToolRegistration:
     
     def test_command_map_exists(self):
         """Test that the command map is defined"""
-        if not MCP_AVAILABLE:
-            pytest.skip("mcp package not installed")
         try:
             from terradev_cli.mcp.server import COMMAND_MAP
             assert isinstance(COMMAND_MAP, dict)
@@ -70,8 +63,6 @@ class TestMCPToolRegistration:
     
     def test_database_tools_registered(self):
         """Test that database tools are registered in command map"""
-        if not MCP_AVAILABLE:
-            pytest.skip("mcp package not installed")
         try:
             from terradev_cli.mcp.server import COMMAND_MAP
             database_tools = [
@@ -88,8 +79,6 @@ class TestMCPToolRegistration:
     
     def test_consolidated_commands_registered(self):
         """Test that consolidated command structures are registered"""
-        if not MCP_AVAILABLE:
-            pytest.skip("mcp package not installed")
         try:
             from terradev_cli.mcp.server import COMMAND_MAP
             # Check that new consolidated command mappings exist
@@ -105,8 +94,6 @@ class TestDatabaseToolHandlers:
     
     def test_database_handlers_import(self):
         """Test that database tool handlers can be imported"""
-        if not MCP_AVAILABLE:
-            pytest.skip("mcp package not installed")
         try:
             from terradev_cli.mcp.new_feature_tools import (
                 handle_create_sqlite_connection,
@@ -126,8 +113,6 @@ class TestDatabaseToolHandlers:
     @pytest.mark.asyncio
     async def test_sqlite_connection_handler_signature(self):
         """Test that SQLite connection handler has correct signature"""
-        if not MCP_AVAILABLE:
-            pytest.skip("mcp package not installed")
         try:
             from terradev_cli.mcp.new_feature_tools import handle_create_sqlite_connection
             # Verify it's callable
