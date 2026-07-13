@@ -277,12 +277,15 @@ class TestOrchestratorStatus:
 
 class TestRunOn:
     @patch("subprocess.run")
-    def test_localhost_runs_shell(self, mock_run):
+    def test_localhost_runs_argv(self, mock_run):
         mock_run.return_value = MagicMock(returncode=0, stdout="OK", stderr="")
         rc, out, err = _run_on(None, "echo hello")
         assert rc == 0
         assert out == "OK"
         mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        assert args == ["echo", "hello"]
+        assert mock_run.call_args[1].get("shell") is False
 
     @patch("subprocess.run")
     def test_remote_runs_ssh(self, mock_run):
@@ -302,18 +305,19 @@ class TestRunOn:
         assert "/home/user/.ssh/id_rsa" in call_args
 
     def test_localhost_variants(self):
-        """localhost and 127.0.0.1 should run locally."""
+        """localhost and 127.0.0.1 should run locally without shell=True."""
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
             _run_on("localhost", "echo hi")
-            # Should run as shell, not SSH
             call_args = mock_run.call_args
-            assert call_args[1].get("shell") is True
+            assert call_args[1].get("shell") is False
+            assert call_args[0][0] == ["echo", "hi"]
 
             mock_run.reset_mock()
             _run_on("127.0.0.1", "echo hi")
             call_args = mock_run.call_args
-            assert call_args[1].get("shell") is True
+            assert call_args[1].get("shell") is False
+            assert call_args[0][0] == ["echo", "hi"]
 
 
 if __name__ == "__main__":
