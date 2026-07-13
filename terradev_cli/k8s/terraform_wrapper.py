@@ -12,16 +12,13 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import logging
 
-# Add terradev_cli to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from core.config import Config
-from core.telemetry import MandatoryTelemetryClient
+from terradev_cli.core.config import TerradevConfig
+from terradev_cli.core.telemetry import MandatoryTelemetryClient
 
 
 class TerraformWrapper:
     def __init__(self):
-        self.config = Config()
+        self.config = TerradevConfig._create_default()
         self.telemetry = MandatoryTelemetryClient()
         self.terraform_dir = Path(__file__).parent.parent / "terraform"
         self.logger = self._setup_logging()

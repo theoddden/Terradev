@@ -17,6 +17,7 @@ All output is structured JSON for MCP consumption.
 import json
 import logging
 import os
+import shlex
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -469,10 +470,10 @@ def _run_on(
             return r.returncode, r.stdout.strip(), r.stderr.strip()
         except Exception as e:  # noqa: BLE001
             return -1, "", str(e)
-    # SECURITY: shell=True is used but command is validated above
+    # SECURITY: validated above; split into argv to avoid shell=True
     try:
         r = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=timeout
+            shlex.split(cmd), shell=False, capture_output=True, text=True, timeout=timeout
         )
         return r.returncode, r.stdout.strip(), r.stderr.strip()
     except Exception as e:  # noqa: BLE001
@@ -753,6 +754,8 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
             return {"status": "failed", "error": "Unsafe command characters detected"}
 
     cmd = " ".join(cmd_parts)
+    stdout_target = None
+    stderr_target = None
     if config.log_path:
         # Validate log path: resolve to absolute path and assert it stays within
         # an allowed directory root to prevent path traversal attacks.
@@ -769,7 +772,8 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
             logger.error(f"Log path outside allowed roots: {resolved_log}")
             return {"status": "failed", "error": "Log path outside allowed directory"}
         os.makedirs(str(resolved_log.parent), exist_ok=True)
-        cmd += f" 2>&1 | tee {resolved_log}"
+        stdout_target = open(resolved_log, "wb")
+        stderr_target = subprocess.STDOUT
 
     # Pre-install FlashOptim if auto-enabled (non-blocking, fail-safe)
     flashoptim_info = artifacts.get("flashoptim", {})
@@ -782,13 +786,13 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     logger.info(f"Launching: {cmd}")
     try:
-        # SECURITY: shell=True is required for pipe redirection, but inputs are validated above
+        # SECURITY: use the validated argv list and redirect to the log file directly
         process = subprocess.Popen(
-            cmd,
-            shell=True,
+            cmd_parts,
+            shell=False,
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stdout=stdout_target,
+            stderr=stderr_target,
             start_new_session=True,
         )
 

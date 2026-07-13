@@ -1073,6 +1073,7 @@ except ImportError:
 _ALL_TOOLS = None
 
 def _build_all_tools():
+    global _ALL_TOOLS
     _ALL_TOOLS = []
 
     if MCP_AVAILABLE:
@@ -5369,6 +5370,9 @@ def _build_all_tools():
         ),
     ]
 
+    if ALL_NEW_TOOLS:
+        _ALL_TOOLS.extend(ALL_NEW_TOOLS)
+
     return _ALL_TOOLS
 # Pre-compress at module load — cached for all subsequent list_tools calls
 _COMPRESSED_TOOLS = None
@@ -7720,10 +7724,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 mem_util = arguments.get("gpu_memory_utilization", 0.85)
                 max_len = arguments.get("max_model_len", 32768)
                 try:
-                    import sys
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.ray_enhanced import (
                         EnhancedRayService,
                         EnhancedRayConfig,
@@ -7780,9 +7780,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             elif tool_name == "ray_disagg_pd_deploy":
                 model_id = arguments["model_id"]
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.ray_enhanced import (
                         EnhancedRayService,
                         EnhancedRayConfig,
@@ -7842,9 +7839,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 gpu_count = arguments.get("gpu_count", 8)
                 gpu_mem = arguments.get("gpu_memory_gb", 80.0)
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.ray_enhanced import (
                         EnhancedRayService,
                         EnhancedRayConfig,
@@ -8238,10 +8232,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     )
 
                 # Import SGLang service
-                import sys
 
-                sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-                from ml_services.sglang_service import SGLangService, WorkloadType
+                from terradev_cli.ml_services.sglang_service import SGLangService, WorkloadType
 
                 service = SGLangService()
 
@@ -9446,9 +9438,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 project = arguments.get("project", "default")
                 days = arguments.get("days", 7)
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.langsmith_service import (
                         LangSmithService,
                         LangSmithConfig,
@@ -9528,9 +9517,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "mlflow_log_run":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.mlflow_service import (
                         MLflowService,
                         MLflowConfig,
@@ -9574,9 +9560,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "mlflow_register_model":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.mlflow_service import (
                         MLflowService,
                         MLflowConfig,
@@ -9692,9 +9675,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 msg = arguments.get("message", "Stage checkpoint via Terradev")
                 remote = arguments.get("remote")
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.dvc_service import (
                         DVCService,
                         DVCConfig,
@@ -9754,9 +9734,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "kserve_generate_yaml":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.kserve_service import (
                         KServeService,
                         KServeConfig,
@@ -9904,9 +9881,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "egress_cheapest_route":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.egress_optimizer import EgressOptimizer
 
                     optimizer = EgressOptimizer()
@@ -9937,9 +9911,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "egress_optimize_staging":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.egress_optimizer import EgressOptimizer
 
                     optimizer = EgressOptimizer()
@@ -10353,9 +10324,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "hf_smart_template":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.hf_smart_templates import HFSmartTemplates
 
                     templates = HFSmartTemplates()
@@ -10386,9 +10354,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "hf_hardware_recommend":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.hf_smart_templates import HFSmartTemplates
 
                     templates = HFSmartTemplates()
@@ -10416,9 +10381,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "hf_hardware_compare":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.hf_smart_templates import HFSmartTemplates
 
                     templates = HFSmartTemplates()
@@ -10445,9 +10407,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "langchain_create_workflow":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.langchain_service import (
                         LangChainService,
                     )
@@ -10477,9 +10436,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "langchain_create_sglang_pipeline":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.langchain_service import (
                         LangChainService,
                     )
@@ -10626,9 +10582,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "langgraph_create_workflow":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.langgraph_service import (
                         LangGraphService,
                     )
@@ -10658,9 +10611,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "langgraph_orchestrator_worker":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.langgraph_service import (
                         LangGraphService,
                     )
@@ -10687,9 +10637,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "langgraph_evaluation_workflow":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.langgraph_service import (
                         LangGraphService,
                     )
@@ -10716,9 +10663,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "langgraph_workflow_status":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.langgraph_service import (
                         LangGraphService,
                     )
@@ -10747,9 +10691,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "wandb_create_dashboard":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
 
                     svc = WandBEnhanced(
@@ -10776,9 +10717,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "wandb_create_terradev_dashboard":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
 
                     svc = WandBEnhanced(
@@ -10817,9 +10755,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "wandb_create_report":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
 
                     svc = WandBEnhanced(
@@ -10846,9 +10781,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "wandb_create_terradev_report":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
 
                     svc = WandBEnhanced(
@@ -10875,9 +10807,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "wandb_setup_alerts":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
 
                     svc = WandBEnhanced(
@@ -10904,9 +10833,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "wandb_create_terradev_alerts":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
 
                     svc = WandBEnhanced(
@@ -10932,9 +10858,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "wandb_dashboard_status":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
 
                     svc = WandBEnhanced(
@@ -10962,9 +10885,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "governance_request_consent":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.data_governance import DataGovernance
 
                     gov = DataGovernance()
@@ -10995,9 +10915,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "governance_record_consent":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.data_governance import DataGovernance
 
                     gov = DataGovernance()
@@ -11027,9 +10944,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "governance_evaluate_opa":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.data_governance import DataGovernance
 
                     gov = DataGovernance()
@@ -11066,9 +10980,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "governance_move_data":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.data_governance import DataGovernance
 
                     gov = DataGovernance()
@@ -11100,9 +11011,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "governance_movement_history":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.data_governance import DataGovernance
 
                     gov = DataGovernance()
@@ -11130,9 +11038,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "governance_compliance_report":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.data_governance import DataGovernance
 
                     gov = DataGovernance()
@@ -11163,9 +11068,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "cost_analyze":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.cost_optimizer import CostOptimizer
 
                     optimizer = CostOptimizer()
@@ -11190,9 +11092,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "cost_optimize_recommend":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.cost_optimizer import CostOptimizer
 
                     optimizer = CostOptimizer()
@@ -11219,9 +11118,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "cost_simulate":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.cost_optimizer import CostOptimizer
 
                     optimizer = CostOptimizer()
@@ -11248,9 +11144,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "cost_budget_optimize":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.cost_optimizer import CostOptimizer
 
                     optimizer = CostOptimizer()
@@ -11284,9 +11177,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "price_trends":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.price_intelligence import PriceIntelligence
 
                     intel = PriceIntelligence()
@@ -11314,9 +11204,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "price_budget_optimize":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.price_intelligence import PriceIntelligence
 
                     intel = PriceIntelligence()
@@ -11345,9 +11232,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "price_spot_risk":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.price_intelligence import PriceIntelligence
 
                     intel = PriceIntelligence()
@@ -11378,9 +11262,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "training_config_generate":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.training_orchestrator import (
                         TrainingOrchestrator,
                     )
@@ -11415,9 +11296,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "training_launch_distributed":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.training_orchestrator import (
                         TrainingOrchestrator,
                     )
@@ -11491,9 +11369,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "train_snapshot":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.training_monitor import TrainingMonitor
 
                     monitor = TrainingMonitor()
@@ -11519,9 +11394,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "train_detect_stragglers":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.training_monitor import TrainingMonitor
 
                     monitor = TrainingMonitor()
@@ -11560,9 +11432,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "preflight_report":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.preflight_validator import PreflightValidator
 
                     validator = PreflightValidator()
@@ -11590,9 +11459,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "preflight_gpu_check":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.preflight_validator import (
                         PreflightValidator,
                         _NCU_STALL_SIGNATURES,
@@ -11642,9 +11508,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "preflight_network_check":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.core.preflight_validator import PreflightValidator
 
                     validator = PreflightValidator()
@@ -11673,9 +11536,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "k8s_gpu_operator_install":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.kubernetes_enhanced import (
                         EnhancedKubernetesService,
                     )
@@ -11706,9 +11566,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "k8s_device_plugin":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.kubernetes_enhanced import (
                         EnhancedKubernetesService,
                     )
@@ -11738,9 +11595,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "k8s_mig_configure":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.kubernetes_enhanced import (
                         EnhancedKubernetesService,
                     )
@@ -11773,9 +11627,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "k8s_time_slicing":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.kubernetes_enhanced import (
                         EnhancedKubernetesService,
                     )
@@ -11808,9 +11659,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "k8s_monitoring_stack":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.ml_services.kubernetes_enhanced import (
                         EnhancedKubernetesService,
                     )
@@ -11843,9 +11691,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "datadog_status":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.integrations.datadog_integration import (
                         get_status_summary,
                         METRIC_CATALOG,
@@ -11869,9 +11714,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "datadog_push_metrics":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.integrations.datadog_integration import (
                         push_cost_snapshot,
                     )
@@ -11890,9 +11732,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "datadog_send_event":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.integrations.datadog_integration import (
                         send_event_async,
                     )
@@ -11918,9 +11757,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "datadog_create_monitors":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.integrations.datadog_integration import (
                         create_monitor,
                         create_all_monitors,
@@ -11944,9 +11780,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "datadog_list_monitors":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.integrations.datadog_integration import (
                         list_monitors,
                     )
@@ -11965,9 +11798,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "datadog_create_dashboard":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.integrations.datadog_integration import (
                         create_dashboard,
                     )
@@ -11988,9 +11818,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "datadog_list_dashboards":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.integrations.datadog_integration import (
                         list_dashboards,
                     )
@@ -12009,9 +11836,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "datadog_query":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.integrations.datadog_integration import (
                         query_metrics,
                     )
@@ -12034,9 +11858,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "datadog_terraform_export":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.integrations.datadog_integration import (
                         generate_full_terraform_module,
                     )
@@ -12066,9 +11887,6 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
 
             elif tool_name == "datadog_metric_catalog":
                 try:
-                    sys.path.insert(
-                        0, os.path.join(os.path.dirname(__file__), "..", "Terradev")
-                    )
                     from terradev_cli.integrations.datadog_integration import (
                         METRIC_CATALOG,
                     )
@@ -13216,6 +13034,88 @@ def main():
         app = create_sse_app()
         logger.info("Starting Terradev MCP SSE server on %s:%s", args.host, args.port)
         uvicorn.run(app, host=args.host, port=args.port)
+
+
+def run_server(transport: str = "stdio", host: Optional[str] = None, port: Optional[int] = None):
+    """Start the Terradev MCP server (used by `terradev mcp serve`)."""
+    if not MCP_AVAILABLE:
+        print(
+            "Error: mcp package not installed. Install with: pip install 'mcp[cli]'",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    argv = [sys.argv[0] if sys.argv else "terradev_mcp"]
+    if transport != "stdio":
+        argv.extend(["--transport", transport])
+    if host is not None:
+        argv.extend(["--host", host])
+    if port is not None:
+        argv.extend(["--port", str(port)])
+
+    old_argv = sys.argv
+    sys.argv = argv
+    try:
+        main()
+    finally:
+        sys.argv = old_argv
+
+
+def list_tools():
+    """Print all registered Terradev MCP tools (used by `terradev mcp list-tools`)."""
+    if not MCP_AVAILABLE:
+        print(
+            "Error: mcp package not installed. Install with: pip install 'mcp[cli]'",
+            file=sys.stderr,
+        )
+        return
+
+    _build_all_tools()
+    print(f"Terradev MCP tools ({len(_ALL_TOOLS)}):\n")
+    for tool in _ALL_TOOLS:
+        print(f"  - {tool.name}: {tool.description}")
+
+
+def install_config(client: str):
+    """Install the MCP client configuration for the requested client."""
+    import platform
+
+    home = os.path.expanduser("~")
+    configs = {
+        "claude-desktop": (
+            os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
+            if platform.system() == "Darwin"
+            else os.path.join(home, ".config", "claude", "claude_desktop_config.json")
+        ),
+        "cursor": os.path.join(home, ".cursor", "mcp.json"),
+        "windsurf": os.path.join(home, ".config", "windsurf", "mcp_config.json"),
+        "continue": os.path.join(home, ".continue", "mcp_config.json"),
+        "cline": os.path.join(home, ".config", "cline", "mcp_config.json"),
+    }
+
+    if client not in configs:
+        print(f"Error: unsupported MCP client '{client}'", file=sys.stderr)
+        print(f"Supported clients: {', '.join(configs.keys())}", file=sys.stderr)
+        sys.exit(1)
+
+    path = configs[client]
+    terradev_entry = {
+        "command": sys.executable,
+        "args": ["-m", "terradev_cli", "mcp", "serve"],
+    }
+
+    existing = {}
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            existing = json.load(f)
+    if "mcpServers" not in existing:
+        existing["mcpServers"] = {}
+    existing["mcpServers"]["terradev"] = terradev_entry
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(existing, f, indent=2)
+    print(f"Installed Terradev MCP config for {client} at {path}")
 
 
 if __name__ == "__main__":

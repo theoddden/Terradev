@@ -20,6 +20,7 @@ import hashlib
 import json
 import logging
 import os
+import shlex
 import shutil
 import subprocess
 import time
@@ -251,10 +252,10 @@ def _run_on(
             return r.returncode, r.stdout.strip(), r.stderr.strip()
         except Exception as e:  # noqa: BLE001
             return -1, "", str(e)
-    # SECURITY: shell=True is used but command is validated above
+    # SECURITY: validated above; split into argv to avoid shell=True
     try:
         r = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=timeout
+            shlex.split(cmd), shell=False, capture_output=True, text=True, timeout=timeout
         )
         return r.returncode, r.stdout.strip(), r.stderr.strip()
     except Exception as e:  # noqa: BLE001
