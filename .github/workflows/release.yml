@@ -37,5 +37,7 @@ jobs:
       run: twine upload dist/*
 
     - name: Create GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         gh release create ${{ github.ref_name }} --generate-notes
