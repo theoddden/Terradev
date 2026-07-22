@@ -7,6 +7,7 @@
 **License: Apache 2.0** - Free and open source for commercial and personal use.
 
 pypi.org/project/terradev-cli/
+<!-- mcp-name: io.github.theoddden/terradev -->
 
 Terradev is a cross-cloud compute control plane for AI workloads, not just a provisioning wrapper. 
 
