@@ -1,11 +1,13 @@
 name: Publish to MCP Registry
 
 "on":
+  workflow_dispatch:
   release:
     types: [published]
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   publish-mcp:
@@ -19,10 +21,8 @@ jobs:
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
 
-      - name: Authenticate with MCP Registry
-        run: mcp-publisher login github
-        env:
-          MCP_REGISTRY_GITHUB_TOKEN: ${{ secrets.MCP_REGISTRY_GITHUB_TOKEN }}
+      - name: Authenticate with MCP Registry via OIDC
+        run: mcp-publisher login github-oidc
 
       - name: Publish server.json to MCP Registry
         run: mcp-publisher publish
