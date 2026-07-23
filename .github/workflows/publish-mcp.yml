@@ -1,6 +1,6 @@
 name: Publish to MCP Registry
 
-on:
+"on":
   release:
     types: [published]
 
