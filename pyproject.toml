@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "5.6.3"
+version = "5.6.4"
 description = "An imperative command-line-interface for AI workload orchestration."
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -120,6 +120,7 @@ dependencies = [
     "huggingface-hub>=0.24.0",
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
+    "mcp[cli]>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -197,6 +198,7 @@ Changelog = "https://github.com/theoddden/Terradev/blob/main/CHANGELOG.md"
 
 [project.scripts]
 terradev = "terradev_cli.cli:cli"
+terradev-cli = "terradev_cli.cli:cli"
 
 [tool.setuptools.packages.find]
 include = ["terradev_cli", "terradev_cli.*"]

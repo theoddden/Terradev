@@ -141,6 +141,9 @@ safety-report.json
 # Activations (local license data)
 activations/
 
+# MCP Registry auth tokens
+.mcpregistry_*
+
 # HuggingFace cache
 hf_cache/
 

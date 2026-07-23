@@ -8,7 +8,7 @@ try:
 
     __version__ = version("terradev-cli")
 except PackageNotFoundError:
-    __version__ = "5.6.3"
+    __version__ = "5.6.4"
 
 __author__ = "Terradev Team"
 __description__ = "Open Source BYOAPI Multi-Cloud GPU Infrastructure Platform"
