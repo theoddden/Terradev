@@ -98,7 +98,6 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9", 
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -107,7 +106,7 @@ classifiers = [
     "Environment :: Console",
     "Natural Language :: English"
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "click>=8.0.0",
     "aiohttp>=3.10.0",
@@ -215,13 +214,13 @@ terradev_cli = [
 ]
 
 [tool.black]
-target-version = ["py39", "py310", "py311", "py312"]
+target-version = ["py310", "py311", "py312"]
 line-length = 120
 skip-string-normalization = true
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = [
