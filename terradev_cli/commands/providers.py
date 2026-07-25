@@ -80,9 +80,9 @@ def configure(provider):
 
         print(f"   Configure {provider.upper()} credentials")
 
-        # Temporarily set up provider-specific prompt
-        config_dir = Path.home() / ".terradev"
-        credentials_file = config_dir / "credentials.json"
+        # Use the injected API's config paths so tests can isolate credentials
+        config_dir = getattr(api, "config_dir", None) or (Path.home() / ".terradev")
+        credentials_file = getattr(api, "credentials_file", None) or (config_dir / "credentials.json")
 
         # Load existing credentials
         existing_creds = {}

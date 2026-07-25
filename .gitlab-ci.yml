@@ -34,6 +34,18 @@ lint:
     - develop
     - merge_requests
 
+# === Command Test Suite (DI migration gate) ===
+test-commands:
+  stage: test
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - pytest tests/commands tests/test_cli_commands.py -v --tb=short
+
 # === Unit Tests ===
 test:
   stage: test

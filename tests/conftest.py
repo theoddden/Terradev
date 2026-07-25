@@ -213,6 +213,27 @@ def registry():
     return ProviderRegistry(factory=mock_factory)
 
 
+@pytest.fixture
+def patch_registry():
+    """Patch ProviderRegistry so provision/quote logic uses a fixed provider ranking."""
+    with patch("terradev_cli.providers.registry.ProviderRegistry") as MockRegistry:
+        instance = MagicMock()
+        instance.ranked_providers.return_value = [
+            "runpod",
+            "vastai",
+            "aws",
+            "gcp",
+            "azure",
+            "tensordock",
+            "lambda_labs",
+            "coreweave",
+            "oracle",
+            "crusoe",
+        ]
+        MockRegistry.return_value = instance
+        yield MockRegistry
+
+
 # ── GPU catalog helpers ───────────────────────────────────────────────────────
 
 @pytest.fixture
