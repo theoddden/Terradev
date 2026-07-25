@@ -97,7 +97,7 @@ def mock_api(tmp_config_dir: Path):
     All async provider methods return minimal valid payloads.  Credential
     and usage I/O is replaced with in-memory stubs so no disk access occurs.
     """
-    from terradev_cli.cli import TerradevAPI
+    from terradev_cli.commands._api import TerradevAPI
 
     api = MagicMock(spec=TerradevAPI)
     api.credentials = {
