@@ -46,3 +46,5 @@ def cli(ctx, config=None, verbose=False, skip_onboarding=False):
 # Register domain modules. Each attaches its commands to the shared `cli` group.
 from . import providers  # noqa: F401,E402
 from . import compute    # noqa: F401,E402
+from . import k8s        # noqa: F401,E402
+from . import inference  # noqa: F401,E402
