@@ -109,9 +109,13 @@ class TestQuoteCommand:
     def test_quote_with_region_filter(self):
         """Quote command with region filter"""
         runner = CliRunner()
-        with patch("terradev_cli.cli.TerradevAPI", create_mock_api()):
-            result = runner.invoke(cli, ["quote", "-g", "A100", "-r", "us-east-1"])
-            assert result.exit_code == 0
+        api = create_mock_api().return_value
+        result = runner.invoke(
+            cli,
+            ["quote", "-g", "A100", "-r", "us-east-1"],
+            obj={"api": api},
+        )
+        assert result.exit_code == 0
 
     def test_quote_with_parallel_flag(self):
         """Quote command with parallel queries"""

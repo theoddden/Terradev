@@ -819,6 +819,10 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
         all_quotes = [
             q for q in all_quotes if region.lower() in q.get("region", "").lower()
         ]
+        if not all_quotes:
+            print(f"ERROR: No quotes returned for {gpu_type} in region {region}")
+            print("\nTip: Try a different region or remove the -r/--region filter")
+            return
 
     all_quotes.sort(key=lambda q: q.get("price", 999))
 
