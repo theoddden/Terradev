@@ -50,6 +50,23 @@
 
 ---
 
+## Progress
+
+| Work Package | Status | Module |
+|---|---|---|
+| WP-0 Foundation | Done | `terradev_cli/commands/__init__.py`, `terradev_cli/commands/_api.py` |
+| WP-1 Providers | Done | `terradev_cli/commands/providers.py` |
+| WP-2 Compute / Provisioning | Done | `terradev_cli/commands/compute.py` |
+| WP-3 Inference Serving | Done | `terradev_cli/commands/inference.py` |
+| WP-4 Kubernetes / GitOps | Done | `terradev_cli/commands/k8s.py` (houses `gitops` for now) |
+| WP-5 ML Integrations | Done | `terradev_cli/commands/ml.py` (15 sub-groups) |
+| WP-6 Training / LoRA | Pending | — |
+| WP-7 Infrastructure Intelligence | Pending | — |
+| WP-8 MLOps / Governance | Pending | — |
+| WP-9 Platform Services | Pending | — |
+
+---
+
 ## Target Package Layout
 
 ```
@@ -60,12 +77,13 @@ terradev_cli/
     providers.py         # WP-1 — providers group + configure, setup, quote
     compute.py           # WP-2 — provision, manage, status, stage, execute, analytics,
                          #         optimize, integrations, cleanup, job, run
-    infer.py             # WP-3 — infer group, inferx group, smart_deploy, orchestrator,
+    inference.py         # WP-3 — infer group, inferx group, smart_deploy, orchestrator,
                          #         warm-pool, cost_scaler
-    k8s_gitops.py        # WP-4 — k8s group, gitops group, up, rollback, manifests, hf-space
+    k8s.py               # WP-4 — k8s group, gitops group, up, rollback, manifests, hf-space
+                         #         (rename to k8s_gitops.py if desired)
     ml.py                # WP-5 — ml group and all sub-groups (wandb, langchain, langgraph,
-                         #         kserve, langsmith, dvc, mlflow, ray, sglang, langfuse,
-                         #         databricks, retrain)
+                         #         kserve, langsmith, dvc, mlflow_legacy, ray, sglang, langfuse,
+                         #         qdrant, guardrails, phoenix, databricks)
     training.py          # WP-6 — train group, lora group, flashoptim, preflight
     infrastructure.py    # WP-7 — price_discovery, budget_optimize, helm_generate,
                          #         percentiles, availability, reliability
