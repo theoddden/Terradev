@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """Kubernetes / GitOps commands for the Terradev CLI."""
 
+import asyncio
+import sys
+
 import click
 from . import cli
+from . import _api
+
+TerraformWrapper = _api.TerraformWrapper
+_telemetry = _api._telemetry
 
 @click.group()
 def k8s():
@@ -831,7 +838,11 @@ def gitops():
     help="Git provider",
 )
 @click.option(
-    "--repo", "--repository", required=True, help="Repository name (format: owner/repo)"
+    "--repo",
+    "--repository",
+    "repository",
+    required=True,
+    help="Repository name (format: owner/repo)",
 )
 @click.option(
     "--tool",

@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 
 import click
 from . import cli
+from terradev_cli.commands._api import TerradevAPI
 
 
 @cli.group()

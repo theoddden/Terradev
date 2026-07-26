@@ -46,6 +46,40 @@ test-commands:
   script:
     - pytest tests/commands tests/test_cli_commands.py -v --tb=short
 
+# === Modular command test jobs (DI extraction gate) ===
+test-commands-inference:
+  stage: test
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - pytest tests/commands/test_commands_inference.py -v --tb=short
+
+test-commands-k8s:
+  stage: test
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - pytest tests/commands/test_commands_k8s.py -v --tb=short
+
+test-commands-ml:
+  stage: test
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - pytest tests/commands/test_commands_ml.py -v --tb=short
+
 # === Unit Tests ===
 test:
   stage: test
