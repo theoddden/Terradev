@@ -124,6 +124,18 @@ test-commands-platform:
   script:
     - pytest tests/commands/test_commands_platform.py -v --tb=short
 
+# === MCP Server Tests ===
+test-mcp:
+  stage: test
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - pytest tests/test_mcp_handlers.py -v --tb=short
+
 # === Unit Tests ===
 test:
   stage: test

@@ -201,14 +201,14 @@ def mcp(action, client, transport):
         click.echo(
             "Error: MCP module not found. Install with: pip install mcp", err=True
         )
-        return 1
+        raise SystemExit(1)
 
     if action == "serve":
         run_server(transport=transport)
     elif action == "install":
         if not client:
             click.echo("Error: --client is required for install action", err=True)
-            return 1
+            raise SystemExit(1)
         install_config(client)
     elif action == "list-tools":
         list_tools()

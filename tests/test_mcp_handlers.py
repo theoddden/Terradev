@@ -318,5 +318,37 @@ class TestMCPToolBatches:
         assert total_new == 52
 
 
+class TestMCPStdioServer:
+    """End-to-end stdio MCP server integration tests."""
+
+    def test_stdio_server_lists_tools(self):
+        import asyncio
+        import os
+        import sys
+
+        from mcp.client.session import ClientSession
+        from mcp.client.stdio import StdioServerParameters, stdio_client
+
+        async def _run(errlog):
+            env = os.environ.copy()
+            env["TERRADEV_SKIP_ONBOARDING"] = "1"
+            params = StdioServerParameters(
+                command=sys.executable,
+                args=["-m", "terradev_cli", "mcp", "serve"],
+                env=env,
+            )
+            async with stdio_client(params, errlog=errlog) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    tools = await session.list_tools()
+                    return tools
+
+        with open(os.devnull, "w") as errlog:
+            tools = asyncio.run(asyncio.wait_for(_run(errlog), timeout=30))
+        assert len(tools.tools) > 50
+        names = {t.name for t in tools.tools}
+        assert "quote_gpu" in names
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

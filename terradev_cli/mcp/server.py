@@ -20,6 +20,7 @@ import logging
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import time
@@ -113,9 +114,8 @@ logger = logging.getLogger("terradev-mcp")
 # Check if terradev CLI is available
 def check_terradev_installation():
     try:
-        result = subprocess.run(
-            ["terradev", "--version"], capture_output=True, text=True, timeout=10
-        )
+        cmd = _terradev_command() + ["--version"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
@@ -314,10 +314,22 @@ def _validate_config_dir(config_dir: str) -> str:
 
 
 # Execute terradev command safely with bug fixes
+def _terradev_command() -> List[str]:
+    """Return the command prefix to invoke the Terradev CLI.
+
+    Prefers the installed `terradev` entry-point script. Falls back to
+    `python -m terradev_cli` so the MCP server works in editable installs
+    and during development without needing the script on PATH.
+    """
+    if shutil.which("terradev"):
+        return ["terradev"]
+    return [sys.executable, "-m", "terradev_cli"]
+
+
 async def execute_terradev_command(args: List[str]) -> Dict[str, Any]:
     """Execute terradev CLI command with helpful error messages."""
     try:
-        cmd = ["terradev"] + args
+        cmd = _terradev_command() + args
 
         # Apply bug fixes for known issues
         env = os.environ.copy()
@@ -12933,7 +12945,7 @@ def create_sse_app() -> "Starlette":
                         server_version="2.0.1",
                         capabilities=self._server.get_capabilities(
                             notification_options=NotificationOptions(),
-                            experimental_capabilities=None,
+                            experimental_capabilities={},
                         ),
                     ),
                 )
@@ -12977,19 +12989,25 @@ def create_sse_app() -> "Starlette":
 
 async def run_stdio():
     """Run in stdio mode (Claude Code / local)."""
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            InitializationOptions(
-                server_name="terradev-mcp",
-                server_version="2.0.1",
-                capabilities=server.get_capabilities(
-                    notification_options=None,
-                    experimental_capabilities=None,
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            await server.run(
+                read_stream,
+                write_stream,
+                InitializationOptions(
+                    server_name="terradev-mcp",
+                    server_version="2.0.1",
+                    capabilities=server.get_capabilities(
+                        notification_options=NotificationOptions(),
+                        experimental_capabilities={},
+                    ),
                 ),
-            ),
-        )
+            )
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        raise
 
 
 def main():
