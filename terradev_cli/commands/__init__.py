@@ -48,3 +48,4 @@ from . import providers  # noqa: F401,E402
 from . import compute    # noqa: F401,E402
 from . import k8s        # noqa: F401,E402
 from . import inference  # noqa: F401,E402
+from . import ml         # noqa: F401,E402
