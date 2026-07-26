@@ -80,6 +80,50 @@ test-commands-ml:
   script:
     - pytest tests/commands/test_commands_ml.py -v --tb=short
 
+test-commands-training:
+  stage: test
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - pytest tests/commands/test_commands_training.py -v --tb=short
+
+test-commands-infrastructure:
+  stage: test
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - pytest tests/commands/test_commands_infrastructure.py -v --tb=short
+
+test-commands-mlops:
+  stage: test
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - pytest tests/commands/test_commands_mlops.py -v --tb=short
+
+test-commands-platform:
+  stage: test
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - pytest tests/commands/test_commands_platform.py -v --tb=short
+
 # === Unit Tests ===
 test:
   stage: test
