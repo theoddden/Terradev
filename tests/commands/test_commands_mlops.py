@@ -1,4 +1,6 @@
 """Tests for mlops commands."""
+from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -334,3 +336,45 @@ class TestFunctionalMlops:
         assert result.exit_code == 0
         assert "mymodel" in result.output
         assert "train-pipeline" in result.output
+
+    @patch("terradev_cli.core.event_system.trigger_manager")
+    def test_triggers_list_runs(self, mock_tm, runner, mock_api):
+        trigger = SimpleNamespace(
+            name="t1",
+            type=SimpleNamespace(value="event_based"),
+            target_pipeline="p1",
+            target_environment=SimpleNamespace(value="dev"),
+            enabled=True,
+            trigger_count=0,
+        )
+        mock_tm.triggers = {"t1": trigger}
+
+        result = runner.invoke(cli, ["triggers", "list"], obj={"api": mock_api})
+        assert result.exit_code == 0
+        assert "t1" in result.output
+
+    @patch("terradev_cli.core.evaluation_orchestrator.EvaluationOrchestrator")
+    def test_eval_model_runs(self, mock_orchestrator, runner, mock_api):
+        result = SimpleNamespace(
+            evaluation_id="eval-1",
+            model_path="/tmp/model",
+            endpoint_url=None,
+            workload_type="general",
+            metrics={"accuracy": 0.95, "latency": 50.0},
+            baseline_comparison=None,
+            timestamp=datetime(2026, 7, 1, 12, 0, 0),
+            duration_seconds=120.0,
+            metadata={},
+        )
+        orch = MagicMock()
+        orch.evaluate_model.return_value = result
+        mock_orchestrator.return_value = orch
+
+        result = runner.invoke(
+            cli,
+            ["eval", "evaluation", "--model", "/tmp/model", "--dataset", "/tmp/dataset"],
+            obj={"api": mock_api},
+        )
+        assert result.exit_code == 0
+        assert "eval-1" in result.output
+        assert "0.950" in result.output
