@@ -1,4 +1,5 @@
 """Tests for training commands."""
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -196,3 +197,58 @@ class TestFunctionalTraining:
         mock_get_registry.return_value = reg
         result = runner.invoke(cli, ["lora", "list", "--endpoint", "http://localhost:8000", "--registry"], obj={"api": mock_api})
         assert result.exit_code == 0
+
+    @patch("terradev_cli.core.job_state_manager.JobStateManager")
+    def test_train_status_job_runs(self, mock_jsm, runner, mock_api):
+        sm = MagicMock()
+        sm.job_metrics.return_value = {
+            "id": "job-1",
+            "name": "test-job",
+            "status": "running",
+            "framework": "pytorch",
+            "current_step": 50,
+            "total_steps": 100,
+            "progress_pct": 50,
+            "elapsed_hours": 1.5,
+            "gpu_hours": 0.75,
+            "eta_hours": 1.5,
+            "cost_usd": 1.23,
+            "efficiency_steps_per_gpuh": 66.7,
+            "last_checkpoint_id": "ckpt-1",
+            "error_message": None,
+        }
+        mock_jsm.return_value = sm
+
+        result = runner.invoke(cli, ["train", "status", "-j", "job-1"], obj={"api": mock_api})
+        assert result.exit_code == 0
+        assert "job-1" in result.output
+        assert "running" in result.output
+
+    @patch("terradev_cli.core.job_state_manager.JobStateManager")
+    def test_train_status_no_jobs_runs(self, mock_jsm, runner, mock_api):
+        sm = MagicMock()
+        sm.running_jobs_summary.return_value = []
+        sm.total_cost.return_value = 0.0
+        mock_jsm.return_value = sm
+
+        result = runner.invoke(cli, ["train", "status"], obj={"api": mock_api})
+        assert result.exit_code == 0
+
+    @patch("terradev_cli.ml_services.peft_import_service.get_peft_import_service")
+    def test_peft_list_runs(self, mock_get_svc, runner, mock_api):
+        svc = MagicMock()
+        svc.list_local_adapters.return_value = [
+            SimpleNamespace(
+                adapter_id="a1",
+                local_path="/tmp/a1",
+                base_model="m1",
+                rank=8,
+                alpha=16,
+                peft_type="lora",
+            )
+        ]
+        mock_get_svc.return_value = svc
+
+        result = runner.invoke(cli, ["lora", "peft", "list"], obj={"api": mock_api})
+        assert result.exit_code == 0
+        assert "a1" in result.output
