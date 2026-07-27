@@ -14,6 +14,15 @@ from typing import Any, Dict, List, Optional
 
 import click
 from . import cli
+from terradev_cli.commands._api import TerradevAPI
+
+
+def _get_api():
+    """Resolve the TerradevAPI instance from the Click context or create a real one."""
+    ctx = click.get_current_context()
+    if ctx and ctx.obj and ctx.obj.get("api"):
+        return ctx.obj["api"]
+    return TerradevAPI()
 
 
 def _parse_vllm_endpoint(endpoint: str):
@@ -48,7 +57,7 @@ def wandb_test():
             get_enhanced_wandb_setup_instructions,
         )
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
@@ -83,7 +92,7 @@ def wandb_list_projects():
     try:
         from terradev_cli.ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
@@ -105,7 +114,7 @@ def wandb_create_project(project_name):
     try:
         from terradev_cli.ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
@@ -127,7 +136,7 @@ def wandb_list_runs(limit):
     try:
         from terradev_cli.ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
@@ -150,7 +159,7 @@ def wandb_create_dashboard():
     try:
         from terradev_cli.ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
@@ -176,7 +185,7 @@ def wandb_create_report():
     try:
         from terradev_cli.ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
@@ -213,7 +222,7 @@ def wandb_setup_alerts():
     try:
         from terradev_cli.ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
@@ -241,7 +250,7 @@ def wandb_dashboard_status():
     try:
         from terradev_cli.ml_services.wandb_enhanced import create_enhanced_wandb_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
@@ -277,7 +286,7 @@ def langchain_test():
             get_langchain_setup_instructions,
         )
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -315,7 +324,7 @@ def langchain_create_workflow(workflow_name):
     try:
         from terradev_cli.ml_services.langchain_service import create_langchain_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -345,7 +354,7 @@ def langchain_create_langgraph(graph_name):
     try:
         from terradev_cli.ml_services.langchain_service import create_langchain_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -375,7 +384,7 @@ def langchain_create_pipeline(pipeline_name):
     try:
         from terradev_cli.ml_services.langchain_service import create_langchain_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -404,7 +413,7 @@ def langchain_list_projects():
     try:
         from terradev_cli.ml_services.langchain_service import create_langchain_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -428,7 +437,7 @@ def langchain_list_runs(project):
     try:
         from terradev_cli.ml_services.langchain_service import create_langchain_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -454,7 +463,7 @@ def langchain_create_trace(run_id, data):
     try:
         from terradev_cli.ml_services.langchain_service import create_langchain_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -491,7 +500,7 @@ def langgraph_test():
             get_langgraph_setup_instructions,
         )
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -533,7 +542,7 @@ def langgraph_create_workflow(workflow_name, type):
     try:
         from terradev_cli.ml_services.langgraph_service import create_langgraph_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -574,7 +583,7 @@ def langgraph_status(workflow_id):
     try:
         from terradev_cli.ml_services.langgraph_service import create_langgraph_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -601,7 +610,7 @@ def langgraph_deploy(workflow_name):
     try:
         from terradev_cli.ml_services.langgraph_service import create_langgraph_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
@@ -628,7 +637,7 @@ def kserve_test():
             get_kserve_setup_instructions,
         )
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("kserve")
 
         if not any(creds.values()):
@@ -659,7 +668,7 @@ def langsmith_test():
             get_langsmith_setup_instructions,
         )
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langsmith")
 
         if not creds.get("api_key"):
@@ -684,7 +693,7 @@ def langsmith_list_projects():
     try:
         from terradev_cli.ml_services.langsmith_service import create_langsmith_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langsmith")
 
         if not creds.get("api_key"):
@@ -706,7 +715,7 @@ def langsmith_create_project(project_name):
     try:
         from terradev_cli.ml_services.langsmith_service import create_langsmith_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langsmith")
 
         if not creds.get("api_key"):
@@ -728,7 +737,7 @@ def langsmith_export(format):
     try:
         from terradev_cli.ml_services.langsmith_service import create_langsmith_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("langsmith")
 
         if not creds.get("api_key"):
@@ -754,7 +763,7 @@ def dvc_test():
             get_dvc_setup_instructions,
         )
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
@@ -778,7 +787,7 @@ def dvc_init():
     try:
         from terradev_cli.ml_services.dvc_service import create_dvc_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
@@ -798,7 +807,7 @@ def dvc_add_remote(remote_spec):
     try:
         from terradev_cli.ml_services.dvc_service import create_dvc_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
@@ -823,7 +832,7 @@ def dvc_add_data(data_path):
     try:
         from terradev_cli.ml_services.dvc_service import create_dvc_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
@@ -842,7 +851,7 @@ def dvc_push():
     try:
         from terradev_cli.ml_services.dvc_service import create_dvc_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
@@ -861,7 +870,7 @@ def dvc_pull():
     try:
         from terradev_cli.ml_services.dvc_service import create_dvc_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
@@ -880,7 +889,7 @@ def dvc_status():
     try:
         from terradev_cli.ml_services.dvc_service import create_dvc_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
@@ -907,7 +916,7 @@ def mlflow_legacy_test():
             get_mlflow_setup_instructions,
         )
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("mlflow")
 
         if not creds.get("tracking_uri"):
@@ -932,7 +941,7 @@ def mlflow_legacy_list_experiments():
     try:
         from terradev_cli.ml_services.mlflow_service import create_mlflow_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("mlflow")
 
         if not creds.get("tracking_uri"):
@@ -954,7 +963,7 @@ def mlflow_legacy_create_experiment(experiment_name):
     try:
         from terradev_cli.ml_services.mlflow_service import create_mlflow_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("mlflow")
 
         if not creds.get("tracking_uri"):
@@ -976,7 +985,7 @@ def mlflow_legacy_list_runs(experiment_id):
     try:
         from terradev_cli.ml_services.mlflow_service import create_mlflow_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("mlflow")
 
         if not creds.get("tracking_uri"):
@@ -1002,7 +1011,7 @@ def mlflow_legacy_export(experiment_id, format):
     try:
         from terradev_cli.ml_services.mlflow_service import create_mlflow_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("mlflow")
 
         if not creds.get("tracking_uri"):
@@ -1027,7 +1036,7 @@ def ray_test():
             create_enhanced_ray_service_from_credentials,
         )
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("ray")
 
         # Ray can work without credentials for local clusters
@@ -1074,7 +1083,7 @@ def ray_install_monitoring():
     try:
         from terradev_cli.ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
         print("Deploying Installing enhanced Ray monitoring stack...")
@@ -1100,7 +1109,7 @@ def ray_metrics_summary():
     try:
         from terradev_cli.ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
         print("Status Getting comprehensive Ray metrics summary...")
@@ -1138,7 +1147,7 @@ def ray_status():
     try:
         from terradev_cli.ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
         print("Status Enhanced Ray cluster status:")
@@ -1176,7 +1185,7 @@ def ray_list_nodes():
     try:
         from terradev_cli.ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
         print(" Listing Ray nodes...")
@@ -1200,7 +1209,7 @@ def ray_start():
     try:
         from terradev_cli.ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
         print("Deploying Starting enhanced Ray cluster...")
@@ -1222,7 +1231,7 @@ def ray_stop():
     try:
         from terradev_cli.ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
         print(" Stopping Ray cluster...")
@@ -1238,7 +1247,7 @@ def ray_dashboard():
     try:
         from terradev_cli.ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
 
-        api = TerradevAPI()
+        api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
         print("Status Getting Ray dashboard URL...")
@@ -1649,7 +1658,7 @@ def phoenix_test():
         get_phoenix_setup_instructions,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("phoenix")
     if not any(creds.values()):
         print(get_phoenix_setup_instructions())
@@ -1667,7 +1676,7 @@ def phoenix_projects(limit):
     """List Phoenix projects."""
     from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
     data = asyncio.run(svc.list_projects(limit=limit))
     projects = data.get("data", [])
@@ -1691,7 +1700,7 @@ def phoenix_spans(project, filter_cond, limit):
     from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
     from terradev_cli.core.trace_viewer import view_recent_spans
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
     output = asyncio.run(
         view_recent_spans(
@@ -1707,7 +1716,7 @@ def phoenix_trace(trace_id, project):
     from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
     from terradev_cli.core.trace_viewer import view_trace
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
     output = asyncio.run(view_trace(svc, trace_id, project=project))
     print(output)
@@ -1717,7 +1726,7 @@ def phoenix_otel_env(project):
     """Print OTEL env vars to inject into serving pods."""
     from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
     env = svc.generate_otel_env(project_name=project)
     for k, v in env.items():
@@ -1728,7 +1737,7 @@ def phoenix_snippet(project):
     """Print Python instrumentation snippet."""
     from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
     print(svc.generate_instrumentation_snippet(project_name=project))
 @phoenix.command("k8s")
@@ -1737,7 +1746,7 @@ def phoenix_k8s(namespace):
     """Print K8s deployment manifest for Phoenix server."""
     from terradev_cli.ml_services.phoenix_service import create_phoenix_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
     print(svc.generate_k8s_deployment(namespace=namespace))
 @ml.group()
@@ -1752,7 +1761,7 @@ def guardrails_test_cmd():
         get_guardrails_setup_instructions,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("guardrails")
     if not any(creds.values()):
         print(get_guardrails_setup_instructions())
@@ -1774,7 +1783,7 @@ def guardrails_chat(message, config_id):
         create_guardrails_service_from_credentials,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_guardrails_service_from_credentials(api._provider_creds("guardrails"))
     result = asyncio.run(svc.test_rail(message, config_id=config_id))
     print(f"Input:     {result['input']}")
@@ -1789,7 +1798,7 @@ def guardrails_generate_config(config_id, output_dir):
         create_guardrails_service_from_credentials,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_guardrails_service_from_credentials(api._provider_creds("guardrails"))
     files = svc.generate_colang_config(config_id=config_id)
     output_path = Path(output_dir)
@@ -1809,7 +1818,7 @@ def guardrails_k8s(namespace):
         create_guardrails_service_from_credentials,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_guardrails_service_from_credentials(api._provider_creds("guardrails"))
     print(svc.generate_k8s_deployment(namespace=namespace))
 @ml.group()
@@ -1824,7 +1833,7 @@ def qdrant_test():
         get_qdrant_setup_instructions,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("qdrant")
     if not any(creds.values()):
         print(get_qdrant_setup_instructions())
@@ -1841,7 +1850,7 @@ def qdrant_collections():
     """List all collections."""
     from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_qdrant_service_from_credentials(api._provider_creds("qdrant"))
     cols = asyncio.run(svc.list_collections())
     if not cols:
@@ -1861,7 +1870,7 @@ def qdrant_create_collection(name, embedding_model):
     """Create a vector collection (auto-configured for embedding model)."""
     from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_qdrant_service_from_credentials(api._provider_creds("qdrant"))
     result = asyncio.run(
         svc.configure_rag_collection(name=name, embedding_model=embedding_model)
@@ -1875,7 +1884,7 @@ def qdrant_info(name):
     """Get collection info and stats."""
     from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_qdrant_service_from_credentials(api._provider_creds("qdrant"))
     info = asyncio.run(svc.get_collection_info(name=name))
     print(json.dumps(info, indent=2))
@@ -1885,7 +1894,7 @@ def qdrant_count(name):
     """Count points in a collection."""
     from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_qdrant_service_from_credentials(api._provider_creds("qdrant"))
     count = asyncio.run(svc.count_points(name=name))
     print(f"Points: {count}")
@@ -1895,7 +1904,7 @@ def qdrant_k8s(namespace):
     """Print K8s StatefulSet manifest for Qdrant."""
     from terradev_cli.ml_services.qdrant_service import create_qdrant_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_qdrant_service_from_credentials(api._provider_creds("qdrant"))
     print(svc.generate_k8s_deployment(namespace=namespace))
 @ml.group()
@@ -2245,7 +2254,7 @@ def langfuse():
 )
 def langfuse_configure(public_key, secret_key, host):
     """Configure Langfuse credentials."""
-    api = TerradevAPI()
+    api = _get_api()
     api._save_provider_creds(
         "langfuse",
         {
@@ -2260,7 +2269,7 @@ def langfuse_test():
     """Test Langfuse connectivity."""
     from terradev_cli.ml_services.langfuse_service import create_langfuse_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     result = asyncio.run(svc.test_connection())
     if result["status"] == "connected":
@@ -2280,7 +2289,7 @@ def langfuse_traces(limit, name, fmt):
     """List recent traces."""
     from terradev_cli.ml_services.langfuse_service import create_langfuse_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     result = asyncio.run(svc.list_traces(limit=limit, name=name))
 
@@ -2309,7 +2318,7 @@ def langfuse_trace(trace_id, fmt):
     """Get a single trace with observations."""
     from terradev_cli.ml_services.langfuse_service import create_langfuse_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     result = asyncio.run(svc.get_trace(trace_id))
 
@@ -2340,7 +2349,7 @@ def langfuse_scores(trace_id, name, limit, fmt):
     """List scores."""
     from terradev_cli.ml_services.langfuse_service import create_langfuse_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     result = asyncio.run(svc.list_scores(trace_id=trace_id, name=name, limit=limit))
 
@@ -2370,7 +2379,7 @@ def langfuse_score(trace_id, name, value, observation_id, comment):
     """Create a score for a trace."""
     from terradev_cli.ml_services.langfuse_service import create_langfuse_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     asyncio.run(
         svc.create_score(
@@ -2391,7 +2400,7 @@ def langfuse_datasets(limit, fmt):
     """List datasets."""
     from terradev_cli.ml_services.langfuse_service import create_langfuse_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     result = asyncio.run(svc.list_datasets(limit=limit))
 
@@ -2417,7 +2426,7 @@ def langfuse_export_training_data(limit, name, min_score, score_name, output):
     """Export traces as instruction/response pairs for LoRA fine-tuning."""
     from terradev_cli.ml_services.langfuse_service import create_langfuse_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     pairs = asyncio.run(
         svc.export_training_data(
@@ -2446,7 +2455,7 @@ def langfuse_quality(score_name, limit, fmt):
     """Get quality metrics for drift detection."""
     from terradev_cli.ml_services.langfuse_service import create_langfuse_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     result = asyncio.run(svc.get_quality_metrics(score_name=score_name, limit=limit))
 
@@ -2464,7 +2473,7 @@ def langfuse_otel_env(project):
     """Print OTEL env vars for instrumenting LLM apps."""
     from terradev_cli.ml_services.langfuse_service import create_langfuse_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     env = svc.generate_otel_env(project_name=project)
     print()
@@ -2477,7 +2486,7 @@ def langfuse_k8s(namespace):
     """Print K8s deployment manifest for Langfuse."""
     from terradev_cli.ml_services.langfuse_service import create_langfuse_service_from_credentials
 
-    api = TerradevAPI()
+    api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     print(svc.generate_k8s_deployment(namespace=namespace))
 @ml.group()
@@ -2489,7 +2498,7 @@ def databricks():
 @click.option("--token", prompt="Databricks PAT (dapi...)", hide_input=True)
 def databricks_configure(host, token):
     """Configure Databricks credentials."""
-    api = TerradevAPI()
+    api = _get_api()
     api._save_provider_creds(
         "databricks",
         {
@@ -2503,7 +2512,7 @@ def databricks_test():
     """Test Databricks connectivity."""
     from terradev_cli.integrations.databricks_integration import test_connection
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("databricks")
     result = asyncio.run(test_connection(creds))
     if result["status"] == "connected":
@@ -2520,7 +2529,7 @@ def databricks_jobs(limit, fmt):
     """List Databricks jobs."""
     from terradev_cli.integrations.databricks_integration import list_jobs
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("databricks")
     result = asyncio.run(list_jobs(creds, limit=limit))
 
@@ -2557,7 +2566,7 @@ def databricks_run(job_id, fmt):
     """Trigger a Databricks job run."""
     from terradev_cli.integrations.databricks_integration import run_job
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("databricks")
     result = asyncio.run(run_job(creds, job_id))
 
@@ -2578,7 +2587,7 @@ def databricks_run_status(run_id, fmt):
     """Get status of a Databricks run."""
     from terradev_cli.integrations.databricks_integration import get_run
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("databricks")
     result = asyncio.run(get_run(creds, run_id))
 
@@ -2604,7 +2613,7 @@ def databricks_clusters(fmt):
     """List Databricks clusters."""
     from terradev_cli.integrations.databricks_integration import list_clusters
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("databricks")
     result = asyncio.run(list_clusters(creds))
 
@@ -2635,7 +2644,7 @@ def databricks_serving_endpoints(fmt):
     """List model serving endpoints."""
     from terradev_cli.integrations.databricks_integration import list_serving_endpoints
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("databricks")
     result = asyncio.run(list_serving_endpoints(creds))
 
@@ -2674,7 +2683,7 @@ def databricks_deploy_model(
     """Deploy a model to a serving endpoint."""
     from terradev_cli.integrations.databricks_integration import create_serving_endpoint
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("databricks")
     result = asyncio.run(
         create_serving_endpoint(
@@ -2706,7 +2715,7 @@ def databricks_query(endpoint, prompt, fmt):
     """Query a model serving endpoint."""
     from terradev_cli.integrations.databricks_integration import query_serving_endpoint
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("databricks")
     inputs = [{"role": "user", "content": prompt}]
     result = asyncio.run(query_serving_endpoint(creds, endpoint, inputs))
@@ -2737,7 +2746,7 @@ def databricks_mlflow_experiments(limit, fmt):
     """List MLflow experiments."""
     from terradev_cli.integrations.databricks_integration import mlflow_list_experiments
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("databricks")
     result = asyncio.run(mlflow_list_experiments(creds, max_results=limit))
 
@@ -2768,7 +2777,7 @@ def databricks_mlflow_models(limit, fmt):
     """List registered models in Databricks Model Registry."""
     from terradev_cli.integrations.databricks_integration import mlflow_list_registered_models
 
-    api = TerradevAPI()
+    api = _get_api()
     creds = api._provider_creds("databricks")
     result = asyncio.run(mlflow_list_registered_models(creds, max_results=limit))
 

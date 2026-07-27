@@ -1,4 +1,7 @@
-"""Comprehensive structural tests for ML integration commands."""
+"""Comprehensive structural and functional tests for ML integration commands."""
+
+import sys
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from terradev_cli.commands import cli
@@ -301,3 +304,168 @@ def test_ml_databricks_mlflow_experiments_help(runner, mock_api):
 
 def test_ml_databricks_mlflow_models_help(runner, mock_api):
     _help_test(runner, mock_api, "ml databricks mlflow models")
+
+
+class TestFunctionalMl:
+    """Functional tests for the heavy ML service test commands."""
+
+    @pytest.mark.parametrize(
+        "path, provider, module_name, create_name, setup_name, creds",
+        [
+            (
+                ["ml", "wandb", "test"],
+                "wandb",
+                "terradev_cli.ml_services.wandb_enhanced",
+                "create_enhanced_wandb_service_from_credentials",
+                "get_enhanced_wandb_setup_instructions",
+                {"api_key": "test-key"},
+            ),
+            (
+                ["ml", "langchain", "test"],
+                "langchain",
+                "terradev_cli.ml_services.langchain_service",
+                "create_langchain_service_from_credentials",
+                "get_langchain_setup_instructions",
+                {"api_key": "test-key"},
+            ),
+            (
+                ["ml", "langgraph", "test"],
+                "langchain",
+                "terradev_cli.ml_services.langgraph_service",
+                "create_langgraph_service_from_credentials",
+                "get_langgraph_setup_instructions",
+                {"api_key": "test-key"},
+            ),
+            (
+                ["ml", "kserve", "test"],
+                "kserve",
+                "terradev_cli.ml_services.kserve_service",
+                "create_kserve_service_from_credentials",
+                "get_kserve_setup_instructions",
+                {"api_key": "test-key"},
+            ),
+            (
+                ["ml", "langsmith", "test"],
+                "langsmith",
+                "terradev_cli.ml_services.langsmith_service",
+                "create_langsmith_service_from_credentials",
+                "get_langsmith_setup_instructions",
+                {"api_key": "test-key"},
+            ),
+            (
+                ["ml", "dvc", "test"],
+                "dvc",
+                "terradev_cli.ml_services.dvc_service",
+                "create_dvc_service_from_credentials",
+                "get_dvc_setup_instructions",
+                {"repo_path": "."},
+            ),
+            (
+                ["ml", "mlflow-legacy", "test"],
+                "mlflow",
+                "terradev_cli.ml_services.mlflow_service",
+                "create_mlflow_service_from_credentials",
+                "get_mlflow_setup_instructions",
+                {"tracking_uri": "http://mlflow.local:5000"},
+            ),
+            (
+                ["ml", "ray", "test"],
+                "ray",
+                "terradev_cli.ml_services.ray_enhanced",
+                "create_enhanced_ray_service_from_credentials",
+                None,
+                {"api_key": "test-key"},
+            ),
+            (
+                ["ml", "phoenix", "test"],
+                "phoenix",
+                "terradev_cli.ml_services.phoenix_service",
+                "create_phoenix_service_from_credentials",
+                "get_phoenix_setup_instructions",
+                {"api_key": "test-key"},
+            ),
+            (
+                ["ml", "guardrails", "test"],
+                "guardrails",
+                "terradev_cli.ml_services.guardrails_service",
+                "create_guardrails_service_from_credentials",
+                "get_guardrails_setup_instructions",
+                {"api_key": "test-key"},
+            ),
+            (
+                ["ml", "qdrant", "test"],
+                "qdrant",
+                "terradev_cli.ml_services.qdrant_service",
+                "create_qdrant_service_from_credentials",
+                "get_qdrant_setup_instructions",
+                {"api_key": "test-key"},
+            ),
+            (
+                ["ml", "langfuse", "test"],
+                "langfuse",
+                "terradev_cli.ml_services.langfuse_service",
+                "create_langfuse_service_from_credentials",
+                None,
+                {"api_key": "test-key"},
+            ),
+            (
+                ["ml", "databricks", "test"],
+                "databricks",
+                "terradev_cli.integrations.databricks_integration",
+                None,
+                None,
+                {"api_key": "test-key"},
+            ),
+        ],
+    )
+    def test_ml_service_test_command(
+        self, runner, mock_api, path, provider, module_name, create_name, setup_name, creds
+    ):
+        fake_mod = MagicMock()
+        ok_result = {
+            "status": "connected",
+            "entity": "terradev",
+            "project": "test",
+            "base_url": "http://localhost",
+            "collector_endpoint": "http://localhost",
+            "projects_found": 1,
+            "url": "http://localhost",
+            "collections": [],
+            "server_url": "http://localhost",
+            "host": "http://localhost",
+            "clusters": 0,
+            "ray_version": "2.0",
+            "dashboard_uri": "http://localhost",
+            "project_names": [],
+            "langsmith": "ready",
+            "environment": "test",
+            "namespace": "default",
+            "workspace_id": "ws-1",
+            "endpoint": "http://localhost:8000",
+            "repo_path": ".",
+            "tracking_uri": "http://mlflow.local:5000",
+            "experiments_count": 0,
+            "projects": [],
+            "error": "",
+        }
+
+        if create_name:
+            fake_create = MagicMock(return_value=MagicMock())
+            fake_create.return_value.test_connection = AsyncMock(
+                return_value=ok_result
+            )
+            setattr(fake_mod, create_name, fake_create)
+
+        if setup_name:
+            setattr(fake_mod, setup_name, MagicMock(return_value="setup instructions"))
+
+        if not create_name and not setup_name:
+            # databricks test imports test_connection directly
+            fake_mod.test_connection = AsyncMock(return_value=ok_result)
+
+        with patch.dict(sys.modules, {module_name: fake_mod}):
+            mock_api._provider_creds.return_value = creds
+            result = runner.invoke(cli, path, obj={"api": mock_api})
+            assert result.exit_code == 0, result.output
+            assert "OK" in result.output or "Connected" in result.output or "\u2705" in result.output
+            mock_api._provider_creds.assert_called_with(provider)
