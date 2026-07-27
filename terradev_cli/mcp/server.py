@@ -5791,6 +5791,13 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                             )
                         if "platform" in device:
                             output_text += f"  - Platform: {device['platform']}\n"
+                else:
+                    output_text += "❌ **No local GPUs detected**\n\n"
+                    output_text += (
+                        "💡 **Tip:** Install PyTorch or nvidia-smi for GPU detection\n"
+                    )
+                    output_text += "   - CUDA: `pip install torch`\n"
+                    output_text += "   - Apple Silicon: PyTorch with MPS support\n"
 
                 output_text += "\n\n💡 **Usage:**\n"
                 output_text += (
@@ -5799,15 +5806,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 output_text += (
                     "• Cloud overflow will be used if local pool is insufficient\n"
                 )
-            else:
-                output_text += "❌ **No local GPUs detected**\n\n"
-                output_text += (
-                    "💡 **Tip:** Install PyTorch or nvidia-smi for GPU detection\n"
-                )
-                output_text += "   - CUDA: `pip install torch`\n"
-                output_text += "   - Apple Silicon: PyTorch with MPS support\n"
 
-            return CallToolResult(content=[TextContent(type="text", text=output_text)])
+                return CallToolResult(content=[TextContent(type="text", text=output_text)])
 
             if tool_name == "quote_gpu":
                 cmd_args.extend(["-g", arguments["gpu_type"]])
@@ -5815,6 +5815,13 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                     cmd_args.extend(["-p", arguments["providers"]])
                 if arguments.get("quick"):
                     cmd_args.append("--quick")
+
+                result = await execute_terradev_command(cmd_args)
+                output = result["stdout"] if result["success"] else result["stderr"]
+                return CallToolResult(
+                    content=[TextContent(type="text", text=output)],
+                    isError=not result["success"],
+                )
 
             if tool_name == "provision_gpu":
                 # Use Terraform for all GPU provisioning (core IP)
@@ -9895,11 +9902,11 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 try:
                     from terradev_cli.core.egress_optimizer import EgressOptimizer
 
-                    optimizer = EgressOptimizer()
+                    egress_optimizer = EgressOptimizer()
                     src = f"{arguments['source_provider']}:{arguments['source_region']}"
                     dst = f"{arguments['dest_provider']}:{arguments['dest_region']}"
                     size_gb = arguments["size_gb"]
-                    route = optimizer.find_cheapest_route(src, dst, size_gb)
+                    route = egress_optimizer.find_cheapest_route(src, dst, size_gb)
                     output_text = "🌐 **Cheapest Egress Route**\n\n"
                     output_text += (
                         f"**From:** {src}\n**To:** {dst}\n**Size:** {size_gb}GB\n\n"
@@ -9925,11 +9932,11 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 try:
                     from terradev_cli.core.egress_optimizer import EgressOptimizer
 
-                    optimizer = EgressOptimizer()
+                    egress_optimizer = EgressOptimizer()
                     source_uri = arguments["source_uri"]
                     targets = arguments["target_regions"]
                     size_gb = arguments["size_gb"]
-                    plan = optimizer.optimize_transfer_plan(
+                    plan = egress_optimizer.optimize_transfer_plan(
                         source_uri, targets, size_gb
                     )
                     output_text = "🌐 **Optimized Staging Plan**\n\n"
@@ -11082,9 +11089,9 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 try:
                     from terradev_cli.core.cost_optimizer import CostOptimizer
 
-                    optimizer = CostOptimizer()
+                    cost_optimizer = CostOptimizer()
                     days = arguments.get("days", 30)
-                    result = await optimizer.analyze(days=days)
+                    result = await cost_optimizer.analyze(days=days)
                     output_text = f"💰 **Cost Analysis — Last {days} Days**\n\n"
                     output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
                     return CallToolResult(
@@ -11106,8 +11113,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 try:
                     from terradev_cli.core.cost_optimizer import CostOptimizer
 
-                    optimizer = CostOptimizer()
-                    result = await optimizer.recommend(
+                    cost_optimizer = CostOptimizer()
+                    result = await cost_optimizer.recommend(
                         target_savings=arguments.get("target_savings"),
                         constraints=arguments.get("constraints"),
                     )
@@ -11132,8 +11139,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 try:
                     from terradev_cli.core.cost_optimizer import CostOptimizer
 
-                    optimizer = CostOptimizer()
-                    result = await optimizer.simulate(
+                    cost_optimizer = CostOptimizer()
+                    result = await cost_optimizer.simulate(
                         scenario=arguments["scenario"],
                         compare_with=arguments.get("compare_with"),
                     )
@@ -11158,8 +11165,8 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 try:
                     from terradev_cli.core.cost_optimizer import CostOptimizer
 
-                    optimizer = CostOptimizer()
-                    result = await optimizer.budget_optimize(
+                    cost_optimizer = CostOptimizer()
+                    result = await cost_optimizer.budget_optimize(
                         budget=arguments["budget"],
                         gpu_type=arguments.get("gpu_type"),
                         gpu_count=arguments.get("gpu_count", 1),

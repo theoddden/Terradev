@@ -42,6 +42,19 @@ jobs:
       run: |
         gh release view ${{ github.ref_name }} >/dev/null 2>&1 || gh release create ${{ github.ref_name }} --generate-notes
 
+    - name: Smoke test published package before registry publish
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        python -m venv smoke_env
+        source smoke_env/bin/activate
+        for i in 1 2 3 4 5; do
+          pip install "terradev-cli==$VERSION" && break
+          echo "PyPI not ready, retrying in 15s..."
+          sleep 15
+        done
+        TERRADEV_SKIP_ONBOARDING=1 terradev mcp list-tools >/dev/null
+        deactivate
+
     - name: Download mcp-publisher
       run: |
         curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher

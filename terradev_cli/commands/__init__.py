@@ -10,11 +10,12 @@ import click
 import os
 import sys
 
+from terradev_cli import __version__
 from terradev_cli.commands._api import TerradevAPI, run_interactive_onboarding
 
 
 @click.group()
-@click.version_option(version="5.1.5", prog_name="Terradev CLI")
+@click.version_option(version=__version__, prog_name="Terradev CLI")
 @click.option("--config", "-c", help="Configuration file path")
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
 @click.option("--skip-onboarding", is_flag=True, help="Skip first-time setup")

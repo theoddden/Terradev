@@ -308,3 +308,29 @@ class TestFunctionalMlops:
         mock_service.artifacts = {}
         result = runner.invoke(cli, ["environments", "list"], obj={"api": mock_api})
         assert result.exit_code == 0
+
+    @patch("terradev_cli.core.auto_lineage.auto_lineage")
+    def test_lineage_show_runs(self, mock_auto, runner, mock_api):
+        from datetime import datetime
+        from terradev_cli.core.auto_lineage import LineageRecord
+        from terradev_cli.core.event_system import Environment
+
+        record = LineageRecord(
+            id="exec-123",
+            pipeline_id="train-pipeline",
+            environment=Environment.PROD,
+            status="completed",
+            duration_seconds=120.0,
+            gpu_hours=10.0,
+            compute_cost=5.0,
+            hyperparameters={"lr": 0.001},
+            datasets=["dataset-1"],
+            output_models=["mymodel"],
+            timestamp=datetime(2026, 7, 1, 12, 0, 0),
+        )
+        mock_auto.get_lineage_for_model.return_value = [record]
+
+        result = runner.invoke(cli, ["lineage", "show", "mymodel"], obj={"api": mock_api})
+        assert result.exit_code == 0
+        assert "mymodel" in result.output
+        assert "train-pipeline" in result.output
