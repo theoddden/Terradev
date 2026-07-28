@@ -5739,6 +5739,7 @@ async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
                 "sso": ["sso"],
                 "cost_optimizer": ["cost-optimizer"],
                 "governance": ["governance"],
+                "local_scan": ["local-scan"],
             }
 
             if tool_name not in command_map:

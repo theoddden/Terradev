@@ -114,12 +114,12 @@ class OptimizationConfigManager:
     def update_config(self, updates: Dict[str, Any]):
         """Update configuration"""
         for key, value in updates.items():
-            if hasattr(self.config, key):
-                setattr(self.config, key, value)
-            elif key == "cuco_config" and isinstance(value, dict):
+            if key == "cuco_config" and isinstance(value, dict):
                 for cuco_key, cuco_value in value.items():
                     if hasattr(self.config.cuco_config, cuco_key):
                         setattr(self.config.cuco_config, cuco_key, cuco_value)
+            elif hasattr(self.config, key):
+                setattr(self.config, key, value)
 
         self.save_config()
 

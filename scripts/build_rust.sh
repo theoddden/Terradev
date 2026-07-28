@@ -23,6 +23,29 @@ fi
 
 echo "=== Terradev Rust build ($MODE mode) ==="
 
+# Detect whether we are running inside a Python virtualenv/conda env.
+# Maturin's `develop` command refuses to install into the system interpreter,
+# so in CI or other system-Python contexts we build wheels and `pip install` them.
+if [[ -n "${VIRTUAL_ENV:-}" ]] || [[ -n "${CONDA_PREFIX:-}" ]]; then
+    USE_VENV=1
+else
+    _in_venv=$(python -c "import sys; print(sys.prefix != sys.base_prefix)" 2>/dev/null || echo "False")
+    if [[ "$_in_venv" == "True" ]]; then
+        USE_VENV=1
+    else
+        USE_VENV=0
+    fi
+fi
+
+if [[ "$USE_VENV" -eq 1 ]]; then
+    echo "Using maturin develop for active virtualenv"
+else
+    WHEEL_DIR=$(mktemp -d)
+    # shellcheck disable=SC2064
+    trap "rm -rf '$WHEEL_DIR'" EXIT
+    echo "No virtualenv detected — maturin will build wheels in $WHEEL_DIR and pip install them"
+fi
+
 # Ensure maturin is available
 if ! command -v maturin &>/dev/null; then
     echo "maturin not found — installing..."
@@ -46,13 +69,34 @@ for crate in "${CRATES[@]}"; do
 
     echo ""
     echo "--- Building $crate ---"
-    if [[ "$MODE" == "debug" ]]; then
-        maturin develop --manifest-path "$crate_dir/Cargo.toml"
+    if [[ "$USE_VENV" -eq 1 ]]; then
+        if [[ "$MODE" == "debug" ]]; then
+            maturin develop --manifest-path "$crate_dir/Cargo.toml"
+        else
+            maturin develop --release --manifest-path "$crate_dir/Cargo.toml"
+        fi
     else
-        maturin develop --release --manifest-path "$crate_dir/Cargo.toml"
+        if [[ "$MODE" == "debug" ]]; then
+            maturin build --manifest-path "$crate_dir/Cargo.toml" --out "$WHEEL_DIR"
+        else
+            maturin build --release --manifest-path "$crate_dir/Cargo.toml" --out "$WHEEL_DIR"
+        fi
     fi
-    echo "    ✓ $crate installed"
+    echo "    ✓ $crate built"
 done
+
+if [[ "$USE_VENV" -eq 0 ]]; then
+    echo ""
+    echo "--- Installing built wheels into system Python ---"
+    shopt -s nullglob
+    wheels=("$WHEEL_DIR"/*.whl)
+    shopt -u nullglob
+    if [[ ${#wheels[@]} -eq 0 ]]; then
+        echo "ERROR: no wheels were produced" >&2
+        exit 1
+    fi
+    pip install --no-deps --force-reinstall "${wheels[@]}"
+fi
 
 echo ""
 echo "=== All Rust extensions built and installed ==="
