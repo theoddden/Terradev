@@ -119,7 +119,7 @@ dependencies = [
     "huggingface-hub>=0.24.0",
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
-    "mcp[cli]>=1.0.0",
+    "mcp[cli]>=1.0.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -127,7 +127,7 @@ aws = ["boto3>=1.34.0"]
 gcp = ["google-cloud-compute>=1.8.0"]
 azure = ["azure-mgmt-compute>=29.0.0", "azure-identity>=1.12.0"]
 lmcache = ["lmcache>=0.1", "redis>=5.0.0"]
-mcp = ["mcp[cli]>=1.0.0"]
+mcp = ["mcp[cli]>=1.0.0,<2.0.0"]
 ml = [
     "torch>=2.0.0",
     "transformers>=4.0.0",
