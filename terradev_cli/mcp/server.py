@@ -5438,12 +5438,21 @@ async def handle_list_tools() -> ListToolsResult:
 
 
 @server.call_tool()
-async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
-    """Handle tool calls with adaptive concurrency control"""
+async def handle_call_tool(name_or_request, arguments=None, **kwargs) -> CallToolResult:
+    """Handle tool calls with adaptive concurrency control.
+
+    Supports both the v1.x MCP low-level decorator signature (name, arguments)
+    and the older / test harness signature that passes a CallToolRequest.
+    """
     global _concurrent_requests, _request_semaphore
 
-    tool_name = request.params.name
-    arguments = request.params.arguments or {}
+    if isinstance(name_or_request, CallToolRequest):
+        request = name_or_request
+        tool_name = request.params.name
+        arguments = request.params.arguments or {}
+    else:
+        tool_name = name_or_request
+        arguments = arguments or {}
 
     # Lazy-create semaphore to avoid Python 3.9 event loop binding bug
     if _request_semaphore is None:
