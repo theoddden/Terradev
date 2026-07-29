@@ -158,6 +158,11 @@ class ObservabilityPipeline:
             logger.error(f"Failed to send to Cost Analytics: {e}")
             return False
     
+    @property
+    def active_destinations(self) -> List[str]:
+        """Return the list of currently enabled destinations."""
+        return [k for k, v in self.destinations.items() if v]
+
     async def get_trace_summary(self) -> Dict[str, Any]:
         """Get summary of trace across all destinations"""
         return {
@@ -165,7 +170,7 @@ class ObservabilityPipeline:
             "start_time": self.start_time.isoformat(),
             "destinations": self.destinations,
             "shared_context": self.shared_context,
-            "active_destinations": [k for k, v in self.destinations.items() if v]
+            "active_destinations": self.active_destinations,
         }
     
     async def cleanup(self) -> bool:
