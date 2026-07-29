@@ -359,7 +359,9 @@ class DAGExecutor:
                     break
         finally:
             if owns_pool:
-                pool.shutdown(wait=False)
+                # Wait for ephemeral pool workers to terminate so callers (and tests)
+                # do not hang on non-daemon threads at interpreter shutdown.
+                pool.shutdown(wait=True)
 
         wall_ms = (time.perf_counter() - wall_start) * 1000
         total_node_ms = sum(result.node_latencies.values())
@@ -414,7 +416,7 @@ class DAGExecutor:
                     results[idx] = err_result
         finally:
             if owns_pool:
-                pool.shutdown(wait=False)
+                pool.shutdown(wait=True)
 
         return results
 
