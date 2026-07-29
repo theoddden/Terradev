@@ -17,7 +17,7 @@ from terradev_cli.core.weight_streaming_manager import (
 )
 
 
-def _config(tmp_path, **overrides):
+def _config(tmp_path=None, **overrides):
     return StreamingConfig(
         model_id="test-model",
         model_path="http://example.com/model",
@@ -118,9 +118,7 @@ def test_generate_checksum_is_stable():
 
 def test_get_next_download_and_compute_chunks():
     """Queue selection returns untaken chunks and skips already active ones."""
-    config = _config(
-        total_layers=4, chunk_size_layers=2, parallel_downloads=1, parallel_computes=1
-    )
+    config = _config()
     manager = WeightStreamingManager(config)
 
     # Manually create two chunks

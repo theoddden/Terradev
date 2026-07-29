@@ -119,8 +119,8 @@ class AdapterRegistry:
     - SQLite persistence
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
-        self.db_path = db_path or Path.home() / ".terradev" / "lora_registry.db"
+    def __init__(self, db_path=None):
+        self.db_path = Path(db_path) if db_path else Path.home() / ".terradev" / "lora_registry.db"
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
         logger.info(f"AdapterRegistry initialized with db at {self.db_path}")
@@ -188,9 +188,11 @@ class AdapterRegistry:
         training_data_hash: Optional[str] = None,
         performance_metrics: Optional[Dict[str, float]] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        version_id: Optional[str] = None,
+        status: Optional[AdapterStatus] = None,
     ) -> AdapterVersion:
         """Register a new adapter version"""
-        version_id = str(uuid.uuid4())
+        version_id = version_id or str(uuid.uuid4())
         version = AdapterVersion(
             version_id=version_id,
             adapter_name=adapter_name,

@@ -253,7 +253,7 @@ class WeightStreamingManager:
         while self.state == StreamingState.STREAMING:
             try:
                 # Get next chunk to download
-                chunk = await self._get_next_download_chunk()
+                chunk = self._get_next_download_chunk()
                 if not chunk:
                     await asyncio.sleep(0.1)
                     continue
@@ -288,7 +288,7 @@ class WeightStreamingManager:
         while self.state == StreamingState.STREAMING:
             try:
                 # Get next chunk to compute
-                chunk = await self._get_next_compute_chunk()
+                chunk = self._get_next_compute_chunk()
                 if not chunk:
                     await asyncio.sleep(0.1)
                     continue
@@ -335,6 +335,8 @@ class WeightStreamingManager:
                 # Check if all chunks are processed
                 if all(chunk.downloaded and chunk.loaded for chunk in self.chunks):
                     self.logger.info("All chunks processed")
+                    self.state = StreamingState.COMPLETED
+                    self.metrics.complete_time = datetime.now()
                     break
 
                 await asyncio.sleep(1.0)

@@ -32,7 +32,7 @@ def test_estimate_vram_for_deepseek_v3(estimator):
 
     assert isinstance(result, VRAMBreakdown)
     assert result.architecture.attention_type == AttentionType.MULTI_HEAD_LATENT
-    assert result.architecture.is_mla_model("deepseek-v3")
+    assert estimator.is_mla_model("deepseek-v3")
     assert result.kv_cache_gb < result.model_weights_gb
     assert result.gpu_count >= 1
 
@@ -48,7 +48,7 @@ def test_estimate_vram_for_llama70b_standard_mha(estimator):
     )
 
     assert result.architecture.attention_type == AttentionType.STANDARD_MHA
-    assert not result.architecture.is_mla_model("llama-3-70b")
+    assert not estimator.is_mla_model("llama-3-70b")
 
 
 def test_mla_compression_saves_vram(estimator):
@@ -93,25 +93,25 @@ def test_auto_select_quantization_respects_accuracy_budget(estimator):
     high = estimator.auto_select_quantization(
         "deepseek-v3", "H200", accuracy_budget="high"
     )
-    assert high["selected"] == "bf16"
+    assert high["selected_quantization"] == "bf16"
 
     medium = estimator.auto_select_quantization(
         "deepseek-v3", "H200", accuracy_budget="medium"
     )
-    assert medium["selected"] == "fp8"
+    assert medium["selected_quantization"] == "fp8"
 
     low = estimator.auto_select_quantization(
         "deepseek-v3", "H200", accuracy_budget="low"
     )
-    assert low["selected"] in ("nvfp4", "mx-fp4")
+    assert low["selected_quantization"] in ("nvfp4", "mx-fp4")
 
 
 def test_auto_select_quantization_fallback_on_unsupported_gpu(estimator):
     """A GPU with no special support falls back to bf16."""
     result = estimator.auto_select_quantization(
-        "deepseek-v3", "V100", accuracy_budget="low"
+        "deepseek-v3", "Unknown-GPU", accuracy_budget="low"
     )
-    assert result["selected"] == "bf16"
+    assert result["selected_quantization"] == "bf16"
 
 
 def test_unknown_model_raises_value_error(estimator):
@@ -139,7 +139,7 @@ def test_register_and_estimate_custom_model(estimator):
 
     result = estimator.estimate_vram("custom-mla", context_tokens=4096)
     assert result.architecture.model_id == "custom-mla"
-    assert result.architecture.is_mla_model("custom-mla")
+    assert estimator.is_mla_model("custom-mla")
 
 
 def test_get_supported_models(estimator):
@@ -153,7 +153,8 @@ def test_get_supported_models(estimator):
 def test_compare_standard_vs_mla_shows_savings(estimator):
     """The comparison helper quantifies MLA savings for a client."""
     result = estimator.compare_standard_vs_mla("deepseek-v3", 32768)
-    assert "standard_kv_cache_gb" in result
-    assert "mla_kv_cache_gb" in result
-    assert result["mla_kv_cache_gb"] < result["standard_kv_cache_gb"]
-    assert result["savings_factor"] > 1
+    assert "standard_mha_estimate" in result
+    assert "mla_estimate" in result
+    assert result["mla_estimate"]["kv_cache_gb"] < result["standard_mha_estimate"]["kv_cache_gb"]
+    assert "kv_cache_compression_ratio" in result["savings"]
+    assert result["savings"]["kv_cache_compression_ratio"] > 1

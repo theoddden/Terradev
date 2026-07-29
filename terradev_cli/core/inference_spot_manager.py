@@ -29,7 +29,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
-from .checkpoint_manager import CheckpointManager, CheckpointConfig
+from .checkpoint_manager import CheckpointManager
 from .kv_cache_checkpoint_manager import (
     KVCacheCheckpointManager,
     KVCacheCheckpoint,
@@ -109,11 +109,7 @@ class InferenceSpotManager:
         )
 
         self.model_manager = CheckpointManager(
-            CheckpointConfig(
-                checkpoint_dir=str(self.checkpoint_dir / "model"),
-                storage_backend=config.storage_backend,
-                storage_config=config.storage_config,
-            )
+            base_dir=str(self.checkpoint_dir / "model"),
         )
 
         self.active_state: Optional[InferenceSpotState] = None

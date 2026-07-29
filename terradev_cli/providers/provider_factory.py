@@ -7,7 +7,7 @@ missing optional dependency (e.g. boto3) does not crash the whole CLI.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,7 @@ class ProviderFactory:
 
     def __init__(self):
         self._provider_classes: Dict[str, Any] = {}
+        self._provider_instances: Dict[str, Any] = {}
         self._loaders = dict(_PROVIDER_LOADERS)
 
     def _resolve(self, provider_name: str):
@@ -86,12 +87,19 @@ class ProviderFactory:
         provider_class = self._resolve(provider_name)
         return provider_class(credentials)
 
-    def get_provider(self, provider_name: str, credentials: Dict[str, str] | None = None):
-        """Get or create a provider instance."""
+    def get_provider(self, provider_name: str, credentials: Optional[Dict[str, str]] = None):
+        """Get or create a provider instance, cached for reuse."""
+        if provider_name in self._provider_instances:
+            return self._provider_instances[provider_name]
+
         credentials = credentials or {}
-        if provider_name in self._provider_classes:
-            return self._provider_classes[provider_name]
-        return self.create_provider(provider_name, credentials)
+        provider_class = self._provider_classes.get(provider_name)
+        if not provider_class:
+            provider_class = self._resolve(provider_name)
+
+        instance = provider_class(credentials)
+        self._provider_instances[provider_name] = instance
+        return instance
 
     def get_supported_providers(self) -> list:
         """Get list of supported providers"""
@@ -103,6 +111,7 @@ class ProviderFactory:
             raise ValueError("Provider class must inherit from BaseProvider")
 
         self._provider_classes[provider_name] = provider_class
+        self._provider_instances.pop(provider_name, None)
 
     def create_all_providers(
         self, credentials: Dict[str, Dict[str, str]]

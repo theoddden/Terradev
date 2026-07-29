@@ -55,8 +55,8 @@ class WorkloadState:
 class MigrationOrchestrator:
     """Lightweight migration orchestration with dry-run support"""
 
-    def __init__(self):
-        self.job_manager = JobStateManager()
+    def __init__(self, job_manager=None):
+        self.job_manager = job_manager or JobStateManager()
 
         # GPU compatibility matrix (performance deltas)
         self.gpu_compatibility = {
@@ -81,8 +81,8 @@ class MigrationOrchestrator:
 
             for job in jobs:
                 # Parse job config to extract workload state
-                config = json.loads(job.config_json) if job.config_json else {}
-                topology = json.loads(job.topology_json) if job.topology_json else {}
+                config = job.config or {}
+                topology = job.topology or {}
 
                 workload = WorkloadState(
                     job_id=job.id,

@@ -122,6 +122,10 @@ async def test_verify_consistency_detects_missing_and_mismatched(manager, regist
     registry.mark_version_active("test", v1.version_id)
 
     # r1 has v1, r2 has v2, r3 missing entirely
+    manager.replicas["r3"] = ReplicaInfo(
+        replica_id="r3", host="10.0.0.3", port=8000,
+        last_heartbeat=datetime.now(),
+    )
     registry.record_replica_load("r1", "test", v1.version_id)
     registry.record_replica_load("r2", "test", v2.version_id)
 

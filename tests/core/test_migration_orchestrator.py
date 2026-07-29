@@ -23,7 +23,7 @@ def manager(tmp_path):
 
 @pytest.fixture
 def orchestrator(manager):
-    return MigrationOrchestrator()
+    return MigrationOrchestrator(job_manager=manager)
 
 
 def test_discover_workloads_finds_running_jobs(manager, orchestrator):
@@ -76,7 +76,7 @@ def test_plan_migration_success(manager, orchestrator):
     assert plan.target["provider"] == "coreweave"
     assert plan.target["gpu_type"] == "A100"
     assert "data_transfer" in plan.costs
-    assert "steps" in plan
+    assert plan.steps
     assert plan.confidence_score > 0
 
 
