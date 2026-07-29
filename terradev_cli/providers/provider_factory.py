@@ -86,6 +86,13 @@ class ProviderFactory:
         provider_class = self._resolve(provider_name)
         return provider_class(credentials)
 
+    def get_provider(self, provider_name: str, credentials: Dict[str, str] | None = None):
+        """Get or create a provider instance."""
+        credentials = credentials or {}
+        if provider_name in self._provider_classes:
+            return self._provider_classes[provider_name]
+        return self.create_provider(provider_name, credentials)
+
     def get_supported_providers(self) -> list:
         """Get list of supported providers"""
         return list(self._loaders.keys())

@@ -12,8 +12,13 @@ from datetime import datetime
 class DemoModeProvider:
     """Demo mode provider with clearly marked static data for demonstration purposes only"""
 
-    def __init__(self, provider_name: str):
-        self.name = provider_name
+    def __init__(self, credentials_or_name=None):
+        # Accept both the ProviderFactory (dict of credentials) form and the
+        # legacy DemoModeManager (string provider name) form.
+        if isinstance(credentials_or_name, dict):
+            self.name = credentials_or_name.get("provider", "demo")
+        else:
+            self.name = credentials_or_name or "demo"
         self.demo_data = self._get_demo_pricing()
 
     def _get_demo_pricing(self) -> Dict[str, Dict[str, Any]]:
