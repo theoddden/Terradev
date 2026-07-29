@@ -228,8 +228,9 @@ class RateLimiter:
             if not await self.acquire(provider):
                 raise aiohttp.ClientError(f"Rate limit exceeded for {provider}")
             try:
-                async with asyncio.timeout(limit.timeout):
-                    result = await func(*args, **kwargs)
+                result = await asyncio.wait_for(
+                    func(*args, **kwargs), timeout=limit.timeout
+                )
                 metrics.successful_requests += 1
                 response_time = time.time() - start_time
                 metrics.average_response_time = (
