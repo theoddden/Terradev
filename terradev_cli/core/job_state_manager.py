@@ -418,11 +418,15 @@ class JobStateManager:
         return self._row_to_checkpoint(row) if row else None
 
     def delete_old_checkpoints(self, job_id: str, keep: int = 3) -> int:
-        """Retain only the latest `keep` committed checkpoints. Returns count deleted."""
+        """Retain only the latest `keep` committed/promoted checkpoints. Returns count deleted."""
         rows = self._conn.execute(
-            "SELECT id FROM checkpoints WHERE job_id = ? AND status = ? "
+            "SELECT id FROM checkpoints WHERE job_id = ? AND status IN (?, ?) "
             "ORDER BY step DESC",
-            (job_id, CheckpointStatus.COMMITTED.value),
+            (
+                job_id,
+                CheckpointStatus.COMMITTED.value,
+                CheckpointStatus.PROMOTED.value,
+            ),
         ).fetchall()
         to_delete = [r[0] for r in rows[keep:]]
         if to_delete:
