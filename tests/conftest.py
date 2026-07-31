@@ -30,6 +30,25 @@ from click.testing import CliRunner
 # ── Path setup ────────────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# ── MCP fallback stub for Python 3.9 where the real SDK cannot be installed ──
+import importlib.util
+
+_mcp_spec = importlib.util.find_spec("mcp")
+_mcp_ok = False
+if _mcp_spec is not None and _mcp_spec.origin not in (None, ""):
+    try:
+        import mcp as _mcp_test  # noqa: F401
+
+        _mcp_ok = True
+    except Exception:
+        # Remove any partially initialised mcp modules so the stub can load.
+        for _name in list(sys.modules):
+            if _name == "mcp" or _name.startswith("mcp."):
+                del sys.modules[_name]
+
+if not _mcp_ok:
+    sys.path.insert(0, str(Path(__file__).resolve().parent / "_mcp_stub"))
+
 # ── Global env: skip interactive onboarding for every test ───────────────────
 os.environ["TERRADEV_SKIP_ONBOARDING"] = "1"
 

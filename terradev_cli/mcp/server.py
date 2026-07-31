@@ -13153,5 +13153,20 @@ def install_config(client: str):
     print(f"Installed Terradev MCP config for {client} at {path}")
 
 
+# ── Exposed command map used by tests and external callers ───────────────────
+COMMAND_MAP: Dict[str, Any] = {}
+
+try:
+    _build_all_tools()
+    if _ALL_TOOLS:
+        COMMAND_MAP = {tool.name: None for tool in _ALL_TOOLS}
+    if NEW_COMMAND_MAP:
+        COMMAND_MAP.update(NEW_COMMAND_MAP)
+except Exception:  # noqa: BLE001
+    # Tool build may fail during partial imports; callers should still be able
+    # to import COMMAND_MAP without raising.
+    pass
+
+
 if __name__ == "__main__":
     main()
