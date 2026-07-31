@@ -24,5 +24,20 @@ jobs:
       - name: Authenticate with MCP Registry via OIDC
         run: mcp-publisher login github-oidc
 
+      - name: Sync server.json version with package version
+        run: |
+          python - <<'PY'
+          import json, tomllib
+          with open("pyproject.toml", "rb") as f:
+              version = tomllib.load(f)["project"]["version"]
+          with open("server.json") as f:
+              server = json.load(f)
+          server["version"] = version
+          server["packages"][0]["version"] = version
+          with open("server.json", "w") as f:
+              json.dump(server, f, indent=2)
+              f.write("\n")
+          PY
+
       - name: Publish server.json to MCP Registry
         run: mcp-publisher publish
