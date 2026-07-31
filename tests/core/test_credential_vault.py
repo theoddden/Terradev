@@ -50,7 +50,8 @@ def test_overwrite_existing(vault):
     assert vault.retrieve("token") == b"new"
 
 
-def test_get_metadata_without_rust(vault):
+def test_get_metadata_without_rust():
     """Python fallback returns None for metadata."""
+    vault = CredentialVault(use_rust=False)
     vault.store("x", b"v", provider="p")
     assert vault.get_metadata("x") is None
