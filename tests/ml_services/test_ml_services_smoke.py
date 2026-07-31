@@ -164,10 +164,11 @@ def test_module_smoke(module_name):
                 warnings.warn(f"{module_name}.{service_cls.__name__}.{mname} failed: {exc}")
 
         # 5. test_connection with a mocked _request
+        old_request = getattr(service, "_request", None)
+        if hasattr(service, "_request"):
+            service._request = AsyncMock(return_value={})
         if hasattr(service, "test_connection"):
-            old_request = getattr(service, "_request", None)
             try:
-                service._request = AsyncMock(return_value={})
                 coro = service.test_connection()
                 if inspect.isawaitable(coro):
                     import asyncio
@@ -175,6 +176,24 @@ def test_module_smoke(module_name):
                     asyncio.run(coro)
             except Exception as exc:  # noqa: BLE001
                 warnings.warn(f"{module_name}.test_connection failed: {exc}")
-            finally:
-                if old_request is not None:
-                    service._request = old_request
+
+        # 6. exercise all other public service methods with a mocked _request
+        for mname, mobj in inspect.getmembers(service, inspect.ismethod):
+            if mname.startswith("_") or mname == "test_connection":
+                continue
+            sig = inspect.signature(mobj)
+            try:
+                args = _build_args(sig, config=config, service=service, credentials=generic_creds)
+            except TypeError:
+                continue
+            try:
+                result = mobj(**args)
+                if inspect.isawaitable(result):
+                    import asyncio
+
+                    asyncio.run(result)
+            except Exception as exc:  # noqa: BLE001
+                warnings.warn(f"{module_name}.{service_cls.__name__}.{mname} failed: {exc}")
+
+        if old_request is not None:
+            service._request = old_request
