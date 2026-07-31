@@ -16,6 +16,36 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch
 
 
+class _FakeResponse:
+    """Aiohttp-like response mock for provider conformance tests."""
+
+    def __init__(self):
+        self.status = 200
+        self.json = AsyncMock(return_value={})
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+
+class _FakeClientSession(AsyncMock):
+    """Aiohttp ClientSession replacement that never opens a real socket."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self._response = _FakeResponse()
+        self.post = self.get = self.put = self.delete = self.request = lambda *a, **k: self._response
+        self.close = AsyncMock()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+
 class _AsyncCtx:
     """Both an async context manager and an awaitable, like aiohttp request()."""
 
@@ -104,6 +134,12 @@ class ProviderConformanceTest:
             "secret_key": "test_secret_key_67890",
         }
 
+    @pytest.fixture(autouse=True)
+    def _patch_aiohttp(self, monkeypatch):
+        """Replace aiohttp network classes with in-memory mocks."""
+        monkeypatch.setattr("aiohttp.ClientSession", _FakeClientSession)
+        monkeypatch.setattr("aiohttp.TCPConnector", AsyncMock)
+
     @pytest.mark.asyncio
     async def test_auth_headers_not_none(self, provider):
         """Test that _get_auth_headers() returns bytes/str, not None"""
@@ -126,38 +162,39 @@ class ProviderConformanceTest:
 
     @pytest.mark.asyncio
     async def test_quotes_returns_iterable(self, provider):
-        """Test that get_instance_quotes() returns non-empty iterable of Quote-like objects"""
+        """Test that get_instance_quotes() returns an iterable of Quote-like objects"""
         # Provider is already instantiated with credentials via fixture
-
-        # This test will likely fail for providers that need real API calls
-        # In a real implementation, we'd use vcrpy/responses fixtures here
+        # Aiohttp is patched via the autouse fixture, but providers that need
+        # extra credentials or real APIs may still skip.
         try:
             quotes = await provider.get_instance_quotes(gpu_type="A100")
-
-            # Assert quotes is iterable
-            assert hasattr(
-                quotes, "__iter__"
-            ), "get_instance_quotes() did not return iterable"
-
-            # Convert to list to check non-empty
-            quotes_list = list(quotes)
-
-            # If we got quotes, verify structure
-            if quotes_list:
-                quote = quotes_list[0]
-                # Verify quote has expected attributes (price, gpu_type, region, etc.)
-                assert (
-                    hasattr(quote, "price") or "price" in quote
-                ), "Quote missing 'price' attribute/key"
-                assert (
-                    hasattr(quote, "gpu_type") or "gpu_type" in quote
-                ), "Quote missing 'gpu_type' attribute/key"
-                assert (
-                    hasattr(quote, "region") or "region" in quote
-                ), "Quote missing 'region' attribute/key"
         except Exception as e:
-            # If provider needs real API, skip with informative message
             pytest.skip(f"Provider requires real API call or mock fixtures: {e}")
+
+        # Assert quotes is iterable
+        assert hasattr(
+            quotes, "__iter__"
+        ), "get_instance_quotes() did not return iterable"
+
+        # Convert to list to check non-empty
+        quotes_list = list(quotes)
+
+        # If we got quotes, verify structure
+        if quotes_list:
+            quote = quotes_list[0]
+            # Accept different price field naming used across providers
+            price_fields = ("price", "price_per_hour", "price_per_request", "price_cents_per_hour")
+            has_price = any(
+                getattr(quote, field, None) is not None or field in quote
+                for field in price_fields
+            )
+            assert has_price, f"Quote missing any price field; got {list(quote.keys()) if isinstance(quote, dict) else dir(quote)}"
+            assert (
+                hasattr(quote, "gpu_type") or "gpu_type" in quote
+            ), "Quote missing 'gpu_type' attribute/key"
+            assert (
+                hasattr(quote, "region") or "region" in quote
+            ), "Quote missing 'region' attribute/key"
 
     @pytest.mark.asyncio
     async def test_429_triggers_backoff(self, provider):
@@ -188,7 +225,7 @@ class ProviderConformanceTest:
                 ), f"Provider did not handle 429 gracefully: {e}"
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Requires provider-specific mocking setup")
+    @pytest.mark.xfail(reason="Requires provider-specific mocking setup", strict=False)
     async def test_401_raises_auth_error(self, provider):
         """Test that 401 response raises AuthError"""
         # Provider is already instantiated with credentials via fixture

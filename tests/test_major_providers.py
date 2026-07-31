@@ -226,7 +226,10 @@ class TestProviderErrorHandling:
             (AzureProvider, {}),
         ],
     )
-    @pytest.mark.skip(reason="Requires actual cloud client setup - coverage focus")
+    @pytest.mark.xfail(
+        reason="Ambient AWS credentials may be present; needs a fully mocked cloud client",
+        strict=False,
+    )
     def test_no_api_key_raises_on_provision(self, provider_class, credentials):
         """Providers should raise error on provision without API key"""
         provider = provider_class(credentials)

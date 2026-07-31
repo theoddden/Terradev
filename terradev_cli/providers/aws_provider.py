@@ -232,6 +232,8 @@ class AWSProvider(BaseProvider):
         self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         """Provision EC2 instance"""
+        if not self._credentials_available():
+            raise RuntimeError("AWS credentials not configured")
         if not self.ec2_client:
             raise RuntimeError("AWS client not initialized")
 
@@ -597,10 +599,14 @@ class AWSProvider(BaseProvider):
         }
         return gpu_map.get(instance_type, 1)
 
-    async def _run_in_executor(self, func, *args):
+    async def _run_in_executor(self, func, *args, **kwargs):
         """Run blocking function in executor"""
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, func, *args)
+
+        def _call():
+            return func(*args, **kwargs)
+
+        return await loop.run_in_executor(None, _call)
 
     def _detect_p5_nccl_degradation(
         self, instance_type: str

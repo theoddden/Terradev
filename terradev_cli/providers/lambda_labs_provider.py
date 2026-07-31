@@ -88,7 +88,7 @@ class LambdaLabsProvider(BaseProvider):
                             "egress_cost": 0.0,  # Lambda has no egress costs
                             "egress_advantage": True,
                             "lambda_stack_preinstalled": True,
-                            "container_conflict_risk": self._check_container_conflicts(
+                            "container_conflict_risk": await self._check_container_conflicts(
                                 gpu_type
                             ),
                         }
@@ -129,9 +129,7 @@ class LambdaLabsProvider(BaseProvider):
                 "egress_cost": 0.0,
                 "egress_advantage": True,
                 "lambda_stack_preinstalled": True,
-                "container_conflict_risk": self._check_container_conflicts(
-                    gpu_type
-                ),
+                "container_conflict_risk": await self._check_container_conflicts(gpu_type),
                 "fallback_routing": {
                     "available": True,
                     "providers": self.fallback_providers,

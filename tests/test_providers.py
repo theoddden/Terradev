@@ -147,11 +147,11 @@ class TestRunPodProvider:
         result = await provider.list_instances()
         assert result == []
 
-    @pytest.mark.skip(reason="RunPod uses query parameter authentication (?api_key=) not header authentication")
     def test_auth_headers_with_key(self):
         provider = RunPodProvider(credentials={"api_key": "test-key-123"})
         headers = provider._get_auth_headers()
-        assert headers == {"Authorization": "Bearer test-key-123"}
+        # RunPod injects api_key as a query parameter, not a header
+        assert headers == {}
 
     def test_auth_headers_without_key(self):
         provider = RunPodProvider(credentials={})

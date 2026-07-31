@@ -29,6 +29,7 @@ import pytest
 import sys
 import os
 import asyncio
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -125,14 +126,28 @@ class TestKubernetesEnhancedCriticalFixes:
 class TestKubernetesServiceCPUParsingFix:
     """Test CPU parsing fix for millicores"""
 
-    @pytest.mark.skip(reason="CPU parsing implementation differs from test expectation")
     def test_cpu_parsing_with_millicores(self):
         """CPU parsing should handle millicores correctly"""
-        # This test verifies the fix for the CPU parsing bug where
-        # the code strips 'm' then checks .endswith('m') (always False)
-        # The fix checks 'm' in parts[1] before stripping
-        # Skipping because the actual implementation may differ
-        pass
+        service = KubernetesService(KubernetesConfig())
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[:2] == ["kubectl", "top"]:
+                return Mock(
+                    returncode=0,
+                    stdout="node1 100m 2000Mi\nnode2 2 4000Mi\n",
+                    stderr="",
+                )
+            # GPU query
+            return Mock(returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=fake_run) as _:
+            result = run_async(service.get_cluster_resources())
+
+        assert result["total_cpu"] == pytest.approx(2.1)
+        assert result["total_memory"] == pytest.approx(6000 / 1024)
+        nodes = {n["name"]: n for n in result["nodes"]}
+        assert nodes["node1"]["cpu_cores"] == pytest.approx(0.1)
+        assert nodes["node2"]["cpu_cores"] == 2
 
 
 class TestKubernetesAPIVersions:

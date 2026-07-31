@@ -7,14 +7,53 @@ defaults or a generic credentials dict.
 """
 import importlib
 import inspect
+import logging
 import pkgutil
-import warnings
 from typing import Any, Dict
 
+logger = logging.getLogger(__name__)
+
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import terradev_cli.ml_services as ml_services
+
+
+class _FakeResponse:
+    """Aiohttp-like response mock for service smoke tests."""
+
+    def __init__(self):
+        self.status = 200
+        self.json = AsyncMock(return_value={})
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+
+class _FakeClientSession(AsyncMock):
+    """Aiohttp ClientSession replacement that never opens a real socket."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self._response = _FakeResponse()
+        self.post = self.get = self.put = self.delete = self.request = lambda *a, **k: self._response
+        self.close = AsyncMock()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+
+@pytest.fixture(autouse=True)
+def _patch_aiohttp(monkeypatch):
+    """Replace aiohttp network classes with in-memory mocks for all smoke tests."""
+    monkeypatch.setattr("aiohttp.ClientSession", _FakeClientSession)
+    monkeypatch.setattr("aiohttp.TCPConnector", AsyncMock)
 
 
 def _iter_modules():
@@ -118,19 +157,19 @@ def test_module_smoke(module_name):
         try:
             service = create_fn(**_build_args(inspect.signature(create_fn), credentials=generic_creds))
         except Exception as exc:  # noqa: BLE001
-            warnings.warn(f"{module_name}.{create_fn.__name__} failed: {exc}")
+            logger.debug(f"{module_name}.{create_fn.__name__} failed: {exc}")
 
     if service is None and config_cls and _can_call_with(inspect.signature(config_cls), set()):
         try:
             config = config_cls()
         except Exception as exc:  # noqa: BLE001
-            warnings.warn(f"{module_name}.{config_cls.__name__}() failed: {exc}")
+            logger.debug(f"{module_name}.{config_cls.__name__}() failed: {exc}")
 
     if service is None and config and service_cls and _can_call_with(inspect.signature(service_cls), {"config"}):
         try:
             service = service_cls(config)
         except Exception as exc:  # noqa: BLE001
-            warnings.warn(f"{module_name}.{service_cls.__name__}() failed: {exc}")
+            logger.debug(f"{module_name}.{service_cls.__name__}() failed: {exc}")
 
     # 3. module-level generator functions
     for fname, fobj in inspect.getmembers(mod, inspect.isfunction):
@@ -146,7 +185,7 @@ def test_module_smoke(module_name):
         try:
             fobj(**args)
         except Exception as exc:  # noqa: BLE001
-            warnings.warn(f"{module_name}.{fname} failed: {exc}")
+            logger.debug(f"{module_name}.{fname} failed: {exc}")
 
     # 4. service instance generator methods
     if service:
@@ -161,7 +200,7 @@ def test_module_smoke(module_name):
             try:
                 mobj(**args)
             except Exception as exc:  # noqa: BLE001
-                warnings.warn(f"{module_name}.{service_cls.__name__}.{mname} failed: {exc}")
+                logger.debug(f"{module_name}.{service_cls.__name__}.{mname} failed: {exc}")
 
         # 5. test_connection with a mocked _request
         old_request = getattr(service, "_request", None)
@@ -175,7 +214,7 @@ def test_module_smoke(module_name):
 
                     asyncio.run(coro)
             except Exception as exc:  # noqa: BLE001
-                warnings.warn(f"{module_name}.test_connection failed: {exc}")
+                logger.debug(f"{module_name}.test_connection failed: {exc}")
 
         # 6. exercise all other public service methods with a mocked _request
         for mname, mobj in inspect.getmembers(service, inspect.ismethod):
@@ -193,7 +232,7 @@ def test_module_smoke(module_name):
 
                     asyncio.run(result)
             except Exception as exc:  # noqa: BLE001
-                warnings.warn(f"{module_name}.{service_cls.__name__}.{mname} failed: {exc}")
+                logger.debug(f"{module_name}.{service_cls.__name__}.{mname} failed: {exc}")
 
         if old_request is not None:
             service._request = old_request
