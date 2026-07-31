@@ -9,6 +9,8 @@ execution fallthrough, branch-specific execution, and direct dispatch patterns.
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
+pytest.importorskip("mcp")
 from mcp.types import CallToolRequest
 
 

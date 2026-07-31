@@ -8,7 +8,7 @@ import json
 import uuid
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import logging
 
@@ -168,7 +168,7 @@ class UserManager:
             tenant_id=tenant_id,
             name=name,
             domain=domain,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
             settings=settings or {},
             max_users=100,
             active=True,
@@ -211,7 +211,7 @@ class UserManager:
             tenant_id=user_data["tenant_id"],
             provider=AuthProvider(user_data.get("provider", "local")),
             provider_user_id=user_data.get("provider_user_id", user_data["email"]),
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
             permissions=user_data.get("permissions", []),
             metadata=user_data.get("metadata", {}),
         )
@@ -302,8 +302,8 @@ class UserManager:
             email=email,
             role=role,
             invited_by=invited_by,
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(days=expires_days),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=expires_days),
         )
 
         self.invites[invite_id] = invite
@@ -322,7 +322,7 @@ class UserManager:
             if (
                 invite.email.lower() == email.lower()
                 and not invite.accepted
-                and datetime.utcnow() < invite.expires_at
+                and datetime.now(timezone.utc).replace(tzinfo=None) < invite.expires_at
             ):
                 return invite
         return None
@@ -336,13 +336,13 @@ class UserManager:
         if invite.accepted:
             return False
 
-        if datetime.utcnow() > invite.expires_at:
+        if datetime.now(timezone.utc).replace(tzinfo=None) > invite.expires_at:
             return False
 
         # Update invite
         invite.accepted = True
         invite.accepted_by = user_id
-        invite.accepted_at = datetime.utcnow()
+        invite.accepted_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # Update user's tenant and role
         user = self.users.get(user_id)
@@ -358,7 +358,7 @@ class UserManager:
     def cleanup_expired_invites(self) -> int:
         """Clean up expired invitations"""
         expired_count = 0
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         expired_invites = [
             invite_id
@@ -394,7 +394,7 @@ class UserManager:
             "active_this_month": 0,
         }
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         week_ago = now - timedelta(days=7)
         month_ago = now - timedelta(days=30)

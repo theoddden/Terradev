@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+pytest.importorskip("mcp")
+
 
 class TestExecuteTerradevCommandChaos:
     """Exercise execute_terradev_command failure modes."""

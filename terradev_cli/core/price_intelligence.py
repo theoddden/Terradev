@@ -26,7 +26,7 @@ The module exposes:
 import logging
 import sqlite3
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
@@ -264,7 +264,7 @@ def get_price_series(
     Default window: 168 hours (7 days).
     """
     conn = _conn()
-    cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+    cutoff = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)).isoformat()
     sql = "SELECT ts, price_hr, provider, region, spot, workload_type FROM price_ticks WHERE gpu_type = ? AND ts >= ?"
     params: list = [gpu_type.upper(), cutoff]
 
@@ -293,7 +293,7 @@ def _get_prices_array(
     hours: int,
 ) -> List[float]:
     """Internal: get raw price array for a series within a time window."""
-    cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+    cutoff = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)).isoformat()
     rows = conn.execute(
         "SELECT price_hr FROM price_ticks "
         "WHERE gpu_type = ? AND provider = ? AND spot = ? AND workload_type = ? AND ts >= ? "
@@ -702,7 +702,7 @@ def compute_percentiles(
     Default window: 720 hours (30 days).
     """
     conn = _conn()
-    cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+    cutoff = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)).isoformat()
 
     sql = "SELECT provider, price_hr FROM price_ticks " "WHERE gpu_type = ? AND ts >= ?"
     params: list = [gpu_type.upper(), cutoff]
@@ -808,7 +808,7 @@ def get_availability(
     avg_response_ms, total_checks, last_seen, last_error.
     """
     conn = _conn()
-    cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+    cutoff = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)).isoformat()
 
     rows = conn.execute(
         "SELECT provider, region, available, response_time_ms, error_message, ts "
@@ -923,7 +923,7 @@ def get_provider_reliability(
         error_breakdown {error_msg: count}.
     """
     conn = _conn()
-    cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+    cutoff = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)).isoformat()
 
     sql = (
         "SELECT provider, event_type, success, latency_ms, error "

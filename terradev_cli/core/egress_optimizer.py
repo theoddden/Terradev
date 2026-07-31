@@ -18,7 +18,7 @@ import heapq
 import json
 import logging
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 
@@ -326,7 +326,7 @@ def refresh_egress_cache(force: bool = False) -> Dict[str, int]:
         if row and row["oldest"]:
             try:
                 oldest = datetime.fromisoformat(row["oldest"])
-                if (datetime.utcnow() - oldest).total_seconds() < CACHE_TTL_S:
+                if (datetime.now(timezone.utc).replace(tzinfo=None) - oldest).total_seconds() < CACHE_TTL_S:
                     stats["cached"] = conn.execute(
                         "SELECT COUNT(*) AS n FROM egress_rate_cache"
                     ).fetchone()["n"]

@@ -191,29 +191,22 @@ def test_cli_integration():
     """Test CLI integration"""
     print("🧪 Testing CLI integration...")
 
-    try:
-        from terradev_cli.cli import cli
+    from terradev_cli.cli import cli
 
-        # Check if vllm group exists under ml group
-        vllm_group = None
-        ml_group = cli.commands.get("ml")
-        if ml_group and hasattr(ml_group, "commands"):
-            vllm_group = ml_group.commands.get("vllm")
+    # Check if vllm group exists under ml group
+    vllm_group = None
+    ml_group = cli.commands.get("ml")
+    if ml_group and hasattr(ml_group, "commands"):
+        vllm_group = ml_group.commands.get("vllm")
 
-        assert vllm_group is not None, "vLLM CLI group not found under ml group"
+    assert vllm_group is not None, "vLLM CLI group not found under ml group"
 
-        # Check if auto-optimize command exists
-        assert "auto-optimize" in vllm_group.commands, "auto-optimize command not found"
-        assert "analyze" in vllm_group.commands, "analyze command not found"
-        assert "optimize" in vllm_group.commands, "optimize command not found"
+    # Check if auto-optimize command exists
+    assert "auto-optimize" in vllm_group.commands, "auto-optimize command not found"
+    assert "analyze" in vllm_group.commands, "analyze command not found"
+    assert "optimize" in vllm_group.commands, "optimize command not found"
 
-        print("✅ vLLM CLI group imported successfully")
-
-    except ImportError as e:
-        print(f"❌ CLI import failed: {e}")
-        return False
-
-    return True
+    print("✅ vLLM CLI group imported successfully")
 
 
 def main():

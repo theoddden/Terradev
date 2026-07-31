@@ -195,6 +195,11 @@ markers = [
     "integration: requires mocked external APIs",
     "slow: full CLI CliRunner or live-service tests",
 ]
+filterwarnings = [
+    "ignore:.*Boto3 will no longer support Python 3.9.*:Warning",
+    "ignore:.*only supports OpenSSL.*:Warning",
+    "ignore:.*sglang.*:UserWarning",
+]
 
 [project.urls]
 Homepage = "https://github.com/theoddden/Terradev"

@@ -8,7 +8,7 @@ import aiohttp
 import logging
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base_provider import BaseProvider
 
@@ -150,7 +150,7 @@ class InferXProvider(BaseProvider):
                         "models_per_node": 30,
                         "api_key_required": True,
                         "openai_compatible": True,
-                        "deployment_time": datetime.utcnow().isoformat(),
+                        "deployment_time": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                         "features": [
                             "sub_2s_cold_start",
                             "90_percent_gpu_utilization",

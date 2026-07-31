@@ -6,7 +6,7 @@ Uses ~/.terradev/cost_tracking.db (SQLite).
 
 import sqlite3
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
@@ -171,7 +171,7 @@ def end_provision(instance_id: str):
     ).fetchone()
     if row:
         start = datetime.fromisoformat(row["ts"])
-        hours = max((datetime.utcnow() - start).total_seconds() / 3600, 0.01)
+        hours = max((datetime.now(timezone.utc).replace(tzinfo=None) - start).total_seconds() / 3600, 0.01)
         total = round(hours * row["price_hr"], 4)
         conn.execute(
             "UPDATE provisions SET end_ts = datetime('now'), status = 'terminated', total_cost = ? WHERE id = ?",
@@ -237,7 +237,7 @@ def record_staging(
 
 
 def _update_daily_spend(conn: sqlite3.Connection, price_hr: float, provider: str):
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d")
     row = conn.execute(
         "SELECT total, providers FROM daily_spend WHERE date = ?", (today,)
     ).fetchone()
@@ -262,7 +262,7 @@ def _update_daily_spend(conn: sqlite3.Connection, price_hr: float, provider: str
 def get_spend_summary(days: int = 30) -> Dict[str, Any]:
     """Get spend summary for the last N days."""
     conn = _conn()
-    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)).strftime("%Y-%m-%d")
 
     total = conn.execute(
         "SELECT COALESCE(SUM(total_cost), 0) as s FROM provisions WHERE ts >= ?",
@@ -302,7 +302,7 @@ def get_spend_summary(days: int = 30) -> Dict[str, Any]:
 def get_daily_spend(days: int = 7) -> List[Dict[str, Any]]:
     """Get daily spend for the last N days."""
     conn = _conn()
-    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)).strftime("%Y-%m-%d")
     rows = conn.execute(
         "SELECT date, total as cost, providers FROM daily_spend WHERE date >= ? ORDER BY date",
         (cutoff,),

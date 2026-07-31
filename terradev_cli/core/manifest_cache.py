@@ -62,11 +62,11 @@ class ManifestCache:
         if version:
             manifest_path = self.cache_dir / f"{job}.{version}.json"
         else:
-            # Load latest version
+            # Load latest version (mtime, then filename as tiebreaker)
             manifests = list(self.cache_dir.glob(f"{job}.*.json"))
             if not manifests:
                 return None
-            manifest_path = max(manifests, key=lambda p: p.stat().st_mtime)
+            manifest_path = max(manifests, key=lambda p: (p.stat().st_mtime, p.name))
 
         if not manifest_path.exists():
             return None

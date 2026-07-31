@@ -246,18 +246,18 @@ def gpu_catalog_normalize():
 # ── Async event loop (pytest-asyncio compat) ─────────────────────────────────
 
 @pytest.fixture(scope="session")
-def event_loop_policy():
+def _loop_policy():
     return asyncio.DefaultEventLoopPolicy()
 
 
 @pytest.fixture(autouse=True)
-def event_loop(event_loop_policy):
+def event_loop(_loop_policy):
     """Provide a fresh current event loop for every test.
 
     This prevents Python 3.9 from raising RuntimeError when earlier tests
     call asyncio.run and leave the main thread without a current loop.
     """
-    loop = event_loop_policy.new_event_loop()
+    loop = _loop_policy.new_event_loop()
     asyncio.set_event_loop(loop)
     yield loop
     try:

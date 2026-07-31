@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+__test__ = False
 """
 Comprehensive Integration Testing Framework for Terradev CLI
+
+This module contains a standalone integration runner, not pytest tests.
 
 Guarantees all integrations work well through:
 1. Unit tests for individual components
@@ -27,6 +30,7 @@ import click
 @dataclass
 class TestConfig:
     """Configuration for integration tests"""
+    __test__ = False  # not a pytest test class
 
     test_cluster_name: str = "terradev-test-cluster"
     test_namespace: str = "terradev-test"
@@ -689,6 +693,9 @@ def test_integration(mock, performance, suite, parallel, timeout):
                 print("\n✅ All integration tests passed!")
 
     asyncio.run(run_tests())
+
+
+test_integration.__test__ = False  # not a pytest test function
 
 
 if __name__ == "__main__":

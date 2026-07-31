@@ -6,7 +6,7 @@ CLI-native drift detection and rollback system (parallel, <30s)
 
 import asyncio
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
 from .manifest_cache import Manifest, ManifestNode, ManifestCache
@@ -80,7 +80,7 @@ class DriftDetector:
             missing_nodes=missing_nodes,
             extra_nodes=extra_nodes,
             dataset_drift=dataset_drift,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         )
 
     async def fix_drift(
@@ -134,7 +134,7 @@ class DriftDetector:
             "terminated": len(drift_report.drifted_nodes),
             "recreated": len(drift_report.missing_nodes),
             "final_report": final_report,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         }
 
     async def rollback(self, job: str, target_version: str) -> Dict[str, Any]:
@@ -173,7 +173,7 @@ class DriftDetector:
             "target_version": target_version,
             "terminated": len(current_nodes),
             "recreated": len(target_manifest.nodes),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         }
 
     async def _get_actual_state(

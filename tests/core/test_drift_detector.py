@@ -4,7 +4,7 @@ Drift detection and idempotent re-provision keep client clusters in sync with
 their declared manifests. These tests cover detection, fixing, and rollback.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -22,7 +22,7 @@ def _node(pod_id, provider="demo", status="running", gpus=1, gpu_type="A100", re
         gpu_type=gpu_type,
         region=region,
         status=status,
-        created_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         ttl="3600",
     )
 
@@ -35,7 +35,7 @@ def _manifest(tmp_path, nodes):
         nodes=nodes,
         dataset_hash="sha256:abc",
         ttl="3600",
-        created_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         metadata={},
     )
     cache.store_manifest(manifest)

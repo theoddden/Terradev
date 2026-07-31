@@ -179,5 +179,8 @@ def test_all_basic() -> bool:
     return True
 
 
+test_integration.__test__ = False  # not a pytest test function
+
+
 if __name__ == "__main__":
     test_integration()

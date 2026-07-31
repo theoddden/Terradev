@@ -13,7 +13,27 @@ Run with: pytest tests/test_provider_conformance.py -v
 """
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+
+class _AsyncCtx:
+    """Both an async context manager and an awaitable, like aiohttp request()."""
+
+    def __init__(self, obj):
+        self._obj = obj
+
+    async def _get(self):
+        return self._obj
+
+    def __await__(self):
+        return self._get().__await__()
+
+    async def __aenter__(self):
+        return self._obj
+
+    async def __aexit__(self, *args):
+        return False
+
 
 # Import all providers from their individual modules
 # (providers are not exported from __init__.py to avoid import errors when optional deps are missing)
@@ -151,7 +171,8 @@ class ProviderConformanceTest:
         mock_response.text = AsyncMock(return_value="Rate limited")
 
         mock_session = AsyncMock()
-        mock_session.get = AsyncMock(return_value=mock_response)
+        mock_session.get = Mock(return_value=_AsyncCtx(mock_response))
+        mock_session.request = Mock(return_value=_AsyncCtx(mock_response))
         mock_session.close = AsyncMock()
 
         with patch("aiohttp.ClientSession", return_value=mock_session):
@@ -178,7 +199,8 @@ class ProviderConformanceTest:
         mock_response.text = AsyncMock(return_value="Unauthorized")
 
         mock_session = AsyncMock()
-        mock_session.get = AsyncMock(return_value=mock_response)
+        mock_session.get = Mock(return_value=_AsyncCtx(mock_response))
+        mock_session.request = Mock(return_value=_AsyncCtx(mock_response))
         mock_session.close = AsyncMock()
 
         with patch("aiohttp.ClientSession", return_value=mock_session):

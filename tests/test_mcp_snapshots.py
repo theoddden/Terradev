@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("mcp")
+
 SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
 
 

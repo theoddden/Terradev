@@ -8,7 +8,7 @@ Not just a generic cron caller - aware of spot market dynamics.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 import json
 import re
@@ -86,14 +86,14 @@ class SpotAwareScheduler:
     def get_active_windows(self, current_time: Optional[datetime] = None) -> List[SpotPricingWindow]:
         """Get currently active pricing windows"""
         if current_time is None:
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc).replace(tzinfo=None)
         
         return [w for w in self.pricing_windows if w.is_active(current_time)]
     
     def get_next_window(self, gpu_type: str, current_time: Optional[datetime] = None) -> Optional[SpotPricingWindow]:
         """Get the next available pricing window for a GPU type"""
         if current_time is None:
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc).replace(tzinfo=None)
         
         gpu_windows = [w for w in self.pricing_windows if w.gpu_type == gpu_type]
         if not gpu_windows:
@@ -125,7 +125,7 @@ class SpotAwareScheduler:
         prefer_current: bool = True
     ) -> Dict[str, Any]:
         """Schedule a job for the next optimal spot pricing window"""
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc).replace(tzinfo=None)
         
         # Get next available window
         next_window = self.get_next_window(gpu_type, current_time)
@@ -261,7 +261,7 @@ class CronExpression:
     def next_run(self, current_time: Optional[datetime] = None) -> datetime:
         """Calculate next run time from cron expression"""
         if current_time is None:
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc).replace(tzinfo=None)
         
         # Simple implementation - check next 24 hours
         # In production, use a proper cron library like croniter
@@ -296,7 +296,7 @@ async def schedule_spot_job(
     """
     scheduler = SpotAwareScheduler()
     
-    job_id = job_name or f"spot_job_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    job_id = job_name or f"spot_job_{datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y%m%d_%H%M%S')}"
     
     print(f"📅 Scheduling Spot-Aware Job")
     print(f"   Job ID: {job_id}")
@@ -304,7 +304,7 @@ async def schedule_spot_job(
     print(f"   Command: {command}")
     
     # Get current pricing windows
-    current_time = datetime.utcnow()
+    current_time = datetime.now(timezone.utc).replace(tzinfo=None)
     active_windows = scheduler.get_active_windows(current_time)
     
     print(f"   Current Time (UTC): {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -365,7 +365,7 @@ async def schedule_list() -> Dict[str, Any]:
 async def schedule_pricing_windows(gpu_type: Optional[str] = None) -> Dict[str, Any]:
     """Show available spot pricing windows"""
     scheduler = SpotAwareScheduler()
-    current_time = datetime.utcnow()
+    current_time = datetime.now(timezone.utc).replace(tzinfo=None)
     
     print(f"💰 Spot Pricing Windows")
     print(f"   Current Time (UTC): {current_time.strftime('%Y-%m-%d %H:%M:%S')}")

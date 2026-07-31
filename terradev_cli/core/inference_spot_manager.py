@@ -25,7 +25,7 @@ import os
 import subprocess
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
@@ -124,8 +124,8 @@ class InferenceSpotManager:
             provider=os.environ.get("TERRADEV_PROVIDER", "unknown"),
             region=os.environ.get("TERRADEV_REGION", "unknown"),
             instance_id=self._get_instance_id(),
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
             + timedelta(hours=self.config.max_checkpoint_age_hours),
         )
 

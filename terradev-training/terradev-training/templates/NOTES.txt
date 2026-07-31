@@ -1,0 +1,24 @@
+Terradev GPU Workload deployed!
+
+GPU: {{ .Values.gpu.type }} x{{ .Values.gpu.count }}
+Node label: {{ .Values.gpu.nodeLabel }}
+
+{{- if .Values.budget.enforce }}
+Budget: ${{ .Values.budget.maxHourlyRate }}/hr (enforced)
+{{- end }}
+
+{{- if eq .Values.workloadType "Job" }}
+Check job status:
+  kubectl get jobs -l app.kubernetes.io/name={{ include "terradev.fullname" . }}
+View logs:
+  kubectl logs job/{{ include "terradev.fullname" . }}
+{{- else }}
+Check deployment:
+  kubectl get deploy {{ include "terradev.fullname" . }}
+View logs:
+  kubectl logs deploy/{{ include "terradev.fullname" . }}
+{{- if .Values.service }}
+Service:
+  kubectl get svc {{ include "terradev.fullname" . }}
+{{- end }}
+{{- end }}

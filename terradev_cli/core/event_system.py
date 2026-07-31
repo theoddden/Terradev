@@ -85,6 +85,7 @@ class Event:
     source: str = ""
     data: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    seq: int = -1  # set by EventBus for stable ordering
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -160,6 +161,7 @@ class EventBus:
         self._lock = threading.Lock()
         self.subscribers: Dict[EventType, List[Callable]] = {}
         self.event_history: Deque[Event] = deque(maxlen=_EVENT_HISTORY_MAX)
+        self._next_seq = 0
         self.logger = logging.getLogger(__name__)
 
     def subscribe(self, event_type: EventType, callback: Callable[[Event], None]):
@@ -172,6 +174,8 @@ class EventBus:
     def publish(self, event: Event):
         """Publish event to all subscribers"""
         with self._lock:
+            event.seq = self._next_seq
+            self._next_seq += 1
             self.event_history.append(event)  # deque auto-evicts oldest when full
             callbacks = list(self.subscribers.get(event.type, []))
         self.logger.info(f"Published event: {event.type.value} from {event.source}")
@@ -197,7 +201,7 @@ class EventBus:
         if since:
             events = [e for e in events if e.timestamp >= since]
 
-        return sorted(events, key=lambda x: x.timestamp, reverse=True)[:limit]
+        return sorted(events, key=lambda x: (x.timestamp, x.seq), reverse=True)[:limit]
 
 
 class TriggerManager:

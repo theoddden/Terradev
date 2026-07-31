@@ -9,7 +9,7 @@ with a shared trace ID across all three destinations.
 import asyncio
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import json
 
@@ -21,7 +21,7 @@ class ObservabilityPipeline:
     
     def __init__(self, trace_id: Optional[str] = None):
         self.trace_id = trace_id or str(uuid.uuid4())
-        self.start_time = datetime.utcnow()
+        self.start_time = datetime.now(timezone.utc).replace(tzinfo=None)
         self.destinations = {
             "wandb": False,
             "phoenix": False,
@@ -105,7 +105,7 @@ class ObservabilityPipeline:
             enriched_data = {
                 **traffic_data,
                 **self.shared_context,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
             }
             
             # Send to each initialized destination

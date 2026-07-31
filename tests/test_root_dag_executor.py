@@ -126,7 +126,7 @@ class TestPlanning:
         assert plan.max_parallelism == 1
 
     def test_diamond_pattern(self):
-        """
+        r"""
             A
            / \
           B   C

@@ -99,7 +99,7 @@ class QuickStart:
         gpu_type = gpu_map.get(gpu_choice, "RTX 3090")
 
         print(f"🚀 Provisioning {gpu_type}...")
-        print("   This will cost ~\$0.20-1.50/hour")
+        print("   This will cost ~$0.20-1.50/hour")
         print("   You can stop it anytime")
         print()
 
@@ -184,7 +184,7 @@ class QuickStart:
         gpu_type = gpu_map.get(gpu_choice, "RTX 3090")
 
         print(f"🚀 Provisioning {gpu_type}...")
-        print("   This will cost ~\$0.15-1.20/hour")
+        print("   This will cost ~$0.15-1.20/hour")
         print("   You can stop it anytime")
         print()
 

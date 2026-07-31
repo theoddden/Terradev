@@ -9,7 +9,7 @@ import json
 import logging
 from typing import Dict, List, Any
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -437,7 +437,7 @@ class InferXCostOptimizer:
 
         # Generate report
         report = {
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             "target_tier": target_tier.value,
             "current_metrics": asdict(current_metrics),
             "recommendations": [asdict(rec) for rec in recommendations],

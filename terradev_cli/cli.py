@@ -14,7 +14,7 @@ import os
 import uuid
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import subprocess
 import time
 import sys
@@ -132,7 +132,7 @@ def up(
                     gpu_type=gpu_type,
                     region=region or "us-east-1",
                     status="running",
-                    created_at=datetime.utcnow().isoformat(),
+                    created_at=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                     ttl=ttl,
                 )
                 nodes.append(node)
@@ -149,7 +149,7 @@ def up(
                 nodes=nodes,
                 dataset_hash=dataset_hash,
                 ttl=ttl,
-                created_at=datetime.utcnow().isoformat(),
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 metadata={
                     "deployment_id": deployment_result.get("deployment_id"),
                     "provider": best_option.provider,
@@ -635,7 +635,7 @@ def _register_local_pool(gpus, pool_name, host=None, user=None, key=None):
         "host": host or "localhost",
         "user": user,
         "key": key,
-        "registered_at": datetime.datetime.utcnow().isoformat(),
+        "registered_at": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat(),
         "price_per_hour": 0.0,
         "provider": "local",
     }

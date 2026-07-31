@@ -368,12 +368,17 @@ class KubernetesDeploymentStrategy:
 
     def _has_kubernetes_configured(self) -> bool:
         """Check if user has Kubernetes configured"""
-        # This would check for kubeconfig, cluster access, etc.
         import os
         from pathlib import Path
 
-        kubeconfig = os.environ.get("KUBECONFIG", Path.home() / ".kube" / "config")
-        return kubeconfig.exists()
+        kubeconfig_env = os.environ.get("KUBECONFIG")
+        if kubeconfig_env:
+            return Path(kubeconfig_env).exists()
+
+        home = os.path.expanduser("~")
+        if home == "~":
+            return False
+        return (Path(home) / ".kube" / "config").exists()
 
     async def deploy(
         self, option: DeploymentOption, requirements: DeploymentRequirements

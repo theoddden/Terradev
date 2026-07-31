@@ -6,6 +6,7 @@ Tracks adapter versions, replica distribution, tenant mappings, and provides
 persistence layer for cross-replica coordination.
 """
 
+from contextlib import closing
 import sqlite3
 import json
 import logging
@@ -127,7 +128,7 @@ class AdapterRegistry:
 
     def _init_db(self):
         """Initialize SQLite database schema"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS adapter_versions (
                     version_id TEXT PRIMARY KEY,
@@ -205,7 +206,7 @@ class AdapterRegistry:
             metadata=metadata or {},
         )
 
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             conn.execute(
                 """
                 INSERT INTO adapter_versions 
@@ -233,7 +234,7 @@ class AdapterRegistry:
 
     def get_adapter_versions(self, adapter_name: str) -> List[AdapterVersion]:
         """Get all versions of an adapter"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT version_id, adapter_name, base_model, path, rank, created_at,
@@ -274,7 +275,7 @@ class AdapterRegistry:
 
     def get_version(self, version_id: str) -> Optional[AdapterVersion]:
         """Get a specific version by ID"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT version_id, adapter_name, base_model, path, rank, created_at,
@@ -304,7 +305,7 @@ class AdapterRegistry:
 
     def mark_version_active(self, adapter_name: str, version_id: str) -> bool:
         """Mark a specific version as active (deactivates others)"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             # Deactivate all versions of this adapter
             conn.execute(
                 """
@@ -332,7 +333,7 @@ class AdapterRegistry:
         self, version_id: str, metrics: Dict[str, float]
     ) -> bool:
         """Update performance metrics for a version"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 UPDATE adapter_versions
@@ -355,7 +356,7 @@ class AdapterRegistry:
     ) -> bool:
         """Record that an adapter was loaded on a replica"""
         now = datetime.now()
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO replica_states
@@ -377,7 +378,7 @@ class AdapterRegistry:
 
     def record_replica_unload(self, replica_id: str, adapter_name: str) -> bool:
         """Record that an adapter was unloaded from a replica"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 DELETE FROM replica_states
@@ -390,7 +391,7 @@ class AdapterRegistry:
 
     def update_replica_last_used(self, replica_id: str, adapter_name: str) -> bool:
         """Update last used timestamp for a replica-adapter pair"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 UPDATE replica_states
@@ -404,7 +405,7 @@ class AdapterRegistry:
 
     def list_replicas_with_adapter(self, adapter_name: str) -> List[AdapterReplicaState]:
         """List all replicas that have a specific adapter loaded"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT replica_id, adapter_name, version_id, loaded_at, last_used,
@@ -434,7 +435,7 @@ class AdapterRegistry:
 
     def get_replica_adapters(self, replica_id: str) -> List[AdapterReplicaState]:
         """Get all adapters loaded on a specific replica"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT replica_id, adapter_name, version_id, loaded_at, last_used,
@@ -468,7 +469,7 @@ class AdapterRegistry:
         self, tenant_id: str, adapter_name: str, priority: int = 0
     ) -> bool:
         """Map a tenant to an adapter"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO tenant_mappings
@@ -482,7 +483,7 @@ class AdapterRegistry:
 
     def get_tenant_adapter(self, tenant_id: str) -> Optional[str]:
         """Get the adapter name for a tenant"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT adapter_name
@@ -499,7 +500,7 @@ class AdapterRegistry:
 
     def list_tenant_mappings(self) -> List[TenantMapping]:
         """List all tenant-to-adapter mappings"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT tenant_id, adapter_name, assigned_at, priority
@@ -525,7 +526,7 @@ class AdapterRegistry:
 
     def list_all_adapters(self) -> List[str]:
         """List all adapter names in the registry"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT DISTINCT adapter_name
@@ -539,7 +540,7 @@ class AdapterRegistry:
 
     def get_registry_stats(self) -> Dict[str, Any]:
         """Get registry statistics"""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             total_versions = conn.execute(
                 "SELECT COUNT(*) FROM adapter_versions"
             ).fetchone()[0]

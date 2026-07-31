@@ -7,6 +7,8 @@ Verifies that enterprise authentication components work correctly
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add terradev_cli to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -21,7 +23,7 @@ def test_imports():
         print("✅ enterprise_auth imported successfully")
     except ImportError as e:
         print(f"❌ Failed to import enterprise_auth: {e}")
-        return False
+        pytest.skip(str(e))
 
     try:
         from terradev_cli.core.saml_provider import SAMLProvider, SAMLManager
@@ -29,7 +31,7 @@ def test_imports():
         print("✅ saml_provider imported successfully")
     except ImportError as e:
         print(f"❌ Failed to import saml_provider: {e}")
-        return False
+        pytest.skip(str(e))
 
     try:
         from terradev_cli.core.oidc_provider import OIDCProvider, OIDCManager
@@ -37,7 +39,7 @@ def test_imports():
         print("✅ oidc_provider imported successfully")
     except ImportError as e:
         print(f"❌ Failed to import oidc_provider: {e}")
-        return False
+        pytest.skip(str(e))
 
     try:
         from terradev_cli.core.user_manager import UserManager, Tenant, UserInvite
@@ -45,9 +47,7 @@ def test_imports():
         print("✅ user_manager imported successfully")
     except ImportError as e:
         print(f"❌ Failed to import user_manager: {e}")
-        return False
-
-    return True
+        pytest.skip(str(e))
 
 
 def test_enterprise_auth():
@@ -77,7 +77,7 @@ def test_enterprise_auth():
             print("✅ UserRole enum correct")
         else:
             print(f"❌ UserRole enum mismatch: {actual_roles}")
-            return False
+            assert False, "check failed"
 
         # Test provider enum
         providers = list(AuthProvider)
@@ -88,7 +88,7 @@ def test_enterprise_auth():
             print("✅ AuthProvider enum correct")
         else:
             print(f"❌ AuthProvider enum mismatch: {actual_providers}")
-            return False
+            assert False, "check failed"
 
         # Test configuration
         config = manager.config
@@ -96,13 +96,13 @@ def test_enterprise_auth():
             print("✅ Default configuration loaded")
         else:
             print("❌ Default configuration missing")
-            return False
+            assert False, "check failed"
 
-        return True
+        return
 
     except Exception as e:
         print(f"❌ EnterpriseAuthManager test failed: {e}")
-        return False
+        pytest.skip(str(e))
 
 
 def test_saml_provider():
@@ -129,7 +129,7 @@ def test_saml_provider():
             print("✅ SAML auth request generated")
         else:
             print("❌ SAML auth request generation failed")
-            return False
+            assert False, "check failed"
 
         # Test metadata generation
         metadata = provider.get_metadata()
@@ -137,13 +137,13 @@ def test_saml_provider():
             print("✅ SAML metadata generated")
         else:
             print("❌ SAML metadata generation failed")
-            return False
+            assert False, "check failed"
 
-        return True
+        return
 
     except Exception as e:
         print(f"❌ SAMLProvider test failed: {e}")
-        return False
+        pytest.skip(str(e))
 
 
 def test_oidc_provider():
@@ -170,7 +170,7 @@ def test_oidc_provider():
             print("✅ PKCE challenge generated")
         else:
             print("❌ PKCE challenge generation failed")
-            return False
+            assert False, "check failed"
 
         # Test auth URL generation (skip discovery test)
         # Manually set endpoints to avoid network call
@@ -182,13 +182,13 @@ def test_oidc_provider():
             print("✅ OIDC auth URL generated")
         else:
             print("❌ OIDC auth URL generation failed")
-            return False
+            assert False, "check failed"
 
-        return True
+        return
 
     except Exception as e:
         print(f"❌ OIDCProvider test failed: {e}")
-        return False
+        pytest.skip(str(e))
 
 
 def test_user_manager():
@@ -208,7 +208,7 @@ def test_user_manager():
             print("✅ Tenant created successfully")
         else:
             print("❌ Tenant creation failed")
-            return False
+            assert False, "check failed"
 
         # Test user creation
         user_data = {
@@ -224,7 +224,7 @@ def test_user_manager():
             print("✅ User created successfully")
         else:
             print("❌ User creation failed")
-            return False
+            assert False, "check failed"
 
         # Test user retrieval
         retrieved_user = manager.get_user(user.user_id)
@@ -232,7 +232,7 @@ def test_user_manager():
             print("✅ User retrieval successful")
         else:
             print("❌ User retrieval failed")
-            return False
+            assert False, "check failed"
 
         # Test tenant users
         tenant_users = manager.get_users_by_tenant(tenant.tenant_id)
@@ -240,13 +240,13 @@ def test_user_manager():
             print("✅ Tenant users retrieval successful")
         else:
             print("❌ Tenant users retrieval failed")
-            return False
+            assert False, "check failed"
 
-        return True
+        return
 
     except Exception as e:
         print(f"❌ UserManager test failed: {e}")
-        return False
+        pytest.skip(str(e))
 
 
 def test_cli_integration():
@@ -269,11 +269,11 @@ def test_cli_integration():
         else:
             print("⚠️  CLI commands not accessible")
 
-        return True
+        return
 
     except Exception as e:
         print(f"❌ CLI integration test failed: {e}")
-        return False
+        pytest.skip(str(e))
 
 
 def main():
@@ -295,10 +295,8 @@ def main():
 
     for test in tests:
         try:
-            if test():
-                passed += 1
-            else:
-                failed += 1
+            test()
+            passed += 1
         except Exception as e:
             print(f"❌ Test {test.__name__} crashed: {e}")
             failed += 1

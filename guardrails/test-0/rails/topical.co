@@ -1,0 +1,7 @@
+# Colang 2.x — Topical guardrail
+define flow check topical
+  """Ensure responses stay on-topic."""
+  $is_on_topic = execute check_topic_relevance
+  if not $is_on_topic
+    bot say "I can only help with topics related to this service."
+    stop

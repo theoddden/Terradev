@@ -23,7 +23,7 @@ BYOAPI: Keys stay local in ~/.terradev/credentials.json
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -213,7 +213,7 @@ def _query_requests_sync(creds: Dict[str, str], **kwargs) -> Dict[str, Any]:
 
 async def get_cost_summary(creds: Dict[str, str], hours: int = 24) -> Dict[str, Any]:
     """Aggregate cost data from recent requests."""
-    since = (datetime.utcnow() - timedelta(hours=hours)).isoformat() + "Z"
+    since = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)).isoformat() + "Z"
     result = await query_requests(
         creds, limit=1000, created_after=since, include_inputs=False
     )
