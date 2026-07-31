@@ -45,17 +45,12 @@ class TestAWSProvider:
         assert provider.credentials["aws_access_key_id"] == "test-key"
         assert provider.credentials["aws_secret_access_key"] == "test-secret"
 
-    def test_no_credentials_returns_hardcoded_quotes(self):
-        """AWS provider returns hardcoded pricing quotes without credentials"""
+    def test_no_credentials_returns_empty_quotes(self, monkeypatch):
+        """AWS provider returns an empty list when no resolvable credentials exist"""
         provider = AWSProvider({})
+        monkeypatch.setattr(provider, "_credentials_available", lambda: False)
         result = run_async(provider.get_instance_quotes("A100"))
-        # If boto3 is not installed, returns empty list
-        # If boto3 is installed, returns hardcoded pricing for common instance types
-        if provider.ec2_client is None:
-            assert len(result) == 0
-        else:
-            assert len(result) > 0
-            assert all(q["provider"] == "aws" for q in result)
+        assert result == []
 
     def test_auth_headers_with_key(self):
         """AWS provider auth headers with key"""
@@ -226,13 +221,11 @@ class TestProviderErrorHandling:
             (AzureProvider, {}),
         ],
     )
-    @pytest.mark.xfail(
-        reason="Ambient AWS credentials may be present; needs a fully mocked cloud client",
-        strict=False,
-    )
-    def test_no_api_key_raises_on_provision(self, provider_class, credentials):
+    def test_no_api_key_raises_on_provision(self, provider_class, credentials, monkeypatch):
         """Providers should raise error on provision without API key"""
         provider = provider_class(credentials)
+        if isinstance(provider, AWSProvider):
+            monkeypatch.setattr(provider, "_credentials_available", lambda: False)
 
         with pytest.raises(RuntimeError):
             run_async(provider.provision_instance("type", "region", "A100"))
@@ -245,9 +238,11 @@ class TestProviderErrorHandling:
             (AzureProvider, {}),
         ],
     )
-    def test_no_api_key_returns_empty_list(self, provider_class, credentials):
+    def test_no_api_key_returns_empty_list(self, provider_class, credentials, monkeypatch):
         """Providers should return empty list for instances without API key"""
         provider = provider_class(credentials)
+        if isinstance(provider, AWSProvider):
+            monkeypatch.setattr(provider, "_credentials_available", lambda: False)
         result = run_async(provider.list_instances())
         assert result == []
 

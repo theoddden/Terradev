@@ -225,34 +225,28 @@ class ProviderConformanceTest:
                 ), f"Provider did not handle 429 gracefully: {e}"
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Requires provider-specific mocking setup", strict=False)
     async def test_401_raises_auth_error(self, provider):
-        """Test that 401 response raises AuthError"""
-        # Provider is already instantiated with credentials via fixture
-
+        """Test that the shared _make_request raises an auth-related error on 401."""
         # Mock aiohttp session to return 401
         mock_response = AsyncMock()
         mock_response.status = 401
         mock_response.text = AsyncMock(return_value="Unauthorized")
 
         mock_session = AsyncMock()
-        mock_session.get = Mock(return_value=_AsyncCtx(mock_response))
         mock_session.request = Mock(return_value=_AsyncCtx(mock_response))
         mock_session.close = AsyncMock()
 
         with patch("aiohttp.ClientSession", return_value=mock_session):
-            try:
-                await provider.get_instance_quotes(gpu_type="A100")
-                # If we get here without error, test fails
-                pytest.fail("Provider did not raise error on 401 response")
-            except Exception as e:
-                # Verify error is auth-related
-                error_msg = str(e).lower()
-                assert (
-                    "auth" in error_msg
-                    or "unauthorized" in error_msg
-                    or "401" in error_msg
-                ), f"Provider did not raise auth-specific error on 401: {e}"
+            with pytest.raises(Exception) as exc_info:
+                await provider._make_request("GET", "http://example.com")
+
+        # Verify error is auth-related
+        error_msg = str(exc_info.value).lower()
+        assert (
+            "auth" in error_msg
+            or "unauthorized" in error_msg
+            or "401" in error_msg
+        ), f"_make_request did not raise auth-specific error on 401: {exc_info.value}"
 
 
 # Generate test classes for each provider

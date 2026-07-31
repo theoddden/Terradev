@@ -394,6 +394,8 @@ class AWSProvider(BaseProvider):
         """List all instances"""
         if not self.ec2_client:
             return []
+        if not self._credentials_available():
+            return []
 
         try:
             response = await self._run_in_executor(
