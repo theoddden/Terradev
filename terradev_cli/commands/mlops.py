@@ -855,7 +855,7 @@ def export(output, job, cache_dir, output_format):
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: Export failed: {e}")
         return 1
-@cli.command()
+@cli.command("import")
 @click.argument("yaml_file", type=click.Path(exists=True))
 @click.option(
     "--name", "-n", help="Name to register pipeline (defaults to YAML metadata name)"

@@ -762,7 +762,7 @@ def record_availability(
     conn = _conn()
     conn.execute(
         "INSERT INTO availability_log "
-        "(gpu_type, provider, region, available, response_ms, error) "
+        "(gpu_type, provider, region, available, response_time_ms, error_message) "
         "VALUES (?, ?, ?, ?, ?, ?)",
         (
             gpu_type.upper(),
@@ -783,7 +783,7 @@ def record_availability_batch(checks: List[Dict[str, Any]]):
     for c in checks:
         conn.execute(
             "INSERT INTO availability_log "
-            "(gpu_type, provider, region, available, response_ms, error) "
+            "(gpu_type, provider, region, available, response_time_ms, error_message) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (
                 c.get("gpu_type", "").upper(),
@@ -811,10 +811,10 @@ def get_availability(
     cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
 
     rows = conn.execute(
-        "SELECT provider, region, available, response_ms, error, ts "
+        "SELECT provider, region, available, response_time_ms, error_message, ts "
         "FROM availability_log "
         "WHERE gpu_type = ? AND ts >= ? "
-        "ORDER BY provider, ts DESC",
+        "ORDER BY provider, ts DESC, id DESC",
         (gpu_type.upper(), cutoff),
     ).fetchall()
     conn.close()
@@ -829,10 +829,10 @@ def get_availability(
     for prov, checks in by_provider.items():
         total = len(checks)
         available_count = sum(1 for c in checks if c["available"])
-        ms_values = [c["response_ms"] for c in checks if c["response_ms"] is not None]
+        ms_values = [c["response_time_ms"] for c in checks if c["response_time_ms"] is not None]
         avg_ms = sum(ms_values) / len(ms_values) if ms_values else 0
         last = checks[0]
-        last_error = next((c["error"] for c in checks if c["error"]), None)
+        last_error = next((c["error_message"] for c in checks if c["error_message"]), None)
 
         result[prov] = {
             "available": bool(last["available"]),
@@ -856,10 +856,13 @@ def get_availability_summary() -> Dict[str, Dict[str, bool]]:
     """Quick summary: {gpu_type: {provider: True/False}} based on last check."""
     conn = _conn()
     rows = conn.execute(
-        "SELECT gpu_type, provider, available, MAX(ts) as last_ts "
+        "SELECT gpu_type, provider, available, ts "
         "FROM availability_log "
-        "GROUP BY gpu_type, provider "
-        "ORDER BY gpu_type, provider"
+        "WHERE (gpu_type, provider, id) IN ("
+        "    SELECT gpu_type, provider, MAX(id) "
+        "    FROM availability_log "
+        "    GROUP BY gpu_type, provider"
+        ")"
     ).fetchall()
     conn.close()
 

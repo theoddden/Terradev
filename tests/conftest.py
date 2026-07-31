@@ -250,6 +250,24 @@ def event_loop_policy():
     return asyncio.DefaultEventLoopPolicy()
 
 
+@pytest.fixture(autouse=True)
+def event_loop(event_loop_policy):
+    """Provide a fresh current event loop for every test.
+
+    This prevents Python 3.9 from raising RuntimeError when earlier tests
+    call asyncio.run and leave the main thread without a current loop.
+    """
+    loop = event_loop_policy.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield loop
+    try:
+        loop.close()
+    except Exception:
+        pass
+    finally:
+        asyncio.set_event_loop(None)
+
+
 # ── Legacy telemetry fixtures (kept for backward compat with older tests) ─────
 
 @pytest.fixture
