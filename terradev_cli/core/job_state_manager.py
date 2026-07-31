@@ -228,6 +228,10 @@ class JobStateManager:
             self._conn.close()
             self._conn = None
 
+    def __del__(self):
+        """Ensure the SQLite connection is closed on garbage collection."""
+        self.close()
+
     # ── Job CRUD ──────────────────────────────────────────────────────────
 
     def create_job(

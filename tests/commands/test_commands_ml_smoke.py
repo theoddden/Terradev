@@ -304,7 +304,9 @@ def test_all_ml_commands_invoke_without_unhandled_exception(mock_api):
                                     full_path = path
                                     argv = full_path + _build_args_for_command(cmd)
                                     try:
-                                        result = runner.invoke(cli, argv, obj={"api": mock_api})
+                                        result = runner.invoke(
+                                            cli, argv, obj={"api": mock_api}, input="test\n" * 10
+                                        )
                                     except Exception as exc:  # noqa: BLE001
                                         failures.append(f"{'.'.join(full_path)}: runner raised {exc}")
                                         continue

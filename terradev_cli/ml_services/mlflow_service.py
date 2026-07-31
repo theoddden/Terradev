@@ -482,6 +482,7 @@ class MLflowService:
         """Query cost_tracking.db for cumulative spend."""
         if not _COST_DB.exists():
             return None
+        conn = None
         try:
             conn = sqlite3.connect(str(_COST_DB))
             if provider:
@@ -495,11 +496,13 @@ class MLflowService:
                     "SELECT SUM(price_hr * CAST((julianday(COALESCE(end_ts, datetime('now'))) - julianday(ts)) * 24 AS REAL)) "
                     "FROM provisions"
                 ).fetchone()
-            conn.close()
             return row[0] if row and row[0] else None
         except Exception as e:  # noqa: BLE001
             logger.debug("Failed to read cumulative spend: %s", e)
             return None
+        finally:
+            if conn:
+                conn.close()
 
     # ── Existing export method ───────────────────────────────────────
 

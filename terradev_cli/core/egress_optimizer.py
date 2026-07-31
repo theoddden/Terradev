@@ -318,49 +318,50 @@ def refresh_egress_cache(force: bool = False) -> Dict[str, int]:
     conn = _db_conn()
     stats = {"updated": 0, "cached": 0, "errors": 0}
 
-    # Check cache freshness
-    if not force:
-        row = conn.execute(
-            "SELECT MIN(updated_at) AS oldest FROM egress_rate_cache"
-        ).fetchone()
-        if row and row["oldest"]:
-            try:
-                oldest = datetime.fromisoformat(row["oldest"])
-                if (datetime.now(timezone.utc).replace(tzinfo=None) - oldest).total_seconds() < CACHE_TTL_S:
-                    stats["cached"] = conn.execute(
-                        "SELECT COUNT(*) AS n FROM egress_rate_cache"
-                    ).fetchone()["n"]
-                    conn.close()
-                    return stats
-            except (ValueError, TypeError):
-                pass  # corrupt timestamp, force refresh
+    try:
+        # Check cache freshness
+        if not force:
+            row = conn.execute(
+                "SELECT MIN(updated_at) AS oldest FROM egress_rate_cache"
+            ).fetchone()
+            if row and row["oldest"]:
+                try:
+                    oldest = datetime.fromisoformat(row["oldest"])
+                    if (datetime.now(timezone.utc).replace(tzinfo=None) - oldest).total_seconds() < CACHE_TTL_S:
+                        stats["cached"] = conn.execute(
+                            "SELECT COUNT(*) AS n FROM egress_rate_cache"
+                        ).fetchone()["n"]
+                        return stats
+                except (ValueError, TypeError):
+                    pass  # corrupt timestamp, force refresh
 
-    # Try live pricing for each provider, fall back to static
-    for provider, static_rates in _STATIC_EGRESS_RATES.items():
-        live_rates = _fetch_live_rates(provider)
-        rates = live_rates if live_rates else static_rates
-        source = "live" if live_rates else "static"
-        if not live_rates:
-            stats["errors"] += 1
+        # Try live pricing for each provider, fall back to static
+        for provider, static_rates in _STATIC_EGRESS_RATES.items():
+            live_rates = _fetch_live_rates(provider)
+            rates = live_rates if live_rates else static_rates
+            source = "live" if live_rates else "static"
+            if not live_rates:
+                stats["errors"] += 1
 
-        for dest_class, rate in rates.items():
-            conn.execute(
-                """
-                INSERT INTO egress_rate_cache (provider, dest_class, rate_per_gb, source, updated_at)
-                VALUES (?, ?, ?, ?, datetime('now'))
-                ON CONFLICT(provider, dest_class) DO UPDATE SET
-                    rate_per_gb = excluded.rate_per_gb,
-                    source      = excluded.source,
-                    updated_at  = excluded.updated_at
-            """,
-                (provider, dest_class, rate, source),
-            )
-        stats["updated"] += 1
+            for dest_class, rate in rates.items():
+                conn.execute(
+                    """
+                    INSERT INTO egress_rate_cache (provider, dest_class, rate_per_gb, source, updated_at)
+                    VALUES (?, ?, ?, ?, datetime('now'))
+                    ON CONFLICT(provider, dest_class) DO UPDATE SET
+                        rate_per_gb = excluded.rate_per_gb,
+                        source      = excluded.source,
+                        updated_at  = excluded.updated_at
+                """,
+                    (provider, dest_class, rate, source),
+                )
+            stats["updated"] += 1
 
-    conn.commit()
-    conn.close()
-    logger.info("Egress cache refreshed: %s", stats)
-    return stats
+        conn.commit()
+        logger.info("Egress cache refreshed: %s", stats)
+        return stats
+    finally:
+        conn.close()
 
 
 def _fetch_live_rates(provider: str) -> Optional[Dict[str, float]]:
@@ -441,17 +442,20 @@ def get_cached_rate(provider: str, dest_class: str) -> float:
     """
     Get an egress rate, preferring cached live data, falling back to static.
     """
+    conn = None
     try:
         conn = _db_conn()
         row = conn.execute(
             "SELECT rate_per_gb FROM egress_rate_cache WHERE provider = ? AND dest_class = ?",
             (provider.lower(), dest_class),
         ).fetchone()
-        conn.close()
         if row:
             return row["rate_per_gb"]
     except Exception:  # noqa: BLE001
         pass
+    finally:
+        if conn:
+            conn.close()
     # Fallback to static
     rates = _STATIC_EGRESS_RATES.get(
         provider.lower(), _STATIC_EGRESS_RATES.get("aws", {})

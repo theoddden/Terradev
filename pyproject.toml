@@ -199,6 +199,9 @@ filterwarnings = [
     "ignore:.*Boto3 will no longer support Python 3.9.*:Warning",
     "ignore:.*only supports OpenSSL.*:Warning",
     "ignore:.*sglang.*:UserWarning",
+    "ignore:.*enable_cleanup_closed.*:DeprecationWarning",
+    "ignore:.*tools returned isError.*:UserWarning",
+    "ignore:.*unclosed database.*:ResourceWarning",
 ]
 
 [project.urls]
