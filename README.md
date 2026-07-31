@@ -1,6 +1,6 @@
-# Terradev CLI v5.7.1
+# Terradev CLI v5.7.2
 
-**An imperative command-line-interface for AI workload orchestration.**
+**Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
@@ -16,6 +16,12 @@ Combines quoting, provisioning, topology optimization, training orchestration, i
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
+
+**NOTES ON 5.7.2**
+
+- Expanded Python 3.9 support with a compatibility shim for the MCP SDK, plus bundled `EnterpriseAuthManager` and `SAMLProvider` scaffolding for enterprise SSO.
+- Hardened the test suite: provider conformance, Kubernetes CPU parsing, and major-provider error paths are now fully exercised.
+- Lowered `requires-python` to `>=3.9` and gated the `mcp` dependency on Python `>=3.10`.
 
 **NOTES ON 5.6.1**
 

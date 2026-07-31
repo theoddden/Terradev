@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.2] - 2026-07-31
+
+### 🔧 **Fixes & Polish**
+- Expanded Python 3.9 support with a compatibility shim for the MCP SDK.
+- Added `EnterpriseAuthManager` and `SAMLProvider` scaffolding for enterprise SSO.
+- Hardened the test suite: provider conformance, Kubernetes CPU parsing, and major-provider error paths are now fully exercised.
+- Lowered `requires-python` to `>=3.9` and gated the `mcp` dependency on Python `>=3.10`.
+- Updated READMEs, command reference, and lifecycle docs to v5.7.2.
+
+---
+
 ## [5.1.5] - 2026-06-06
 
 ### 🔧 **Fixes & Polish**
