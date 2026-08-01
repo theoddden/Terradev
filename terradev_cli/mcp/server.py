@@ -1205,6 +1205,40 @@ def _build_all_tools():
             },
         ),
         Tool(
+            name="preflight_provision",
+            description="Validate provisioning prerequisites before billing: API key scope, host capacity, image accessibility, and exact provider payload. Safe read-only dry-run.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "gpu_type": {
+                        "type": "string",
+                        "description": "GPU type to validate (H100, A100, L40S, L4, T4, RTX4090, RTX3090, V100)",
+                        "enum": [
+                            "H100",
+                            "A100",
+                            "A10G",
+                            "L40S",
+                            "L4",
+                            "T4",
+                            "RTX4090",
+                            "RTX3090",
+                            "V100",
+                        ],
+                    },
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider to validate (runpod, vastai, lambda, aws, gcp, azure, coreweave, tensordock, etc.)",
+                    },
+                    "region": {
+                        "type": "string",
+                        "description": "Preferred region (optional)",
+                        "default": "us-east-1",
+                    },
+                },
+                "required": ["gpu_type", "provider"],
+            },
+        ),
+        Tool(
             name="terraform_plan",
             description="Generate Terraform execution plan for GPU provisioning",
             inputSchema={
@@ -5483,6 +5517,7 @@ async def handle_call_tool(name_or_request, arguments=None, **kwargs) -> CallToo
             command_map = {
                 "quote_gpu": ["quote"],
                 "provision_gpu": ["terraform"],  # Now uses Terraform by default
+                "preflight_provision": ["provision"],  # Dry-run preflight handled specially
                 "terraform_plan": ["terraform", "plan"],
                 "terraform_apply": ["terraform", "apply"],
                 "terraform_destroy": ["terraform", "destroy"],
@@ -5825,6 +5860,27 @@ async def handle_call_tool(name_or_request, arguments=None, **kwargs) -> CallToo
                     cmd_args.extend(["-p", arguments["providers"]])
                 if arguments.get("quick"):
                     cmd_args.append("--quick")
+
+                result = await execute_terradev_command(cmd_args)
+                output = result["stdout"] if result["success"] else result["stderr"]
+                return CallToolResult(
+                    content=[TextContent(type="text", text=output)],
+                    isError=not result["success"],
+                )
+
+            if tool_name == "preflight_provision":
+                gpu_type = arguments["gpu_type"]
+                provider = arguments["provider"]
+                region = arguments.get("region", "us-east-1")
+
+                cmd_args = [
+                    "provision",
+                    "-g", gpu_type,
+                    "-p", provider,
+                    "--region", region,
+                    "--dry-run",
+                    "--auto",
+                ]
 
                 result = await execute_terradev_command(cmd_args)
                 output = result["stdout"] if result["success"] else result["stderr"]

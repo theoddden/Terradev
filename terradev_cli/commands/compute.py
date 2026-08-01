@@ -366,9 +366,6 @@ def provision(
 
     # ── Check local pool if --prefer-local is set ──
     if prefer_local:
-        import json
-        import os
-
         pool_path = os.path.expanduser("~/.terradev/local_pool.json")
         if os.path.exists(pool_path):
             try:
@@ -755,6 +752,48 @@ def provision(
         elapsed = (time.time() - provision_start) * 1000
         print(f"\nEstimated: ${total_hr:.2f}/hr  (${total_hr*24:.2f}/day)")
         print(f"Plan built in {elapsed:.0f}ms")
+
+        # ── Preflight validation for the selected allocation ──────────────────
+        print("\nPreflight validation (read-only, no billing):")
+        async def _preflight_all():
+            from terradev_cli.core.provision_preflight import preflight_provision
+            from terradev_cli.providers.provider_factory import ProviderFactory
+
+            factory = ProviderFactory()
+            tasks = []
+            for q in allocations:
+                pname = q["provider"].lower().replace(" ", "_")
+                creds = api._provider_creds(pname)
+                itype = q.get("instance_type", f"{pname}-{gpu_type.lower()}")
+                tasks.append(
+                    preflight_provision(
+                        provider_name=pname,
+                        credentials=creds,
+                        gpu_type=gpu_type,
+                        region=q.get("region", "us-east-1"),
+                        instance_type=itype,
+                    )
+                )
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
+        preflight_reports = asyncio.run(_preflight_all())
+        for report in preflight_reports:
+            if isinstance(report, Exception):
+                print(f"   [!] Preflight failed: {report}")
+                continue
+            icon = "OK" if report.passed else "ERROR"
+            print(f"   [{icon}] {report.provider}: {report.gpu_type} in {report.region}")
+            for check in report.checks:
+                cicon = "OK" if check.passed else "FAIL"
+                print(f"      [{cicon}] {check.name}: {check.message}")
+            if report.payload:
+                print("      Payload (exact JSON to be sent):")
+                for line in json.dumps(report.payload, indent=8, default=str).splitlines():
+                    print(f"            {line}")
+            if not report.passed:
+                print(f"\n   Tip: Fix the failed checks, then re-run with --dry-run")
+                return 1
+        print("\nPreflight passed. Remove --dry-run to launch instances.")
         return
 
     # ── Step 3: Deploy across clouds in parallel via real provider APIs ──
@@ -839,21 +878,27 @@ def provision(
                         f"{pname}_{int(time.time())}_{uuid.uuid4().hex[:6]}",
                     )
 
-                    # Start background verification (doesn't block semaphore)
-                    verify_task = asyncio.create_task(
-                        _verify_instance_bg(provider, iid, pname)
+                    # Wait for RUNNING and capture connection metadata.
+                    # Long timeout to tolerate large image pulls / datacenter congestion.
+                    status = await _wait_for_running(provider, iid, pname)
+                    verified = status is not None and status.get("status", "").lower() in (
+                        "running", "active", "ready"
                     )
 
-                    # Return immediately with pending status, verification happens in background
+                    connection = _build_connection_metadata(
+                        pname, iid, status, group_id
+                    )
+
                     return {
-                        "status": "pending",  # verification running in background
+                        "status": "active" if verified else "pending",
                         "instance_id": iid,
                         "provider": q["provider"],
                         "region": q.get("region", ""),
                         "price": result.get("price_per_hour", q["price"]),
                         "spot": q.get("availability") == "spot",
                         "elapsed_ms": round(elapsed, 1),
-                        "verify_task": verify_task,  # track for later if needed
+                        "verified": verified,
+                        "connection": connection,
                     }
                 except Exception as e:  # noqa: BLE001
                     elapsed = (time.monotonic() - t0) * 1000
@@ -867,6 +912,56 @@ def provision(
                         "elapsed_ms": round(elapsed, 1),
                         "error": str(e),
                     }
+
+        async def _wait_for_running(provider, instance_id, pname):
+            """Poll provider until RUNNING/ACTIVE/READY or timeout."""
+            delay = 5.0
+            max_delay = 30.0
+            max_attempts = 80  # ~10 minutes max
+            for attempt in range(max_attempts):
+                try:
+                    status_resp = await provider.get_instance_status(instance_id)
+                    actual = status_resp.get("status", "unknown").lower()
+                    if actual in ("running", "active", "ready"):
+                        return status_resp
+                    if actual in ("error", "failed", "terminated", "deleted"):
+                        return status_resp
+                except Exception as _exc:  # noqa: BLE001
+                    logger.debug(f"{_exc}")
+                await asyncio.sleep(delay)
+                delay = min(delay * 1.5, max_delay)
+            return None
+
+        def _build_connection_metadata(provider_name, instance_id, status, _group_id):
+            """Build a dict with SSH command and web terminal URL."""
+            ip = status.get("ip") if status else None
+            port = status.get("port") if status else None
+
+            ssh_key_path = None
+            try:
+                from terradev_cli.core.ssh_key_manager import decrypt_private_key
+
+                ssh_key_path = decrypt_private_key(_group_id)
+            except Exception as _exc:  # noqa: BLE001
+                logger.debug(f"Could not decrypt SSH key: {_exc}")
+
+            ssh_cmd = None
+            if ip:
+                ssh_cmd = f"ssh -p {port or 22} root@{ip}"
+                if ssh_key_path:
+                    ssh_cmd += f" -i {ssh_key_path}"
+
+            web_terminal_url = None
+            if provider_name == "runpod" and instance_id:
+                web_terminal_url = f"https://www.runpod.io/console/serverless/{instance_id}/console"
+
+            return {
+                "ssh_command": ssh_cmd,
+                "web_terminal_url": web_terminal_url,
+                "ip": ip,
+                "port": port,
+                "instance_id": instance_id,
+            }
 
         return await asyncio.gather(*[_do_one(q) for q in allocations])
 
@@ -1129,6 +1224,21 @@ def provision(
             print(
                 "W&B: WANDB_* env vars ready for injection  use `terradev run` to auto-configure"
             )
+
+        # Print explicit SSH / web terminal connection metadata
+        print("\nConnection details:")
+        for r in succeeded:
+            conn = r.get("connection") or {}
+            if conn.get("ssh_command"):
+                print(f"\n  {r['provider']} / {r['instance_id']}")
+                print(f"    Direct SSH Command:")
+                print(f"      {conn['ssh_command']}")
+            if conn.get("web_terminal_url"):
+                print(f"    Web Terminal:")
+                print(f"      {conn['web_terminal_url']}")
+            if not conn.get("ssh_command") and not conn.get("web_terminal_url"):
+                print(f"\n  {r['provider']} / {r['instance_id']}: connection metadata not yet available")
+                print(f"    Check status: terradev manage -i {r['instance_id']} -a status")
     if failed:
         print(f"\n{len(failed)} instance(s) failed:")
         for r in failed:
@@ -1136,9 +1246,6 @@ def provision(
     print(f"Total provision time: {provision_time:.0f}ms")
     if _provision_ssh_pubkey and succeeded:
         print(f"\nSSH key (Ed25519, encrypted): ~/.terradev/ssh/{group_id}.key")
-        print("Instance is provisioning — SSH available once status is 'running'.")
-        print("Check status:  terradev manage -i <instance-id> -a status")
-        print("Then connect:  (SSH command shown automatically with IP)")
     if type == "inference":
         print(f"Model: {model_name or 'Not specified'}")
         print("Type: Inference workload")
