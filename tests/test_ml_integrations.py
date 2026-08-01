@@ -329,3 +329,157 @@ class TestWandbIntegration:
 
     def test_required_credentials_defined(self, mod):
         assert "api_key" in mod.REQUIRED_CREDENTIALS
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Prometheus Integration
+# ══════════════════════════════════════════════════════════════════════════
+
+class TestPrometheusIntegration:
+    @pytest.fixture
+    def mod(self):
+        from terradev_cli.integrations import prometheus_integration
+        return prometheus_integration
+
+    @pytest.fixture
+    def full_creds(self):
+        return {
+            "prometheus_pushgateway_url": "http://pushgateway:9091",
+            "prometheus_username": "admin",
+            "prometheus_password": "secret",
+        }
+
+    @pytest.fixture
+    def empty_creds(self):
+        return {}
+
+    def test_get_credential_prompts_returns_list(self, mod):
+        prompts = mod.get_credential_prompts()
+        assert isinstance(prompts, list)
+        assert len(prompts) >= 1
+
+    def test_credential_prompts_have_required_keys(self, mod):
+        for p in mod.get_credential_prompts():
+            assert "key" in p
+            assert "prompt" in p
+            assert "required" in p
+
+    def test_build_metric_payload_format(self, mod):
+        payload = mod.build_metric_payload(
+            "terradev_provisions_total",
+            1,
+            {"provider": "runpod", "gpu_type": "RTX4090", "region": "us-east-1"},
+        )
+        assert "# HELP terradev_provisions_total" in payload
+        assert "# TYPE terradev_provisions_total counter" in payload
+        assert 'provider="runpod"' in payload
+        assert 'gpu_type="RTX4090"' in payload
+        assert "terradev_provisions_total" in payload
+
+    def test_build_provision_metrics_has_counter_and_gauge(self, mod):
+        payload = mod.build_provision_metrics(
+            "runpod", "RTX4090", "us-east-1", "pod-123", 1.25
+        )
+        assert "terradev_provisions_total" in payload
+        assert "terradev_gpu_cost_per_hour" in payload
+        assert 'instance_id="pod-123"' in payload
+        assert "1.25" in payload
+
+    def test_build_terminate_metrics(self, mod):
+        payload = mod.build_terminate_metrics("runpod", "pod-123", 4.5, 3600)
+        assert "terradev_total_cost_usd" in payload
+        assert "terradev_provision_duration_seconds" in payload
+        assert "4.5" in payload
+        assert "3600" in payload
+
+    def test_get_push_url(self, mod, full_creds):
+        url = mod.get_push_url(full_creds)
+        assert url == "http://pushgateway:9091/metrics/job/terradev"
+
+    def test_get_push_url_custom_job(self, mod, full_creds):
+        url = mod.get_push_url(full_creds, job="myjob")
+        assert url == "http://pushgateway:9091/metrics/job/myjob"
+
+    def test_get_auth_headers_with_basic_auth(self, mod, full_creds):
+        headers = mod.get_auth_headers(full_creds)
+        assert "Authorization" in headers
+        assert headers["Authorization"].startswith("Basic ")
+
+    def test_get_auth_headers_no_auth(self, mod, empty_creds):
+        headers = mod.get_auth_headers(empty_creds)
+        assert "Authorization" not in headers
+
+    def test_is_configured_with_url(self, mod, full_creds):
+        assert mod.is_configured(full_creds) is True
+
+    def test_is_configured_without_url(self, mod, empty_creds):
+        assert mod.is_configured(empty_creds) is False
+
+    def test_get_status_summary_configured(self, mod, full_creds):
+        s = mod.get_status_summary(full_creds)
+        assert s["configured"] is True
+        assert s["integration"] == "prometheus"
+        assert s["pushgateway_url"] == "http://pushgateway:9091"
+        assert s["auth_enabled"] is True
+
+    def test_get_status_summary_unconfigured(self, mod, empty_creds):
+        s = mod.get_status_summary(empty_creds)
+        assert s["configured"] is False
+        assert s["pushgateway_url"] == "(not set)"
+
+    def test_generate_scrape_config(self, mod):
+        cfg = mod.generate_scrape_config()
+        assert "- job_name: 'terradev'" in cfg
+        assert "honor_labels: true" in cfg
+
+    def test_generate_grafana_dashboard_json(self, mod):
+        dashboard = mod.generate_grafana_dashboard_json()
+        assert "dashboard" in dashboard
+        assert dashboard["dashboard"]["title"].startswith("Terradev")
+        assert len(dashboard["dashboard"]["panels"]) > 0
+
+    def test_push_metrics_success(self, mod, full_creds, monkeypatch):
+        class _FakeResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a, **k):
+                return None
+
+        def _fake_urlopen(req, *a, **k):
+            assert req.get_method() == "POST"
+            assert "text/plain" in req.headers["Content-type"]
+            return _FakeResponse()
+
+        monkeypatch.setattr(
+            "urllib.request.urlopen",
+            _fake_urlopen,
+        )
+
+        result = mod.push_metrics(full_creds, "test payload\n")
+        assert result["success"] is True
+        assert result["status_code"] == 200
+
+    def test_push_metrics_connection_failure(self, mod, full_creds, monkeypatch):
+        import urllib.error
+
+        def _fake_urlopen(*a, **k):
+            raise urllib.error.URLError(" refused")
+
+        monkeypatch.setattr(
+            "urllib.request.urlopen",
+            _fake_urlopen,
+        )
+
+        result = mod.push_metrics(full_creds, "test payload\n")
+        assert result["success"] is False
+        assert "Connection failed" in result["error"]
+
+    def test_required_credentials_defined(self, mod):
+        assert "pushgateway_url" in mod.REQUIRED_CREDENTIALS
+
+    def test_optional_credentials_defined(self, mod):
+        assert "username" in mod.OPTIONAL_CREDENTIALS
+        assert "password" in mod.OPTIONAL_CREDENTIALS
