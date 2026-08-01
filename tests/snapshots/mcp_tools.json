@@ -1,5 +1,5 @@
 {
-  "tool_count": 223,
+  "tool_count": 224,
   "tool_names": [
     "active_context",
     "analytics",
@@ -154,6 +154,7 @@
     "preflight",
     "preflight_gpu_check",
     "preflight_network_check",
+    "preflight_provision",
     "preflight_report",
     "price_budget_optimize",
     "price_discovery",
