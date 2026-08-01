@@ -37,12 +37,25 @@ class _FakeClientSession:
         self.headers = kwargs.get("headers") or {}
         self.closed = False
 
-    def request(self, method, url, **kwargs):
+    def _next_response(self):
         if self.responses:
-            status, json_data, text_data = self.responses.pop(0)
-        else:
-            status, json_data, text_data = 200, {}, ""
-        return _FakeRequestContext(_FakeResponse(status, json_data, text_data))
+            return _FakeResponse(*self.responses.pop(0))
+        return _FakeResponse(200, {}, "")
+
+    def get(self, url, **kwargs):
+        return _FakeRequestContext(self._next_response())
+
+    def post(self, url, **kwargs):
+        return _FakeRequestContext(self._next_response())
+
+    def put(self, url, **kwargs):
+        return _FakeRequestContext(self._next_response())
+
+    def delete(self, url, **kwargs):
+        return _FakeRequestContext(self._next_response())
+
+    def request(self, method, url, **kwargs):
+        return _FakeRequestContext(self._next_response())
 
     async def close(self):
         self.closed = True

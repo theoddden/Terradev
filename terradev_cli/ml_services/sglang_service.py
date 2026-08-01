@@ -913,7 +913,7 @@ class SGLangService:
                     "sglang_version": version,
                     "model": self.config.model_name,
                     "endpoint": self.base_url,
-                    "tp_size": self.config.tp_size,
+                    "tp_size": self.config.tp,
                     "dp_size": self.config.dp_size,
                     "expert_parallel": self.config.enable_expert_parallel,
                 }
@@ -1006,7 +1006,7 @@ python3 -c "import sglang; print('SGLang', sglang.__version__, 'installed')"
                 "--port",
                 str(self.config.port),
                 "--tp-size",
-                str(self.config.tp_size),
+                str(self.config.tp),
                 "--dp-size",
                 str(self.config.dp_size),
                 "--mem-fraction-static",
@@ -1077,7 +1077,7 @@ systemctl status sglang
                     "provider": "sglang",
                     "model": self.config.model_name,
                     "endpoint": f"http://{instance_ip}:{self.config.port}/v1",
-                    "tp_size": self.config.tp_size,
+                    "tp_size": self.config.tp,
                     "dp_size": self.config.dp_size,
                     "expert_parallel": self.config.enable_expert_parallel,
                     "output": result.stdout,
@@ -1312,7 +1312,7 @@ systemctl daemon-reload
 # SGLang Deployment Script for Terradev
 # Target: {instance_ip}
 
-echo "Deploying SGLang for {self.config.model_name}..."
+echo "Deploying SGLang for {self.config.model_name or self.config.model_path}..."
 
 # Install SGLang
 pip install "sglang[all]" --find-links https://flashinfer.ai/whl/cu124/torch2.5/flashinfer-python
@@ -1328,10 +1328,10 @@ Type=simple
 User=root
 WorkingDirectory=/root
 ExecStart=python3 -m sglang.launch_server \\
-    --model-path {self.config.model_name} \\
+    --model-path {self.config.model_path} \\
     --host {self.config.host} \\
     --port {self.config.port} \\
-    --tp-size {self.config.tp_size} \\
+    --tp-size {self.config.tp} \\
     --dp-size {self.config.dp_size} \\
     --mem-fraction-static {self.config.mem_fraction_static} \\
     --trust-remote-code{ep_flags}
@@ -1369,16 +1369,27 @@ echo "Test with: curl http://{instance_ip}:{self.config.port}/v1/models"
         ]
 
 
+def _resolve_workload_type(credentials: Dict[str, str]) -> WorkloadType:
+    """Resolve workload type from credentials, falling back to model detection."""
+    wt_value = credentials.get("workload_type")
+    if wt_value:
+        return WorkloadType(wt_value)
+    model_path = credentials.get("model_path", "")
+    _, model_config = SGLangOptimizer().detect_model_type(model_path)
+    return model_config.get("workload_type", WorkloadType.AGENTIC_CHAT)
+
+
 def create_sglang_service_from_credentials(
     credentials: Dict[str, str]
 ) -> SGLangService:
     """Create SGLangService from credential dictionary"""
     config = SGLangConfig(
         model_name=credentials.get("model_name", credentials.get("model_path", "")),
+        workload_type=_resolve_workload_type(credentials),
         host=credentials.get("host", "0.0.0.0"),
         port=int(credentials.get("port", "8000")),
         api_key=credentials.get("api_key", ""),
-        tp_size=int(credentials.get("tp_size", "1")),
+        tp=int(credentials.get("tp_size", "1")),
         dp_size=int(credentials.get("dp_size", "8")),
         mem_fraction_static=float(credentials.get("mem_fraction_static", "0.85")),
         max_model_len=(
