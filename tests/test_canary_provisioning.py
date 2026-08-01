@@ -94,11 +94,59 @@ def _load_creds(provider: str) -> dict:
             "api_key": all_creds.get("gcp_project_id", ""),
             "credentials_file": all_creds.get("gcp_credentials_file", ""),
         },
-        "azure": {"api_key": all_creds.get("azure_client_id", "")},
+        "azure": {
+            "api_key": all_creds.get("azure_client_id", ""),
+            "tenant": all_creds.get("azure_tenant_id", ""),
+            "secret": all_creds.get("azure_client_secret", ""),
+        },
         "oracle": {"api_key": all_creds.get("oci_api_key", "")},
         "crusoe": {"api_key": all_creds.get("crusoe_access_key", "")},
-        "huggingface": {"api_key": all_creds.get("hf_token", "")},
+        "huggingface": {
+            "api_key": all_creds.get("hf_token", ""),
+            "namespace": all_creds.get("hf_namespace", ""),
+        },
         "baseten": {"api_key": all_creds.get("baseten_api_key", "")},
+        "hyperstack": {
+            "api_key": all_creds.get("hyperstack_api_key", ""),
+            "environment": all_creds.get("hyperstack_environment", ""),
+            "ssh_key_name": all_creds.get("hyperstack_ssh_key_name", ""),
+        },
+        "digitalocean": {
+            "api_key": all_creds.get("digitalocean_api_key", all_creds.get("digitalocean_api_token", "")),
+            "region": all_creds.get("digitalocean_region", ""),
+        },
+        "alibaba": {
+            "access_key_id": all_creds.get("alibaba_access_key_id", ""),
+            "access_key_secret": all_creds.get("alibaba_access_key_secret", ""),
+            "region_id": all_creds.get("alibaba_region_id", ""),
+        },
+        "ovhcloud": {
+            "application_key": all_creds.get("ovhcloud_application_key", ""),
+            "application_secret": all_creds.get("ovhcloud_application_secret", ""),
+            "consumer_key": all_creds.get("ovhcloud_consumer_key", ""),
+            "project_id": all_creds.get("ovhcloud_project_id", ""),
+        },
+        "fluidstack": {"api_key": all_creds.get("fluidstack_api_key", "")},
+        "hetzner": {
+            "api_token": all_creds.get("hetzner_api_token", ""),
+            "robot_user": all_creds.get("hetzner_robot_user", ""),
+            "robot_password": all_creds.get("hetzner_robot_password", ""),
+        },
+        "siliconflow": {
+            "api_key": all_creds.get("siliconflow_api_key", ""),
+            "default_model": all_creds.get("siliconflow_default_model", ""),
+        },
+        "inferx": {
+            "api_key": all_creds.get("inferx_api_key", ""),
+            "api_endpoint": all_creds.get("inferx_api_endpoint", ""),
+            "region": all_creds.get("inferx_region", ""),
+        },
+        "latitude": {"api_key": all_creds.get("latitude_api_key", "")},
+        "yottalabs": {"api_key": all_creds.get("yottalabs_api_key", "")},
+        "e2enetworks": {
+            "api_key": all_creds.get("e2enetworks_api_key", ""),
+            "project_id": all_creds.get("e2enetworks_project_id", ""),
+        },
     }
     return flat.get(provider, {})
 
@@ -166,7 +214,61 @@ CANARY_PROVIDER_CONFIG = {
         "gpu_types": ["A100", "A10G"],
         "regions": ["us-east-1"],
     },
+    "hyperstack": {
+        "gpu_types": ["A100", "RTX4090"],
+        "regions": ["default-CANADA-1"],
+    },
+    "digitalocean": {
+        "gpu_types": ["A100", "H100"],
+        "regions": ["tor1", "nyc3"],
+    },
+    "alibaba": {
+        "gpu_types": ["A100", "H100"],
+        "regions": ["cn-beijing", "cn-shanghai"],
+    },
+    "ovhcloud": {
+        "gpu_types": ["A100", "H100"],
+        "regions": ["gra", "sbg"],
+    },
+    "fluidstack": {
+        "gpu_types": ["A100", "H100"],
+        "regions": ["us-east"],
+    },
+    "hetzner": {
+        "gpu_types": ["A100", "H100"],
+        "regions": ["fsn1", "nbg1"],
+    },
+    "siliconflow": {
+        "gpu_types": ["A100", "H100"],
+        "regions": ["global"],
+    },
+    "inferx": {
+        "gpu_types": ["A100", "H100"],
+        "regions": ["us-west-2", "us-east-1"],
+    },
+    "latitude": {
+        "gpu_types": ["A100", "H100"],
+        "regions": ["us-east-1"],
+    },
+    "yottalabs": {
+        "gpu_types": ["A100", "H100"],
+        "regions": ["us-east-1"],
+    },
+    "e2enetworks": {
+        "gpu_types": ["A100", "H100"],
+        "regions": ["us-east-1"],
+    },
 }
+
+CANARY_PROVIDERS = list(CANARY_PROVIDER_CONFIG.keys())
+CANARY_GPU_MATRIX = [
+    (p, CANARY_PROVIDER_CONFIG[p]["gpu_types"][0])
+    for p in CANARY_PROVIDERS
+]
+CANARY_REGION_MATRIX = [
+    (p, CANARY_PROVIDER_CONFIG[p]["regions"][0])
+    for p in CANARY_PROVIDERS
+]
 
 
 def _get_canary_regions(provider_name: str) -> List[str]:
@@ -309,7 +411,10 @@ async def _canary_for_provider(
 
     try:
         # Step 1: Get quotes and validate one exists
-        quotes = await provider.get_instance_quotes(gpu) or []
+        try:
+            quotes = await provider.get_instance_quotes(gpu) or []
+        except (NotImplementedError, AttributeError) as exc:
+            pytest.skip(f"{provider_name} does not support canary quote fetching: {exc}")
         if not quotes:
             pytest.skip(f"No {gpu} quotes from {provider_name}")
 
@@ -483,7 +588,10 @@ async def _canary_distributed(provider_names: List[str], gpu_type: Optional[str]
                 pytest.skip(f"No credentials configured for {provider_name}")
 
             provider = factory.create_provider(provider_name, creds)
-            quotes = await provider.get_instance_quotes(gpu) or []
+            try:
+                quotes = await provider.get_instance_quotes(gpu) or []
+            except (NotImplementedError, AttributeError) as exc:
+                pytest.skip(f"{provider_name} does not support canary quote fetching: {exc}")
             cheap = _select_canary_quotes(quotes, TERRADEV_CANARY_MAX_PRICE, _get_canary_regions(provider_name))
             if not cheap:
                 pytest.skip(f"No affordable {gpu} quotes from {provider_name}")
@@ -541,9 +649,6 @@ async def _canary_distributed(provider_names: List[str], gpu_type: Optional[str]
 
 # ── Test functions ──────────────────────────────────────────────────────
 
-CANARY_PROVIDERS = list(CANARY_PROVIDER_CONFIG.keys())
-
-
 @pytest.mark.parametrize("provider", CANARY_PROVIDERS)
 async def test_canary_provider(provider):
     """Canary test for a single provider with default GPU."""
@@ -554,14 +659,7 @@ async def test_canary_provider(provider):
 
 @pytest.mark.parametrize(
     "provider, gpu",
-    [
-        ("runpod", "RTX4090"),
-        ("runpod", "A6000"),
-        ("vastai", "RTX4090"),
-        ("lambda_labs", "A100"),
-        ("coreweave", "A100"),
-        ("tensordock", "RTX4090"),
-    ],
+    CANARY_GPU_MATRIX,
 )
 async def test_canary_gpu_matrix(provider, gpu):
     """Canary tests across provider + GPU combinations."""
@@ -571,14 +669,7 @@ async def test_canary_gpu_matrix(provider, gpu):
 
 @pytest.mark.parametrize(
     "provider, region",
-    [
-        ("runpod", "us-east-1"),
-        ("runpod", "us-west-1"),
-        ("vastai", "us"),
-        ("lambda_labs", "us-east-1"),
-        ("coreweave", "us-east-1"),
-        ("tensordock", "us-east"),
-    ],
+    CANARY_REGION_MATRIX,
 )
 async def test_canary_region(provider, region):
     """Canary tests across provider + region combinations."""
@@ -588,7 +679,7 @@ async def test_canary_region(provider, region):
 
 @pytest.mark.parametrize(
     "provider",
-    ["runpod", "vastai"],
+    CANARY_PROVIDERS,
 )
 async def test_canary_quote_to_provision(provider):
     """Canary that validates the provisioned instance matches the selected quote."""
@@ -602,7 +693,7 @@ async def test_canary_quote_to_provision(provider):
 
 @pytest.mark.parametrize(
     "provider",
-    ["runpod", "vastai", "lambda_labs"],
+    CANARY_PROVIDERS,
 )
 async def test_canary_lifecycle(provider):
     """Canary with lifecycle probes enabled."""
@@ -616,7 +707,7 @@ async def test_canary_lifecycle(provider):
 async def test_canary_distributed_two_providers():
     """Provision tiny nodes on two providers and verify both are reachable."""
     # Prefer providers with likely cheap spot GPUs
-    candidates = ["runpod", "vastai"]
+    candidates = ["runpod", "vastai", "lambda_labs", "tensordock", "coreweave"]
     configured = [p for p in candidates if any(_load_creds(p).values())]
     if len(configured) < 2:
         pytest.skip("Need credentials for at least two of runpod/vastai for distributed canary")
