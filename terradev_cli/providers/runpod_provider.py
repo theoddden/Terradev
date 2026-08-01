@@ -67,6 +67,9 @@ class RunPodProvider(BaseProvider):
             logger.debug(f"RunPod API error: {e}")
             return []
 
+        # No matching quotes found or API returned empty list
+        return []
+
     async def _get_live_pricing(self, gpu_type: str) -> List[Dict[str, Any]]:
         """Query RunPod GraphQL API for live GPU availability"""
         query = """
@@ -137,6 +140,9 @@ class RunPodProvider(BaseProvider):
         attach_volume: bool = True,
         volume_size_gb: int = 100,
         ssh_public_key: str = "",
+        image_name: str = "",
+        min_memory_in_gb: int = 24,
+        min_vcpu_count: int = 4,
     ) -> Dict[str, Any]:
         """Provision RunPod instance with optional volume attachment"""
         if not self.api_key:
@@ -160,15 +166,18 @@ class RunPodProvider(BaseProvider):
             else:
                 raise RuntimeError(f"Unsupported cloud type: {instance_type}")
 
+            # Validated RunPod template image (old runpod/base:latest is not in registry)
+            default_image = "runpod/pytorch:2.2.0-py3.10-cuda12.1.1-devel-ubuntu22.04"
+
             # Create pod specification
             pod_spec = {
                 "name": f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "imageName": "runpod/base:latest",
+                "imageName": image_name or default_image,
                 "gpuTypeId": gpu_id,
                 "cloudType": "SECURE" if is_secure else "COMMUNITY",
                 "containerDiskInGb": 40,
-                "minMemoryInGb": 80,
-                "minVcpuCount": 4,
+                "minMemoryInGb": min_memory_in_gb,
+                "minVcpuCount": min_vcpu_count,
                 "env": [
                     {"key": "TERRADEV_MANAGED", "value": "true"},
                     {"key": "GPU_TYPE", "value": gpu_type},
@@ -510,4 +519,18 @@ class RunPodProvider(BaseProvider):
             "POST", self.API_BASE, json={"query": mutation, "variables": variables}
         )
 
-        return data.get("data", {}).get("podFindAndDeployOnDemand", {})
+        if not isinstance(data, dict):
+            raise RuntimeError(f"Unexpected RunPod deploy response: {data}")
+
+        if data.get("errors"):
+            errors = data["errors"]
+            messages = [e.get("message", str(e)) for e in errors]
+            raise RuntimeError(f"RunPod GraphQL error: {'; '.join(messages)}")
+
+        deployment = data.get("data", {}).get("podFindAndDeployOnDemand")
+        if not deployment:
+            raise RuntimeError(
+                f"RunPod podFindAndDeployOnDemand returned empty data: {data}"
+            )
+
+        return deployment

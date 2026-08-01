@@ -127,11 +127,11 @@ async def _capacity_check(
 async def _image_check(provider, provider_name: str) -> PreflightCheck:
     """Verify that the provider can resolve its default container image."""
     # Default image used by most providers; RunPod overrides in its pod spec
-    default_image = "runpod/base:latest"
+    default_image = "runpod/pytorch:2.2.0-py3.10-cuda12.1.1-devel-ubuntu22.04"
     if provider_name == "runpod":
-        default_image = "runpod/base:latest"
+        default_image = "runpod/pytorch:2.2.0-py3.10-cuda12.1.1-devel-ubuntu22.04"
     elif provider_name == "vastai":
-        default_image = "pytorch/pytorch:latest"
+        default_image = "pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel"
 
     # We cannot actually pull the image without an instance, but we can ensure
     # the image string is well-formed and, where possible, hit the registry

@@ -164,6 +164,22 @@ test:
     - develop
     - merge_requests
 
+# === Provider API Contract Tests (Snapshot) ===
+provider-contracts:
+  stage: test
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - pytest tests/test_provider_api_contracts.py -v --tb=short
+  only:
+    - main
+    - develop
+    - merge_requests
+
 # === Integration Tests (Mock) ===
 integration-mock:
   stage: integration
@@ -195,6 +211,26 @@ integration-live:
   only:
     - main
     - develop
+
+# === Canary Provisioning (Live - Manual) ===
+canary-live:
+  stage: integration
+  image: python:3.11
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -e ".[dev]" 2>/dev/null || pip install -e .
+    - pip install pytest pytest-asyncio
+  script:
+    - TERRADEV_CANARY_TEST=1 pytest tests/test_canary_provisioning.py -v --tb=short
+  when: manual
+  only:
+    - main
+    - develop
+  variables:
+    TERRADEV_CANARY_GPU: "RTX4090"
+    TERRADEV_CANARY_MAX_PRICE: "0.50"
+    TERRADEV_CANARY_TIMEOUT: "300"
 
 # === Build Package ===
 build:

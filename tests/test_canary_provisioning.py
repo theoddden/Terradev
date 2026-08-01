@@ -116,7 +116,7 @@ async def _canary_for_provider(provider_name: str):
     provider = factory.create_provider(provider_name, creds)
 
     # Step 1: Get quotes for the canary GPU
-    quotes = await provider.get_instance_quotes(TERRADEV_CANARY_GPU)
+    quotes = await provider.get_instance_quotes(TERRADEV_CANARY_GPU) or []
     cheap = [q for q in quotes if q.get("price", q.get("price_per_hour", 1e9)) <= TERRADEV_CANARY_MAX_PRICE]
     if not cheap:
         cheap = sorted(
@@ -135,14 +135,51 @@ async def _canary_for_provider(provider_name: str):
         f"[{provider_name}] Canary selected: {instance_type} in {region} at ${price:.2f}/hr"
     )
 
-    # Step 2: Provision
-    provision_result = await provider.provision_instance(
-        instance_type=instance_type,
-        region=region,
-        gpu_type=TERRADEV_CANARY_GPU,
-        ssh_public_key="",
-    )
-    instance_id = provision_result.get("instance_id")
+    # Step 2: Provision, with retries for spot preemption / instant capacity depletion
+    provision_kwargs = {
+        "instance_type": instance_type,
+        "region": region,
+        "gpu_type": TERRADEV_CANARY_GPU,
+        "ssh_public_key": "",
+        "attach_volume": False,
+    }
+    if provider_name == "runpod":
+        # Lower constraints to improve the chance of matching an available host
+        provision_kwargs["min_memory_in_gb"] = 16
+        provision_kwargs["min_vcpu_count"] = 2
+
+    last_error = None
+    for attempt, quote in enumerate(cheap[:3]):
+        instance_type = quote.get("instance_type", f"{provider_name}-{TERRADEV_CANARY_GPU.lower()}")
+        region = quote.get("region", "us-east-1")
+        provision_kwargs["instance_type"] = instance_type
+        provision_kwargs["region"] = region
+
+        logger.info(f"[{provider_name}] Canary provision attempt {attempt + 1}: {instance_type} in {region}")
+        try:
+            provision_result = await provider.provision_instance(**provision_kwargs)
+            instance_id = provision_result.get("instance_id")
+            if instance_id:
+                break
+        except RuntimeError as exc:
+            last_error = exc
+            msg = str(exc).lower()
+            if any(phrase in msg for phrase in (
+                "no instances available",
+                "no longer any instances",
+                "capacity",
+                "not enough",
+                "out of stock",
+                "unavailable",
+            )):
+                logger.warning(f"[{provider_name}] Capacity depleted for {instance_type}: {exc}")
+                continue
+            raise
+    else:
+        raise RuntimeError(
+            f"[{provider_name}] Could not provision any canary instance after 3 attempts. Last error: {last_error}"
+        )
+
     assert instance_id, f"[{provider_name}] provision did not return an instance id"
 
     logger.info(f"[{provider_name}] Provisioned {instance_id}, polling for RUNNING...")
@@ -193,6 +230,8 @@ async def _canary_for_provider(provider_name: str):
         except Exception as term_exc:  # noqa: BLE001
             logger.warning(f"[{provider_name}] Cleanup failed: {term_exc}")
         raise
+    finally:
+        await provider.aclose()
 
 
 @pytest.mark.parametrize(
