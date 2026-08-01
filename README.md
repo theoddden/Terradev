@@ -1,4 +1,4 @@
-# Terradev CLI v5.7.2
+# Terradev CLI v5.7.3
 
 **Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration.**
 
@@ -17,7 +17,7 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON 5.7.2**
+**NOTES ON 5.7.3**
 
 - Expanded Python 3.9 support with a compatibility shim for the MCP SDK, plus bundled `EnterpriseAuthManager` and `SAMLProvider` scaffolding for enterprise SSO.
 - Hardened the test suite: provider conformance, Kubernetes CPU parsing, and major-provider error paths are now fully exercised.

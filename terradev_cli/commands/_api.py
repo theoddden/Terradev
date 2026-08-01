@@ -621,51 +621,115 @@ class TerradevAPI:
 
 
 def run_interactive_onboarding(api: TerradevAPI):
-    """Interactive onboarding flow for first-time users"""
+    """Interactive onboarding flow for first-time users."""
+    import asyncio
+    from terradev_cli.providers.provider_factory import ProviderFactory
 
-    # Beautiful welcome screen
-    print("\n" + "=" * 70)
+    async def _test_provider(provider_key: str) -> tuple:
+        """Test a provider's credentials with a lightweight quote call."""
+        try:
+            creds = api._provider_creds(provider_key)
+            factory = ProviderFactory()
+            provider = factory.create_provider(provider_key, creds)
+        except Exception as exc:  # noqa: BLE001
+            return False, f"Could not initialise provider: {exc}"
+
+        try:
+            quotes = await provider.get_instance_quotes("A100")
+            if quotes:
+                return True, "API connection OK"
+            return False, "No quotes returned. The key may be invalid, the provider has no available A100 capacity, or the API is unreachable."
+        except Exception as exc:  # noqa: BLE001
+            return False, str(exc)
+        finally:
+            try:
+                if provider.session and not provider.session.closed:
+                    await provider.session.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _clear_provider_creds(provider_key: str) -> None:
+        """Remove in-memory credentials for a provider if the user discards them."""
+        if provider_key == "aws":
+            api.credentials.pop("aws_access_key_id", None)
+            api.credentials.pop("aws_secret_access_key", None)
+        elif provider_key == "gcp":
+            api.credentials.pop("gcp_project_id", None)
+            api.credentials.pop("gcp_credentials_file", None)
+        else:
+            api.credentials.pop(f"{provider_key}_api_key", None)
+
+    def _collect_provider(provider_key: str, config: dict) -> bool:
+        """Collect credentials for a provider. Returns True if something was entered."""
+        if provider_key == "gcp":
+            print()
+            print("   Enter path to your service account JSON file:")
+            print(f"   Example: {config['example']}")
+            file_path = click.prompt(
+                f"   {config['key_name']}", default="", show_default=False
+            )
+            if file_path and file_path.strip():
+                if os.path.exists(file_path):
+                    api.credentials["gcp_project_id"] = click.prompt(
+                        "   GCP Project ID", default=""
+                    )
+                    api.credentials["gcp_credentials_file"] = file_path
+                    return True
+                print(f"   File not found: {file_path}")
+            return False
+
+        if provider_key == "aws":
+            print()
+            print("   AWS requires both Access Key ID and Secret Access Key")
+            access_key = click.prompt(
+                "   Access Key ID",
+                default="",
+                hide_input=True,
+                show_default=False,
+            )
+            if access_key and access_key.strip():
+                secret_key = click.prompt(
+                    "   Secret Access Key",
+                    default="",
+                    hide_input=True,
+                    show_default=False,
+                )
+                if secret_key and secret_key.strip():
+                    api.credentials["aws_access_key_id"] = access_key
+                    api.credentials["aws_secret_access_key"] = secret_key
+                    return True
+                print("   Skipped AWS (missing secret)")
+            else:
+                print("   Skipped AWS")
+            return False
+
+        key_value = click.prompt(
+            f"   {config['key_name']}",
+            default="",
+            hide_input=True,
+            show_default=False,
+        )
+        if key_value and key_value.strip():
+            if provider_key == "aws":
+                api.credentials["aws_access_key_id"] = key_value
+            elif provider_key == "gcp":
+                api.credentials["gcp_project_id"] = key_value
+            else:
+                api.credentials[f"{provider_key}_api_key"] = key_value
+            return True
+        return False
+
+    print()
+    print("=" * 70)
     print("WELCOME TO TERRADEV CLI".center(70))
     print("=" * 70)
-    print("\nYour Cross-Cloud GPU Optimization Platform")
-    print("Save 30-60% on GPU compute costs across 9+ cloud providers")
+    print()
+    print("Your Cross-Cloud GPU Optimization Platform")
+    print("Save 30-60% on GPU compute costs across multiple cloud providers")
     print("Real-time pricing + automated provisioning")
-    print("\n" + "=" * 70)
+    print()
+    print("=" * 70)
 
-    # Show what we'll set up
-    print("\nWe'll configure API keys for these providers:")
-    providers_to_show = [
-        ("runpod", "RunPod", "Cheapest spot GPUs"),
-        ("vastai", "Vast.ai", "Competitive spot market"),
-        ("aws", "AWS", "Enterprise cloud"),
-        ("gcp", "Google Cloud", "ML-optimized"),
-        ("azure", "Azure", "Enterprise integration"),
-        ("lambda_labs", "Lambda Labs", "Fast provisioning"),
-        ("tensordock", "TensorDock", "Budget-friendly"),
-        ("oracle", "Oracle Cloud", "Reliable infrastructure"),
-        ("crusoe", "Crusoe Cloud", "Sustainable computing"),
-    ]
-
-    for i, (key, name, desc) in enumerate(providers_to_show, 1):
-        print(f"   {i:2d}. {name:<15} - {desc}")
-
-    print("\nTip: You can start with just 1-2 providers and add more later!")
-    print("All keys are stored locally in ~/.terradev/credentials.json")
-
-    # Ask if they want to proceed
-    print("\n" + "-" * 70)
-    proceed = click.confirm("Ready to set up your cloud providers?", default=True)
-
-    if not proceed:
-        print("\nNo problem! You can configure anytime with:")
-        print("   terradev configure")
-        print("   terradev configure --provider runpod")
-        print("\nQuick start: Add just RunPod for cheapest spot GPUs")
-        return
-
-    print("\nLet's set up your providers! (Press Enter to skip any provider)\n")
-
-    # Provider configurations with helpful info
     provider_configs = {
         "runpod": {
             "name": "RunPod",
@@ -739,204 +803,115 @@ def run_interactive_onboarding(api: TerradevAPI):
             "env_var": "CRUSOE_ACCESS_KEY",
             "why": "Sustainable computing, unique GPU options",
         },
-        "huggingface": {
-            "name": "HuggingFace",
-            "key_name": "API Token",
-            "help": "Get from: https://huggingface.co/settings/tokens",
-            "example": "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "env_var": "HF_TOKEN",
-            "why": "ML model hub, inference endpoints",
-        },
-        "baseten": {
-            "name": "Baseten",
-            "key_name": "API Key",
-            "help": "Get from: Baseten dashboard",
-            "example": "bt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "env_var": "BASETEN_API_KEY",
-            "why": "Production model serving platform",
-        },
-        "siliconflow": {
-            "name": "SiliconFlow",
-            "key_name": "API Key",
-            "help": "Get from: https://cloud.siliconflow.cn/account/ak",
-            "example": "sf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "env_var": "SILICONFLOW_API_KEY",
-            "why": "GPU cloud with competitive pricing",
-        },
-        "fluidstack": {
-            "name": "FluidStack",
-            "key_name": "API Key",
-            "help": "Get from: FluidStack dashboard → API Keys",
-            "example": "fs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "env_var": "FLUIDSTACK_API_KEY",
-            "why": "Low-cost GPU instances for training",
-        },
-        "hetzner": {
-            "name": "Hetzner",
-            "key_name": "API Token",
-            "help": "Get from: Hetzner Cloud Console → Security → API Tokens",
-            "example": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "env_var": "HETZNER_API_TOKEN",
-            "why": "European cloud, excellent price/performance",
-        },
-        "ovhcloud": {
-            "name": "OVHcloud",
-            "key_name": "Application Key",
-            "help": "Get from: https://api.ovh.com/createToken/",
-            "example": "xxxxxxxxxxxxxxxx",
-            "env_var": "OVH_APPLICATION_KEY",
-            "why": "European sovereign cloud, GPU instances",
-        },
-        "alibaba": {
-            "name": "Alibaba Cloud",
-            "key_name": "Access Key ID",
-            "help": "Get from: Alibaba Cloud Console → AccessKey Management",
-            "example": "LTAIxxxxxxxxxxxxxxxxxx",
-            "env_var": "ALIBABA_ACCESS_KEY_ID",
-            "why": "Asia-Pacific GPU availability",
-        },
-        "hyperstack": {
-            "name": "Hyperstack",
-            "key_name": "API Key",
-            "help": "Get from: Hyperstack dashboard → API Keys",
-            "example": "hs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "env_var": "HYPERSTACK_API_KEY",
-            "why": "GPU-optimized cloud infrastructure",
-        },
-        "digitalocean": {
-            "name": "DigitalOcean",
-            "key_name": "API Token",
-            "help": "Get from: DigitalOcean → API → Tokens",
-            "example": "dop_v1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "env_var": "DIGITALOCEAN_TOKEN",
-            "why": "Simple cloud with GPU droplets",
-        },
-        "inferx": {
-            "name": "InferX",
-            "key_name": "API Key",
-            "help": "Get from: InferX dashboard → API Keys",
-            "example": "ix_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "env_var": "INFERX_API_KEY",
-            "why": "Serverless inference, <2s cold starts",
-        },
     }
 
-    # Track what we configured
     configured_providers = []
 
-    # Interactive setup for each provider
-    for provider_key, config in provider_configs.items():
-        print(f"\n{'='*60}")
+    print()
+    print("Tip: You only need to set up ONE provider to get started.")
+    print("Add more later with: terradev configure --provider <name>")
+    print("All keys are stored locally in ~/.terradev/credentials.json")
+
+    while True:
+        print()
+        print("-" * 70)
+        print("Available providers:")
+        for i, (key, config) in enumerate(provider_configs.items(), 1):
+            marker = " (configured)" if key in configured_providers else ""
+            print(f"   {i:2d}. {config['name']:<15} - {config['why']}{marker}")
+        print("    0.  Done / skip")
+
+        choice = click.prompt(
+            "Which provider would you like to set up?",
+            default="runpod",
+        ).strip().lower()
+
+        if not choice or choice in ("0", "done", "skip", "no", "n"):
+            break
+
+        if choice.isdigit():
+            idx = int(choice) - 1
+            if 0 <= idx < len(provider_configs):
+                choice = list(provider_configs.keys())[idx]
+            else:
+                print("Invalid choice. Please pick a number from the list.")
+                continue
+
+        if choice not in provider_configs:
+            print(f"Unknown provider '{choice}'. Please choose from the list.")
+            continue
+
+        provider_key = choice
+        config = provider_configs[provider_key]
+
+        print()
+        print("=" * 60)
         print(f"Setting up {config['name']}")
         print(f"   {config['why']}")
         print(f"   Help: {config['help']}")
         print(f"   Environment variable: {config['env_var']}")
 
-        # Check if already configured
-        existing_value = api.credentials.get(
-            f"{provider_key}_api_key"
-        ) or api.credentials.get(f"{provider_key}_access_key_id")
-        if existing_value and isinstance(existing_value, str) and not any(
-            pattern in existing_value.lower()
-            for pattern in ["your_", "example_", "test_", "placeholder_", "xxx"]
+        existing = (
+            api.credentials.get(f"{provider_key}_api_key")
+            or api.credentials.get("aws_access_key_id")
+            or api.credentials.get("gcp_project_id")
+        )
+        if (
+            existing
+            and isinstance(existing, str)
+            and not any(pattern in existing.lower() for pattern in ["your_", "example_", "test_", "placeholder_", "xxx"])
         ):
-            print("   Already configured!")
-            configured_providers.append(provider_key)
-            continue
+            if not click.confirm(f"   {config['name']} is already configured. Reconfigure?", default=False):
+                print(f"   Kept existing {config['name']} configuration.")
+                if provider_key not in configured_providers:
+                    configured_providers.append(provider_key)
+                continue
 
-        # Ask to configure this provider
-        configure_this = click.confirm(f"   Configure {config['name']}?", default=False)
-
-        if not configure_this:
+        if not click.confirm(f"   Configure {config['name']}?", default=True):
             print(f"   Skipped {config['name']}")
             continue
 
-        # Get the API key
-        if provider_key == "gcp":
-            # Special handling for GCP JSON file
-            print("\n   Enter path to your service account JSON file:")
-            print(f"   Example: {config['example']}")
-            file_path = click.prompt(
-                f"   {config['key_name']}", default="", show_default=False
-            )
+        got_input = _collect_provider(provider_key, config)
+        if not got_input:
+            print(f"   Skipped {config['name']}")
+            continue
 
-            if file_path and file_path.strip():
-                # Validate file exists
-                if os.path.exists(file_path):
-                    api.credentials["gcp_project_id"] = click.prompt(
-                        "   GCP Project ID", default=""
-                    )
-                    api.credentials["gcp_credentials_file"] = file_path
-                    configured_providers.append(provider_key)
-                    print(f"   {config['name']} configured!")
-                else:
-                    print(f"   File not found: {file_path}")
-            else:
-                print(f"   Skipped {config['name']}")
+        print()
+        print(f"   Testing {config['name']} API connection...")
+        try:
+            success, msg = asyncio.run(_test_provider(provider_key))
+        except Exception as exc:  # noqa: BLE001
+            success, msg = False, str(exc)
 
-        elif provider_key == "aws":
-            # AWS needs multiple keys
-            print("\n   AWS requires both Access Key ID and Secret Access Key")
-            access_key = click.prompt(
-                f"   {config['key_name']}",
-                default="",
-                hide_input=True,
-                show_default=False,
-            )
-            if access_key and access_key.strip():
-                secret_key = click.prompt(
-                    "   Secret Access Key",
-                    default="",
-                    hide_input=True,
-                    show_default=False,
-                )
-                if secret_key and secret_key.strip():
-                    api.credentials["aws_access_key_id"] = access_key
-                    api.credentials["aws_secret_access_key"] = secret_key
-                    configured_providers.append(provider_key)
-                    print(f"   {config['name']} configured!")
-                else:
-                    print(f"   Skipped {config['name']} (missing secret)")
-            else:
-                print(f"   Skipped {config['name']}")
-
+        if not success:
+            print(f"   Warning: API check failed: {msg}")
+            if not click.confirm("   Save credentials anyway?", default=False):
+                _clear_provider_creds(provider_key)
+                print(f"   Discarded {config['name']} credentials.")
+                continue
         else:
-            # Single key providers
-            key_value = click.prompt(
-                f"   {config['key_name']}",
-                default="",
-                hide_input=True,
-                show_default=False,
-            )
+            print(f"   {config['name']} API connection verified")
 
-            if key_value and key_value.strip():
-                # Store with appropriate key name
-                if provider_key == "aws":
-                    api.credentials["aws_access_key_id"] = key_value
-                elif provider_key == "gcp":
-                    api.credentials["gcp_project_id"] = key_value
-                else:
-                    api.credentials[f"{provider_key}_api_key"] = key_value
+        configured_providers.append(provider_key)
 
-                configured_providers.append(provider_key)
-                print(f"   {config['name']} configured!")
-            else:
-                print(f"   Skipped {config['name']}")
+        if not click.confirm("   Set up another provider?", default=False):
+            break
 
-    # Save credentials
     if configured_providers:
         api.save_credentials()
-        print(f"\n{'='*70}")
-        print(f"SUCCESS! Configured {len(configured_providers)} providers:")
+        print()
+        print("=" * 70)
+        print(f"SUCCESS! Configured {len(configured_providers)} provider(s):")
         for provider in configured_providers:
             print(f"   {provider_configs[provider]['name']}")
     else:
-        print(f"\n{'='*70}")
+        print()
+        print("=" * 70)
         print("No providers configured. You can add them anytime with:")
         print("   terradev configure --provider runpod")
 
-    # Next steps
-    print("\nNEXT STEPS:")
+    print()
+    print("NEXT STEPS:")
     if configured_providers:
         print("   1. Try it out: terradev quote -g A100")
         print("   2. Provision GPU: terradev provision -g A100 --duration 4")
@@ -946,12 +921,13 @@ def run_interactive_onboarding(api: TerradevAPI):
         print("      terradev configure --provider runpod")
         print("   2. Then try: terradev quote -g A100")
 
-    print("\nNEED HELP?")
+    print()
+    print("NEED HELP?")
     print("   Documentation: https://github.com/theoddden/terradev")
     print("   Support: team@terradev.com")
     print("   Quick start guide: https://github.com/theoddden/terradev#quick-start")
 
-    print("\nWELCOME TO TERRADEV! Happy GPU hunting!")
-    print("=" * 70 + "\n")
-
-
+    print()
+    print("WELCOME TO TERRADEV! Happy GPU hunting!")
+    print("=" * 70)
+    print()
