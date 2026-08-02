@@ -38,6 +38,30 @@ def state_mgr(tmp_path):
     m.close()
 
 
+class _FakePopen:
+    """Stand-in for a launched training process."""
+
+    pid = 1234
+
+    def poll(self):
+        return None
+
+    def terminate(self):
+        pass
+
+    def wait(self, timeout=None):
+        return 0
+
+
+@pytest.fixture(autouse=True)
+def no_real_training_process(monkeypatch):
+    """Prevent live torchrun/deepspeed/accelerate processes during tests."""
+    monkeypatch.setattr(
+        "terradev_cli.core.training_orchestrator.subprocess.Popen",
+        lambda *args, **kwargs: _FakePopen(),
+    )
+
+
 # ── TrainingConfig ────────────────────────────────────────────────────────────
 
 
