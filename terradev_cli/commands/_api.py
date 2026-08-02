@@ -230,6 +230,15 @@ class TerradevAPI:
         except Exception as e:  # noqa: BLE001
             print(f"ERROR: Failed to save credentials: {e}", file=sys.stderr)
 
+    def _save_provider_creds(self, provider_name: str, creds: Dict[str, str]) -> None:
+        """Store/update credentials for a specific provider."""
+        if not isinstance(self.credentials, dict):
+            self.credentials = {}
+        self.credentials[provider_name] = {
+            k: str(v) if v is not None else "" for k, v in creds.items()
+        }
+        self.save_credentials()
+
     def load_usage(self):
         """Load usage tracking"""
         if self.usage_file.exists():
