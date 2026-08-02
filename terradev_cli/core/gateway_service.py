@@ -15,6 +15,7 @@ Features:
 """
 
 import asyncio
+import inspect
 import json
 import logging
 import time
@@ -23,6 +24,23 @@ from typing import Dict, List, Any, Optional, AsyncGenerator
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+
+# FastAPI 0.104.x with Starlette >=1.0: Starlette's Router no longer accepts
+# on_startup/on_shutdown, but FastAPI's APIRouter still passes them. Patch the
+# parent Router.__init__ to drop the legacy kwargs so the gateway app can load.
+try:
+    import starlette.routing
+
+    _starlette_router_init = starlette.routing.Router.__init__
+    if "on_startup" not in inspect.signature(_starlette_router_init).parameters:
+        def _patched_router_init(self, *args, **kwargs):
+            kwargs.pop("on_startup", None)
+            kwargs.pop("on_shutdown", None)
+            return _starlette_router_init(self, *args, **kwargs)
+
+        starlette.routing.Router.__init__ = _patched_router_init
+except Exception:  # noqa: BLE001
+    pass
 
 try:
     from fastapi import FastAPI, Request, Response, HTTPException, BackgroundTasks
