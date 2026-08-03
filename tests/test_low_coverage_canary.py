@@ -121,9 +121,17 @@ class TestCanaryDemo:
     def test_main_runs(self, monkeypatch):
         from terradev_cli import demo
 
+        class _FakeTime:
+            _t = 0.0
+
+            def __call__(self):
+                self._t += 0.1
+                return self._t
+
         monkeypatch.setattr("builtins.print", lambda *a, **k: None)
         monkeypatch.setattr(asyncio, "sleep", AsyncMock())
-        asyncio.get_event_loop().run_until_complete(demo.main())
+        monkeypatch.setattr("time.time", _FakeTime())
+        _run(demo.main())
 
 
 # ---------------------------------------------------------------------------

@@ -312,7 +312,7 @@ async def main():
     parallel_time = time.time() - parallel_start
     print(f"   All providers: {parallel_time:.1f}s")
 
-    speedup = sequential_time / parallel_time
+    speedup = sequential_time / parallel_time if parallel_time > 0 else 0.0
     print(f"\n🚀 Speedup: {speedup:.1f}x faster")
 
     # Demo 3: Multi-GPU comparison
