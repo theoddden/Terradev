@@ -3,6 +3,7 @@
 
 import json
 import logging
+import sys
 from typing import Any, Dict, List, Optional
 
 import click

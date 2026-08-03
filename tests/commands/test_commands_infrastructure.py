@@ -69,6 +69,15 @@ class TestFunctionalInfrastructure:
         result = runner.invoke(cli, ["price-discovery", "--gpu-type", "A100", "--trends"], obj={"api": mock_api})
         assert result.exit_code == 0
 
+    @patch("terradev_cli.core.price_discovery.PriceDiscoveryEngine")
+    def test_price_discovery_requires_gpu_type(self, MockEngine, runner, mock_api):
+        engine = MockEngine.return_value
+        engine.__aenter__ = AsyncMock(return_value=engine)
+        engine.__aexit__ = AsyncMock(return_value=False)
+        result = runner.invoke(cli, ["price-discovery"], obj={"api": mock_api})
+        assert result.exit_code == 2
+        assert "Please specify --gpu-type" in result.output
+
     @patch("terradev_cli.core.price_discovery.BudgetOptimizationEngine")
     def test_budget_optimize_runs(self, MockEngine, runner, mock_api):
         engine = MockEngine.return_value
