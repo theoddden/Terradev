@@ -57,8 +57,8 @@ os.environ["TERRADEV_SKIP_ONBOARDING"] = "1"
 
 @pytest.fixture
 def runner() -> CliRunner:
-    """Isolated Click test runner that mixes stdout/stderr."""
-    return CliRunner(mix_stderr=False)
+    """Isolated Click test runner."""
+    return CliRunner()
 
 
 # ── Temporary config directory ────────────────────────────────────────────────

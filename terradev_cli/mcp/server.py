@@ -5794,9 +5794,6 @@ async def handle_call_tool(name_or_request, arguments=None, **kwargs) -> CallToo
                     isError=True,
                 )
 
-            # Build command arguments
-            cmd_args = command_map[tool_name].copy()
-
             # Handle database tools via new_feature_tools handlers
             if tool_name in ["create_sqlite_connection", "create_postgresql_connection", "query_database", "upsert_database", "get_database_connection"]:
                 if tool_name in NEW_COMMAND_MAP:
@@ -5810,6 +5807,9 @@ async def handle_call_tool(name_or_request, arguments=None, **kwargs) -> CallToo
                         content=[TextContent(type="text", text=f"Database tool handler not found: {tool_name}")],
                         isError=True
                     )
+
+            # Build command arguments
+            cmd_args = command_map[tool_name].copy()
 
             # Handle local_scan tool separately (doesn't use terradev CLI)
             if tool_name == "local_scan":
