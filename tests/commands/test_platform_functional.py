@@ -170,6 +170,7 @@ class TestLocalFunctional:
 
     def test_pool_empty(self, runner, monkeypatch, tmp_path):
         monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
         result = runner.invoke(cli, ["local", "pool"])
         assert result.exit_code == 0
         assert "No local pool" in result.output
@@ -178,7 +179,10 @@ class TestLocalFunctional:
         import json as _json
         import os
 
+        # On Windows os.path.expanduser("~") ignores HOME and uses USERPROFILE,
+        # so we set both to the temp directory for a portable cross-platform home.
         monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
         os.makedirs(tmp_path / ".terradev", exist_ok=True)
         pool = {
             "ws": {
