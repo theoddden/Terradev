@@ -16,6 +16,11 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Clean dist and build directories
+      run: rm -rf dist build
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -29,6 +34,30 @@ jobs:
 
     - name: Build package
       run: python -m build
+
+    - name: Check distribution metadata
+      run: twine check dist/*
+
+    - name: Inspect wheel contents
+      run: |
+        python - <<'PY'
+        import zipfile, glob
+        whl = glob.glob('dist/*.whl')[0]
+        with zipfile.ZipFile(whl) as z:
+            print(f"Wheel: {whl}")
+            print(f"Total files: {len(z.namelist())}")
+            for name in z.namelist()[:30]:
+                print(name)
+        PY
+
+    - name: Local smoke test wheel before upload
+      run: |
+        python -m venv smoke_env
+        source smoke_env/bin/activate
+        pip install dist/*.whl
+        TERRADEV_SKIP_ONBOARDING=1 terradev mcp list-tools >/dev/null
+        deactivate
+        rm -rf smoke_env
 
     - name: Publish to PyPI
       env:
