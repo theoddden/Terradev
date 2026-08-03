@@ -363,7 +363,7 @@ async def handle_call_tool(name_or_request, arguments=None, **kwargs) -> CallToo
             # O(1) dispatch through the smart router
             return await router.dispatch(tool_name, arguments, execute_terradev_command)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return CallToolResult(
                 content=[TextContent(type="text", text=f"❌ Error: {str(e)}")],
                 isError=True,

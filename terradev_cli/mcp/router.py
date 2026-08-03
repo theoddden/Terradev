@@ -17,7 +17,7 @@ except ImportError:
 
 try:
     from .new_feature_tools import COMMAND_MAP as NEW_COMMAND_MAP
-except Exception:
+except ImportError:
     NEW_COMMAND_MAP = {}
 
 from .registry_data import TERRADEV_COMMAND_MAP
