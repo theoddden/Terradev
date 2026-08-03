@@ -196,6 +196,9 @@ markers = [
     "unit: pure-function / no-I/O tests",
     "integration: requires mocked external APIs",
     "slow: full CLI CliRunner or live-service tests",
+    "canary: quick smoke tests for low-coverage modules",
+    "hypothesis: property-based / fuzz tests for low-coverage modules",
+    "deep: deep invariants and state tests for low-coverage modules",
 ]
 filterwarnings = [
     "ignore:.*Boto3 will no longer support Python 3.9.*:Warning",
