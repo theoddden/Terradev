@@ -212,7 +212,7 @@ class TerradevOutput:
         try:
             self._stream.write(text)
             self._stream.flush()
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             pass
 
     @contextmanager
@@ -313,7 +313,7 @@ def get_output(ctx: Optional[Any] = None) -> TerradevOutput:
         try:
             import click
             ctx = click.get_current_context(silent=True)
-        except Exception:
+        except (ImportError, RuntimeError, AttributeError):
             ctx = None
     if ctx is not None and hasattr(ctx, "obj") and ctx.obj and isinstance(ctx.obj, dict):
         if "terradev_output" in ctx.obj and ctx.obj["terradev_output"] is not None:

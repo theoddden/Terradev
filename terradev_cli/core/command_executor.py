@@ -115,5 +115,5 @@ def _record_command(
             duration_ms=duration_ms,
             attributes={"cwd": "", "source": "command_executor"},
         )
-    except Exception:
+    except (AttributeError, TypeError, ValueError, KeyError, RuntimeError, OSError):
         pass
