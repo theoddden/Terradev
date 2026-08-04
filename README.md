@@ -1,6 +1,6 @@
 # Terradev CLI v5.7.7
 
-**Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration — now with a built-in `vault` command for CI/CD-friendly secret management.**
+**Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
