@@ -1,6 +1,6 @@
-# Terradev CLI v5.7.6
+# Terradev CLI v5.7.7
 
-**Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration.**
+**Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration — now with a built-in `vault` command for CI/CD-friendly secret management.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
@@ -16,6 +16,13 @@ Combines quoting, provisioning, topology optimization, training orchestration, i
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
+
+**NOTES ON 5.7.7**
+
+- **Vault command** (`terradev vault`): store, sync, and use cloud API secrets from environment variables or the encrypted local vault. Designed for GitHub Actions / CI/CD pipelines where secrets are provided as `TERRADEV_<PROVIDER>_<KEY>` env vars.
+  - `terradev vault sync` imports every `TERRADEV_*` secret into the encrypted `~/.terradev/credentials.json`.
+  - `terradev vault run -- <command>` injects vault secrets into a sub-process and zeroizes them afterwards.
+  - `terradev` now automatically falls back to `TERRADEV_*` environment variables when the local vault file is missing, so `terradev up` works directly from GitHub Secrets without a separate `configure` step.
 
 **NOTES ON 5.7.5**
 

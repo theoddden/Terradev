@@ -21,12 +21,14 @@ logger = logging.getLogger(__name__)
 
 # Import telemetry - MANDATORY FOR USAGE TRACKING
 try:
-    from terradev_cli.core.telemetry import get_mandatory_telemetry
-
-    _telemetry = get_mandatory_telemetry()
+    from terradev_cli.core.node_span_stream import NodeSpanStream
+    from terradev_cli.core.telemetry import get_telemetry
+    _telemetry = get_telemetry()
 except Exception as _exc:  # noqa: BLE001
     logger.exception(_exc)
     _telemetry = None
+
+from terradev_cli.core.vault_adapter import VaultAdapter
 
 # Import Kubernetes wrapper
 try:
@@ -85,6 +87,7 @@ class TerradevAPI:
         self.usage_file = self.config_dir / "usage.json"
         # Tier system removed - no tier file needed
 
+        self._vault = VaultAdapter(self.config_dir)
         self.load_credentials()
         self.load_usage()
 
@@ -107,8 +110,8 @@ class TerradevAPI:
 
     def is_first_time_user(self) -> bool:
         """Check if this is a first-time user with no configured credentials"""
-        # Check if credentials file exists and has any content
-        if not self.credentials_file.exists():
+        # Check if credentials file and any env-based credentials exist
+        if not self.credentials_file.exists() and not self.credentials:
             return True
 
         # Check if credentials are empty or only contain default/placeholder values
@@ -160,7 +163,8 @@ class TerradevAPI:
         try:
             auth = AuthManager.load(str(self.credentials_file))
             self._auth_manager = auth
-            self.credentials = auth.credentials  # nested {provider: {key: val}}
+            # File-backed credentials, then overlay any TERRADEV_* env vars.
+            self.credentials = self._vault.load_env_credentials(auth.credentials)
         except Exception as e:  # noqa: BLE001
             import sys
             print(
@@ -172,7 +176,8 @@ class TerradevAPI:
                 "   Run `terradev configure` to re-enter your keys.",
                 file=sys.stderr,
             )
-            self.credentials = {}
+            # Still allow environment variables to work when the file is missing/broken.
+            self.credentials = self._vault.load_env_credentials({})
             self._auth_manager = None
 
     def _migrate_plaintext_credentials(self, key_file: Path) -> None:
