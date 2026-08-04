@@ -28,6 +28,14 @@ except ImportError:
     DATABASE_AVAILABLE = False
     logger.warning("Database connection module not available")
 
+# Import vault adapter
+try:
+    from terradev_cli.core.vault_adapter import VaultAdapter
+    VAULT_AVAILABLE = True
+except ImportError:
+    VAULT_AVAILABLE = False
+    logger.warning("Vault adapter not available")
+
 # Import MCP types (optional)
 try:
     from mcp.types import Tool
@@ -297,3 +305,312 @@ if DATABASE_AVAILABLE and MCP_AVAILABLE:
     COMMAND_MAP["query_database"] = handle_query_database
     COMMAND_MAP["upsert_database"] = handle_upsert_database
     COMMAND_MAP["get_database_connection"] = handle_get_database_connection
+
+# Vault MCP Tools
+if VAULT_AVAILABLE and MCP_AVAILABLE:
+
+    _VAULT_TOOLS = [
+        Tool(
+            name="vault_set",
+            description="Store a secret in the Terradev vault. Values are encrypted at rest.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": "Cloud provider name (e.g. runpod, aws, vastai)",
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": "Credential key name (e.g. api_key, secret_key)",
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "Secret value to store",
+                    },
+                    "no_persist": {
+                        "type": "boolean",
+                        "description": "Keep the secret in memory only; do not write the vault file",
+                        "default": False,
+                    },
+                },
+                "required": ["provider", "key", "value"],
+            },
+        ),
+        Tool(
+            name="vault_get",
+            description="Retrieve a stored secret. By default the value is masked.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider name",
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": "Credential key name",
+                    },
+                    "raw": {
+                        "type": "boolean",
+                        "description": "Return the raw secret value instead of a masked preview",
+                        "default": False,
+                    },
+                },
+                "required": ["provider", "key"],
+            },
+        ),
+        Tool(
+            name="vault_list",
+            description="List stored provider and key names. Values are never shown.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="vault_remove",
+            description="Remove a provider or a single key from the vault.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider name",
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": "Optional key name. If omitted, the whole provider is removed.",
+                    },
+                },
+                "required": ["provider"],
+            },
+        ),
+        Tool(
+            name="vault_sync",
+            description="Import TERRADEV_* environment variables into the vault for supported cloud providers.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Show what would be imported without persisting",
+                        "default": False,
+                    },
+                    "no_persist": {
+                        "type": "boolean",
+                        "description": "Keep imported secrets in env only; do not write the vault file",
+                        "default": False,
+                    },
+                    "all": {
+                        "type": "boolean",
+                        "description": "Import every TERRADEV_* variable, not just supported cloud providers",
+                        "default": False,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="vault_verify",
+            description="Check which providers are fully configured and which keys are missing.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="vault_env",
+            description="Print environment-style export lines for a provider. By default values are masked.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider name",
+                    },
+                    "raw": {
+                        "type": "boolean",
+                        "description": "Return raw export values",
+                        "default": False,
+                    },
+                },
+                "required": ["provider"],
+            },
+        ),
+        Tool(
+            name="vault_run",
+            description="Run a shell command with vault secrets injected into the environment.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "Shell command to execute (will be split into arguments)",
+                    },
+                    "provider": {
+                        "type": "string",
+                        "description": "Only inject secrets for this provider (optional)",
+                    },
+                    "no_exec": {
+                        "type": "boolean",
+                        "description": "Build the env and print export lines without running the command",
+                        "default": False,
+                    },
+                },
+                "required": ["command"],
+            },
+        ),
+    ]
+
+    ALL_NEW_TOOLS.extend(_VAULT_TOOLS)
+
+    def _mask_secret(value: str) -> str:
+        """Return a masked preview of a secret."""
+        if len(value) <= 8:
+            return "***"
+        return f"{value[:4]}***{value[-4:]}"
+
+    async def handle_vault_set(arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
+        try:
+            vault = VaultAdapter()
+            if arguments.get("no_persist"):
+                vault._no_persist = True
+            vault.set(arguments["provider"], arguments["key"], arguments["value"])
+            return [{
+                "type": "text",
+                "text": f"Stored {arguments['provider']}.{arguments['key']}"
+            }]
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to store vault secret: {e}")
+            return [{
+                "type": "text",
+                "text": f"Error storing vault secret: {str(e)}"
+            }]
+
+    async def handle_vault_get(arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
+        try:
+            vault = VaultAdapter()
+            value = vault.get(arguments["provider"], arguments["key"])
+            if value is None:
+                return [{
+                    "type": "text",
+                    "text": f"No secret found for {arguments['provider']}.{arguments['key']}"
+                }]
+            if arguments.get("raw"):
+                return [{"type": "text", "text": value}]
+            return [{"type": "text", "text": _mask_secret(value)}]
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to get vault secret: {e}")
+            return [{"type": "text", "text": f"Error getting vault secret: {str(e)}"}]
+
+    async def handle_vault_list(arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
+        try:
+            vault = VaultAdapter()
+            creds = vault.all_credentials()
+            lines = [f"{provider}: {', '.join(sorted(keys))}" for provider, keys in sorted(creds.items())]
+            if not lines:
+                return [{"type": "text", "text": "No credentials in the vault."}]
+            return [{"type": "text", "text": "\n".join(lines)}]
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to list vault: {e}")
+            return [{"type": "text", "text": f"Error listing vault: {str(e)}"}]
+
+    async def handle_vault_remove(arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
+        try:
+            vault = VaultAdapter()
+            removed = vault.remove(arguments["provider"], arguments.get("key"))
+            if removed:
+                return [{"type": "text", "text": f"Removed {arguments['provider']}" + (f".{arguments['key']}" if arguments.get('key') else "")}]
+            return [{"type": "text", "text": f"No matching secret found for {arguments['provider']}"}]
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to remove vault secret: {e}")
+            return [{"type": "text", "text": f"Error removing vault secret: {str(e)}"}]
+
+    async def handle_vault_sync(arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
+        try:
+            vault = VaultAdapter()
+            if arguments.get("no_persist"):
+                vault._no_persist = True
+            base = vault.load_credentials()
+            merged = vault.load_env_credentials(base, known_only=not arguments.get("all", False))
+            imported = []
+            for provider, provider_creds in merged.items():
+                for key in provider_creds:
+                    if provider not in base or key not in base.get(provider, {}):
+                        imported.append(f"{provider}.{key}")
+            if arguments.get("dry_run"):
+                return [{"type": "text", "text": f"Would import {len(imported)} secret(s): " + ", ".join(imported)}]
+            if not imported:
+                return [{"type": "text", "text": "No new TERRADEV_* secrets to import."}]
+            if not arguments.get("no_persist"):
+                vault.save_credentials(merged)
+            return [{"type": "text", "text": f"Imported {len(imported)} secret(s): " + ", ".join(imported)}]
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to sync vault: {e}")
+            return [{"type": "text", "text": f"Error syncing vault: {str(e)}"}]
+
+    async def handle_vault_verify(arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
+        try:
+            vault = VaultAdapter()
+            status = vault.verify()
+            lines = ["Configured providers:"] + [f"  - {p}" for p in status["configured"]]
+            if status["missing"]:
+                lines.append("Missing keys:")
+                for provider, keys in status["missing"].items():
+                    lines.append(f"  - {provider}: {', '.join(keys)}")
+            return [{"type": "text", "text": "\n".join(lines)}]
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to verify vault: {e}")
+            return [{"type": "text", "text": f"Error verifying vault: {str(e)}"}]
+
+    async def handle_vault_env(arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
+        try:
+            import shlex
+            vault = VaultAdapter()
+            env = vault.to_env(arguments["provider"])
+            if not env:
+                return [{"type": "text", "text": f"No credentials for {arguments['provider']}"}]
+            raw = arguments.get("raw", False)
+            lines = []
+            for name, value in env.items():
+                if raw:
+                    lines.append(f"export {name}={shlex.quote(value)}")
+                else:
+                    lines.append(f"export {name}={_mask_secret(value)}")
+            return [{"type": "text", "text": "\n".join(lines)}]
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to build vault env: {e}")
+            return [{"type": "text", "text": f"Error building vault env: {str(e)}"}]
+
+    async def handle_vault_run(arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
+        try:
+            import shlex
+            import subprocess
+            vault = VaultAdapter()
+            run_env = vault.build_run_env(arguments.get("provider"))
+            if arguments.get("no_exec"):
+                lines = [
+                    f"export {name}={shlex.quote(value)}"
+                    for name, value in run_env.items()
+                    if name.startswith(vault.ENV_PREFIX)
+                ]
+                return [{"type": "text", "text": "\n".join(lines) if lines else "No vault secrets to export."}]
+            cmd = shlex.split(arguments["command"])
+            proc = subprocess.run(cmd, env=run_env, capture_output=True, text=True)
+            output = (proc.stdout or "") + (proc.stderr or "")
+            if proc.returncode != 0:
+                return [{"type": "text", "text": f"Command failed (exit {proc.returncode}):\n{output}"}]
+            return [{"type": "text", "text": output or "Command completed with no output."}]
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to run command with vault: {e}")
+            return [{"type": "text", "text": f"Error running command with vault: {str(e)}"}]
+
+    # Register vault command handlers
+    COMMAND_MAP["vault_set"] = handle_vault_set
+    COMMAND_MAP["vault_get"] = handle_vault_get
+    COMMAND_MAP["vault_list"] = handle_vault_list
+    COMMAND_MAP["vault_remove"] = handle_vault_remove
+    COMMAND_MAP["vault_sync"] = handle_vault_sync
+    COMMAND_MAP["vault_verify"] = handle_vault_verify
+    COMMAND_MAP["vault_env"] = handle_vault_env
+    COMMAND_MAP["vault_run"] = handle_vault_run

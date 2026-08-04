@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Terradev MCP Server v5.7.6 - Complete Agentic GPU Infrastructure for Claude Code
+Terradev MCP Server v5.7.8 - Complete Agentic GPU Infrastructure for Claude Code
 
 220 MCP tools: GPU provisioning, Kubernetes clusters, Karpenter auto-provisioning,
 GitOps/ArgoCD automation, event-driven triggers, environment promotion, lineage tracking,

@@ -17,6 +17,12 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
+**NOTES ON 5.7.8**
+
+- **MCP Vault tools** (`terradev mcp`): the Terradev MCP server now exposes the vault directly so agents can store, retrieve, sync, and verify cloud credentials securely.
+  - New tools: `vault_set`, `vault_get`, `vault_list`, `vault_remove`, `vault_sync`, `vault_verify`, `vault_env`, `vault_run`.
+  - Tools use the encrypted `~/.terradev/credentials.json` vault and respect `TERRADEV_NO_PERSIST` for in-memory-only secrets.
+
 **NOTES ON 5.7.7**
 
 - **Vault command** (`terradev vault`): store, sync, and use cloud API secrets from environment variables or the encrypted local vault. Designed for GitHub Actions / CI/CD pipelines where secrets are provided as `TERRADEV_<PROVIDER>_<KEY>` env vars.
