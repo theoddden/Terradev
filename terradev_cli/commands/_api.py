@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 # Import telemetry - MANDATORY FOR USAGE TRACKING
 try:
     from terradev_cli.core.node_span_stream import NodeSpanStream
-    from terradev_cli.core.telemetry import get_telemetry
-    _telemetry = get_telemetry()
+    from terradev_cli.core.telemetry import get_mandatory_telemetry
+    _telemetry = get_mandatory_telemetry()
 except Exception as _exc:  # noqa: BLE001
     logger.exception(_exc)
     _telemetry = None
