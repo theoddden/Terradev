@@ -152,7 +152,13 @@ class TerradevAPI:
         companion .keyfile, the flat-format contents are read, converted to
         the nested {provider: {key: val}} schema and re-saved encrypted so
         that subsequent runs use the secure path.
+
+        Defensively create the vault adapter if it is missing (some tests
+        construct ``TerradevAPI`` via ``__new__`` and only set a config dir).
         """
+        if not hasattr(self, "_vault"):
+            self._vault = VaultAdapter(getattr(self, "config_dir", None))
+
         from terradev_cli.core.auth import AuthManager
 
         key_file = self.config_dir / ".keyfile"
