@@ -97,8 +97,18 @@ class VaultAdapter:
         auth.credentials = self._deep_copy(credentials)
         self._save_auth(auth)
 
-    def load_env_credentials(self, base: Optional[Dict] = None) -> Dict[str, Dict[str, str]]:
-        """Merge ``TERRADEV_*`` environment variables into credentials."""
+    def load_env_credentials(
+        self,
+        base: Optional[Dict] = None,
+        known_only: bool = False,
+    ) -> Dict[str, Dict[str, str]]:
+        """Merge ``TERRADEV_*`` environment variables into credentials.
+
+        When ``known_only`` is True, only env vars whose provider is in
+        ``PROVIDER_SCHEMAS`` (or already present in ``base``) are merged.
+        This prevents CI-only tokens such as ``TERRADEV_GITHUB_TOKEN``
+        from being treated as cloud provider credentials.
+        """
         credentials = self._deep_copy(base or {})
         for env_name, value in os.environ.items():
             if not value or not env_name.startswith(self.ENV_PREFIX):
@@ -106,8 +116,11 @@ class VaultAdapter:
             if env_name in self.EXCLUDED:
                 continue
             provider, key = self.parse_env_name(env_name)
-            if provider and key:
-                credentials.setdefault(provider, {})[key] = value
+            if not provider or not key:
+                continue
+            if known_only and provider not in PROVIDER_SCHEMAS and provider not in credentials:
+                continue
+            credentials.setdefault(provider, {})[key] = value
         return credentials
 
     def all_credentials(self) -> Dict[str, Dict[str, str]]:

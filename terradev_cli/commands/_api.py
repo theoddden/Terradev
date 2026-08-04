@@ -169,8 +169,10 @@ class TerradevAPI:
         try:
             auth = AuthManager.load(str(self.credentials_file))
             self._auth_manager = auth
-            # File-backed credentials, then overlay any TERRADEV_* env vars.
-            self.credentials = self._vault.load_env_credentials(auth.credentials)
+            # File-backed credentials, then overlay any TERRADEV_* env vars for
+            # known cloud providers only (avoids CI-only tokens such as
+            # TERRADEV_GITHUB_TOKEN being treated as a provider credential).
+            self.credentials = self._vault.load_env_credentials(auth.credentials, known_only=True)
         except Exception as e:  # noqa: BLE001
             import sys
             print(
@@ -183,7 +185,7 @@ class TerradevAPI:
                 file=sys.stderr,
             )
             # Still allow environment variables to work when the file is missing/broken.
-            self.credentials = self._vault.load_env_credentials({})
+            self.credentials = self._vault.load_env_credentials({}, known_only=True)
             self._auth_manager = None
 
     def _migrate_plaintext_credentials(self, key_file: Path) -> None:

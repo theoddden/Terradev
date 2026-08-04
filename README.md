@@ -20,7 +20,7 @@ Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thin
 **NOTES ON 5.7.7**
 
 - **Vault command** (`terradev vault`): store, sync, and use cloud API secrets from environment variables or the encrypted local vault. Designed for GitHub Actions / CI/CD pipelines where secrets are provided as `TERRADEV_<PROVIDER>_<KEY>` env vars.
-  - `terradev vault sync` imports every `TERRADEV_*` secret into the encrypted `~/.terradev/credentials.json`.
+  - `terradev vault sync` imports supported `TERRADEV_<PROVIDER>_<KEY>` secrets into the encrypted `~/.terradev/credentials.json` (use `--all` to also import custom keys).
   - `terradev vault run -- <command>` injects vault secrets into a sub-process and zeroizes them afterwards.
   - `terradev` now automatically falls back to `TERRADEV_*` environment variables when the local vault file is missing, so `terradev up` works directly from GitHub Secrets without a separate `configure` step.
 

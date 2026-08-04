@@ -118,8 +118,14 @@ def vault_set(
     is_flag=True,
     help="Keep imported secrets in env only; do not write the vault file",
 )
-def vault_sync(dry_run: bool, no_persist: bool):
-    """Import all TERRADEV_* environment variables into the vault.
+@click.option(
+    "--all",
+    "include_all",
+    is_flag=True,
+    help="Import every TERRADEV_* variable, not just supported cloud providers",
+)
+def vault_sync(dry_run: bool, no_persist: bool, include_all: bool):
+    """Import TERRADEV_* environment variables for supported cloud providers.
 
     This is the recommended command for CI/CD pipelines using GitHub Secrets:
 
@@ -129,10 +135,11 @@ def vault_sync(dry_run: bool, no_persist: bool):
       run: terradev vault sync
 
     Use --dry-run in a workflow to verify mapping before a real run.
+    Use --all to also import non-provider/custom TERRADEV_* variables.
     """
     output = get_output()
     v = _get_vault()
-    env_creds = v.load_env_credentials()
+    env_creds = v.load_env_credentials(known_only=not include_all)
 
     imported = []
     for provider, creds in env_creds.items():
@@ -155,7 +162,7 @@ def vault_sync(dry_run: bool, no_persist: bool):
         return
 
     base = v.load_credentials()
-    merged = v.load_env_credentials(base)
+    merged = v.load_env_credentials(base, known_only=not include_all)
     v.save_credentials(merged)
 
     output.success(f"Synced {len(imported)} secret(s)")
