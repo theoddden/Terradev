@@ -228,6 +228,42 @@ class QdrantService:
         )
         return data.get("result", {}).get("count", 0)
 
+    async def scroll_points(
+        self,
+        name: Optional[str] = None,
+        *,
+        filter_conditions: Optional[Dict] = None,
+        limit: int = 10,
+        with_payload: bool = True,
+        with_vectors: bool = False,
+    ) -> Dict[str, Any]:
+        """Scroll points in a collection."""
+        body: Dict[str, Any] = {
+            "limit": limit,
+            "with_payload": with_payload,
+            "with_vector": with_vectors,
+        }
+        if filter_conditions:
+            body["filter"] = filter_conditions
+        return await self._request(
+            "POST",
+            f"/collections/{name or self.config.default_collection}/points/scroll",
+            json_body=body,
+        )
+
+    async def delete_points(
+        self,
+        points: Any,
+        *,
+        name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Delete points from a collection."""
+        return await self._request(
+            "POST",
+            f"/collections/{name or self.config.default_collection}/points/delete",
+            json_body=points,
+        )
+
     async def configure_rag_collection(
         self, name: Optional[str] = None, *, embedding_model: Optional[str] = None
     ) -> Dict[str, Any]:

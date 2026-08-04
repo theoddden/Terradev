@@ -218,6 +218,15 @@ class DatabaseBackendAdapter(Adapter):
         """Run a CRUD operation (insert, select, update, delete)."""
         raise NotImplementedError
 
+    async def sql(
+        self,
+        query: str,
+        table: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Execute raw SQL if the backend supports it."""
+        raise NotImplementedError(f"SQL is not supported by {self.name}")
+
     async def vector_search(
         self,
         table: str,

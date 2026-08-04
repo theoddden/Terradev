@@ -10,6 +10,7 @@ Provides SQLite and PostgreSQL database connections with:
 
 import logging
 import os
+import sqlite3
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -129,7 +130,7 @@ class SQLiteConnection(DatabaseConnection):
             return False
     
     async def query(self, sql: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Execute SELECT query"""
+        """Execute SELECT query and return results as a list of dicts."""
         if not self._connected:
             raise RuntimeError("Database not connected")
         
@@ -137,12 +138,21 @@ class SQLiteConnection(DatabaseConnection):
         if params:
             logger.info(f"Parameters: {params}")
         
-        # Simulate query execution
-        # In production, use actual sqlite3 cursor
-        return []
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(sql, params or {})
+            rows = cursor.fetchall()
+            columns = [d[0] for d in cursor.description] if cursor.description else []
+            conn.close()
+            return [dict(zip(columns, row)) for row in rows]
+        except sqlite3.Error as e:
+            logger.error(f"SQLite query failed: {e}")
+            raise
     
     async def upsert(self, table: str, data: Dict[str, Any], conflict_columns: Optional[List[str]] = None) -> bool:
-        """Insert or update data"""
+        """Insert or update data using INSERT OR REPLACE."""
         if not self._connected:
             raise RuntimeError("Database not connected")
         
@@ -151,29 +161,58 @@ class SQLiteConnection(DatabaseConnection):
         if conflict_columns:
             logger.info(f"Conflict columns: {conflict_columns}")
         
-        # Simulate upsert
-        return True
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            columns = list(data.keys())
+            placeholders = ", ".join(["?"] * len(columns))
+            sql = f"INSERT OR REPLACE INTO {full_table_name} ({', '.join(columns)}) VALUES ({placeholders})"
+            cursor.execute(sql, [data[c] for c in columns])
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e).lower():
+                logger.info(f"Creating missing table on upsert: {full_table_name}")
+                try:
+                    conn = sqlite3.connect(self.db_path)
+                    cursor = conn.cursor()
+                    col_defs = ", ".join([f"{k} TEXT" for k in columns])
+                    cursor.execute(f"CREATE TABLE IF NOT EXISTS {full_table_name} ({col_defs})")
+                    conn.commit()
+                    # Retry insert
+                    placeholders = ", ".join(["?"] * len(columns))
+                    sql = f"INSERT OR REPLACE INTO {full_table_name} ({', '.join(columns)}) VALUES ({placeholders})"
+                    cursor.execute(sql, [data[c] for c in columns])
+                    conn.commit()
+                    conn.close()
+                    return True
+                except sqlite3.Error as e2:
+                    logger.error(f"SQLite upsert failed after table creation: {e2}")
+                    raise
+            logger.error(f"SQLite upsert failed: {e}")
+            raise
     
     async def create_tables(self) -> bool:
-        """Create standard metadata tables"""
+        """Create standard metadata tables."""
         try:
-            tables = [
-                "dataset_versions",
-                "workflow_runs", 
-                "idempotency_keys",
-                "node_executions"
-            ]
-            
-            for table in tables:
+            definitions = {
+                "dataset_versions": "id TEXT PRIMARY KEY, version TEXT, created_at TEXT",
+                "workflow_runs": "id TEXT PRIMARY KEY, name TEXT, status TEXT, started_at TEXT",
+                "idempotency_keys": "key TEXT PRIMARY KEY, payload TEXT, created_at TEXT",
+                "node_executions": "id TEXT PRIMARY KEY, node_id TEXT, status TEXT, executed_at TEXT",
+            }
+
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            for table, cols in definitions.items():
                 full_table_name = f"{self.table_prefix}{table}"
                 logger.info(f"Creating table: {full_table_name}")
-                
-                # Simulate table creation
-                # In production, use actual CREATE TABLE SQL
-            
-            logger.info(f"Created {len(tables)} standard metadata tables")
+                cursor.execute(f"CREATE TABLE IF NOT EXISTS {full_table_name} ({cols})")
+            conn.commit()
+            conn.close()
             return True
-        except (OSError, RuntimeError) as e:
+        except (OSError, RuntimeError, sqlite3.Error) as e:
             logger.error(f"Failed to create tables: {e}")
             return False
 

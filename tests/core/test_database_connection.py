@@ -39,7 +39,7 @@ async def test_sqlite_connection_lifecycle(manager, tmp_path):
     assert conn.table_prefix == "td_"
 
     rows = await conn.query("SELECT 1")
-    assert rows == []
+    assert rows == [{"1": 1}]
 
     assert await conn.upsert("runs", {"id": 1}) is True
     assert await conn.create_tables() is True
