@@ -1,4 +1,4 @@
-# Terradev CLI v5.7.6
+# Terradev CLI v5.7.9
 
 **Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration.**
 
