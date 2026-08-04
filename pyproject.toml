@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "5.7.5"
+version = "5.7.6"
 description = "Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration."
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -130,6 +130,7 @@ aws = ["boto3>=1.34.0"]
 gcp = ["google-cloud-compute>=1.8.0"]
 azure = ["azure-mgmt-compute>=29.0.0", "azure-identity>=1.12.0"]
 lmcache = ["lmcache>=0.1", "redis>=5.0.0"]
+redis = ["redis>=5.0.0"]
 mcp = ["mcp[cli]>=1.0.0,<2.0.0; python_version >= '3.10'"]
 ml = [
     "torch>=2.0.0",

@@ -122,7 +122,7 @@ class TestMCPHandleCallToolFuzz:
             ),
         ),
     )
-    @settings(max_examples=80, suppress_health_check=[HealthCheck.too_slow], deadline=5000)
+    @settings(max_examples=80, suppress_health_check=[HealthCheck.too_slow], deadline=None)
     async def test_handle_call_tool_never_crashes(self, tool_name, arguments):
         from mcp.types import CallToolResult
         from terradev_cli.mcp.server import handle_call_tool

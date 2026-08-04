@@ -15,6 +15,7 @@ import secrets
 
 from .config import TerradevConfig
 from .auth import AuthManager
+from .node_span_stream import NodeSpanStream
 from ..providers.provider_factory import ProviderFactory
 from ..providers.base_provider import BaseProvider
 from ..providers.registry import ProviderRegistry
@@ -97,6 +98,9 @@ class TerradevEngine:
         self.provider_factory = ProviderFactory()
         self.provider_registry = ProviderRegistry(factory=self.provider_factory)
 
+        # Active per-node span streams keyed by instance_id.
+        self._active_streams: Dict[str, NodeSpanStream] = {}
+
         # Use real existing modules instead of non-existent ones
         try:
             from .dataset_stager import DatasetStager
@@ -135,6 +139,8 @@ class TerradevEngine:
         providers: Optional[List[str]] = None,
         parallel_queries: int = 6,
         dry_run: bool = False,
+        job: Optional[str] = None,
+        version: Optional[str] = None,
     ) -> ProvisioningResult:
         """Provision instances with parallel optimization"""
         start_time = time.time()
@@ -171,7 +177,9 @@ class TerradevEngine:
             if dry_run:
                 instances = self._create_mock_instances(selected_quotes)
             else:
-                instances = await self._provision_selected_instances(selected_quotes)
+                instances = await self._provision_selected_instances(
+                    selected_quotes, job=job, version=version
+                )
 
             # Step 5: Cost analysis
             cost_analysis = self._analyze_costs(instances)
@@ -356,7 +364,10 @@ class TerradevEngine:
         return instances
 
     async def _provision_selected_instances(
-        self, quotes: List[InstanceQuote]
+        self,
+        quotes: List[InstanceQuote],
+        job: Optional[str] = None,
+        version: Optional[str] = None,
     ) -> List[ProvisionedInstance]:
         """Provision selected instances"""
         instances = []
@@ -364,7 +375,7 @@ class TerradevEngine:
         # Provision in parallel
         tasks = []
         for quote in quotes:
-            task = self._provision_single_instance(quote)
+            task = self._provision_single_instance(quote, job=job, version=version)
             tasks.append(task)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -378,7 +389,10 @@ class TerradevEngine:
         return instances
 
     async def _provision_single_instance(
-        self, quote: InstanceQuote
+        self,
+        quote: InstanceQuote,
+        job: Optional[str] = None,
+        version: Optional[str] = None,
     ) -> ProvisionedInstance:
         """Provision a single instance"""
         provider = self.providers[quote.provider]
@@ -391,6 +405,23 @@ class TerradevEngine:
                 gpu_type=quote.gpu_type,
             )
 
+            # Start a per-node span stream sidecar for this instance.
+            stream = NodeSpanStream(
+                job=job or quote.provider,
+                version=version or "v0",
+                instance_id=instance_data["instance_id"],
+                provider=quote.provider,
+                region=quote.region,
+                gpu_type=quote.gpu_type,
+                gpu_count=1,
+            )
+            stream.start({
+                "instance_type": quote.instance_type,
+                "price_per_hour": quote.price_per_hour,
+                "source": "TerradevEngine.provision_instances",
+            })
+            self._active_streams[instance_data["instance_id"]] = stream
+
             instance = ProvisionedInstance(
                 instance_id=instance_data["instance_id"],
                 provider=quote.provider,
@@ -400,7 +431,11 @@ class TerradevEngine:
                 region=quote.region,
                 status=ProvisioningStatus.RUNNING,
                 created_at=datetime.now(),
-                metadata=instance_data.get("metadata", {}),
+                metadata={
+                    **instance_data.get("metadata", {}),
+                    "stream_key": stream.stream_key,
+                    "trace_id": stream.trace_id,
+                },
             )
 
             logger.info(f"Instance provisioned: {instance.instance_id}")
@@ -445,10 +480,17 @@ class TerradevEngine:
         if action == "status":
             return await provider.get_instance_status(instance_id)
         elif action == "stop":
+            if instance_id in self._active_streams:
+                self._active_streams[instance_id].emit("instance.stopped", "OK")
             return await provider.stop_instance(instance_id)
         elif action == "start":
+            if instance_id in self._active_streams:
+                self._active_streams[instance_id].emit("instance.started", "OK")
             return await provider.start_instance(instance_id)
         elif action == "terminate":
+            if instance_id in self._active_streams:
+                stream = self._active_streams.pop(instance_id)
+                stream.destroy({"action": "terminate"})
             return await provider.terminate_instance(instance_id)
         else:
             raise ValueError(f"Unknown action: {action}")
@@ -478,15 +520,38 @@ class TerradevEngine:
     async def execute_command(
         self, instance_id: str, command: str, async_exec: bool
     ) -> Dict[str, Any]:
-        """Execute command on instance"""
+        """Execute command on instance and mirror it to the node span stream."""
         # Find provider for instance
         provider_name = instance_id.split("_")[0] if "_" in instance_id else None
 
         if not provider_name or provider_name not in self.providers:
             raise ValueError(f"Unknown provider for instance: {instance_id}")
 
+        start = time.time()
         provider = self.providers[provider_name]
-        return await provider.execute_command(instance_id, command, async_exec)
+        result = await provider.execute_command(instance_id, command, async_exec)
+        duration_ms = (time.time() - start) * 1000
+
+        if instance_id in self._active_streams:
+            self._active_streams[instance_id].record_command(
+                command=command,
+                args=["async" if async_exec else "sync"],
+                success=result.get("success", True),
+                returncode=result.get("returncode", 0),
+                duration_ms=duration_ms,
+                attributes={"result_keys": list(result.keys())},
+            )
+        else:
+            get_telemetry().record_command_to_active_streams(
+                command=command,
+                args=[instance_id, "async" if async_exec else "sync"],
+                success=result.get("success", True),
+                returncode=result.get("returncode", 0),
+                duration_ms=duration_ms,
+                attributes={"instance_id": instance_id},
+            )
+
+        return result
 
     async def get_analytics(self, days: int) -> Dict[str, Any]:
         """Get cost analytics"""

@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 # Import the root group and shared API helpers from the modular commands package.
 # Commands extracted to terradev_cli.commands register themselves on `cli`.
 from terradev_cli.commands import cli
+from terradev_cli.core.node_span_stream import NodeSpanStream
+from terradev_cli.core.telemetry import get_telemetry
 from terradev_cli.commands._api import (
     TerradevAPI,
     validate_credentials,
@@ -121,24 +123,51 @@ def up(
                 best_option, router.requirements_analyzer.analyze(user_request)
             )
 
-            # Create manifest nodes
+            # Create manifest nodes and start a span stream sidecar for each one.
             nodes = []
+            active_streams = []
+            version = f"v{len(cache.list_versions(job)) + 1}"
             for i in range(gpu_count):
+                instance_id = deployment_result.get("instance_id", f"instance-{i+1}")
+                stream = NodeSpanStream(
+                    job=job,
+                    version=version,
+                    instance_id=instance_id,
+                    provider=best_option.provider,
+                    region=region or "us-east-1",
+                    gpu_type=gpu_type,
+                    gpu_count=1,
+                    ttl=ttl,
+                )
+                stream.start({
+                    "instance_type": best_option.instance_type,
+                    "price_per_hour": best_option.price_per_hour,
+                    "confidence": best_option.confidence,
+                })
+                # Start a background heartbeat so the stream TTL stays fresh
+                # while the node is running (off by default; controlled by env).
+                if os.environ.get("TERRADEV_NODE_HEARTBEAT"):
+                    stream.start_heartbeat(
+                        int(os.environ.get("TERRADEV_NODE_HEARTBEAT_INTERVAL", "30"))
+                    )
+                active_streams.append(stream)
+
                 node = ManifestNode(
                     provider=best_option.provider,
                     pod_id=f"{job}-node-{i+1}",
-                    instance_id=deployment_result.get("instance_id", f"instance-{i+1}"),
+                    instance_id=instance_id,
                     gpus=1,
                     gpu_type=gpu_type,
                     region=region or "us-east-1",
                     status="running",
                     created_at=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                     ttl=ttl,
+                    stream_key=stream.stream_key,
+                    trace_id=stream.trace_id,
                 )
                 nodes.append(node)
 
             # Create manifest
-            version = f"v{len(cache.list_versions(job)) + 1}"
             dataset_hash = (
                 cache.compute_dataset_hash(dataset) if dataset else "sha256:none"
             )

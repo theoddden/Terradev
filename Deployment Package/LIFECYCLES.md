@@ -1,4 +1,4 @@
-# Terradev CLI Lifecycles (v5.7.5)
+# Terradev CLI Lifecycles (v5.7.6)
 
 Complete end-to-end workflows covering nearly every command in the CLI. These have been updated to match the current CLI signatures and remove deprecated commands.
 

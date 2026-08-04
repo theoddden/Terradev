@@ -7,6 +7,7 @@ and produces a human-readable or JSON summary.
 
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
@@ -14,6 +15,7 @@ from typing import Any, Dict, List
 import click
 
 from . import cli
+from terradev_cli.core.output import get_output
 
 
 def _default_canary_output() -> Path:
@@ -151,7 +153,12 @@ def canary_report(output, file, provider, gpu):
     summary = _summarize_records(records)
 
     if output == "json":
-        print(json.dumps(summary, indent=2, default=str))
+        # Canary already produces stable JSON; suppress the global wrapper and
+        # emit the raw canary report so existing scripts/pipes keep working.
+        out = get_output()
+        if out is not None:
+            out._closed = True
+        sys.stdout.write(json.dumps(summary, indent=2, default=str) + "\n")
         return
 
     print("=" * 60)

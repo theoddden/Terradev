@@ -52,6 +52,10 @@ if not _mcp_ok:
 # ── Global env: skip interactive onboarding for every test ───────────────────
 os.environ["TERRADEV_SKIP_ONBOARDING"] = "1"
 
+# Default tests to human output so existing text assertions keep passing.
+# The CLI still respects --format / TERRADEV_OUTPUT for CI/Docker usage.
+os.environ.setdefault("TERRADEV_OUTPUT", "human")
+
 
 # ── CLI runner ────────────────────────────────────────────────────────────────
 

@@ -24,6 +24,8 @@ class ManifestNode:
     status: str
     created_at: str
     ttl: str
+    stream_key: str = ""
+    trace_id: str = ""
 
 
 @dataclass
