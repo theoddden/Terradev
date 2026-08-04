@@ -88,6 +88,12 @@ class TerradevOutput:
     def format(self) -> str:
         return self._format
 
+    def set_format(self, fmt: str) -> "TerradevOutput":
+        """Change the output format for the remainder of the command."""
+        if fmt in self.FORMATS:
+            self._format = fmt
+        return self
+
     @property
     def result(self) -> TerradevResult:
         return self._result
