@@ -24,23 +24,7 @@ Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thin
   - `terradev vault run -- <command>` injects vault secrets into a sub-process and zeroizes them afterwards.
   - `terradev` now automatically falls back to `TERRADEV_*` environment variables when the local vault file is missing, so `terradev up` works directly from GitHub Secrets without a separate `configure` step.
 
-**NOTES ON 5.7.5**
-
-- Expanded Python 3.9 support with a compatibility shim for the MCP SDK, plus bundled `EnterpriseAuthManager` and `SAMLProvider` scaffolding for enterprise SSO.
-- Hardened the test suite: provider conformance, Kubernetes CPU parsing, and major-provider error paths are now fully exercised.
-- Lowered `requires-python` to `>=3.9` and gated the `mcp` dependency on Python `>=3.10`.
-
-**NOTES ON 5.6.1**
-
-Added **Database Connection System** and **Unified Observability & Scheduling** commands:
-
-- **Database Connection System** (`core/database_connection.py`): SQLite and PostgreSQL support with in-memory connection storage, connection ID system, auto-table creation for 4 standard metadata tables (dataset_versions, workflow_runs, idempotency_keys, node_executions), and database operations (query, upsert, get connection).
-
-- **Observe Command** (`terradev observe`): Unified monitoring pipeline that wires API Gateway traffic into W&B, Phoenix, and Cost Analytics with a shared trace ID across all three destinations. Commands: `terradev observe gateway`, `terradev observe status`.
-
-- **Schedule Command** (`terradev schedule`): Spot-aware scheduling for cost-optimized job execution with pricing window awareness (not just generic cron). Commands: `terradev schedule job`, `terradev schedule list`, `terradev schedule windows`.
-
-- **MCP Tools**: 5 new database tools for connection management and queries (create_sqlite_connection, create_postgresql_connection, query_database, upsert_database, get_database_connection).
+- **Database command** (`terradev database`): universal database and vector store operations with SQLite, PostgreSQL, Qdrant, and Redis adapters. Subcommands: `terradev database up`, `database down`, `database crud`, `database search`, `database sql`, and `database qdrant` with its own `search`, `scroll`, `upsert`, `create-collection`, and `delete-collection` operations.
 
 **NOTES ON 5.6.0**
 
