@@ -1,5 +1,5 @@
 {
-  "tool_count": 224,
+  "tool_count": 232,
   "tool_names": [
     "active_context",
     "analytics",
@@ -204,6 +204,14 @@
     "training_launch_distributed",
     "up",
     "upsert_database",
+    "vault_env",
+    "vault_get",
+    "vault_list",
+    "vault_remove",
+    "vault_run",
+    "vault_set",
+    "vault_sync",
+    "vault_verify",
     "vllm_analyze",
     "vllm_auto_optimize",
     "vllm_benchmark",
