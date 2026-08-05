@@ -259,3 +259,47 @@ class TestNewProvider:
 6. **Use live integration tests sparingly** (manual trigger only)
 7. **Document new credential requirements** in this file
 8. **Review test account usage monthly** to catch unexpected costs
+
+---
+
+## Canary Provisioning Tests
+
+**Location:** `tests/test_canary_provisioning.py`
+
+**Credentials Required:** Yes (manual trigger only)
+
+**How They Work:**
+- These are end-to-end tests that provision the cheapest available instance for each configured provider.
+- Tests poll for RUNNING/ACTIVE status, verify SSH or endpoint connectivity, then immediately terminate the instance.
+- Results are recorded in `~/.terradev/canary-results.jsonl`.
+
+**Why They Are Skipped by Default:**
+- By default, the entire canary suite is skipped with the message:  
+  `Canary tests hit live provider APIs. Set TERRADEV_CANARY_TEST=1 to enable.`
+- This prevents CI from accidentally provisioning real (and potentially costly) cloud instances.
+
+**Command to Enable Locally:**
+
+```bash
+TERRADEV_CANARY_TEST=1 pytest tests/test_canary_provisioning.py
+```
+
+Optional overrides:
+
+```bash
+# Default GPU type (default: RTX4090)
+export TERRADEV_CANARY_GPU=RTX4090
+
+# Maximum hourly price cap (default: $0.50)
+export TERRADEV_CANARY_MAX_PRICE=0.50
+
+# Provisioning timeout in seconds (default: 300)
+export TERRADEV_CANARY_TIMEOUT=300
+
+# Comma-separated region override
+export TERRADEV_CANARY_REGIONS=us-east-1,us-west-1
+```
+
+**CI Configuration:**
+- Do not run canary tests on every commit.
+- Run them only via a manual `workflow_dispatch` trigger with the required provider secrets.
