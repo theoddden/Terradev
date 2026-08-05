@@ -1,4 +1,4 @@
-# Terradev CLI v5.7.10
+# Terradev CLI v5.7.11
 
 **Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration.**
 
@@ -22,12 +22,6 @@ Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thin
 - **Local Ollama integration** (`terradev ml ollama`): list, pull, generate, chat, inspect, and check running models on a local Ollama server (`list`, `pull`, `generate`, `chat`, `info`, `ps`).
 - **DeepEval integration** (`terradev ml deepeval`): install, run test suites, list metrics, and evaluate single LLM outputs with metrics like `AnswerRelevancyMetric`, `FaithfulnessMetric`, and `HallucinationMetric` (`install`, `init`, `run`, `metrics`, `evaluate`).
 - **MCP tool surface** now at 237 tools, including `ollama_*` and `deepeval_*` tool definitions and handlers.
-
-**NOTES ON 5.7.8**
-
-- **MCP Vault tools** (`terradev mcp`): the Terradev MCP server now exposes the vault directly so agents can store, retrieve, sync, and verify cloud credentials securely.
-  - New tools: `vault_set`, `vault_get`, `vault_list`, `vault_remove`, `vault_sync`, `vault_verify`, `vault_env`, `vault_run`.
-  - Tools use the encrypted `~/.terradev/credentials.json` vault and respect `TERRADEV_NO_PERSIST` for in-memory-only secrets.
 
 **NOTES ON 5.7.7**
 
