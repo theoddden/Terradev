@@ -78,22 +78,12 @@ def sso_configure(
 
     config = {}
 
-    if provider in ["google_workspace", "auth0", "azure_ad"]:
-        # OIDC providers
-        if not client_id or not client_secret:
-            print("ERROR: Client ID and secret required for OIDC providers")
-            return
+    is_oidc = client_id and client_secret
+    is_saml = entity_id and sso_url
 
-        if provider == "google_workspace":
-            config = api.enterprise_auth.get_sso_provider_config(provider)
-            config.update(
-                {
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "enabled": True,
-                }
-            )
-        elif provider == "auth0":
+    if is_oidc and provider in ["google_workspace", "auth0", "azure_ad"]:
+        # OIDC providers
+        if provider == "auth0":
             if not domain:
                 print("ERROR: Domain required for Auth0")
                 return
@@ -119,13 +109,19 @@ def sso_configure(
                     "enabled": True,
                 }
             )
+        else:
+            # google_workspace
+            config = api.enterprise_auth.get_sso_provider_config(provider)
+            config.update(
+                {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "enabled": True,
+                }
+            )
 
-    elif provider in ["azure_ad", "okta"]:
+    elif is_saml and provider in ["okta", "azure_ad"]:
         # SAML providers
-        if not entity_id or not sso_url:
-            print("ERROR: Entity ID and SSO URL required for SAML providers")
-            return
-
         config = api.enterprise_auth.get_sso_provider_config(provider)
         config.update(
             {
@@ -135,6 +131,17 @@ def sso_configure(
                 "enabled": True,
             }
         )
+
+    else:
+        if provider in ["google_workspace", "auth0"] or (
+            provider == "azure_ad" and not is_saml
+        ):
+            print("ERROR: Client ID and secret required for OIDC providers")
+        elif provider in ["okta"] or (provider == "azure_ad" and not is_oidc):
+            print("ERROR: Entity ID and SSO URL required for SAML providers")
+        else:
+            print(f"ERROR: {provider} not supported with the provided credentials")
+        return
 
     try:
         api.enterprise_auth.enable_sso_provider(provider, config)
@@ -160,8 +167,10 @@ def sso_test(provider):
             return
 
         print(f"Testing {provider}...")
-        # Add actual testing logic here
-        print(f"OK: {provider} configuration appears valid")
+        if api.enterprise_auth.test_sso_provider(provider):
+            print(f"OK: {provider} configuration appears valid")
+        else:
+            print(f"WARNING: {provider} configuration test failed")
     else:
         # Test all providers
         enabled_providers = api.enterprise_auth.list_enabled_providers()
@@ -171,7 +180,10 @@ def sso_test(provider):
 
         print("Testing all configured providers...")
         for p in enabled_providers:
-            print(f"OK: {p} configuration appears valid")
+            if api.enterprise_auth.test_sso_provider(p):
+                print(f"OK: {p} configuration appears valid")
+            else:
+                print(f"WARNING: {p} configuration test failed")
 @cli.command("mcp")
 @click.argument("action", type=click.Choice(["serve", "install", "list-tools"]))
 @click.option(
