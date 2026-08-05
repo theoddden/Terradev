@@ -723,6 +723,51 @@ terradev execute -i <node-id> -c "ibstat -v"
 terradev provision -g H100 -n 4 --ensure-rdma --enable-gpudirect
 ```
 
+## Inference Provider Gateway
+
+`terradev gateway` is the API gateway for OpenAI/Anthropic-compatible inference. It can also manage inference-only providers directly through provider subcommands.
+
+### Supported inference providers
+
+- `huggingface` - HuggingFace Inference Endpoints
+- `baseten` - Baseten model deployments
+- `siliconflow` - SiliconFlow model API
+- `inferx` - InferX serverless inference
+
+### Typical workflow
+
+```bash
+# 1. Configure the provider
+terradev gateway huggingface configure --api-key $HF_TOKEN --namespace hf-user
+terradev gateway baseten configure --api-key $BASETEN_API_KEY
+terradev gateway siliconflow configure --api-key $SILICONFLOW_KEY
+terradev gateway inferx configure --api-key $INFERX_KEY
+
+# 2. Deploy a model
+terradev gateway huggingface deploy --model meta-llama/Llama-3.1-8B-Instruct --gpu-type A100
+terradev gateway siliconflow deploy --model meta-llama/Llama-3.1-8B-Instruct --gpu-type A100
+terradev gateway inferx deploy --model meta-llama/Llama-3.1-8B-Instruct
+
+# 3. List and check status
+terradev gateway huggingface list
+terradev gateway huggingface status <endpoint-id>
+
+# 4. Chat
+terradev gateway huggingface chat --model <endpoint-id> --prompt "Hello"
+
+# 5. Delete
+terradev gateway huggingface delete <endpoint-id>
+```
+
+### `terradev infer` with inference-only providers
+
+`infer deploy` compares quotes from all configured providers (including the inference-only ones). `infer endpoint` deploys the model and registers it with the inference router.
+
+```bash
+terradev infer deploy -m meta-llama/Llama-3.1-8B-Instruct
+terradev infer endpoint meta-llama/Llama-3.1-8B-Instruct -n my-ep --dry-run
+```
+
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.

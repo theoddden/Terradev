@@ -108,7 +108,7 @@ class HuggingFaceProvider(BaseProvider):
                     "model": {
                         "framework": "pytorch",
                         "image": {"huggingface": {}},
-                        "repository": "placeholder/model",
+                        "repository": self.credentials.get("model", "placeholder/model"),
                     },
                     "provider": {"region": region or "us-east-1", "vendor": "aws"},
                 },

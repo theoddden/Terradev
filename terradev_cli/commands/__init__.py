@@ -76,6 +76,7 @@ from . import ml         # noqa: F401,E402
 from . import training   # noqa: F401,E402
 from . import mlops      # noqa: F401,E402
 from . import platform   # noqa: F401,E402
+from . import gateway    # noqa: F401,E402
 from . import canary     # noqa: F401,E402
 from . import database   # noqa: F401,E402
 from . import vault      # noqa: F401,E402

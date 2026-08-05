@@ -297,8 +297,8 @@ class TestAgentFunctional:
 
 
 class TestGatewayFunctional:
-    @patch("terradev_cli.core.gateway_service.create_gateway_config")
-    @patch("terradev_cli.core.gateway_service.GatewayService")
+    @patch("terradev_cli.commands.gateway.create_gateway_config")
+    @patch("terradev_cli.commands.gateway.GatewayService")
     def test_gateway_runs(self, MockSvc, MockCfg, runner):
         MockCfg.return_value = SimpleNamespace()
         MockSvc.return_value = MagicMock()

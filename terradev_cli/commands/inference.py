@@ -1081,15 +1081,22 @@ def infer():
 @click.option(
     "--provider",
     "-p",
-    type=click.Choice(["runpod", "vastai", "lambda_labs", "baseten"]),
-    help="Provider preference",
+    type=click.Choice(["runpod", "vastai", "lambda_labs", "baseten", "huggingface", "siliconflow", "inferx"]),
+    help="Provider (runpod|vastai|lambda_labs|baseten|huggingface|siliconflow|inferx)",
 )
 @click.option("--gpu-type", "-g", help="GPU type preference")
 @click.option("--region", "-r", help="Region preference")
 @click.option("--max-latency", type=float, help="Max latency in ms")
 @click.option("--max-cost", type=float, help="Max cost per request")
 def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_cost):
-    """Deploy and manage inference endpoints"""
+    """Compare and select the cheapest inference option across providers.
+
+    Queries all configured inference providers (GPU-based and inference-only)
+    and prints the best quote. To actually deploy, use `terradev infer endpoint`.
+
+    Supported providers: runpod, vastai, lambda_labs, baseten, huggingface,
+    siliconflow, inferx.
+    """
     print(f"Deploying inference for model: {model}")
 
     if type:
@@ -1110,7 +1117,7 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
 
     api = TerradevAPI()
     target_gpu = gpu_type or "A100"
-    inference_providers = ["runpod", "vastai", "lambda_labs", "baseten"]
+    inference_providers = ["runpod", "vastai", "lambda_labs", "baseten", "huggingface", "siliconflow", "inferx"]
     if provider:
         inference_providers = [provider.replace("lambda", "lambda_labs")]
 
@@ -1251,8 +1258,8 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
 @click.option(
     "--provider",
     "-p",
-    type=click.Choice(["runpod", "vastai", "lambda_labs", "baseten"]),
-    help="Provider (runpod|vastai|lambda_labs|baseten)",
+    type=click.Choice(["runpod", "vastai", "lambda_labs", "baseten", "huggingface", "siliconflow", "inferx"]),
+    help="Provider (runpod|vastai|lambda_labs|baseten|huggingface|siliconflow|inferx)",
 )
 @click.option("--gpu-type", "-g", help="GPU type (A100|H100|RTX4090)")
 @click.option("--min-workers", type=int, default=1, help="Minimum workers")
@@ -1271,7 +1278,19 @@ def infer_endpoint(
     cost_optimize,
     dry_run,
 ):
-    """Deploy inference endpoint"""
+    """Deploy an inference endpoint for MODEL_PATH.
+
+    MODEL_PATH is passed to inference-only providers (huggingface, baseten,
+    siliconflow, inferx) as their deployment model. For GPU-VM providers
+    (runpod, vastai, lambda_labs) it is used as the endpoint label.
+
+    Use --provider to pin a specific provider or omit it to pick the cheapest
+    quote. Use --dry-run to preview the selected provider before provisioning.
+
+    Examples:
+      terradev infer endpoint meta-llama/Llama-3.1-8B-Instruct -n my-ep
+      terradev infer endpoint my-org/my-model -n my-ep --provider siliconflow -g A100
+    """
     print(f"Deploying inference endpoint: {name}")
     print(f"Model path: {model_path}")
 
@@ -1290,7 +1309,7 @@ def infer_endpoint(
 
     api = TerradevAPI()
     target_gpu = gpu_type or "A100"
-    target_providers = ["runpod", "vastai", "lambda_labs", "baseten"]
+    target_providers = ["runpod", "vastai", "lambda_labs", "baseten", "huggingface", "siliconflow", "inferx"]
     if provider:
         target_providers = [provider.replace("lambda", "lambda_labs")]
 
@@ -1335,7 +1354,20 @@ def infer_endpoint(
 
         factory = ProviderFactory()
         creds = api._provider_creds(pname)
+        # Inference-only providers need the requested model in their credentials
+        if pname in ("huggingface", "baseten", "siliconflow", "inferx"):
+            creds["model"] = model_path
+            creds["default_model"] = model_path
         prov = factory.create_provider(pname, creds)
+        if pname == "inferx":
+            return await prov.deploy_model(
+                {
+                    "model_id": model_path,
+                    "gpu_type": target_gpu,
+                    "region": best.get("region", "us-east-1"),
+                    "openai_compatible": True,
+                }
+            )
         return await prov.provision_instance(
             best.get("instance_type", f"{pname}-{target_gpu.lower()}"),
             best.get("region", "us-east-1"),

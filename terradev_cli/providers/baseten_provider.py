@@ -103,7 +103,7 @@ class BasetenProvider(BaseProvider):
             "POST",
             f"{self.API_BASE}/models",
             json={
-                "model_name": f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%H%M%S')}",
+                "model_name": self.credentials.get("model", f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%H%M%S')}"),
                 "gpu": gpu_info["model_id"],
                 "min_replicas": 1,
                 "max_replicas": 1,

@@ -297,8 +297,9 @@ class InferXProvider(BaseProvider):
         self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         """Provision serverless instance (InferX deployment)"""
+        model_id = self.credentials.get("model") or f"serverless-{instance_type}"
         model_config = {
-            "model_id": f"serverless-{instance_type}",
+            "model_id": model_id,
             "gpu_type": gpu_type,
             "region": region,
         }
@@ -331,6 +332,29 @@ class InferXProvider(BaseProvider):
             "async": async_exec,
             "message": "Command execution not supported on serverless platform",
         }
+
+    async def chat_completion(
+        self,
+        messages: List[Dict[str, str]],
+        model: str = "",
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """OpenAI-compatible chat completions endpoint."""
+        session = await self._get_session()
+        url = f"{self.api_endpoint}/v1/chat/completions"
+        body = {
+            "model": model or self.credentials.get("model", "default"),
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "stream": False,
+        }
+        async with session.post(url, json=body) as resp:
+            if resp.status >= 400:
+                raise RuntimeError(f"InferX chat failed: HTTP {resp.status}")
+            return await resp.json()
 
     def _get_auth_headers(self) -> Dict[str, str]:
         """Get InferX authentication headers"""
