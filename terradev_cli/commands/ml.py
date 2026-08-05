@@ -8,9 +8,12 @@ import subprocess
 import sys
 import time
 import uuid
+import urllib.error
+import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlencode
 
 import click
 from . import cli
@@ -2800,3 +2803,321 @@ def databricks_mlflow_models(limit, fmt):
             desc = (m.get("description") or "")[:30]
             print(f"  {name:<40} {latest:<16} {desc}")
         print()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Ollama Local Model Commands
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _ollama_request(endpoint: str, method: str, path: str, data: Optional[Dict] = None, timeout: int = 30):
+    """Make a synchronous JSON request to the Ollama HTTP API."""
+    url = f"{endpoint.rstrip('/')}/{path.lstrip('/')}"
+    body = json.dumps(data).encode("utf-8") if data is not None else None
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method=method,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        raise RuntimeError(f"Ollama returned {e.code}: {body}")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Cannot connect to Ollama at {endpoint}: {e.reason}")
+
+
+def _ollama_stream(endpoint: str, path: str, data: Dict, timeout: int = 600):
+    """Stream an NDJSON response from the Ollama HTTP API and print progress."""
+    url = f"{endpoint.rstrip('/')}/{path.lstrip('/')}"
+    body = json.dumps(data).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            for line in resp:
+                line = line.decode("utf-8").strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if "status" in obj:
+                    print(f"  {obj['status']}")
+                if "error" in obj:
+                    raise RuntimeError(obj["error"])
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        raise RuntimeError(f"Ollama returned {e.code}: {body}")
+
+
+@ml.group()
+def ollama():
+    """Local Ollama model management and inference."""
+    pass
+
+
+@ollama.command("list")
+@click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
+def ollama_list(endpoint):
+    """List models available on the Ollama server."""
+    try:
+        data = _ollama_request(endpoint, "GET", "/api/tags")
+        models = data.get("models", [])
+        if not models:
+            print("No Ollama models found.")
+            return
+        print(f"Ollama models on {endpoint}:")
+        for m in models:
+            size_gb = m.get("size", 0) / (1024**3)
+            print(f"  {m['name']} ({size_gb:.1f}GB)")
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: {e}")
+
+
+@ollama.command("pull")
+@click.argument("model")
+@click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
+def ollama_pull(model, endpoint):
+    """Pull an Ollama model onto the local server."""
+    print(f"Pulling {model} from {endpoint}...")
+    try:
+        _ollama_stream(endpoint, "/api/pull", {"name": model, "stream": True})
+        print(f"OK: {model} pulled successfully")
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: {e}")
+
+
+@ollama.command("generate")
+@click.argument("model")
+@click.option("--prompt", "-p", required=True, help="Prompt text")
+@click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
+@click.option("--options", "-o", help="JSON options for generation")
+def ollama_generate(model, prompt, endpoint, options):
+    """Generate text with an Ollama model."""
+    try:
+        payload = {"model": model, "prompt": prompt, "stream": False}
+        if options:
+            payload["options"] = json.loads(options)
+        data = _ollama_request(endpoint, "POST", "/api/generate", payload, timeout=120)
+        print(data.get("response", ""))
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: {e}")
+
+
+@ollama.command("chat")
+@click.argument("model")
+@click.option("--message", "-m", required=True, help="User message")
+@click.option("--system", "-s", help="System message")
+@click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
+@click.option("--options", "-o", help="JSON options for the chat request")
+def ollama_chat(model, message, system, endpoint, options):
+    """Chat with an Ollama model."""
+    try:
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": message})
+        payload = {"model": model, "messages": messages, "stream": False}
+        if options:
+            payload["options"] = json.loads(options)
+        data = _ollama_request(endpoint, "POST", "/api/chat", payload, timeout=120)
+        reply = data.get("message", {}).get("content", "")
+        print(reply)
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: {e}")
+
+
+@ollama.command("info")
+@click.argument("model")
+@click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
+def ollama_info(model, endpoint):
+    """Show detailed information about an Ollama model."""
+    try:
+        data = _ollama_request(endpoint, "POST", "/api/show", {"name": model})
+        print(json.dumps(data, indent=2, default=str))
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: {e}")
+
+
+@ollama.command("ps")
+@click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
+def ollama_ps(endpoint):
+    """List currently running Ollama models."""
+    try:
+        data = _ollama_request(endpoint, "GET", "/api/ps")
+        models = data.get("models", [])
+        if not models:
+            print("No Ollama models are currently running.")
+            return
+        print(f"Running Ollama models on {endpoint}:")
+        for m in models:
+            size_gb = m.get("size", 0) / (1024**3)
+            until = m.get("expires_at", "unknown")
+            print(f"  {m['name']} ({size_gb:.1f}GB, expires {until})")
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# DeepEval LLM Evaluation Commands
+# ═══════════════════════════════════════════════════════════════════════
+
+
+DEEPEVAL_METRICS = [
+    "AnswerRelevancyMetric",
+    "FaithfulnessMetric",
+    "ContextualRelevancyMetric",
+    "ContextualPrecisionMetric",
+    "ContextualRecallMetric",
+    "HallucinationMetric",
+    "BiasMetric",
+    "ToxicityMetric",
+    "SummarizationMetric",
+    "RagasMetric",
+    "GEval",
+    "DAGMetric",
+]
+
+
+@ml.group()
+def deepeval():
+    """LLM evaluation with DeepEval."""
+    pass
+
+
+@deepeval.command("install")
+@click.option("--upgrade", is_flag=True, help="Upgrade DeepEval")
+def deepeval_install(upgrade):
+    """Install the DeepEval package."""
+    cmd = [sys.executable, "-m", "pip", "install"]
+    if upgrade:
+        cmd.append("--upgrade")
+    cmd.append("deepeval")
+    print("Installing DeepEval...")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            print("OK: DeepEval installed")
+        else:
+            print(f"ERROR: {result.stderr}")
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: {e}")
+
+
+@deepeval.command("init")
+@click.option("--output", "-o", default="test_deepeval.py", help="Output test file path")
+def deepeval_init(output):
+    """Generate a starter DeepEval test file."""
+    sample = '''import pytest
+from deepeval import assert_test
+from deepeval.test_case import LLMTestCase
+from deepeval.metrics import AnswerRelevancyMetric
+
+def test_llm():
+    test_case = LLMTestCase(
+        input="What is the capital of France?",
+        actual_output="Paris",
+        expected_output="Paris"
+    )
+    assert_test(test_case, [AnswerRelevancyMetric(threshold=0.5)])
+'''
+    try:
+        Path(output).write_text(sample, encoding="utf-8")
+        print(f"OK: Starter DeepEval test written to {output}")
+        print(f"Run it with: terradev ml deepeval run --file {output}")
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: {e}")
+
+
+@deepeval.command("run")
+@click.option("--file", "-f", default="test_deepeval.py", help="DeepEval test file")
+def deepeval_run(file):
+    """Run DeepEval tests."""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "deepeval", "test", "run", "-x", file],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            print(result.stdout)
+        else:
+            print(f"ERROR:\n{result.stderr}")
+    except FileNotFoundError:
+        print("ERROR: DeepEval not found. Run 'terradev ml deepeval install' first.")
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: {e}")
+
+
+@deepeval.command("metrics")
+def deepeval_metrics():
+    """List available DeepEval metrics."""
+    print("Available DeepEval metrics:")
+    for m in DEEPEVAL_METRICS:
+        print(f"  {m}")
+
+
+@deepeval.command("evaluate")
+@click.option("--input", "-i", required=True, help="Test input/prompt")
+@click.option("--actual-output", "-a", required=True, help="Actual LLM output")
+@click.option(
+    "--metric",
+    "-m",
+    required=True,
+    type=click.Choice(DEEPEVAL_METRICS, case_sensitive=False),
+    help="DeepEval metric to use",
+)
+@click.option("--expected-output", "-e", help="Expected output")
+@click.option("--context", "-c", help="Ground-truth context (comma-separated)")
+@click.option("--retrieval-context", "-r", help="Retrieval context (comma-separated)")
+@click.option("--threshold", "-t", default=0.5, type=float, help="Passing threshold")
+def deepeval_evaluate(input, actual_output, metric, expected_output, context, retrieval_context, threshold):
+    """Evaluate a single LLM output with a DeepEval metric."""
+    try:
+        from deepeval.test_case import LLMTestCase
+    except ImportError:
+        print("ERROR: DeepEval not installed. Run 'terradev ml deepeval install' first.")
+        return
+
+    if metric in ("GEval", "DAGMetric"):
+        print(f"ERROR: {metric} requires a custom definition. Use 'deepeval run' with a test file.")
+        return
+
+    kwargs: Dict[str, Any] = {"input": input, "actual_output": actual_output}
+    if expected_output:
+        kwargs["expected_output"] = expected_output
+    if context:
+        kwargs["context"] = [c.strip() for c in context.split(",") if c.strip()]
+    if retrieval_context:
+        kwargs["retrieval_context"] = [c.strip() for c in retrieval_context.split(",") if c.strip()]
+
+    test_case = LLMTestCase(**kwargs)
+
+    try:
+        from deepeval import metrics as deepeval_metrics
+
+        metric_cls = getattr(deepeval_metrics, metric, None)
+        if metric_cls is None:
+            print(f"ERROR: Unknown metric {metric}")
+            return
+        metric_obj = metric_cls(threshold=threshold)
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: Failed to load metric: {e}")
+        return
+
+    try:
+        metric_obj.measure(test_case)
+        print(f"Score: {metric_obj.score}")
+        print(f"Reason: {metric_obj.reason}")
+        print(f"Passed: {metric_obj.is_successful()}")
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: {e}")

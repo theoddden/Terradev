@@ -1839,3 +1839,46 @@ async def _handle_vllm_benchmark(arguments, cmd_args, tool_name, execute_terrade
     return cmd_args
 
 HANDLERS['vllm_benchmark'] = _handle_vllm_benchmark
+
+
+async def _handle_ollama_ps(arguments, cmd_args, tool_name, execute_terradev_command):
+    endpoint = arguments.get("endpoint", "http://localhost:11434")
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{endpoint}/api/ps",
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    models = data.get("models", [])
+                    output_text = f"🦙 **Ollama Running Models — {endpoint}**\n\n"
+                    if models:
+                        for m in models:
+                            size_gb = m.get("size", 0) / (1024**3)
+                            until = m.get("expires_at", "unknown")
+                            output_text += f"  - **{m['name']}** ({size_gb:.1f}GB, expires {until})\n"
+                    else:
+                        output_text += "No Ollama models are currently running."
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=output_text)]
+                    )
+                else:
+                    return CallToolResult(
+                        content=[
+                            TextContent(
+                                type="text",
+                                text=f"❌ Ollama returned {resp.status}",
+                            )
+                        ],
+                        isError=True,
+                    )
+    except Exception as e:  # noqa: BLE001
+        return CallToolResult(
+            content=[TextContent(type="text", text=f"❌ Cannot connect to Ollama: {e}")],
+            isError=True,
+        )
+    return cmd_args
+
+
+HANDLERS['ollama_ps'] = _handle_ollama_ps

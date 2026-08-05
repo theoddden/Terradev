@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Terradev MCP Server v5.7.9 - Complete Agentic GPU Infrastructure for Claude Code
+Terradev MCP Server v5.7.10 - Complete Agentic GPU Infrastructure for Claude Code
 
-220 MCP tools: GPU provisioning, Kubernetes clusters, Karpenter auto-provisioning,
+237 MCP tools: GPU provisioning, Kubernetes clusters, Karpenter auto-provisioning,
 GitOps/ArgoCD automation, event-driven triggers, environment promotion, lineage tracking,
-cross-provider migration, vLLM/SGLang/Ollama inference, Arize Phoenix trace observability,
+cross-provider migration, vLLM/SGLang/Ollama inference, DeepEval LLM evaluation, Arize Phoenix trace observability,
 NeMo Guardrails output safety, Qdrant vector DB, Ray cluster management, W&B/LangSmith/MLflow/DVC,
 HuggingFace Hub, Datadog monitoring, data governance, cost optimization, FlashOptim training,
 Langfuse LLM observability, Databricks MLOps, vLLM auto-optimization/analysis/benchmarking,

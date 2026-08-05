@@ -2190,3 +2190,46 @@ async def _handle_qdrant_k8s(arguments, cmd_args, tool_name, execute_terradev_co
     return cmd_args
 
 HANDLERS['qdrant_k8s'] = _handle_qdrant_k8s
+
+
+async def _handle_deepeval_run(arguments, cmd_args, tool_name, execute_terradev_command):
+    if arguments.get("file"):
+        cmd_args.extend(["--file", arguments["file"]])
+    return cmd_args
+
+
+HANDLERS['deepeval_run'] = _handle_deepeval_run
+
+
+async def _handle_deepeval_metrics(arguments, cmd_args, tool_name, execute_terradev_command):
+    return cmd_args
+
+
+HANDLERS['deepeval_metrics'] = _handle_deepeval_metrics
+
+
+async def _handle_deepeval_evaluate(arguments, cmd_args, tool_name, execute_terradev_command):
+    cmd_args.extend(["--input", arguments["input"]])
+    cmd_args.extend(["--actual-output", arguments["actual_output"]])
+    cmd_args.extend(["--metric", arguments["metric"]])
+    if arguments.get("expected_output"):
+        cmd_args.extend(["--expected-output", arguments["expected_output"]])
+    if arguments.get("context"):
+        cmd_args.extend(["--context", arguments["context"]])
+    if arguments.get("retrieval_context"):
+        cmd_args.extend(["--retrieval-context", arguments["retrieval_context"]])
+    if arguments.get("threshold"):
+        cmd_args.extend(["--threshold", str(arguments["threshold"])])
+    return cmd_args
+
+
+HANDLERS['deepeval_evaluate'] = _handle_deepeval_evaluate
+
+
+async def _handle_deepeval_init(arguments, cmd_args, tool_name, execute_terradev_command):
+    if arguments.get("output"):
+        cmd_args.extend(["--output", arguments["output"]])
+    return cmd_args
+
+
+HANDLERS['deepeval_init'] = _handle_deepeval_init

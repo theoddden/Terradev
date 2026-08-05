@@ -1,5 +1,5 @@
 {
-  "tool_count": 232,
+  "tool_count": 237,
   "tool_names": [
     "active_context",
     "analytics",
@@ -38,6 +38,10 @@
     "datadog_send_event",
     "datadog_status",
     "datadog_terraform_export",
+    "deepeval_evaluate",
+    "deepeval_init",
+    "deepeval_metrics",
+    "deepeval_run",
     "dvc_diff",
     "dvc_push",
     "dvc_stage_checkpoint",
@@ -136,6 +140,7 @@
     "ollama_generate",
     "ollama_list",
     "ollama_model_info",
+    "ollama_ps",
     "ollama_pull",
     "optimize",
     "orchestrator_evict",
