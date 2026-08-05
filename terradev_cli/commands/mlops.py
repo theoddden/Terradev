@@ -11,10 +11,10 @@ from terradev_cli.commands._api import TerradevAPI
 
 logger = logging.getLogger(__name__)
 
-@cli.group("agentic-serving")
-def agentic_serving():
-    """Agentic inference serving  KV cache TTL, prefix caching, LMCache, priority scheduling."""
-    pass
+agentic_serving = click.Group(
+    name="agentic-serving",
+    help="Agentic inference serving  KV cache TTL, prefix caching, LMCache, priority scheduling.",
+)
 @agentic_serving.command("configure")
 @click.option(
     "--engine",

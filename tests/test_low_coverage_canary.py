@@ -244,12 +244,12 @@ class TestCanaryHFCliIntegration:
 
         cli = click.Group()
         register_hf_commands(cli)
-        # Verify a hf-space-ish command was registered.
+        # Verify an hf-spaces command was registered.
         assert any("hf" in name.lower() for name in cli.commands)
 
     def test_cli_help(self):
         runner = CliRunner()
-        result = runner.invoke(terradev_cli.cli.cli, ["hf-space", "--help"])
+        result = runner.invoke(terradev_cli.cli.cli, ["hf-spaces", "--help"])
         assert result.exit_code == 0
 
 

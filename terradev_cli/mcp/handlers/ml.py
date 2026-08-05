@@ -41,7 +41,7 @@ HANDLERS['hf_space_deploy'] = _handle_hf_space_deploy
 
 
 async def _handle_hf_space_status(arguments, cmd_args, tool_name, execute_terradev_command):
-    cmd_args = ["hf-space", "--status", arguments["space_name"]]
+    cmd_args = ["hf-spaces", "info", arguments["space_name"]]
     result = await execute_terradev_command(cmd_args)
     output = result["stdout"] if result["success"] else result["stderr"]
     output_text = (

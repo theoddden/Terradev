@@ -74,25 +74,6 @@ async def _handle_price_intel(arguments, cmd_args, tool_name, execute_terradev_c
 HANDLERS['price_intel'] = _handle_price_intel
 
 
-async def _handle_price_discovery(arguments, cmd_args, tool_name, execute_terradev_command):
-    cmd_args = ["price-discovery", "--gpu-type", arguments["gpu_type"]]
-    if "region" in arguments:
-        cmd_args.extend(["--region", arguments["region"]])
-    if "hours" in arguments:
-        cmd_args.extend(["--hours", str(arguments["hours"])])
-    result = await execute_terradev_command(cmd_args)
-    output = result["stdout"] if result["success"] else result["stderr"]
-    output_text = (
-        f"💰 **Price Discovery — {arguments['gpu_type']}**\n\n" + output
-    )
-    return CallToolResult(
-        content=[TextContent(type="text", text=output_text)],
-        isError=not result["success"],
-    )
-
-HANDLERS['price_discovery'] = _handle_price_discovery
-
-
 async def _handle_cost_analyze(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.core.cost_optimizer import CostOptimizer

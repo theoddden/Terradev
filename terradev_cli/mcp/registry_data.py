@@ -16,7 +16,7 @@ TERRADEV_COMMAND_MAP = {
     "inferx_status": ["inferx", "status"],
     "inferx_list": ["inferx", "list"],
     "inferx_optimize": ["inferx", "optimize"],
-    "hf_space_deploy": ["hf-space"],
+    "hf_space_deploy": ["hf-spaces", "create"],
     "status": ["status"],
     "manage_instance": ["manage"],
     "analytics": ["analytics"],
@@ -30,7 +30,6 @@ TERRADEV_COMMAND_MAP = {
     "checkpoint_list": ["checkpoint", "list"],
     "checkpoint_save": ["checkpoint", "save"],
     "preflight": ["preflight"],
-    "price_discovery": ["price-discovery"],
     # v3.2.0 tools
     "infer_route": ["inference", "route"],
     "infer_route_disagg": ["inference", "route"],
@@ -70,7 +69,7 @@ TERRADEV_COMMAND_MAP = {
     "inferx_delete": ["inferx", "delete"],
     "inferx_usage": ["inferx", "usage"],
     "inferx_quote": ["inferx", "quote"],
-    "hf_space_status": ["hf-space"],
+    "hf_space_status": ["hf-spaces", "info"],
     "run_workflow": ["workflow", "run"],
     "active_context": ["status"],  # Composite — handled specially
     # v3.5.0: Multi-LoRA

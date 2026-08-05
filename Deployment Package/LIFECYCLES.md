@@ -1,4 +1,4 @@
-# Terradev CLI Lifecycles (v5.7.11)
+# Terradev CLI Lifecycles (v5.7.12)
 
 Complete end-to-end workflows covering nearly every command in the CLI. These have been updated to match the current CLI signatures and remove deprecated commands.
 
@@ -1025,7 +1025,7 @@ terradev langsmith evaluate \
 
 ```bash
 # Configure serving settings
-terradev agentic-serving configure \
+terradev agent agentic-serving configure \
   --backend vllm \
   --cache-backend redis \
   --enable-prefix-caching
@@ -1035,28 +1035,28 @@ terradev agentic-serving configure \
 
 ```bash
 # Show current configuration
-terradev agentic-serving show-config
+terradev agent agentic-serving show-config
 ```
 
 ### Phase 3: Generate Launch Args
 
 ```bash
 # Show launch arguments
-terradev agentic-serving launch-args
+terradev agent agentic-serving launch-args
 ```
 
 ### Phase 4: Generate LMCache Environment
 
 ```bash
 # Generate LMCache environment
-terradev agentic-serving lmcache-env
+terradev agent agentic-serving lmcache-env
 ```
 
 ### Phase 5: Deploy on Kubernetes
 
 ```bash
 # Deploy on Kubernetes
-terradev agentic-serving k8s \
+terradev agent agentic-serving k8s \
   --namespace inference \
   --replicas 3
 ```
@@ -1065,7 +1065,7 @@ terradev agentic-serving k8s \
 
 ```bash
 # Generate Helm values
-terradev agentic-serving helm-values --output values.yaml
+terradev agent agentic-serving helm-values --output values.yaml
 ```
 
 ### Phase 7: Configure Model Router

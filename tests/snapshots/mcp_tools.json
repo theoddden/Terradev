@@ -1,5 +1,5 @@
 {
-  "tool_count": 237,
+  "tool_count": 236,
   "tool_names": [
     "active_context",
     "analytics",
@@ -162,7 +162,6 @@
     "preflight_provision",
     "preflight_report",
     "price_budget_optimize",
-    "price_discovery",
     "price_intel",
     "price_spot_risk",
     "price_trends",

@@ -1,6 +1,6 @@
 """Targeted functional tests for previously missing top-level CLI commands.
 
-These tests exercise `up`, `rollback`, `manifests`, `hf-space`, and a subset of
+These tests exercise `up`, `rollback`, `manifests`, and a subset of
 `hf-spaces`/`karpenter` subcommands with heavy dependencies mocked so they run
 fast and do not perform real network or cloud I/O.
 """
@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Ensure top-level commands (up, rollback, manifests, hf-space, hf-spaces,
+# Ensure top-level commands (up, rollback, manifests, hf-spaces,
 # karpenter) are registered on the shared `cli` group before use.
 import terradev_cli.cli  # noqa: F401
 from terradev_cli.commands import cli
@@ -94,50 +94,6 @@ class TestManifestsCommand:
             )
         assert result.exit_code == 0, result.output
         assert "No cached manifests" in result.output
-
-
-class TestHfSpaceCommand:
-    @patch("terradev_cli.core.hf_spaces.HFSpacesDeployer")
-    @patch("terradev_cli.core.hf_spaces.HFSpaceTemplates")
-    def test_hf_space_deploys_with_template(
-        self, MockTemplates, MockDeployer, runner, mock_api, monkeypatch
-    ):
-        """Top-level `hf-space` should deploy using a template."""
-        monkeypatch.setenv("HF_TOKEN", "test-token")
-
-        config = MagicMock()
-        config.hardware = "cpu-basic"
-        config.sdk = "gradio"
-        config.private = False
-        config.env_vars = {}
-        config.secrets = None
-        MockTemplates.get_llm_template.return_value = config
-
-        deployer = MockDeployer.return_value
-        deployer.create_space = AsyncMock(
-            return_value={
-                "status": "created",
-                "space_url": "https://huggingface.co/spaces/test/space",
-                "hardware": "cpu-basic",
-                "model_id": "meta-llama/Llama-2-7b",
-            }
-        )
-
-        result = runner.invoke(
-            cli,
-            [
-                "hf-space",
-                "test-space",
-                "--model-id",
-                "meta-llama/Llama-2-7b",
-                "--template",
-                "llm",
-            ],
-            obj={"api": mock_api},
-        )
-        assert result.exit_code == 0, result.output
-        assert "OK" in result.output
-        assert deployer.create_space.called
 
 
 class TestHfSpacesGroup:

@@ -32,20 +32,6 @@ class TestHelmGenerate:
         result = runner.invoke(cli, ["helm-generate"], obj={"api": mock_api})
         assert result.exit_code != 0
 
-class TestPercentiles:
-    def test_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["percentiles", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    def test_requires_args(self, runner, mock_api):
-        result = runner.invoke(cli, ["percentiles"], obj={"api": mock_api})
-        assert result.exit_code != 0
-
-class TestPriceDiscovery:
-    def test_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["price-discovery", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
 class TestReliability:
     def test_help(self, runner, mock_api):
         result = runner.invoke(cli, ["reliability", "--help"], obj={"api": mock_api})
@@ -58,25 +44,6 @@ class TestFunctionalInfrastructure:
     def _price(self, provider="RunPod", price=2.0, instance_type="runpod-a100", capacity="high", confidence=0.95):
         from types import SimpleNamespace
         return SimpleNamespace(provider=provider, price=price, instance_type=instance_type, capacity=capacity, confidence=confidence)
-
-    @patch("terradev_cli.core.price_discovery.PriceDiscoveryEngine")
-    def test_price_discovery_runs(self, MockEngine, runner, mock_api):
-        engine = MockEngine.return_value
-        engine.__aenter__ = AsyncMock(return_value=engine)
-        engine.__aexit__ = AsyncMock(return_value=False)
-        engine.get_realtime_prices = AsyncMock(return_value=[self._price()])
-        engine.get_price_trends = AsyncMock(return_value={"RunPod": {"metrics": {"avg_price": 2.0, "min_price": 1.5, "max_price": 2.5, "volatility": 0.05, "trend": "flat"}}})
-        result = runner.invoke(cli, ["price-discovery", "--gpu-type", "A100", "--trends"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    @patch("terradev_cli.core.price_discovery.PriceDiscoveryEngine")
-    def test_price_discovery_requires_gpu_type(self, MockEngine, runner, mock_api):
-        engine = MockEngine.return_value
-        engine.__aenter__ = AsyncMock(return_value=engine)
-        engine.__aexit__ = AsyncMock(return_value=False)
-        result = runner.invoke(cli, ["price-discovery"], obj={"api": mock_api})
-        assert result.exit_code == 2
-        assert "Please specify --gpu-type" in result.output
 
     @patch("terradev_cli.core.price_discovery.BudgetOptimizationEngine")
     def test_budget_optimize_runs(self, MockEngine, runner, mock_api):
@@ -91,16 +58,6 @@ class TestFunctionalInfrastructure:
 
     def test_helm_generate_dry_run(self, runner, mock_api):
         result = runner.invoke(cli, ["helm-generate", "--image", "nginx", "--dry-run"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    @patch("terradev_cli.core.price_intelligence.compute_percentiles")
-    def test_percentiles_runs(self, mock_func, runner, mock_api):
-        mock_func.return_value = {
-            "providers": {
-                "RunPod": {"p10": 1.0, "p25": 1.5, "p50": 2.0, "p75": 2.5, "p90": 3.0, "p99": 4.0, "min": 0.5, "max": 5.0, "count": 100},
-            }
-        }
-        result = runner.invoke(cli, ["percentiles", "--gpu-type", "A100"], obj={"api": mock_api})
         assert result.exit_code == 0
 
     @patch("terradev_cli.core.price_intelligence.get_availability")

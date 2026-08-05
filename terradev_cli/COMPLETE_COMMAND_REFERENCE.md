@@ -1,6 +1,6 @@
 # Complete Terradev CLI Command Reference
 
-**All commands and subcommands for Terradev CLI v5.7.11**
+**All commands and subcommands for Terradev CLI v5.7.12**
 
 ---
 
@@ -441,29 +441,6 @@ Options:
   -f, --format [table|json]     Output format [default: table]
   --breakdown                   Show cost breakdown by category
   --forecast                    Show cost forecast
-```
-
-#### **price-discovery** - Enhanced price discovery with capacity and arbitrage
-```bash
-terradev price-discovery [OPTIONS]
-
-Options:
-  -g, --gpu-type TEXT           GPU type
-  --confidence FLOAT            Confidence level [default: 0.95]
-  --regions TEXT                Target regions
-  --include-spot                Include spot instances
-  --arbitrage                   Show arbitrage opportunities
-```
-
-#### **percentiles** - Show historical price percentiles (p10–p99)
-```bash
-terradev percentiles [OPTIONS]
-
-Options:
-  -g, --gpu-type TEXT           GPU type
-  --r, --region TEXT             Region
-  -d, --days INTEGER            Number of days [default: 30]
-  --format [table|json]         Output format [default: table]
 ```
 
 #### **reliability** - Show provider reliability scores and error rates
@@ -1583,23 +1560,6 @@ Options:
 
 ---
 
-## 🤖 **Agentic Serving Subcommands**
-
-### **agentic-serving** - Multi-backend inference serving
-```bash
-terradev agentic-serving [SUBCOMMAND]
-
-Subcommands:
-  configure      Configure serving settings
-  show-config    Show current configuration
-  launch-args    Show launch arguments
-  lmcache-env    Generate LMCache environment
-  k8s            Deploy on Kubernetes
-  helm-values    Generate Helm values
-```
-
----
-
 ##  **Retrain Subcommands**
 
 ### **retrain** - Automated model retraining
@@ -1711,19 +1671,20 @@ Subcommands:
 
 ##  **HF Spaces Subcommands**
 
-### **hf-space** - One-click HuggingFace Spaces deployment
+### **hf-spaces** - Create, list, manage, and delete HuggingFace Spaces
 ```bash
-terradev hf-space [OPTIONS] SPACE_NAME
+terradev hf-spaces [SUBCOMMAND]
 
-Options:
-  --model-id TEXT               Model ID (required)
-  --template [llm|embedding|image|custom]
-                                Space template [default: llm]
-  --hardware TEXT                Hardware type
-  --sdk [gradio|streamlit|fastapi]
-                                SDK [default: gradio]
-  --private                     Private space
-  --org TEXT                    Organization
+Subcommands:
+  create     Create a new Space with auto-generated app
+  list       List HuggingFace Spaces
+  info       Get Space details
+  delete     Delete a Space
+  restart    Restart a Space (factory reboot)
+  pause      Pause a running Space (stops billing)
+  resume     Resume a paused Space
+  hardware   Show or change hardware tier
+  logs       Show Space build/run logs
 ```
 
 ---

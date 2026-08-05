@@ -10,63 +10,6 @@ from . import cli
 logger = logging.getLogger(__name__)
 
 @cli.command()
-@click.option("--gpu-type", help="GPU type for price discovery")
-@click.option("--region", help="Region filter")
-@click.option(
-    "--hours", type=int, default=24, help="Hours of historical data to analyze"
-)
-@click.option("--trends", is_flag=True, help="Show price trends")
-def price_discovery(gpu_type, region, hours, trends):
-    """Enhanced price discovery with capacity and confidence scoring"""
-    try:
-        from terradev_cli.core.price_discovery import PriceDiscoveryEngine
-    except ImportError:
-        print(
-            "ERROR: Price discovery module not available. Install terradev_cli package."
-        )
-        sys.exit(1)
-    import asyncio
-
-    async def _price_discovery():
-
-        engine = PriceDiscoveryEngine()
-
-        async with engine as e:
-            if gpu_type:
-                print(f" Getting real-time prices for {gpu_type}...")
-                prices = await e.get_realtime_prices(gpu_type, region)
-
-                print(f"\nCOST: Real-time Prices for {gpu_type}:")
-                print("=" * 70)
-                print(
-                    f"{'Provider':<12} {'Price':<10} {'Instance':<20} {'Capacity':<12} {'Confidence':<12}"
-                )
-                print("-" * 70)
-
-                for price in prices:
-                    print(
-                        f"{price.provider:<12} ${price.price:<9.2f} {price.instance_type:<20} {price.capacity:<12} {price.confidence:<12.1%}"
-                    )
-
-                if trends:
-                    print(f"\n Price Trends (last {hours} hours):")
-                    trends_data = await e.get_price_trends(gpu_type, hours)
-
-                    for provider, data in trends_data.items():
-                        metrics = data.get("metrics", {})
-                        print(f"\n{provider}:")
-                        print(f"   Average: ${metrics['avg_price']:.2f}/hr")
-                        print(
-                            f"   Range: ${metrics['min_price']:.2f} - ${metrics['max_price']:.2f}/hr"
-                        )
-                        print(f"   Volatility: {metrics['volatility']:.3f}")
-                        print(f"   Trend: {metrics['trend']}")
-            else:
-                print("ERROR: Please specify --gpu-type")
-                sys.exit(2)
-
-    asyncio.run(_price_discovery())
-@cli.command()
 @click.option("--gpu-type", required=True, help="GPU type")
 @click.option("--budget", type=float, required=True, help="Budget constraint ($/hr)")
 @click.option("--gpu-count", type=int, default=1, help="Number of GPUs")
@@ -243,50 +186,6 @@ def helm_generate(
 
     except Exception as e:  # noqa: BLE001
         print(f"Failed to generate Helm chart: {e}")
-@cli.command()
-@click.option("--gpu-type", "-g", required=True, help="GPU type (e.g. A100, H100)")
-@click.option("--provider", "-p", help="Filter to a single provider")
-@click.option("--spot", is_flag=True, default=None, help="Spot instances only")
-@click.option(
-    "--window", "-w", default=720, help="Lookback window in hours (default: 720 = 30d)"
-)
-def percentiles(gpu_type, provider, spot, window):
-    """Show historical price percentiles (p10p99) per provider."""
-    try:
-        from terradev_cli.core.price_intelligence import compute_percentiles
-    except ImportError:
-        print("ERROR: Price intelligence module not available")
-        sys.exit(1)
-
-    data = compute_percentiles(gpu_type, provider=provider, spot=spot, hours=window)
-    providers = data.get("providers", {})
-
-    if not providers:
-        print(f"ERROR: No price data for {gpu_type.upper()} in the last {window}h")
-        print("Tip: Run 'terradev quote -g {gpu_type}' to start collecting price data.")
-        return
-
-    print(f"\nStatus Price Percentiles  {gpu_type.upper()} (last {window}h)")
-    print(
-        f"{'Provider':<14} {'p10':>8} {'p25':>8} {'p50':>8} {'p75':>8} {'p90':>8} {'p99':>8} {'Min':>8} {'Max':>8} {'N':>6}"
-    )
-    print("─" * 100)
-    for prov, stats in sorted(providers.items()):
-        print(
-            f"{prov:<14} "
-            f"${stats['p10']:>6.2f} ${stats['p25']:>6.2f} ${stats['p50']:>6.2f} "
-            f"${stats['p75']:>6.2f} ${stats['p90']:>6.2f} ${stats['p99']:>6.2f} "
-            f"${stats['min']:>6.2f} ${stats['max']:>6.2f} {stats['count']:>5}"
-        )
-
-    # Summary
-    all_p50 = [(p, s["p50"]) for p, s in providers.items()]
-    all_p50.sort(key=lambda x: x[1])
-    cheapest = all_p50[0]
-    print(f"\nTip: Cheapest median (p50): {cheapest[0]} at ${cheapest[1]:.2f}/hr")
-    if len(all_p50) > 1:
-        spread = all_p50[-1][1] - all_p50[0][1]
-        print(f" Median spread: ${spread:.2f}/hr across {len(all_p50)} providers")
 @cli.command()
 @click.option("--gpu-type", "-g", help="GPU type filter (shows all if omitted)")
 @click.option(

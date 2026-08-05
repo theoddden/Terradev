@@ -228,7 +228,7 @@ terradev integrations --tracing --provider tempo --cluster production
 
 ## 3. **HuggingFace Spaces - Public Demo**
 
-**Deploy public demos to Spaces with one command.**
+**Deploy and manage HuggingFace Spaces from the CLI.**
 
 ```bash
 # Install HF Spaces support
@@ -236,26 +236,22 @@ pip install terradev-cli[hf]
 export HF_TOKEN=your_huggingface_token
 
 # LLM Template (A10G GPU)
-terradev hf-space my-llama --model-id meta-llama/Llama-2-7b-hf --template llm
+terradev hf-spaces create my-llama --model-id meta-llama/Llama-2-7b-hf --template llm
 
 # Embedding Model (CPU Upgrade)
-terradev hf-space my-embeddings --model-id sentence-transformers/all-MiniLM-L6-v2 --template embedding
+terradev hf-spaces create my-embeddings --model-id sentence-transformers/all-MiniLM-L6-v2 --template embedding
 
 # Image Model (T4 GPU)
-terradev hf-space my-image --model-id runwayml/stable-diffusion-v1-5 --template image
+terradev hf-spaces create my-image --model-id runwayml/stable-diffusion-v1-5 --template image
 
 # Custom Hardware and SDK
-terradev hf-space my-model --model-id microsoft/DialoGPT-medium \
+terradev hf-spaces create my-model --model-id microsoft/DialoGPT-medium \
   --hardware a10g-large --sdk gradio --private
 
-# Multi-space deployment
-terradev hf-space batch --config spaces-config.yaml
-
 # Space management
-terradev hf-space list
-terradev hf-space status --space my-llama
-terradev hf-space update --space my-llama --model-id meta-llama/Llama-2-13b-hf
-terradev hf-space delete --space my-llama
+terradev hf-spaces list
+terradev hf-spaces info my-llama
+terradev hf-spaces delete my-llama
 ```
 
 **Available Templates:**
@@ -263,24 +259,6 @@ terradev hf-space delete --space my-llama
 - **embedding** — FastAPI serving with batch processing
 - **image** — Diffusers pipeline with memory optimization
 - **custom** — Your choice of SDK (Gradio, Streamlit, FastAPI)
-
-### **Advanced Spaces Features**
-```bash
-# Custom domain
-terradev hf-space update --space my-llama --domain chat.mycompany.com
-
-# Organization spaces
-terradev hf-space create --org mycompany --space my-llama --template llm
-
-# Space monitoring
-terradev hf-space monitor --space my-llama --metrics gpu,requests,errors
-
-# A/B testing
-terradev hf-space ab-test --space my-llama --model-a meta-llama/Llama-2-7b-hf --model-b meta-llama/Llama-2-13b-hf
-
-# Analytics integration
-terradev hf-space analytics --space my-llama --provider wandb
-```
 
 ---
 
@@ -656,11 +634,8 @@ terradev analytics --days 30
 # View spend over last 30 days
 terradev optimize
 
-# Find cheaper alternatives for running instances
-terradev price-discovery --gpu-type H100 --confidence 0.95
-
-# Enhanced price discovery with confidence scoring
-terradev price-discovery --gpu-type A100 --regions us-east-1,us-west-2 --confidence 0.99
+# Get real-time GPU quotes
+terradev quote --gpu-type H100
 
 # Cost optimization recommendations
 terradev optimize --instance-id <instance-id> --auto-apply
@@ -760,7 +735,7 @@ terradev sglang deploy --model meta-llama/Llama-2-7b-hf --workload low-latency
 terradev integrations --deploy --stack monitoring
 
 # 4. Deploy public demo
-terradev hf-space my-demo --model-id meta-llama/Llama-2-7b-hf --template llm
+terradev hf-spaces create my-demo --model-id meta-llama/Llama-2-7b-hf --template llm
 
 # 5. Monitor costs
 terradev analytics --days 7

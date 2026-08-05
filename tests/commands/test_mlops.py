@@ -64,7 +64,7 @@ class TestAgenticServing:
         ), patch("terradev_cli.ml_services.agentic_serving.generate_vllm_args", return_value=["--model", config.model]), patch(
             "terradev_cli.ml_services.agentic_serving.generate_lmcache_config", return_value={"local_cpu": True}
         ):
-            result = runner.invoke(cli, ["agentic-serving", "show-config"])
+            result = runner.invoke(cli, ["agent", "agentic-serving", "show-config"])
         assert result.exit_code == 0, result.output
         assert config.model in result.output
 
@@ -76,7 +76,7 @@ class TestAgenticServing:
         ), patch("terradev_cli.ml_services.agentic_serving.generate_vllm_args", return_value=["--model", config.model]), patch(
             "terradev_cli.ml_services.agentic_serving.generate_lmcache_config", return_value={"local_cpu": True}
         ):
-            result = runner.invoke(cli, ["agentic-serving", "show-config", "--format", "json"])
+            result = runner.invoke(cli, ["agent", "agentic-serving", "show-config", "--format", "json"])
         assert result.exit_code == 0, result.output
         assert '"engine"' in result.output
 
@@ -86,7 +86,7 @@ class TestAgenticServing:
             "terradev_cli.ml_services.agentic_serving.create_agentic_serving_from_credentials",
             return_value=(config, instructions),
         ), patch("terradev_cli.ml_services.agentic_serving.generate_vllm_args", return_value=["--model", config.model]):
-            result = runner.invoke(cli, ["agentic-serving", "launch-args"])
+            result = runner.invoke(cli, ["agent", "agentic-serving", "launch-args"])
         assert result.exit_code == 0, result.output
         assert config.model in result.output
 
@@ -96,7 +96,7 @@ class TestAgenticServing:
             "terradev_cli.ml_services.agentic_serving.create_agentic_serving_from_credentials",
             return_value=(config, instructions),
         ), patch("terradev_cli.ml_services.agentic_serving.generate_lmcache_env", return_value={"LMCACHE_LOCAL_CPU": "1"}):
-            result = runner.invoke(cli, ["agentic-serving", "lmcache-env"])
+            result = runner.invoke(cli, ["agent", "agentic-serving", "lmcache-env"])
         assert result.exit_code == 0, result.output
         assert "LMCACHE_LOCAL_CPU" in result.output
 
@@ -106,7 +106,7 @@ class TestAgenticServing:
             "terradev_cli.ml_services.agentic_serving.create_agentic_serving_from_credentials",
             return_value=(config, instructions),
         ), patch("terradev_cli.ml_services.agentic_serving.generate_k8s_deployment", return_value="apiVersion: v1"):
-            result = runner.invoke(cli, ["agentic-serving", "k8s"])
+            result = runner.invoke(cli, ["agent", "agentic-serving", "k8s"])
         assert result.exit_code == 0, result.output
         assert "apiVersion" in result.output
 
@@ -119,7 +119,7 @@ class TestAgenticServing:
             "terradev_cli.ml_services.agentic_serving.generate_helm_values",
             return_value={"image": "vllm/vllm-openai"},
         ):
-            result = runner.invoke(cli, ["agentic-serving", "helm-values"])
+            result = runner.invoke(cli, ["agent", "agentic-serving", "helm-values"])
         assert result.exit_code == 0, result.output
         assert "image" in result.output
 
@@ -161,13 +161,13 @@ class TestModelRouter:
 
 class TestMLOpsHelp:
     @pytest.mark.parametrize("path", [
-        "agentic-serving",
-        "agentic-serving configure",
-        "agentic-serving show-config",
-        "agentic-serving launch-args",
-        "agentic-serving lmcache-env",
-        "agentic-serving k8s",
-        "agentic-serving helm-values",
+        "agent agentic-serving",
+        "agent agentic-serving configure",
+        "agent agentic-serving show-config",
+        "agent agentic-serving launch-args",
+        "agent agentic-serving lmcache-env",
+        "agent agentic-serving k8s",
+        "agent agentic-serving helm-values",
         "model-router",
         "model-router configure",
         "model-router test",

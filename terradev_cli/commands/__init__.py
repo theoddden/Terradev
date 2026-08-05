@@ -80,3 +80,6 @@ from . import gateway    # noqa: F401,E402
 from . import canary     # noqa: F401,E402
 from . import database   # noqa: F401,E402
 from . import vault      # noqa: F401,E402
+
+# Fold agentic-serving under the agent group
+platform.agent.add_command(mlops.agentic_serving)

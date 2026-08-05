@@ -9,7 +9,7 @@ errors, and registration issues anywhere in the command corpus.
 import click
 import pytest
 
-# Ensure top-level commands (up, rollback, manifests, hf-space, hf-spaces,
+# Ensure top-level commands (up, rollback, manifests, hf-spaces,
 # karpenter) are registered on the shared `cli` group before we collect paths.
 import terradev_cli.cli  # noqa: F401
 from terradev_cli.commands import cli

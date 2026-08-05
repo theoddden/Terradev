@@ -13,32 +13,32 @@ from terradev_cli.commands import cli
 
 class TestAgenticServing:
     def test_group_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["agentic-serving", "--help"], obj={"api": mock_api})
+        result = runner.invoke(cli, ["agent", "agentic-serving", "--help"], obj={"api": mock_api})
         assert result.exit_code == 0
         assert "agentic-serving" in result.output
 
     def test_configure_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["agentic-serving", "configure", "--help"], obj={"api": mock_api})
+        result = runner.invoke(cli, ["agent", "agentic-serving", "configure", "--help"], obj={"api": mock_api})
         assert result.exit_code == 0
 
     def test_helm_values_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["agentic-serving", "helm-values", "--help"], obj={"api": mock_api})
+        result = runner.invoke(cli, ["agent", "agentic-serving", "helm-values", "--help"], obj={"api": mock_api})
         assert result.exit_code == 0
 
     def test_k8s_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["agentic-serving", "k8s", "--help"], obj={"api": mock_api})
+        result = runner.invoke(cli, ["agent", "agentic-serving", "k8s", "--help"], obj={"api": mock_api})
         assert result.exit_code == 0
 
     def test_launch_args_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["agentic-serving", "launch-args", "--help"], obj={"api": mock_api})
+        result = runner.invoke(cli, ["agent", "agentic-serving", "launch-args", "--help"], obj={"api": mock_api})
         assert result.exit_code == 0
 
     def test_lmcache_env_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["agentic-serving", "lmcache-env", "--help"], obj={"api": mock_api})
+        result = runner.invoke(cli, ["agent", "agentic-serving", "lmcache-env", "--help"], obj={"api": mock_api})
         assert result.exit_code == 0
 
     def test_show_config_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["agentic-serving", "show-config", "--help"], obj={"api": mock_api})
+        result = runner.invoke(cli, ["agent", "agentic-serving", "show-config", "--help"], obj={"api": mock_api})
         assert result.exit_code == 0
 
 class TestEnvironments:
