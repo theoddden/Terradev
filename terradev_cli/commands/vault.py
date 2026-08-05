@@ -17,7 +17,6 @@ from terradev_cli.core.output import get_output
 from terradev_cli.core.vault_adapter import (
     VaultAdapter,
     read_secret_from_stdin,
-    PROVIDER_SCHEMAS,
 )
 
 

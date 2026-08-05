@@ -8,15 +8,12 @@ import time
 import sys
 import uuid
 import logging
-import subprocess
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict
 
 import click
 
 from . import cli
-from ._api import TerradevAPI
 
 logger = logging.getLogger(__name__)
 

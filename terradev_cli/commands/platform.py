@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
 """Commands for the Terradev CLI."""
 
-import asyncio
-import json
 import logging
-import os
 import sys
-import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import click
 from . import cli
@@ -16,8 +10,6 @@ from terradev_cli.commands._api import TerradevAPI
 
 logger = logging.getLogger(__name__)
 
-from .inference import _resolve_provision_nodes
-from .ml import _parse_vllm_endpoint
 @cli.group()
 def sso():
     """Enterprise SSO authentication"""
@@ -1018,7 +1010,6 @@ def gateway(host, port, openai, no_openai, anthropic, no_anthropic, custom, no_c
       curl http://localhost:8000/health
       curl http://localhost:8000/v1/gateway/status
     """
-    import asyncio
     
     # Resolve boolean flags
     enable_openai = openai and not no_openai

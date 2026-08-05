@@ -8,15 +8,9 @@ command definitions that have not yet been extracted.
 """
 
 import click
-import asyncio
 import json
 import os
-import uuid
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta, timezone
-import subprocess
-import time
+from datetime import datetime, timezone
 import sys
 import logging
 
@@ -27,14 +21,9 @@ logger = logging.getLogger(__name__)
 # Commands extracted to terradev_cli.commands register themselves on `cli`.
 from terradev_cli.commands import cli
 from terradev_cli.core.node_span_stream import NodeSpanStream
-from terradev_cli.core.telemetry import get_telemetry
 from terradev_cli.commands._api import (
     TerradevAPI,
-    validate_credentials,
-    run_interactive_onboarding,
-    _telemetry,
-    TerraformWrapper,
-    EnterpriseAuthManager,
+    validate_credentials,  # noqa: F401
 )
 
 

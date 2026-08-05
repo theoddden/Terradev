@@ -3,17 +3,14 @@
 
 import asyncio
 import json
-import os
+import os  # noqa: F401
 import subprocess
 import sys
-import time
-import uuid
+import time  # noqa: F401
 import urllib.error
 import urllib.request
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from urllib.parse import urlencode
+from typing import Any, Dict, Optional
 
 import click
 from . import cli

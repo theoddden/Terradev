@@ -354,8 +354,8 @@ class IntegrationTestFramework:
             assert orchestrator is not None
 
             # Test model registration
-            success = orchestrator.register_model("test-model", "/path/to/model")
-            assert success is True
+            model_instance = await orchestrator.register_model("test-model", "/path/to/model")
+            assert model_instance is not None
 
             return True
         except Exception as e:

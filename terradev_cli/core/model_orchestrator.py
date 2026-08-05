@@ -205,7 +205,7 @@ class ModelOrchestrator:
 
     # ── Model Registration ──
 
-    def register_model(
+    async def register_model(
         self,
         model_id: str,
         model_path: str,
@@ -236,7 +236,7 @@ class ModelOrchestrator:
         self.models[model_id] = instance
 
         # Register with warm pool manager and cost scaler
-        self.warm_pool_manager.register_model(model_id, priority)
+        await self.warm_pool_manager.register_model(model_id, priority)
 
         self._save_metrics()
         return instance

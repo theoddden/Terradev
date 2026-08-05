@@ -425,7 +425,7 @@ class TestCanaryModelOrchestrator:
         orch.used_memory_gb = 8.0
         orch.available_memory_gb = 24.0
         orch.scaling_policy = ScalingPolicy.HYBRID
-        orch.register_model("m1", "/tmp/m1", "pytorch")
+        asyncio.run(orch.register_model("m1", "/tmp/m1", "pytorch"))
         status = orch.get_status()
         assert isinstance(status, dict)
 

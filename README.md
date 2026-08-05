@@ -17,6 +17,12 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
+**NOTES ON 5.7.10**
+
+- **Local Ollama integration** (`terradev ml ollama`): list, pull, generate, chat, inspect, and check running models on a local Ollama server (`list`, `pull`, `generate`, `chat`, `info`, `ps`).
+- **DeepEval integration** (`terradev ml deepeval`): install, run test suites, list metrics, and evaluate single LLM outputs with metrics like `AnswerRelevancyMetric`, `FaithfulnessMetric`, and `HallucinationMetric` (`install`, `init`, `run`, `metrics`, `evaluate`).
+- **MCP tool surface** now at 237 tools, including `ollama_*` and `deepeval_*` tool definitions and handlers.
+
 **NOTES ON 5.7.8**
 
 - **MCP Vault tools** (`terradev mcp`): the Terradev MCP server now exposes the vault directly so agents can store, retrieve, sync, and verify cloud credentials securely.

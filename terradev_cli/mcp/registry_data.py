@@ -265,14 +265,5 @@ TERRADEV_COMMAND_MAP = {
     "vllm_analyze": ["vllm", "analyze"],
     "vllm_benchmark": ["vllm", "benchmark"],
     # v4.0.12: New ML Services and Enhanced Features
-    "phoenix": ["phoenix"],
-    "guardrails": ["guardrails"],
-    "qdrant": ["qdrant"],
-    "latitude": ["latitude"],
-    "flashoptim": ["flashoptim"],
-    "vllm_enhanced": ["vllm-enhanced"],
-    "sso": ["sso"],
-    "cost_optimizer": ["cost-optimizer"],
-    "governance": ["governance"],
     "local_scan": ["local-scan"],
 }

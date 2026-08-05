@@ -67,9 +67,11 @@ class MLflowService:
         if self.session is None or self.session.closed:
             kwargs: Dict[str, Any] = {}
             if self.config.username and self.config.password:
-                kwargs["auth"] = aiohttp.BasicAuth(
-                    self.config.username, self.config.password
-                )
+                kwargs["headers"] = {
+                    "Authorization": aiohttp.encode_basic_auth(
+                        self.config.username, self.config.password
+                    )
+                }
             self.session = aiohttp.ClientSession(**kwargs)
         return self.session
 

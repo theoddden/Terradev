@@ -4,16 +4,11 @@ Terradev CLI - Complete Production Version
 """
 
 import click
-import asyncio
 import json
 import os
-import uuid
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
-import subprocess
-import time
-import sys
+from typing import Dict, List, Any
+from datetime import datetime
 import logging
 
 # Configure logging
@@ -21,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 # Import telemetry - MANDATORY FOR USAGE TRACKING
 try:
-    from terradev_cli.core.node_span_stream import NodeSpanStream
     from terradev_cli.core.telemetry import get_mandatory_telemetry
     _telemetry = get_mandatory_telemetry()
 except Exception as _exc:  # noqa: BLE001

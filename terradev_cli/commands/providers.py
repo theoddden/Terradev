@@ -3,17 +3,13 @@
 
 import asyncio
 import json
-import os
-import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional
 import logging
 
 import click
 
 from . import cli
 from ._api import (
-    TerradevAPI,
     validate_credentials,
     run_interactive_onboarding,
     _telemetry,

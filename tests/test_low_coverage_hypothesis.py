@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import string
 from pathlib import Path
 from typing import Any, Dict
@@ -64,7 +65,9 @@ class TestHypothesisDemo:
             assert result == {}
         else:
             assert result["best_price"] <= result["worst_price"]
-            assert result["best_price"] <= result["avg_price"]
+            assert result["best_price"] <= result["avg_price"] or math.isclose(
+                result["best_price"], result["avg_price"], rel_tol=1e-9, abs_tol=1e-9
+            )
             assert -0.01 <= result["savings_vs_worst"] <= 100.01
             assert -0.01 <= result["savings_vs_avg"] <= 100.01
 
@@ -333,7 +336,7 @@ class TestHypothesisModelOrchestrator:
 
         orch = ModelOrchestrator()
         orch.available_memory_gb = orch.total_memory_gb - orch.used_memory_gb
-        orch.register_model(model_id, "/tmp/" + model_id, framework)
+        asyncio.run(orch.register_model(model_id, "/tmp/" + model_id, framework))
         status = orch.get_status()
         assert isinstance(status, dict)
 

@@ -8,8 +8,8 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
+from pathlib import Path  # noqa: F401
 from typing import Any, Dict, List, Optional
 
 import click
@@ -93,13 +93,13 @@ def orchestrator_register(model_id, model_path, framework, priority, tags):
     orchestrator = ModelOrchestrator()
     tag_set = set(tags.split(",")) if tags else None
 
-    orchestrator.register_model(
+    asyncio.run(orchestrator.register_model(
         model_id=model_id,
         model_path=model_path,
         framework=framework,
         priority=priority,
         tags=tag_set,
-    )
+    ))
 
     print(f"Model registered: {model_id}")
     print(f"  Path: {model_path}")

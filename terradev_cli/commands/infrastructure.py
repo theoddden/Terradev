@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """Infrastructure intelligence commands for the Terradev CLI."""
 
-import json
 import logging
 import sys
-from typing import Any, Dict, List, Optional
 
 import click
 from . import cli
-from terradev_cli.commands._api import TerradevAPI
 
 logger = logging.getLogger(__name__)
 
