@@ -1637,8 +1637,16 @@ def vllm_lora_sync(name, replicas):
 
     replica_list = []
     for r in replicas.split(","):
-        host, port = r.split(":")
-        replica_list.append({"replica_id": r, "host": host, "port": int(port)})
+        if ":" not in r:
+            print(f"ERROR: invalid replica format '{r}'. Expected host:port")
+            return
+        host, port = r.rsplit(":", 1)
+        try:
+            port = int(port)
+        except ValueError:
+            print(f"ERROR: invalid port in replica '{r}'")
+            return
+        replica_list.append({"replica_id": r, "host": host, "port": port})
 
     async def run_sync():
         config = VLLMConfig(model_name="")
