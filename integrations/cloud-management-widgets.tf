@@ -97,35 +97,3 @@ resource "azurerm_monitor_dashboard" "terradev_widget" {
   })
 }
 
-## 3. GCP Cloud Monitoring Widget
-# Integrates with Google Cloud Monitoring
-
-resource "google_monitoring_dashboard" "terradev_widget" {
-  dashboard_json = jsonencode({
-    displayName = "Terradev GPU Arbitrage"
-    gridLayout = {
-      columns = "2"
-      widgets = [
-        {
-          title = "GPU Cost Savings"
-          xyChart = {
-            dataSets = [
-              {
-                timeSeriesQuery = {
-                  prometheusQuery = {
-                    query = "terradev_gpu_savings_percentage"
-                  }
-                }
-                plotType = "LINE"
-              }
-            ]
-            timeshiftDuration = "0s"
-            yAxis = {
-              scale = "LINEAR"
-            }
-          }
-        }
-      ]
-    }
-  })
-}

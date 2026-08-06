@@ -20,7 +20,7 @@ Every GPU cloud hands you hardware in a suboptimal configuration by default. You
 - **Inference teams** serving models at scale who need sub-2-second cold starts and per-tenant adapter routing
 - **Platform engineers** building GPU infrastructure with Kubernetes who need auto-scaling done properly
 - **Researchers** who have local GPUs and want to mix them with cloud compute in a single pool
-- **AI agents** (via MCP server) — Terradev exposes 218 tools to language models so they can autonomously manage GPU infrastructure
+- **AI agents** (via MCP server) — Terradev exposes 217 tools to language models so they can autonomously manage GPU infrastructure
 
 ---
 
@@ -76,7 +76,7 @@ Multi-tenant serving uses LoRA adapters — multiple fine-tuned variants loaded 
 Terradev creates and destroys topology-optimized Kubernetes clusters with Karpenter for GPU node auto-provisioning. Every node that Karpenter spins up inherits the same NUMA-aware kubelet Topology Manager configuration as a manually provisioned instance — correct topology is enforced at the cluster level, not just per-job.
 
 ### MCP Server
-Terradev runs a Rust-based MCP (Model Context Protocol) server exposing 218 tools to language models. Claude, Cursor, and Windsurf can call `terradev mcp serve` and then autonomously manage infrastructure through conversation — provision GPUs, launch training, deploy inference endpoints, manage costs. The Rust runtime processes tool calls with sub-millisecond overhead vs ~50ms for Python-based MCP servers, which compounds across complex multi-step agent workflows.
+Terradev runs a Rust-based MCP (Model Context Protocol) server exposing 217 tools to language models. Claude, Cursor, and Windsurf can call `terradev mcp serve` and then autonomously manage infrastructure through conversation — provision GPUs, launch training, deploy inference endpoints, manage costs. The Rust runtime processes tool calls with sub-millisecond overhead vs ~50ms for Python-based MCP servers, which compounds across complex multi-step agent workflows.
 
 ### ML Platform Integrations
 Native integrations for Weights & Biases, MLflow, LangSmith, Langfuse, Arize Phoenix, Databricks, and HuggingFace Spaces. Each surfaces as a CLI command group and as MCP tools.

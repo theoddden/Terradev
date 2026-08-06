@@ -100,7 +100,6 @@ checkpoints/
 *.db-wal
 
 # Secrets / tokens / payment sessions
-**/grafana_token*.json
 payment_cs_*.json
 *_secret_key*.json
 *token_service*/*.json

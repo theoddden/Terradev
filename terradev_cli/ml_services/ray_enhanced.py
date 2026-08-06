@@ -1005,8 +1005,6 @@ def create_enhanced_ray_service_from_credentials(
         decode_dp=int(credentials.get("ray_decode_dp", "4")),
         kv_connector=credentials.get("ray_kv_connector", "NixlConnector"),
         kv_buffer_size=int(credentials.get("ray_kv_buffer_size", "5368709120")),
-        # Monitoring
-        == "true",
     )
 
     return EnhancedRayService(config)

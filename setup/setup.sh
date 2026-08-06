@@ -233,18 +233,8 @@ EOF
     open_signup_page "https://coreweave.com/signup" "CoreWeave"
     prompt_api_key "COREWEAVE_API_KEY" "CoreWeave API Key" "false"
     
-    # Phase 5: DevOps & Monitoring
-    print_header "📊 Phase 5: DevOps & Monitoring"
-    
-    # Grafana
-    open_signup_page "https://grafana.com/signup" "Grafana Cloud"
-    prompt_api_key "GRAFANA_API_KEY" "Grafana API Key" "false"
-    echo -n "Enter your Grafana URL (default: https://grafana.com): "
-    read grafana_url
-    echo "GRAFANA_URL=${grafana_url:-https://grafana.com}" >> $ENV_FILE
-    
     # Slack (optional)
-    print_header "💬 Phase 6: Communication (Optional)"
+    print_header "💬 Phase 5: Communication (Optional)"
     echo "Slack integration is optional but recommended for notifications"
     read -p "Do you want to setup Slack integration? (y/n): " setup_slack
     

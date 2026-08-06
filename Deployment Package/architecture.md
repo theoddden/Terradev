@@ -17,7 +17,7 @@
 │  Python CLI         │   │  Rust MCP Orchestrator             │
 │  (terradev_cli/     │   │  (terradev-mcp/terradev_mcp.py)    │
 │   cli.py)           │   │                                    │
-│  Click command tree │   │  218 tools · JSON-RPC 2.0 stdio   │
+│  Click command tree │   │  217 tools · JSON-RPC 2.0 stdio   │
 │  ~11,600 lines      │   │  DAG sequencing · idempotency      │
 │                     │◄──│  Sub-ms overhead per tool call     │
 └────────┬────────────┘   └────────────────────────────────────┘
@@ -67,7 +67,7 @@
 
 The MCP server is the interface for AI agents. It runs as a subprocess that Claude/Cursor/Windsurf connect to via the MCP protocol (JSON-RPC 2.0 over stdio).
 
-- **218 tools** — every Terradev capability exposed as a structured tool with JSON Schema parameter validation
+- **217 tools** — every Terradev capability exposed as a structured tool with JSON Schema parameter validation
 - **DAG execution** — the orchestrator builds a dependency graph for multi-step workflows and enforces correct sequencing. An agent can issue `provision_gpu` and `launch_training` simultaneously; the orchestrator ensures training doesn't start until provisioning completes
 - **Idempotency** — duplicate tool calls for the same resource are detected and short-circuited
 - **Performance** — Rust deserialization/routing adds <1ms overhead per call vs ~50ms for Python MCP servers. Across a 50-step agent workflow this is the difference between 50ms and 2,500ms of pure overhead

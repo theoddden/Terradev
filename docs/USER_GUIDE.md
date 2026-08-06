@@ -436,7 +436,7 @@ terradev price spot-risk --gpu H100 --provider runpod
 
 ## MCP Server (Claude Code)
 
-Terradev ships a Rust-based MCP server with **218 tools** for Claude Code and any MCP-compatible agent.
+Terradev ships a Rust-based MCP server with **217 tools** for Claude Code and any MCP-compatible agent.
 
 ```bash
 # Install the MCP package
@@ -453,7 +453,7 @@ npm install -g terradev-mcp
 # }
 ```
 
-Claude can then use all 218 tools: provision GPUs, launch training jobs, query prices, manage checkpoints, deploy MoE clusters, configure Qdrant, trace with Phoenix, set up guardrails, manage K8s clusters, and more — all through natural language.
+Claude can then use all 217 tools: provision GPUs, launch training jobs, query prices, manage checkpoints, deploy MoE clusters, configure Qdrant, trace with Phoenix, set up guardrails, manage K8s clusters, and more — all through natural language.
 
 ---
 

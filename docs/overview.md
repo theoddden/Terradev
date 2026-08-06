@@ -20,7 +20,7 @@ Every GPU cloud hands you hardware in a suboptimal configuration by default. You
 - **Inference teams** serving models at scale who need sub-2-second cold starts and per-tenant adapter routing
 - **Platform engineers** building GPU infrastructure with Kubernetes who need auto-scaling done properly
 - **Researchers** who have local GPUs and want to mix them with cloud compute in a single pool
-- **AI agents** (via MCP server) — Terradev exposes 218 tools to language models so they can autonomously manage GPU infrastructure
+- **AI agents** (via MCP server) — Terradev exposes 217 tools to language models so they can autonomously manage GPU infrastructure
 
 ---
 

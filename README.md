@@ -1,4 +1,4 @@
-# Terradev CLI v6.0.1
+# Terradev CLI v6.0.2
 
 **Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration.**
 
@@ -162,7 +162,7 @@ We removed the paywall, open-sourced Terradev, and added Rust accelerators for s
 
 With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. You or the agent can issue commands freely... the orchestrator ensures they're safe to execute.
 
-218 tools not including subcommand/flags require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 23 cloud providers, that compounds across every tool call in the chain.
+217 tools not including subcommand/flags require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 23 cloud providers, that compounds across every tool call in the chain.
 
 ## BYOAPI Configuration
 

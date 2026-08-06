@@ -34,7 +34,6 @@
 #   - kubernetes_namespace.terradev_workloads → eks  (parallel with above)
 #   - helm_release.nginx_ingress → eks
 #   - helm_release.cert_manager → eks  (parallel with nginx)
-#   - helm_release.prometheus → eks    (parallel with nginx + cert-manager)
 #
 # LAYER 3 (depends on RDS/Redis/namespaces):
 #   - kubernetes_config_map.database_config → rds + elasticache + namespace
@@ -80,7 +79,7 @@ locals {
       azure_multi = ["connector", "blob_container", "blob_mount", "vault", "key"]
       gcp_multi   = ["connector", "key_ring", "key"]
       tensordock  = ["ml_worker[0]", "ml_worker[1]"]
-      k8s_addons  = ["nginx_ingress", "cert_manager", "prometheus"]
+      k8s_addons  = ["nginx_ingress", "cert_manager"]
     }
   }
 }

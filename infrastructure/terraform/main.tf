@@ -963,27 +963,6 @@ resource "helm_release" "cert_manager" {
   }
 }
 
-resource "helm_release" "prometheus" {
-  name       = "prometheus"
-  repository = "https://prometheus-community.github.io/helm-charts"
-  chart      = "kube-prometheus-stack"
-  namespace  = "monitoring"
-
-  create_namespace = true
-
-  set {
-    name  = "prometheus.prometheusSpec.replicas"
-    value = "2"
-  }
-
-  set {
-    name  = "grafana.adminPassword"
-    value = "admin123"
-  }
-
-  # Removed depends_on — prometheus and nginx_ingress are independent helm charts
-  # Terraform parallelizes their installation for ~2x faster cluster bootstrap
-}
 
 # Outputs
 output "cluster_endpoint" {
@@ -1133,36 +1112,6 @@ resource "kubernetes_service" "tensordock_ml" {
       port = 80
       target_port = 8080
     }
-  }
-}
-
-# TensorDock Monitoring
-resource "kubernetes_config_map" "tensordock_monitoring" {
-  metadata {
-    name = "tensordock-monitoring"
-    namespace = "monitoring"
-  }
-  
-  data = {
-    "prometheus-tensordock.yml" = <<-EOT
-      global:
-        scrape_interval: 30s
-      
-      scrape_configs:
-        - job_name: 'tensordock-ml-workers'
-          static_configs:
-            - targets: ${jsonencode([for instance in tensordock_instance.ml_worker : "${instance.ip_address}:8080"])}
-          metrics_path: /metrics
-          scrape_interval: 30s
-          scrape_timeout: 10s
-        
-        - job_name: 'tensordock-gpu-metrics'
-          static_configs:
-            - targets: ${jsonencode([for instance in tensordock_instance.ml_worker : "${instance.ip_address}:9400"])}
-          metrics_path: /metrics
-          scrape_interval: 30s
-          scrape_timeout: 10s
-    EOT
   }
 }
 

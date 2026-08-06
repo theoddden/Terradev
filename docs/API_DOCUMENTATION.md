@@ -64,7 +64,7 @@ Add to `~/.config/claude/claude_desktop_config.json`:
 
 ### Available Tools
 
-The MCP server exposes 218 tools across these categories:
+The MCP server exposes 217 tools across these categories:
 
 - **GPU Provisioning**: quote_gpu, provision_gpu, setup_provider, configure_provider
 - **Training**: train_launch, train_status, train_stop, train_resume, train_snapshot
