@@ -1,4 +1,4 @@
-# Terradev CLI v6.0.0
+# Terradev CLI v6.0.1
 
 **Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration.**
 
@@ -17,10 +17,35 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
+**NOTES ON 6.0.1**
+
+- Patch release: README and `terradev-cloud` CLI.md regenerated for the 6.0.x command surface, version-flag tests now assert against the live `__version__`, and the stale `TestHypothesisDatabricksIntegration` test has been removed.
+- Version bumped to **6.0.1** and pushed to PyPI.
+
 **NOTES ON 6.0.0**
 
-- **Unsloth** (`terradev train unsloth`), **Weaviate** (`terradev database weaviate`), and **Letta** (`terradev agent letta`) command groups are now available.
-- **Removed integrations**: Databricks, LangSmith, and Jaeger have been removed from the CLI and Helm values.
+- **Unsloth** (`terradev train unsloth`): optimized local LLM training, serving, and coding agents with 70% lower VRAM usage and faster training via Triton kernels. Subcommands: `run`, `start`, `stop`.
+  - `terradev train unsloth run --model unsloth/Llama-3.1-8B`
+  - `terradev train unsloth run --model unsloth/Qwen3.6-7B-GGUF:Q4_K_M --port 8080`
+  - `terradev train unsloth start claude --model unsloth/Llama-3.1-8B`
+  - `terradev train unsloth stop`
+
+- **Weaviate** (`terradev database weaviate`): vector database operations with local, embedded, cloud, and custom environments. Subcommands: `up`, `list-collections`, `create-collection`, `delete-collection`, `insert`, `query`, `hybrid-search`.
+  - `terradev database weaviate up --environment local`
+  - `terradev database weaviate create-collection --name Article --vector-size 384`
+  - `terradev database weaviate insert --collection Article --objects '[{"properties": {"title": "Hello"}, "vector": [0.1, ...]}]'`
+  - `terradev database weaviate query --collection Article --vector '[0.1, ...]' --top-k 5`
+  - `terradev database weaviate hybrid-search --collection Article --query "generative AI" --top-k 5`
+
+- **Letta** (`terradev agent letta`): stateful agents with long-horizon memory across sessions. Subcommands: `create`, `list`, `chat`, `status`, `delete`, `remember`.
+  - `terradev agent letta create --name my-agent --model openai/gpt-4.1`
+  - `terradev agent letta list`
+  - `terradev agent letta chat --agent-id <id> --message "hello"`
+  - `terradev agent letta remember --agent-id <id> --text "Our staging cluster is on us-east-1" --label fact`
+  - `terradev agent letta status --agent-id <id>`
+  - `terradev agent letta delete --agent-id <id>`
+
+- **Removed integrations**: `terradev ml databricks` and `terradev ml langsmith` command groups, all related MCP tools, and Jaeger tracing endpoints in the Helm values have been removed.
 - Version bumped to **6.0.0** to reflect these breaking changes.
 
 **NOTES ON 5.7.10**

@@ -1,10 +1,10 @@
 # Complete Terradev CLI Command Reference
 
-**All commands and subcommands for Terradev CLI v5.7.12**
+**All commands and subcommands for Terradev CLI v6.0.1**
 
 ---
 
-## Main Commands (218+ MCP Tools)
+## Main Commands (219+ MCP Tools)
 
 ### **Core Infrastructure Commands**
 
