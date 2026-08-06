@@ -17,11 +17,6 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON 6.0.1**
-
-- Patch release: README and `terradev-cloud` CLI.md regenerated for the 6.0.x command surface, version-flag tests now assert against the live `__version__`, and the stale `TestHypothesisDatabricksIntegration` test has been removed.
-- Version bumped to **6.0.1** and pushed to PyPI.
-
 **NOTES ON 6.0.0**
 
 - **Unsloth** (`terradev train unsloth`): optimized local LLM training, serving, and coding agents with 70% lower VRAM usage and faster training via Triton kernels. Subcommands: `run`, `start`, `stop`.
