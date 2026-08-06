@@ -15,7 +15,9 @@ cli.name = "terradev"
 
 TERRADEV_ROOT = Path(__file__).resolve().parents[1]
 TERRADEV_CLOUD_ROOT = Path("/Users/theowolfenden/CascadeProjects/terradev-cloud")
-VERSION = "v6.0.3"
+from terradev_cli import __version__
+
+VERSION = f"v{__version__}"
 
 
 def _invoke_help(path):

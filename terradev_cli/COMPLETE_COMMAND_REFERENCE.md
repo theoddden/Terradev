@@ -1,6 +1,6 @@
 # Complete Terradev CLI Command Reference
 
-**All commands and subcommands for Terradev CLI v6.0.3**
+**All commands and subcommands for Terradev CLI v6.0.1**
 
 ---
 
