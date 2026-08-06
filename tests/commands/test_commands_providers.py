@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
+from terradev_cli import __version__
 from terradev_cli.commands import cli
 
 
@@ -324,7 +325,7 @@ class TestCLIStructure:
     def test_version_flag(self, runner):
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert "5." in result.output
+        assert __version__ in result.output
 
     def test_quote_help(self, runner):
         result = runner.invoke(cli, ["quote", "--help"])

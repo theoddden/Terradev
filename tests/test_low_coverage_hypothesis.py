@@ -408,24 +408,6 @@ class TestHypothesisHelmGenerator:
 
 
 # ---------------------------------------------------------------------------
-# databricks_integration
-# ---------------------------------------------------------------------------
-
-
-class TestHypothesisDatabricksIntegration:
-    @given(experiment_name=st.text(min_size=1, max_size=50))
-    @settings(max_examples=20, suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
-    def test_generate_gpu_training_job_config_returns_dict(self, experiment_name):
-        from terradev_cli.integrations.databricks_integration import generate_gpu_training_job_config
-
-        result = generate_gpu_training_job_config(
-            name=experiment_name,
-            script_path="/foo/bar.py",
-        )
-        assert isinstance(result, dict)
-
-
-# ---------------------------------------------------------------------------
 # kv_cache_checkpoint_tests / weight_streaming / mla (aggregation invariants)
 # ---------------------------------------------------------------------------
 

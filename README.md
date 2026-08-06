@@ -1,4 +1,4 @@
-# Terradev CLI v5.7.12
+# Terradev CLI v6.0.0
 
 **Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration.**
 
@@ -16,6 +16,12 @@ Combines quoting, provisioning, topology optimization, training orchestration, i
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
+
+**NOTES ON 6.0.0**
+
+- **Unsloth** (`terradev train unsloth`), **Weaviate** (`terradev database weaviate`), and **Letta** (`terradev agent letta`) command groups are now available.
+- **Removed integrations**: Databricks, LangSmith, and Jaeger have been removed from the CLI and Helm values.
+- Version bumped to **6.0.0** to reflect these breaking changes.
 
 **NOTES ON 5.7.10**
 

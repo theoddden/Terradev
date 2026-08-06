@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from click.testing import CliRunner
 
+from terradev_cli import __version__
 from terradev_cli.commands import cli
 from terradev_cli.commands._api import TerradevAPI
 
@@ -524,7 +525,7 @@ class TestCLIHelpAndVersion:
     def test_cli_version(self):
         result = CliRunner().invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert "5." in result.output
+        assert __version__ in result.output
 
     def test_quote_help(self):
         result = CliRunner().invoke(cli, ["quote", "--help"])
