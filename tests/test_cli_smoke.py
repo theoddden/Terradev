@@ -130,7 +130,6 @@ class TestMonitor:
         assert result.exit_code == 0
         assert "--job-id" in result.output
         assert "--interval" in result.output
-        assert "--prometheus" in result.output
         assert "--cost-rate" in result.output
 
 

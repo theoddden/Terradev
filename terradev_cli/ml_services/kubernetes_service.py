@@ -23,11 +23,6 @@ class KubernetesConfig:
     karpenter_version: str = "v1.10.0"
     aws_region: str = "us-east-1"
     aws_account_id: Optional[str] = None
-    # Enhanced monitoring fields (used by EnhancedKubernetesService)
-    monitoring_enabled: bool = False
-    prometheus_enabled: bool = False
-    grafana_enabled: bool = False
-    dashboard_port: int = 3000
     # DRA (Dynamic Resource Allocation) - K8s 1.32+ GA
     dra_enabled: bool = False
     dra_driver_name: str = "nvidia.com/gpu"

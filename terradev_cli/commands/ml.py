@@ -867,9 +867,6 @@ def ray_test():
             print(f"   Version: {result.get('ray_version', 'N/A')}")
             print(f"   Cluster: {result.get('cluster_name', 'local')}")
             print(f"   Dashboard: {result.get('dashboard_uri', 'N/A')}")
-            print(
-                f"   Monitoring: {'Enabled' if creds.get('ray_monitoring_enabled') == 'true' else 'Disabled'}"
-            )
         elif result["status"] == "not_connected":
             print("Warning  Ray installed but cluster not running")
             print(f"   Version: {result.get('ray_version', 'N/A')}")
@@ -895,70 +892,6 @@ def ray_install():
         print(
             "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
         )
-@ray.command("install-monitoring")
-def ray_install_monitoring():
-    """Install monitoring stack with Ray dashboards."""
-    try:
-        from terradev_cli.ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
-
-        api = _get_api()
-        creds = api._provider_creds("ray")
-        service = create_enhanced_ray_service_from_credentials(creds)
-        print("Deploying Installing enhanced Ray monitoring stack...")
-        result = asyncio.run(service.install_monitoring_stack())
-
-        if result["status"] == "installed":
-            print("OK: Ray monitoring stack installed")
-            print(f"   Ray Dashboard: {result.get('ray')}")
-            print(f"   Prometheus: {result.get('prometheus')}")
-            print(f"   Grafana: {result.get('grafana')}")
-            print(f"   Dashboards: {result.get('dashboards')}")
-            print("   Access Ray Dashboard: http://localhost:8265")
-            print("   Access Grafana: http://localhost:3000")
-        else:
-            print(f"ERROR: Installation failed: {result['error']}")
-    except ImportError:
-        print(
-            "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
-        )
-@ray.command("metrics-summary")
-def ray_metrics_summary():
-    """Get comprehensive metrics summary."""
-    try:
-        from terradev_cli.ml_services.ray_enhanced import create_enhanced_ray_service_from_credentials
-
-        api = _get_api()
-        creds = api._provider_creds("ray")
-        service = create_enhanced_ray_service_from_credentials(creds)
-        print("Status Getting comprehensive Ray metrics summary...")
-        result = asyncio.run(service.get_monitoring_status())
-
-        if result.get("status") != "failed":
-            print(f"   Ray Status: {result.get('ray', {})}")
-            print(f"   Monitoring: {result.get('monitoring', {})}")
-            print(f"   Metrics: {result.get('metrics', {})}")
-        else:
-            print(f"ERROR: Metrics summary failed: {result.get('error')}")
-    except ImportError:
-        print(
-            "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
-        )
-@ray.command("grafana")
-def ray_grafana():
-    """Access Grafana dashboard."""
-    print(" Accessing Ray Grafana dashboard...")
-    print("   Access at: http://localhost:3000")
-    print("   Username: admin")
-    print("   Password: prom-operator")
-    print("   Ray metrics are available in the 'Ray Overview' dashboard")
-@ray.command("prometheus")
-def ray_prometheus():
-    """Access Prometheus metrics."""
-    print("Status Accessing Ray Prometheus metrics...")
-    print("   Access at: http://localhost:8080")
-    print(
-        "   Available metrics: ray_cluster_total_workers, ray_cluster_cpu_total, ray_cluster_memory_total"
-    )
 @ray.command("status")
 def ray_status():
     """Show cluster status."""
@@ -1033,12 +966,6 @@ def ray_start():
         print("Deploying Starting enhanced Ray cluster...")
         result = asyncio.run(service.start_cluster(head_node=True))
         print(f"OK: Cluster started: {result['status']}")
-
-        if creds.get("ray_monitoring_enabled") == "true":
-            print("   Status Monitoring enabled - access dashboards:")
-            print("      Ray Dashboard: http://localhost:8265")
-            print("      Grafana: http://localhost:3000")
-            print("      Prometheus: http://localhost:8080")
     except ImportError:
         print(
             "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"

@@ -254,7 +254,6 @@ def train_start(
 @click.option("--log-path", "-l", default="", help="Training log file to parse")
 @click.option("--interval", "-i", default=10.0, help="Snapshot interval in seconds")
 @click.option("--count", default=0, help="Number of snapshots (0 = continuous)")
-@click.option("--prometheus", default="", help="Prometheus endpoint (optional)")
 @click.option("--cost-rate", default=0.0, help="Cost per GPU-hour in USD")
 @click.option(
     "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
@@ -268,19 +267,17 @@ def monitor(
     log_path,
     interval,
     count,
-    prometheus,
     cost_rate,
     fmt,
 ):
     """Monitor GPU utilization, training metrics, and cost.
 
-    Default: nvidia-smi (zero deps). Optional Prometheus/DCGM-exporter hook.
+    Default: nvidia-smi (zero deps).
     Includes straggler detection for multi-node clusters.
 
     Examples:
         terradev monitor -n 10.0.0.1 -n 10.0.0.2 -l /tmp/train.log
         terradev monitor --from-provision latest --cost-rate 3.50
-        terradev monitor --prometheus http://localhost:9090 -f json
         terradev monitor -j job-abc123 --interval 5 --count 10
     """
     from terradev_cli.core.training_monitor import TrainingMonitor
@@ -302,7 +299,6 @@ def monitor(
         ssh_key=resolved_ssh_key or None,
         log_path=log_path,
         cost_per_gpu_hour=cost_rate,
-        prometheus_endpoint=prometheus,
     )
 
     if fmt == "json":

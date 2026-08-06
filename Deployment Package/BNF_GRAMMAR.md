@@ -161,8 +161,6 @@
     [--auto-apply]
 
 <integrations-command> ::= integrations
-    [--export-grafana]
-    [--export-scrape-config]
     [--export-wandb-script]
 
 <cleanup-command> ::= cleanup
@@ -301,7 +299,6 @@
     [-l <path>]
     [-i <float>]
     [--count <integer>]
-    [--prometheus <url>]
     [--cost-rate <float>]
     [-f <json-or-text>]
 
@@ -556,8 +553,7 @@
     <databricks-deploy-model-options>
 
 <ml-ray-options> ::=
-    [--test] [--install-monitoring] [--metrics-summary] [--grafana] [--prometheus]
-    [--status] [--list-nodes] [--start] [--stop] [--dashboard]
+    [--test] [--status] [--list-nodes] [--start] [--stop] [--dashboard]
     [--gpu-type <gpu-type>]
 
 

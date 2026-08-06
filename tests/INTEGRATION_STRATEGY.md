@@ -114,8 +114,6 @@ For integration tests, we use:
 - [x] Performance optimization
 
 ### **Monitoring & Observability**
-- [x] Prometheus integration
-- [x] Grafana dashboards
 - [x] Weights & Biases integration
 - [x] Custom metrics collection
 - [x] Alert management

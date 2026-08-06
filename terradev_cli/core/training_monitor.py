@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""
-Training Monitor — Unified GPU + training metrics + cost view.
+"""Training Monitor — Unified GPU + training metrics + cost view.
 
 Default: nvidia-smi (zero deps). Hooks for:
-  - Prometheus/DCGM-exporter (if endpoint configured)
   - W&B (if wandb_run configured)
   - Custom callbacks (for any other sink)
 
@@ -185,7 +183,7 @@ def _safe_float(s: str, default: float = 0.0) -> float:
 
 
 # ---------------------------------------------------------------------------
-# GPU metric collection — nvidia-smi default, Prometheus hook
+# GPU metric collection — nvidia-smi default
 # ---------------------------------------------------------------------------
 
 
@@ -225,37 +223,6 @@ def _collect_gpu_nvidia_smi(ctx: Dict[str, Any]) -> List[GPUMetric]:
             )
         )
     return metrics
-
-
-def _collect_gpu_prometheus(endpoint: str, node: str) -> List[GPUMetric]:
-    """Optional: scrape Prometheus/DCGM-exporter endpoint."""
-    try:
-        import urllib.request
-
-        url = f"{endpoint}/api/v1/query?query=DCGM_FI_DEV_GPU_UTIL"
-        with urllib.request.urlopen(url, timeout=5) as resp:
-            data = json.loads(resp.read())
-        metrics = []
-        for result in data.get("data", {}).get("result", []):
-            gpu_idx = int(result.get("metric", {}).get("gpu", "0"))
-            util = float(result["value"][1])
-            metrics.append(
-                GPUMetric(
-                    node=node,
-                    gpu_index=gpu_idx,
-                    gpu_name="",
-                    utilization_pct=util,
-                    memory_used_mb=0,
-                    memory_total_mb=0,
-                    temperature_c=0,
-                    power_w=0,
-                    power_limit_w=0,
-                )
-            )
-        return metrics
-    except Exception as e:  # noqa: BLE001
-        logger.debug(f"Prometheus scrape failed ({e}), falling back to nvidia-smi")
-        return []
 
 
 # ---------------------------------------------------------------------------
@@ -469,7 +436,6 @@ class TrainingMonitor:
 
     Default: nvidia-smi + log file parsing (zero external deps).
     Optional hooks:
-      - prometheus_endpoint: scrape DCGM-exporter / Prometheus
       - wandb_run: push snapshots to W&B
       - on_snapshot: custom callback for any sink
 
@@ -488,7 +454,6 @@ class TrainingMonitor:
         log_path: str = "",
         cost_per_gpu_hour: float = 0.0,
         # Optional hooks
-        prometheus_endpoint: str = "",
         wandb_run=None,
         on_snapshot: Optional[Callable] = None,
     ):
@@ -498,7 +463,6 @@ class TrainingMonitor:
         self.state_manager = state_manager
         self.log_path = log_path
         self.cost_per_gpu_hour = cost_per_gpu_hour
-        self.prometheus_endpoint = prometheus_endpoint
         self.wandb_run = wandb_run
         self.on_snapshot = on_snapshot
         self._history: List[MonitorSnapshot] = []
@@ -512,39 +476,20 @@ class TrainingMonitor:
         for i, node in enumerate(self.nodes):
             name = f"gpu_{i}"
             wave0.append(name)
-            if self.prometheus_endpoint:
-                # Try Prometheus first, nvidia-smi fallback inside
-                def make_prom_fn(h, ep):
-                    def fn(_ctx):
-                        result = _collect_gpu_prometheus(ep, h or "localhost")
-                        if result:
-                            return result
-                        return _collect_gpu_nvidia_smi(
-                            {
-                                "host": h,
-                                "ssh_user": self.ssh_user,
-                                "ssh_key": self.ssh_key,
-                            }
-                        )
 
-                    return fn
+            def make_smi_fn(h):
+                def fn(_ctx):
+                    return _collect_gpu_nvidia_smi(
+                        {
+                            "host": h,
+                            "ssh_user": self.ssh_user,
+                            "ssh_key": self.ssh_key,
+                        }
+                    )
 
-                dag.add_node(name, make_prom_fn(node, self.prometheus_endpoint))
-            else:
+                return fn
 
-                def make_smi_fn(h):
-                    def fn(_ctx):
-                        return _collect_gpu_nvidia_smi(
-                            {
-                                "host": h,
-                                "ssh_user": self.ssh_user,
-                                "ssh_key": self.ssh_key,
-                            }
-                        )
-
-                    return fn
-
-                dag.add_node(name, make_smi_fn(node))
+            dag.add_node(name, make_smi_fn(node))
 
         # Training log parse
         dag.add_node(

@@ -33,9 +33,6 @@ spec:
         app.kubernetes.io/name: moe-inference
         app.kubernetes.io/component: vllm-serving
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8000"
-        prometheus.io/path: "/metrics"
     spec:
       # Require NVLink-connected multi-GPU node
       nodeSelector:

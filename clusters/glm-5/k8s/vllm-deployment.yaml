@@ -24,9 +24,6 @@ spec:
         app.kubernetes.io/name: glm-5
         app.kubernetes.io/component: vllm-serving
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8000"
-        prometheus.io/path: "/metrics"
     spec:
       # Node selection — require 8× H100 SXM with NVLink
       nodeSelector:

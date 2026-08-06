@@ -40,9 +40,6 @@ spec:
         app: reasoning-tier
         terradev.ai/tier: reasoning
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8000"
-        prometheus.io/path: "/metrics"
     spec:
       nodeSelector:
         terradev.ai/tier: reasoning
@@ -197,9 +194,6 @@ spec:
         app: decode-tier
         terradev.ai/tier: decode
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8001"
-        prometheus.io/path: "/metrics"
     spec:
       nodeSelector:
         terradev.ai/tier: decode
@@ -345,8 +339,6 @@ spec:
         app: cpu-tools-tier
         terradev.ai/tier: cpu-tools
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9000"
     spec:
       nodeSelector:
         terradev.ai/tier: cpu-tools

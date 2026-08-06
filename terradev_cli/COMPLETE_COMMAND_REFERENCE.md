@@ -679,8 +679,6 @@ Commands:
 terradev integrations [OPTIONS]
 
 Options:
-  --export-grafana              Export Grafana dashboard JSON
-  --export-scrape-config        Print Prometheus scrape config
   --export-wandb-script         Print W&B setup script
   --deploy                      Deploy integration stack
   --stack [monitoring|ml|full]  Integration stack to deploy

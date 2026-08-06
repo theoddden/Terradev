@@ -6,7 +6,7 @@ Extends the base RayService with Ray Serve LLM orchestration for:
   1. Wide Expert Parallelism (Wide-EP) via build_dp_deployment
   2. Disaggregated Prefill/Decode serving via build_pd_openai_app
   3. MoE-aware cluster management with topology integration
-  4. Monitoring stack (Prometheus, Grafana, Ray Dashboard)
+  4. Ray cluster management
 
 References:
   - Anyscale blog: "Ray Serve LLM APIs for Wide-EP and Disaggregated Serving"
@@ -147,9 +147,6 @@ class EnhancedRayConfig:
     kv_buffer_size: int = 5368709120  # 5GB default
 
     # Monitoring
-    monitoring_enabled: bool = False
-    prometheus_port: int = 8080
-    grafana_port: int = 3000
 
 
 # ── Enhanced Ray Service ─────────────────────────────────────────────────────
@@ -164,7 +161,7 @@ class EnhancedRayService:
       - Disaggregated P/D serving via build_pd_openai_app API
       - MoE model profiling with weight vs. active memory distinction
       - Topology-aware EP group placement
-      - Monitoring stack management (Prometheus, Grafana, Ray Dashboard)
+      - Ray cluster management
     """
 
     def __init__(self, config: EnhancedRayConfig):
@@ -201,7 +198,6 @@ class EnhancedRayService:
                     "serving_pattern": self.config.serving_pattern.value,
                     "model_id": self.config.model_id,
                     "ep_enabled": self.config.enable_expert_parallel,
-                    "monitoring_enabled": self.config.monitoring_enabled,
                 }
             else:
                 return {
@@ -670,36 +666,6 @@ print(f"  KV Connector: {kv["type"]}")
 
     # ── Monitoring Stack ──────────────────────────────────────────────────
 
-    async def install_monitoring_stack(self) -> Dict[str, Any]:
-        """Install Ray + Prometheus + Grafana monitoring stack"""
-        try:
-            # Check if Ray is running
-            status = subprocess.run(
-                ["ray", "status"], capture_output=True, text=True, timeout=10
-            )
-            if status.returncode != 0:
-                return {
-                    "status": "failed",
-                    "error": "Ray cluster not running. Start with: terradev ml ray --start",
-                }
-
-            # Ray Dashboard is built-in at :8265
-            # For Prometheus/Grafana, generate the config
-            prom_config = self._generate_prometheus_config()
-            grafana_config = self._generate_grafana_dashboard()
-
-            return {
-                "status": "installed",
-                "ray": "http://localhost:8265",
-                "prometheus": f"http://localhost:{self.config.prometheus_port}",
-                "grafana": f"http://localhost:{self.config.grafana_port}",
-                "dashboards": "Ray Overview, MoE Expert Utilization, EP Load Balance",
-                "prometheus_config": prom_config,
-                "grafana_dashboard": grafana_config,
-            }
-        except Exception as e:  # noqa: BLE001
-            return {"status": "failed", "error": str(e)}
-
     async def get_monitoring_status(self) -> Dict[str, Any]:
         """Get comprehensive monitoring status"""
         try:
@@ -720,10 +686,6 @@ print(f"  KV Connector: {kv["type"]}")
                         "dashboard_uri": self.config.dashboard_uri
                         or "http://localhost:8265",
                     },
-                    "monitoring": {
-                        "prometheus": self.config.monitoring_enabled,
-                        "grafana": self.config.monitoring_enabled,
-                    },
                     "metrics": metrics,
                     "serving": {
                         "pattern": self.config.serving_pattern.value,
@@ -739,13 +701,11 @@ print(f"  KV Connector: {kv["type"]}")
                         "status": "stopped",
                         "error": "No active Ray cluster",
                     },
-                    "monitoring": {"prometheus": False, "grafana": False},
                     "metrics": {},
                 }
         except Exception as e:  # noqa: BLE001
             return {
                 "ray": {"status": "error", "error": str(e)},
-                "monitoring": {"prometheus": False, "grafana": False},
                 "metrics": {},
             }
 
@@ -1006,92 +966,6 @@ applications:
                     pass
         return metrics
 
-    def _generate_prometheus_config(self) -> Dict[str, Any]:
-        """Generate Prometheus scrape config for Ray + MoE metrics"""
-        return {
-            "global": {"scrape_interval": "15s"},
-            "scrape_configs": [
-                {
-                    "job_name": "ray",
-                    "metrics_path": "/api/prometheus",
-                    "static_configs": [
-                        {"targets": ["localhost:8265"]},
-                    ],
-                },
-                {
-                    "job_name": "vllm",
-                    "metrics_path": "/metrics",
-                    "static_configs": [
-                        {"targets": ["localhost:8000"]},
-                    ],
-                },
-            ],
-        }
-
-    def _generate_grafana_dashboard(self) -> Dict[str, Any]:
-        """Generate Grafana dashboard config for MoE monitoring"""
-        return {
-            "dashboard": {
-                "title": "Terradev MoE Inference",
-                "panels": [
-                    {
-                        "title": "Expert Utilization per Rank",
-                        "type": "timeseries",
-                        "targets": [{"expr": "vllm:expert_utilization_ratio"}],
-                    },
-                    {
-                        "title": "EP All-to-All Latency",
-                        "type": "timeseries",
-                        "targets": [{"expr": "vllm:all2all_latency_seconds"}],
-                    },
-                    {
-                        "title": "EPLB Rebalance Events",
-                        "type": "stat",
-                        "targets": [
-                            {"expr": "increase(vllm:eplb_rebalance_total[5m])"}
-                        ],
-                    },
-                    {
-                        "title": "GPU Memory (Weight vs KV Cache)",
-                        "type": "timeseries",
-                        "targets": [
-                            {
-                                "expr": "vllm:gpu_cache_usage_perc",
-                                "legendFormat": "KV Cache",
-                            },
-                            {
-                                "expr": "vllm:weight_memory_bytes",
-                                "legendFormat": "Weights",
-                            },
-                        ],
-                    },
-                    {
-                        "title": "Request Queue Depth",
-                        "type": "timeseries",
-                        "targets": [{"expr": "vllm:num_requests_waiting"}],
-                    },
-                    {
-                        "title": "Tokens/Second (Prefill vs Decode)",
-                        "type": "timeseries",
-                        "targets": [
-                            {
-                                "expr": "rate(vllm:prompt_tokens_total[1m])",
-                                "legendFormat": "Prefill tok/s",
-                            },
-                            {
-                                "expr": "rate(vllm:generation_tokens_total[1m])",
-                                "legendFormat": "Decode tok/s",
-                            },
-                        ],
-                    },
-                ],
-            },
-        }
-
-
-# ── Factory Functions (CLI interface) ────────────────────────────────────────
-
-
 def create_enhanced_ray_service_from_credentials(
     credentials: Dict[str, str],
 ) -> EnhancedRayService:
@@ -1132,7 +1006,6 @@ def create_enhanced_ray_service_from_credentials(
         kv_connector=credentials.get("ray_kv_connector", "NixlConnector"),
         kv_buffer_size=int(credentials.get("ray_kv_buffer_size", "5368709120")),
         # Monitoring
-        monitoring_enabled=credentials.get("ray_monitoring_enabled", "false").lower()
         == "true",
     )
 
@@ -1191,6 +1064,4 @@ Example: Wide-EP for DeepSeek-V3 on 8× H100:
 
 Dashboard URLs:
   - Ray Dashboard: http://localhost:8265
-  - vLLM Metrics: http://localhost:8000/metrics
-  - Grafana: http://localhost:3000 (if monitoring enabled)
 """

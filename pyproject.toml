@@ -64,8 +64,6 @@ keywords = [
     "helm",
     "karpenter",
     "opa",
-    "prometheus",
-    "grafana",
     "ray",
     "vllm",
     "ollama",
@@ -151,8 +149,6 @@ all = [
     "wandb>=0.16.0",
     "mlflow>=2.8.0",
     "huggingface-hub>=0.19.0",
-    "prometheus-client>=0.17.0",
-    "grafana-api>=1.0.3",
     "lmcache>=0.1",
     "redis>=5.0.0",
 ]

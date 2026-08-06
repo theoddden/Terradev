@@ -344,8 +344,6 @@ terradev k8s mig-configure --cluster my-cluster --profile 3g.40gb
 # GPU time-slicing
 terradev k8s time-slicing --cluster my-cluster --replicas 4
 
-# Deploy full monitoring stack (Prometheus + Grafana + DCGM)
-terradev k8s monitoring-stack --cluster my-cluster
 ```
 
 ---

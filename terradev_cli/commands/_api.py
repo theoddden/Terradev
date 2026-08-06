@@ -506,18 +506,6 @@ class TerradevAPI:
             )
             creds["aws_region"] = self.credentials.get("aws_region", "us-east-1")
             creds["aws_account_id"] = self.credentials.get("aws_account_id", "")
-            creds["monitoring_enabled"] = self.credentials.get(
-                "kubernetes_monitoring_enabled", "false"
-            )
-            creds["prometheus_enabled"] = self.credentials.get(
-                "kubernetes_prometheus_enabled", "false"
-            )
-            creds["grafana_enabled"] = self.credentials.get(
-                "kubernetes_grafana_enabled", "false"
-            )
-            creds["dashboard_port"] = self.credentials.get(
-                "kubernetes_dashboard_port", "3000"
-            )
         elif provider_name == "wandb":
             creds["api_key"] = self.credentials.get("wandb_api_key", "")
             creds["entity"] = self.credentials.get("wandb_entity", "")

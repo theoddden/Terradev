@@ -50,7 +50,7 @@ helm install my-training . --namespace terradev-workloads
 - **HPA**: configurable autoscaling (disabled by default)
 - **PDB**: minAvailable=1
 - **Config checksum**: auto-restart on ConfigMap change
-- **Metrics**: ServiceMonitor for Prometheus
+- **Metrics**: ServiceMonitor
 
 ## Monitoring
 

@@ -461,35 +461,3 @@ async def _handle_k8s_time_slicing(arguments, cmd_args, tool_name, execute_terra
 HANDLERS['k8s_time_slicing'] = _handle_k8s_time_slicing
 
 
-async def _handle_k8s_monitoring_stack(arguments, cmd_args, tool_name, execute_terradev_command):
-    try:
-        from terradev_cli.ml_services.kubernetes_enhanced import (
-            EnhancedKubernetesService,
-        )
-
-        svc = EnhancedKubernetesService()
-        result = await svc.install_monitoring_stack(
-            cluster_name=arguments["cluster_name"],
-            namespace=arguments.get("namespace", "monitoring"),
-            grafana_password=arguments.get("grafana_password"),
-            enable_alerting=arguments.get("enable_alerting", True),
-        )
-        output_text = f"📊 **Monitoring Stack Deployed — {arguments['cluster_name']}**\n\n"
-        output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:3000]}\n```"
-        return CallToolResult(
-            content=[TextContent(type="text", text=output_text)]
-        )
-    except ImportError:
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text="❌ Terradev CLI not found.")
-            ],
-            isError=True,
-        )
-    except Exception as e:  # noqa: BLE001
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"❌ {e}")], isError=True
-        )
-    return cmd_args
-
-HANDLERS['k8s_monitoring_stack'] = _handle_k8s_monitoring_stack

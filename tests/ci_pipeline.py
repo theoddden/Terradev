@@ -372,25 +372,6 @@ class CIPipeline:
         except Exception:
             return False
 
-    async def test_monitoring_workflow(self) -> bool:
-        """Test monitoring integration workflow"""
-        try:
-            # Test monitoring setup
-            result = subprocess.run(
-                [
-                    "./test_env/bin/python",
-                    "-m",
-                    "terradev_cli",
-                    "integrations",
-                    "--export-grafana",
-                ],
-                capture_output=True,
-                text=True,
-            )
-
-            return result.returncode == 0
-        except Exception:
-            return False
 
     async def cleanup_environment(self) -> bool:
         """Cleanup test environment"""

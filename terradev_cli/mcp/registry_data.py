@@ -97,7 +97,6 @@ TERRADEV_COMMAND_MAP = {
     "sglang_start": ["ml", "sglang", "start"],
     "sglang_stop": ["ml", "sglang", "stop"],
     "sglang_inference": ["ml", "sglang", "inference"],
-    "sglang_metrics": ["ml", "sglang", "metrics"],
     "ollama_list": ["ml", "ollama", "list"],
     "ollama_pull": ["ml", "ollama", "pull"],
     "ollama_generate": ["ml", "ollama", "generate"],
@@ -193,7 +192,6 @@ TERRADEV_COMMAND_MAP = {
     "k8s_device_plugin": ["k8s", "device-plugin"],
     "k8s_mig_configure": ["k8s", "mig-configure"],
     "k8s_time_slicing": ["k8s", "time-slicing"],
-    "k8s_monitoring_stack": ["k8s", "monitoring-stack"],
     # v5.1.0: Datadog Integration — handled by custom elif blocks
     "datadog_status": ["datadog", "status"],
     "datadog_push_metrics": ["datadog", "push"],

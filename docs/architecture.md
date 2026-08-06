@@ -90,7 +90,7 @@ RAG template (`clusters/rag-template/`) deploys all three + embedding model + Re
 
 - **Karpenter NodePools**: NUMA-aligned kubelet Topology Manager, GPUDirect RDMA, PCIe locality enforcement
 - **GPU Operator**: NVIDIA device plugin, MIG configuration, time-slicing
-- **Monitoring stack**: Prometheus + Grafana + DCGM exporter
+- **Monitoring stack**: DCGM exporter
 - **API versions**: `karpenter.sh/v1`, `karpenter.k8s.aws/v1`
 
 ---

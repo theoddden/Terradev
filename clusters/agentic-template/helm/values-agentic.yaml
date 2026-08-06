@@ -188,25 +188,6 @@ router:
     stickyRouting: true
     stickyHeader: "X-Agent-Id"
 
-# ── Monitoring ────────────────────────────────────────────────────────────────
-# Prometheus metrics for autoscaling signal derivation.
-# Key metrics: vllm_kv_cache_usage_perc, vllm_num_requests_waiting,
-#   vllm_request_ttft_seconds (histogram), agent_tool_execution_latency_ms
-monitoring:
-  enabled: true
-  prometheus:
-    enabled: true
-    serviceMonitor: true
-    scrapeInterval: 10s
-  grafana:
-    enabled: true
-    dashboards:
-      agentFleet: true        # KV hit rate, TTFT, queue depth, tier cost
-  dcgm:
-    enabled: true             # GPU memory utilization, bandwidth saturation
-  alerts:
-    kvHitRateBelow: 0.80      # arXiv threshold for healthy caching
-    ttftP95AboveMs: 2000      # reasoning tier TTFT threshold
     decodeQueueDepthAbove: 8  # decode backlog alert
     toolLatencyP95AboveMs: 500
 

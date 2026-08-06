@@ -1417,7 +1417,7 @@ async def _handle_sglang_start(arguments, cmd_args, tool_name, execute_terradev_
     result = await execute_safe_command(ssh_args)
     if result["success"]:
         output_text = f"✅ **SGLang Server Started**\n\n**Model:** {model}\n**Endpoint:** http://{ip}:{port}/v1\n**TP:** {tp}, **DP:** {dp}\n**Expert Parallel:** {ep}\n\n{result['stdout']}\n\n"
-        output_text += "**suggest_action:** Test with `sglang_inference`. Check metrics with `sglang_metrics`."
+        output_text += "**suggest_action:** Test with `sglang_inference`."
     else:
         output_text = f"❌ **Failed to start SGLang**\n\n{result['stderr']}"
     return CallToolResult(
@@ -1558,37 +1558,6 @@ async def _handle_sglang_inference(arguments, cmd_args, tool_name, execute_terra
 HANDLERS['sglang_inference'] = _handle_sglang_inference
 
 
-async def _handle_sglang_metrics(arguments, cmd_args, tool_name, execute_terradev_command):
-    endpoint = arguments["endpoint"].rstrip("/")
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{endpoint}/metrics",
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
-                if resp.status == 200:
-                    raw = await resp.text()
-                    output_text = f"📊 **SGLang Metrics — {endpoint}**\n\n```\n{raw[:3000]}\n```"
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=output_text)]
-                    )
-                else:
-                    return CallToolResult(
-                        content=[
-                            TextContent(
-                                type="text",
-                                text=f"❌ Metrics endpoint returned {resp.status}",
-                            )
-                        ],
-                        isError=True,
-                    )
-    except Exception as e:  # noqa: BLE001
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"❌ {e}")], isError=True
-        )
-    return cmd_args
-
-HANDLERS['sglang_metrics'] = _handle_sglang_metrics
 
 
 async def _handle_ollama_list(arguments, cmd_args, tool_name, execute_terradev_command):

@@ -341,7 +341,7 @@ class AgenticProvisioner:
         """
         Return live fleet status.
 
-        Metrics are read from Prometheus/DCGM where available, otherwise
+        Metrics are read from DCGM where available, otherwise
         estimated from provisioned state.
         """
         state = _load_fleet_state(fleet_id)
@@ -366,7 +366,7 @@ class AgenticProvisioner:
             provisioning = instance_count - healthy - failed
 
             # KV hit rate: in a no-thrashing regime, research shows 84.6-99.5%.
-            # We track this via Prometheus dcgm_kv_cache_usage_perc when available.
+            # We track this via dcgm_kv_cache_usage_perc when available.
             kv_hit_rate = self._estimate_kv_hit_rate(tier_name, tier_spec)
             if kv_hit_rate < 0.80 and gpu_type:
                 warnings.append(
@@ -374,7 +374,7 @@ class AgenticProvisioner:
                     f"— risk of cache thrashing (arXiv:2605.26297)"
                 )
 
-            # TTFT estimate: better with live Prometheus, but we provide a model-based
+            # TTFT estimate: better with live DCGM metrics, but we provide a model-based
             # estimate from bandwidth and model size.
             ttft_est = self._estimate_ttft_ms(tier_spec)
             if ttft_est > 2000 and tier_name == "reasoning":
@@ -400,7 +400,7 @@ class AgenticProvisioner:
                 provisioning=provisioning,
                 failed=failed,
                 kv_hit_rate=kv_hit_rate,
-                decode_queue_depth=0,    # live value from Prometheus if available
+                decode_queue_depth=0,    # live value from DCGM if available
                 ttft_p95_ms=ttft_est,
                 tool_latency_p95_ms=80.0 if tier_name == "cpu_tools" else 0.0,
                 cost_hr=round(tier_cost, 2),

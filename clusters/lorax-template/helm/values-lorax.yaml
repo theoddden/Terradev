@@ -54,9 +54,4 @@ env:
   - name: SHM_SIZE
     value: "1g"
 
-# Prometheus metrics
-metrics:
-  enabled: true
-  port: 8080
-  path: /metrics
 

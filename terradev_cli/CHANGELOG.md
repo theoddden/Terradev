@@ -36,9 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Critical: added 4 missing methods (`install_gpu_operator`, `configure_device_plugin`, `configure_mig`, `configure_time_slicing`)
 - Critical: `EnhancedKubernetesService()` default config fix
 - API version corrections: `karpenter.sh/v1beta1` → `karpenter.sh/v1`, `karpenter.k8s.aws/v1beta1` → `karpenter.k8s.aws/v1`
-- Grafana Helm chart: `grafana-charts/grafana` → `grafana/grafana`
 - CPU parsing bug: `.endswith('m')` after strip fixed to check before strip
-- Prometheus relabel_configs: `source_label` → `source_labels`
 
 ---
 
@@ -175,7 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CLI Command Reference**: Complete command documentation with examples
 - **Pricing Tiers**: Clear feature comparison across tiers
 - **Security Architecture**: Zero-trust credential management
-- **Integration Matrix**: W&B, Prometheus, Grafana setup guides
+- **Integration Matrix**: W&B setup guides
 
 ### 🚀 **Enhanced User Experience**
 - **One-Command Deployments**: Simplified HF Spaces deployment
@@ -245,8 +243,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `terradev inferx optimize` - Cost optimization
 
 ### 📊 **Monitoring & Observability**
-- Custom Prometheus metrics for InferX
-- Grafana dashboards for performance monitoring
 - Health checks and readiness probes
 - Resource utilization tracking
 

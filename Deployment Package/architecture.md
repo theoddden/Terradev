@@ -313,8 +313,6 @@ terradev k8s create my-cluster
        │     └── Time-slicing
        │
        └── Monitoring stack:
-             ├── Prometheus
-             ├── Grafana (grafana/grafana Helm chart)
              └── DCGM exporter (GPU metrics)
 ```
 

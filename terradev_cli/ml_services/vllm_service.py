@@ -1221,7 +1221,7 @@ echo "🔗 Test with: curl http://{instance_ip}:{self.config.port}/v1/models"
             return {"status": "failed", "error": f"Workload analysis failed: {str(e)}"}
 
     def _parse_vllm_metrics(self, metrics_text: str) -> Dict[str, Any]:
-        """Parse vLLM Prometheus metrics to extract workload patterns."""
+        """Parse vLLM metrics to extract workload patterns."""
         workload = {
             "avg_prompt_tokens": 0,
             "avg_generation_tokens": 0,

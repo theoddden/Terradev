@@ -107,17 +107,6 @@ def test_ml_ray_test_help(runner, mock_api):
 def test_ml_ray_install_help(runner, mock_api):
     _help_test(runner, mock_api, "ml ray install")
 
-def test_ml_ray_install_monitoring_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml ray install-monitoring")
-
-def test_ml_ray_metrics_summary_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml ray metrics-summary")
-
-def test_ml_ray_grafana_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml ray grafana")
-
-def test_ml_ray_prometheus_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml ray prometheus")
 
 def test_ml_ray_status_help(runner, mock_api):
     _help_test(runner, mock_api, "ml ray status")

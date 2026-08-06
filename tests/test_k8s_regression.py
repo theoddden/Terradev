@@ -12,16 +12,13 @@ Critical (4):
 
 Medium (6):
 5. kubernetes_service.py + kubernetes_enhanced.py — CPU parsing strips 'm' then checks .endswith('m')
-6. kubernetes_enhanced.py — Prometheus relabel_configs: source_label (singular, should be plural)
 7. kubernetes_service.py — Karpenter NodePool API karpenter.sh/v1beta1 → karpenter.sh/v1
 8. kubernetes_service.py — EC2NodeClass API karpenter.k8s.aws/v1beta1 → karpenter.k8s.aws/v1
 9. cli.py — Karpenter label karpenter.sh/provisioner-name → karpenter.sh/nodepool
-10. kubernetes_enhanced.py — Grafana Helm chart grafana-charts/grafana → grafana/grafana
 
 Low (4):
 11. cli.py — Garbled emoji strings in k8s_create/k8s_destroy
 12. cli.py — Karpenter toleration missing operator: Equal
-13. kubernetes_enhanced.py — install_monitoring_stack signature didn't accept MCP kwargs
 14. kubernetes_enhanced_fixed.py — stale duplicate file (should not exist)
 """
 
@@ -94,20 +91,6 @@ class TestKubernetesEnhancedCriticalFixes:
         config = service.get_enhanced_config()
         assert config is not None
 
-    def test_install_monitoring_stack_accepts_kwargs(self):
-        """Bug #13: install_monitoring_stack signature should accept MCP kwargs"""
-        service = EnhancedKubernetesService()
-
-        # Should accept additional kwargs without error
-        # (we won't actually run it since it requires kubectl, just check signature)
-        import inspect
-
-        sig = inspect.signature(service.install_monitoring_stack)
-
-        # Should have at least the base parameters
-        params = list(sig.parameters.keys())
-        assert "cluster_name" in params or len(params) > 0
-
     def test_total_tool_count(self):
         """Total new tools in v5.0.0 should be 55"""
         total_new = 11 + 9 + 11 + 11 + 10
@@ -164,30 +147,6 @@ class TestKubernetesAPIVersions:
         """Bug #8: EC2NodeClass API should be karpenter.k8s.aws/v1 not v1beta1"""
         # This would be tested in actual YAML generation
         service = KubernetesService(KubernetesConfig())
-        assert service is not None
-
-
-class TestKubernetesEnhancedPrometheusFix:
-    """Test Prometheus relabel config fix"""
-
-    def test_prometheus_relabel_uses_plural(self):
-        """Bug #6: Prometheus relabel_configs should use source_labels (plural)"""
-        service = EnhancedKubernetesService()
-
-        # Check that install_monitoring_stack generates correct prometheus config
-        # The fix changed source_label to source_labels (plural)
-        # We can verify this by checking the method exists and is callable
-        assert hasattr(service, "install_monitoring_stack")
-        assert callable(service.install_monitoring_stack)
-
-
-class TestKubernetesEnhancedGrafanaFix:
-    """Test Grafana Helm chart fix"""
-
-    def test_grafana_helm_chart_url(self):
-        """Bug #10: Grafana Helm chart should be grafana/grafana not grafana-charts/grafana"""
-        # This would be tested in actual Helm command generation
-        service = EnhancedKubernetesService()
         assert service is not None
 
 

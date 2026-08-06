@@ -143,8 +143,6 @@ class IntegrationTestFramework:
     async def test_monitoring_integrations(self) -> Dict[str, Any]:
         """Test monitoring and observability integrations"""
         tests = [
-            self._test_prometheus_integration,
-            self._test_grafana_dashboards,
             self._test_wandb_integration,
             self._test_metrics_aggregation,
         ]
@@ -362,24 +360,6 @@ class IntegrationTestFramework:
             print(f"Model orchestrator test failed: {e}")
             return False
 
-    async def _test_prometheus_integration(self) -> bool:
-        """Test Prometheus integration"""
-        try:
-            from terradev_cli.integrations.prometheus_integration import (
-                get_status_summary,
-            )
-
-            # Mock test
-            with patch("requests.get") as mock_get:
-                mock_get.return_value.status_code = 200
-                mock_get.return_value.json.return_value = {"status": "ok"}
-
-                status = get_status_summary({})
-                assert isinstance(status, dict)
-                return True
-        except Exception as e:
-            print(f"Prometheus integration test failed: {e}")
-            return False
 
     async def _test_parallel_provisioning(self) -> bool:
         """Test parallel provisioning performance"""

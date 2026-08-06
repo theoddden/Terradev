@@ -1163,29 +1163,6 @@ def provision(
         logger.exception(_exc)
         pass
 
-    # ── Step 5: Integration hooks (W&B + Prometheus) ──
-    # Prometheus: push provision metrics
-    try:
-        from terradev_cli.integrations.prometheus_integration import (
-            is_configured as prom_configured,
-            build_provision_metrics,
-            push_metrics,
-        )
-
-        if prom_configured(api.credentials) and succeeded:
-            for r in succeeded:
-                payload = build_provision_metrics(
-                    provider=r["provider"],
-                    gpu_type=gpu_type,
-                    region=r.get("region", ""),
-                    instance_id=r["instance_id"],
-                    price_per_hour=r["price"],
-                )
-                push_metrics(api.credentials, payload)
-    except Exception as _exc:  # noqa: BLE001
-        logger.exception(_exc)
-        pass
-
     # W&B: show env var injection status
     wandb_injected = False
     try:
@@ -1339,39 +1316,6 @@ def manage(instance_id, action):
                 from terradev_cli.core.cost_tracker import end_provision
 
                 end_provision(instance_id)
-            except Exception as _exc:  # noqa: BLE001
-                logger.exception(_exc)
-                pass
-            # BYOAPI: Billing disabled - no GPU-hour reporting
-            # Prometheus: push terminate metrics
-            try:
-                from terradev_cli.integrations.prometheus_integration import (
-                    is_configured as prom_configured,
-                    build_terminate_metrics,
-                    push_metrics,
-                )
-
-                if prom_configured(api.credentials):
-                    created = instance.get("created_at", "")
-                    duration = 0.0
-                    if created:
-                        from datetime import datetime as _dt
-
-                        try:
-                            duration = (
-                                _dt.now() - _dt.fromisoformat(created)
-                            ).total_seconds()
-                        except Exception as _exc:  # noqa: BLE001
-                            logger.exception(_exc)
-                            pass
-                    total_cost = instance.get("price", 0) * (duration / 3600)
-                    payload = build_terminate_metrics(
-                        provider=instance.get("provider", ""),
-                        instance_id=instance_id,
-                        total_cost=round(total_cost, 4),
-                        duration_seconds=round(duration, 1),
-                    )
-                    push_metrics(api.credentials, payload)
             except Exception as _exc:  # noqa: BLE001
                 logger.exception(_exc)
                 pass
@@ -2121,21 +2065,11 @@ def optimize(instance_id, auto_apply):
 
 @cli.command()
 @click.option(
-    "--export-grafana",
-    is_flag=True,
-    help="Export a Grafana dashboard JSON for Terradev metrics",
-)
-@click.option(
-    "--export-scrape-config",
-    is_flag=True,
-    help="Print a Prometheus scrape config snippet",
-)
-@click.option(
     "--export-wandb-script",
     is_flag=True,
     help="Print a W&B setup script for remote instances",
 )
-def integrations(export_grafana, export_scrape_config, export_wandb_script):
+def integrations(export_wandb_script):
     """Show status of observability & ML integrations and export configs.
 
     Terradev facilitates connections to your existing tools  your keys
@@ -2143,37 +2077,9 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
 
     Examples:
         terradev integrations
-        terradev integrations --export-grafana
-        terradev integrations --export-scrape-config
         terradev integrations --export-wandb-script
     """
     api = click.get_current_context().obj["api"]
-
-    # ── Export modes ──
-    if export_grafana:
-        try:
-            from terradev_cli.integrations.prometheus_integration import (
-                generate_grafana_dashboard_json,
-            )
-            import json as _json
-
-            dashboard = generate_grafana_dashboard_json()
-            print(_json.dumps(dashboard, indent=2))
-            print("\nImport this JSON into Grafana → Dashboards → Import")
-        except Exception as e:  # noqa: BLE001
-            print(f"Error generating dashboard: {e}", file=sys.stderr)
-            sys.exit(1)
-        return
-
-    if export_scrape_config:
-        try:
-            from terradev_cli.integrations.prometheus_integration import generate_scrape_config
-
-            print("# Add this to your prometheus.yml under scrape_configs:")
-            print(generate_scrape_config())
-        except Exception as e:  # noqa: BLE001
-            print(f"Error generating config: {e}")
-        return
 
     if export_wandb_script:
         try:
@@ -2217,36 +2123,10 @@ def integrations(export_grafana, export_scrape_config, export_wandb_script):
         logger.exception(_exc)
         print("\nWeights & Biases          Module not available")
 
-    # Prometheus
-    try:
-        from terradev_cli.integrations.prometheus_integration import get_status_summary
-
-        pm = get_status_summary(api.credentials)
-        status = "Connected" if pm["configured"] else "Not configured"
-        print(f"\nPrometheus                {status}")
-        if pm["configured"]:
-            print(f"   Pushgateway: {pm['pushgateway_url']}")
-            print(f"   Auth:        {'Basic auth' if pm['auth_enabled'] else 'None'}")
-            print(
-                "   Metrics:     terradev_provisions_total, terradev_gpu_cost_per_hour, ..."
-            )
-            print("   Hooks:       provision (push), terminate (push)")
-            print("   Export:      terradev integrations --export-grafana")
-            print("                terradev integrations --export-scrape-config")
-        else:
-            print(
-                "   Setup:       terradev configure --provider prometheus --api-key PUSHGATEWAY_URL"
-            )
-            print("   Requires:    A running Prometheus Pushgateway")
-    except Exception as _exc:  # noqa: BLE001
-        logger.exception(_exc)
-        print("\nPrometheus                Module not available")
-
     # Existing infra hooks
     print("\nInfrastructure Hooks      Built-in")
     print("   Kubernetes:  terradev k8s")
     print("   Karpenter:   terradev k8s --workload training|inference")
-    print("   Grafana:     terradev integrations --export-grafana")
     print("   OPA:         Policy-as-code via data governance module")
 
     print("\nConfigure integrations: terradev configure")

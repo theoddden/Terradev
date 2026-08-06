@@ -24,9 +24,6 @@ spec:
         app.kubernetes.io/name: glm-5
         app.kubernetes.io/component: sglang-serving
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8000"
-        prometheus.io/path: "/metrics"
     spec:
       nodeSelector:
         nvidia.com/gpu.product: NVIDIA-H100-80GB-HBM3

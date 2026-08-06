@@ -64,7 +64,7 @@ class TerradevAnnotations:
     tier: Optional[str] = None  # research, research+, enterprise
     cost_optimization: Optional[str] = None  # conservative, moderate, aggressive
     migration_enabled: Optional[bool] = None
-    monitoring: Optional[str] = None  # prometheus, wandb, none
+    monitoring: Optional[str] = None  # wandb, none
     dry_run: Optional[bool] = None
 
     def to_dict(self) -> Dict[str, str]:
@@ -451,11 +451,10 @@ class PipelineValidator:
                 )
 
             if terradev_ann.monitoring and terradev_ann.monitoring not in [
-                "prometheus",
                 "wandb",
                 "none",
             ]:
-                errors.append("Monitoring must be one of: prometheus, wandb, none")
+                errors.append("Monitoring must be one of: wandb, none")
 
         return errors
 

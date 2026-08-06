@@ -109,7 +109,6 @@ class TrainingConfig:
     # Monitoring hooks (optional — empty means disabled)
     log_path: str = ""
     wandb_project: str = ""  # optional W&B hook
-    prometheus_port: int = 0  # optional prometheus push gateway
     # Resume
     resume_from_checkpoint: str = ""
     # Elastic

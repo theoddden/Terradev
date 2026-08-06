@@ -77,7 +77,7 @@ Added **LoRAX (LoRA eXchange) integration** and **HuggingFace PEFT import** for 
   terradev lora peft delete -a username/adapter
   ```
 
-- **LoRAX Helm Template** (`clusters/lorax-template/helm/`): Production-ready Kubernetes manifests with GPU resource limits, storage configuration, and Prometheus metrics support.
+- **LoRAX Helm Template** (`clusters/lorax-template/helm/`): Production-ready Kubernetes manifests with GPU resource limits, storage configuration.
 
 - **Registry Integration**: One-step import from HuggingFace and automatic registration in Terradev LoRA registry with version tracking, cross-replica sync, and cost attribution.
 
@@ -559,7 +559,7 @@ echo " InferX endpoint: https://inferx.terradev.cloud/burst-llm-api"
 echo " LoRA adapters loaded: $(terradev lora list -e http://$BASELINE_IP:8000 --count)"
 echo " Semantic routing: Active"
 echo " Warm pool: Configured for top adapters"
-echo " Monitoring: W&B + Prometheus + Grafana"
+echo " Monitoring: W&B"
 
 # 10. Set up automated LoRA updates
 echo " Step 10: Configure automated LoRA adapter updates"

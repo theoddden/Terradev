@@ -143,51 +143,6 @@ redis:
       size: 20Gi
       storageClass: "gp3"
 
-# Monitoring Configuration
-prometheus:
-  enabled: true
-  server:
-    retention: 30d
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: "gp3"
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 200Gi
-    resources:
-      limits:
-        cpu: 2000m
-        memory: 4Gi
-      requests:
-        cpu: 1000m
-        memory: 2Gi
-
-grafana:
-  enabled: true
-  admin:
-    existingSecret: "terradev-grafana-secret"
-    userKey: "admin-user"
-    passwordKey: "admin-password"
-  persistence:
-    enabled: true
-    size: 20Gi
-    storageClass: "gp3"
-  sidecar:
-    dashboards:
-      enabled: true
-      searchNamespace: "monitoring"
-    datasources:
-      enabled: true
-      searchNamespace: "monitoring"
-  resources:
-    limits:
-      cpu: 500m
-      memory: 1Gi
-    requests:
-      cpu: 250m
-      memory: 512Mi
 
 # Security Configuration
 securityContext:
@@ -327,10 +282,6 @@ configMaps:
           gpu_types: ["a100", "h100", "a10g", "rtx4090", "rtx3090"]
           confidence_threshold: 0.8
           max_risk_score: 0.3
-        monitoring:
-          prometheus:
-            enabled: true
-            port: 8081
         security:
           jwt:
             expiration: 3600

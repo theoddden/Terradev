@@ -1254,7 +1254,7 @@ systemctl daemon-reload
             return {"status": "failed", "error": f"Failed to get server info: {e}"}
 
     async def get_server_metrics(self) -> Dict[str, Any]:
-        """Get SGLang server metrics from the /metrics Prometheus endpoint"""
+        """Get SGLang server metrics from the /metrics endpoint"""
         try:
             if not self.session:
                 self.session = aiohttp.ClientSession()
@@ -1265,7 +1265,7 @@ systemctl daemon-reload
             ) as response:
                 if response.status == 200:
                     raw = await response.text()
-                    # Parse key metrics from Prometheus text format
+                    # Parse key metrics from text format
                     metrics = {}
                     for line in raw.split("\n"):
                         if line.startswith("#") or not line.strip():

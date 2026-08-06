@@ -190,9 +190,6 @@ terradev gitops rollout --cluster prod --app my-app --strategy canary --steps 10
 terradev configure --provider wandb --api-key $WANDB_KEY
 terradev ml wandb --test
 
-# Prometheus + Grafana
-terradev configure --provider prometheus --api-key $PROMETHEUS_URL
-terradev integrations --export-grafana
 
 # Datadog integration
 terradev configure --provider datadog --api-key $DD_API_KEY
@@ -202,14 +199,11 @@ terradev datadog --test
 terradev integrations --deploy --stack full --cluster production
 ```
 
-**Auto-injection:** All WANDB_*, PROMETHEUS_*, DD_* environment variables automatically injected into provisioned containers.
+**Auto-injection:** All WANDB_*, DD_* environment variables automatically injected into provisioned containers.
 
 ### **Advanced Observability**
 ```bash
 # Custom dashboards
-terradev integrations --export-grafana --dashboard gpu-utilization
-terradev integrations --export-grafana --dashboard training-metrics
-terradev integrations --export-grafana --dashboard cost-analysis
 
 # Alert management
 terradev integrations --alert --name gpu-memory-high --threshold 90%
@@ -452,7 +446,6 @@ terradev phoenix retention --project my-inference --days 30
 terradev phoenix archive --project my-inference --older-than 30d
 
 # Integration with other tools
-terradev phoenix integrate --provider grafana --project my-inference
 terradev phoenix integrate --provider slack --project my-inference --webhook $SLACK_WEBHOOK
 ```
 

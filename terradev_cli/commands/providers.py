@@ -364,26 +364,8 @@ def configure(provider):
             if karpenter_enabled.lower() == "y":
                 api.credentials["kubernetes_karpenter_enabled"] = "true"
 
-            # Enhanced monitoring options
-            monitoring_enabled = click.prompt(
-                "Enable monitoring stack (Prometheus/Grafana)? (y/n)",
-                default="n",
-                show_default=False,
-            )
-            if monitoring_enabled.lower() == "y":
-                api.credentials["kubernetes_monitoring_enabled"] = "true"
-                api.credentials["kubernetes_prometheus_enabled"] = "true"
-                api.credentials["kubernetes_grafana_enabled"] = "true"
-                dashboard_port = click.prompt(
-                    "Grafana dashboard port (default: 3000)",
-                    default="3000",
-                    show_default=False,
-                )
-                if dashboard_port:
-                    api.credentials["kubernetes_dashboard_port"] = dashboard_port
-
             print(
-                "   Kubernetes configured  cluster management, Karpenter, and monitoring"
+                "   Kubernetes configured  cluster management and Karpenter"
             )
 
         # W&B (enhanced)
@@ -492,27 +474,6 @@ def configure(provider):
                 api.credentials["sglang_observability_enabled"] = "true"
 
             print("   SGLang configured  model serving and optimization")
-
-        prom_url = click.prompt(
-            "Prometheus Pushgateway URL (optional, e.g. http://pushgateway:9091)",
-            default="",
-            show_default=False,
-        )
-        if prom_url:
-            api.credentials["prometheus_pushgateway_url"] = prom_url
-            prom_user = click.prompt(
-                "Pushgateway Username (optional)", default="", show_default=False
-            )
-            if prom_user:
-                api.credentials["prometheus_username"] = prom_user
-            prom_pass = click.prompt(
-                "Pushgateway Password", hide_input=True, default="", show_default=False
-            )
-            if prom_pass:
-                api.credentials["prometheus_password"] = prom_pass
-            print(
-                "   Prometheus configured  metrics will be pushed on provision/terminate events"
-            )
 
         # ── ML Platform Integrations ──
         print("\nML Platform Integrations (optional)")

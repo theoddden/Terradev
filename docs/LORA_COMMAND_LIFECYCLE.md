@@ -412,7 +412,7 @@ terradev lora lorax sync-registry
 - **Dynamic Adapter Loading:** Load adapters just-in-time without blocking requests
 - **Heterogeneous Continuous Batching:** Pack requests for different adapters together
 - **Adapter Exchange Scheduling:** Async prefetch and offload between GPU/CPU memory
-- **Production Ready:** Docker images, Helm charts, Prometheus metrics, OpenTelemetry tracing
+- **Production Ready:** Docker images, Helm charts, OpenTelemetry tracing
 - **OpenAI Compatible API:** Multi-turn chat conversations with adapters
 
 **Documentation:** https://loraexchange.ai/

@@ -192,7 +192,7 @@ tracker.add_alert_handler(email_alert_handler)
 - ✅ Kubernetes (Cost monitoring)
 - ✅ Jenkins (Build cost tracking)
 - ✅ GitHub Actions (Workflow costs)
-- ✅ Grafana (Cost dashboards)
+- ✅ Cost dashboards
 - ✅ Slack (Budget alerts)
 
 ### Financial Systems

@@ -143,10 +143,9 @@ class TestMCPToolCategories:
                 "k8s_device_plugin",
                 "k8s_mig_configure",
                 "k8s_time_slicing",
-                "k8s_monitoring_stack",
             ]
 
-            assert len(k8s_tools) == 5
+            assert len(k8s_tools) == 4
         except ImportError:
             pytest.skip("MCP server module not available")
 

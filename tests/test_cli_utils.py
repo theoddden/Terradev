@@ -695,10 +695,6 @@ class TestTerradevAPI:
                     "karpenter_version": "v1.10.0",
                     "aws_region": "us-east-1",
                     "aws_account_id": "",
-                    "monitoring_enabled": "false",
-                    "prometheus_enabled": "false",
-                    "grafana_enabled": "false",
-                    "dashboard_port": "3000",
                 }
 
     def test_provider_creds_flat_format_wandb(self):

@@ -9,7 +9,7 @@ metadata:
     terradev.io/gpu-count: 4
     terradev.io/tier: enterprise
     terradev.io/cost-optimization: aggressive
-    terradev.io/monitoring: prometheus
+    terradev.io/monitoring: none
 spec:
   entrypoint: main
   templates:

@@ -1,5 +1,5 @@
 {
-  "tool_count": 219,
+  "tool_count": 217,
   "tool_names": [
     "active_context",
     "analytics",
@@ -87,7 +87,6 @@
     "k8s_info",
     "k8s_list",
     "k8s_mig_configure",
-    "k8s_monitoring_stack",
     "k8s_time_slicing",
     "kserve_generate_yaml",
     "kserve_list",
@@ -170,7 +169,6 @@
     "setup_provider",
     "sglang",
     "sglang_inference",
-    "sglang_metrics",
     "sglang_start",
     "sglang_stop",
     "smart_deploy",

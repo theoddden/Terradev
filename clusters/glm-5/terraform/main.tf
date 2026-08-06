@@ -51,7 +51,7 @@ resource "terradev_gpu_node" "glm5_serving" {
 
   # Network configuration for inference serving
   network {
-    open_ports = [8000, 8080, 9090]  # vLLM/SGLang, metrics, prometheus
+    open_ports = [8000, 8080]  # vLLM/SGLang, metrics
     bandwidth_gbps = 100              # minimum NIC bandwidth
   }
 
