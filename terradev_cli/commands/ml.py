@@ -16,14 +16,12 @@ import click
 from . import cli
 from terradev_cli.commands._api import TerradevAPI
 
-
 def _get_api():
     """Resolve the TerradevAPI instance from the Click context or create a real one."""
     ctx = click.get_current_context()
     if ctx and ctx.obj and ctx.obj.get("api"):
         return ctx.obj["api"]
     return TerradevAPI()
-
 
 def _parse_vllm_endpoint(endpoint: str):
     """Parse 'http://host:port' into (host, port)."""
@@ -32,17 +30,14 @@ def _parse_vllm_endpoint(endpoint: str):
     p = urlparse(endpoint if "://" in endpoint else f"http://{endpoint}")
     return p.hostname or "127.0.0.1", p.port or 8000
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # ML Services Commands
 # ═══════════════════════════════════════════════════════════════════════
-
 
 @cli.group()
 def ml():
     """ML Platform Integration Commands"""
     pass
-
 
 @ml.group()
 def wandb():
@@ -299,7 +294,6 @@ def langchain_test():
 
         if result["status"] == "connected":
             print("OK: LangChain connected successfully")
-            print(f"   LangSmith: {result['langsmith']}")
             print(f"   Environment: {result['environment']}")
             print(
                 f"   Dashboard: {'Enabled' if creds.get('langchain_dashboard_enabled') == 'true' else 'Disabled'}"
@@ -407,86 +401,6 @@ def langchain_create_pipeline(pipeline_name):
             print(f"ERROR: Pipeline creation failed: {result['error']}")
     except ImportError:
         print("ERROR: Enhanced LangChain service not available.")
-@langchain.command("list-projects")
-def langchain_list_projects():
-    """List LangSmith projects."""
-    try:
-        from terradev_cli.ml_services.langchain_service import create_langchain_service_from_credentials
-
-        api = _get_api()
-        creds = api._provider_creds("langchain")
-
-        if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
-            return
-
-        service = create_langchain_service_from_credentials(creds)
-        print("Plan Listing LangSmith projects...")
-        projects = asyncio.run(service.get_langsmith_projects())
-
-        for project in projects:
-            print(
-                f"   Path {project.get('name', 'Unknown')} (ID: {project.get('id', 'Unknown')}"
-            )
-    except ImportError:
-        print("ERROR: Enhanced LangChain service not available.")
-@langchain.command("list-runs")
-@click.option("--project", "-p", help="LangSmith project name")
-def langchain_list_runs(project):
-    """List LangSmith runs."""
-    try:
-        from terradev_cli.ml_services.langchain_service import create_langchain_service_from_credentials
-
-        api = _get_api()
-        creds = api._provider_creds("langchain")
-
-        if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
-            return
-
-        service = create_langchain_service_from_credentials(creds)
-        project_name = project or creds.get("project_name", "terradev")
-        print(f" Listing LangSmith runs in project: {project_name}")
-        runs = asyncio.run(service.get_langsmith_runs(project_name))
-
-        for run in runs[:10]:
-            print(
-                f"    {run.get('name', 'Unknown')[:30]} - {run.get('status', 'Unknown')} - {run.get('created_at', 'Unknown')[:10]}"
-            )
-    except ImportError:
-        print("ERROR: Enhanced LangChain service not available.")
-@langchain.command("create-trace")
-@click.option("--run-id", "-r", required=True, help="Run ID for trace")
-@click.option("--data", "-d", required=True, help="Trace data (JSON)")
-def langchain_create_trace(run_id, data):
-    """Create a trace in LangSmith."""
-    try:
-        from terradev_cli.ml_services.langchain_service import create_langchain_service_from_credentials
-
-        api = _get_api()
-        creds = api._provider_creds("langchain")
-
-        if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
-            return
-
-        service = create_langchain_service_from_credentials(creds)
-
-        try:
-            trace_data = json.loads(data)
-        except json.JSONDecodeError:
-            print("ERROR: Invalid JSON data")
-            return
-
-        print(f" Creating trace: {run_id}")
-        result = asyncio.run(service.create_trace(run_id, trace_data))
-
-        if result["status"] == "created":
-            print(f"OK: Trace created: {run_id}")
-        else:
-            print(f"ERROR: Trace creation failed: {result['error']}")
-    except ImportError:
-        print("ERROR: Enhanced LangChain service not available.")
 @ml.group()
 def langgraph():
     """LangGraph workflow orchestration with monitoring."""
@@ -513,7 +427,6 @@ def langgraph_test():
 
         if result["status"] == "connected":
             print("OK: LangGraph connected successfully")
-            print(f"   LangSmith: {result['langsmith']}")
             print(f"   Environment: {result['environment']}")
             print(
                 f"   Dashboard: {'Enabled' if creds.get('langchain_dashboard_enabled') == 'true' else 'Disabled'}"
@@ -655,101 +568,6 @@ def kserve_test():
             print(f"ERROR: KServe connection failed: {result['error']}")
     except ImportError:
         print("ERROR: KServe service not available. Install with: pip install kserve")
-@ml.group()
-def langsmith():
-    """LangSmith experiment tracking and monitoring."""
-    pass
-@langsmith.command("test")
-def langsmith_test():
-    """Test connection to LangSmith service."""
-    try:
-        from terradev_cli.ml_services.langsmith_service import (
-            create_langsmith_service_from_credentials,
-            get_langsmith_setup_instructions,
-        )
-
-        api = _get_api()
-        creds = api._provider_creds("langsmith")
-
-        if not creds.get("api_key"):
-            print(get_langsmith_setup_instructions())
-            return
-
-        service = create_langsmith_service_from_credentials(creds)
-        print(" Testing LangSmith connection...")
-        result = asyncio.run(service.test_connection())
-
-        if result["status"] == "connected":
-            print("OK: LangSmith connected successfully")
-            print(f"   Workspace: {result['workspace_id']}")
-            print(f"   Endpoint: {result['endpoint']}")
-        else:
-            print(f"ERROR: LangSmith connection failed: {result['error']}")
-    except ImportError:
-        print("ERROR: LangSmith service not available.")
-@langsmith.command("list-projects")
-def langsmith_list_projects():
-    """List all LangSmith projects."""
-    try:
-        from terradev_cli.ml_services.langsmith_service import create_langsmith_service_from_credentials
-
-        api = _get_api()
-        creds = api._provider_creds("langsmith")
-
-        if not creds.get("api_key"):
-            print("ERROR: LangSmith not configured. Run 'terradev ml langsmith configure' first.")
-            return
-
-        service = create_langsmith_service_from_credentials(creds)
-        print("Plan Listing LangSmith projects...")
-        projects = asyncio.run(service.list_projects())
-
-        for project in projects:
-            print(f"   Path {project['name']} (ID: {project['id']})")
-    except ImportError:
-        print("ERROR: LangSmith service not available.")
-@langsmith.command("create-project")
-@click.argument("project_name")
-def langsmith_create_project(project_name):
-    """Create a new LangSmith project."""
-    try:
-        from terradev_cli.ml_services.langsmith_service import create_langsmith_service_from_credentials
-
-        api = _get_api()
-        creds = api._provider_creds("langsmith")
-
-        if not creds.get("api_key"):
-            print("ERROR: LangSmith not configured. Run 'terradev ml langsmith configure' first.")
-            return
-
-        service = create_langsmith_service_from_credentials(creds)
-        print(f"Path Creating project: {project_name}")
-        result = asyncio.run(
-            service.create_project(project_name, "Created via Terradev CLI")
-        )
-        print(f"OK: Project created: {result['id']}")
-    except ImportError:
-        print("ERROR: LangSmith service not available.")
-@langsmith.command("export")
-@click.option("--format", "-f", type=click.Choice(["json", "csv"]), default="json", help="Export format")
-def langsmith_export(format):
-    """Export runs data."""
-    try:
-        from terradev_cli.ml_services.langsmith_service import create_langsmith_service_from_credentials
-
-        api = _get_api()
-        creds = api._provider_creds("langsmith")
-
-        if not creds.get("api_key"):
-            print("ERROR: LangSmith not configured. Run 'terradev ml langsmith configure' first.")
-            return
-
-        service = create_langsmith_service_from_credentials(creds)
-        print("UPLOAD: Exporting runs data...")
-        data = asyncio.run(service.export_runs(format=format))
-        print(data)
-    except ImportError:
-        print("ERROR: LangSmith service not available.")
 @ml.group()
 def dvc():
     """DVC (Data Version Control) management."""
@@ -2489,323 +2307,10 @@ def langfuse_k8s(namespace):
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     print(svc.generate_k8s_deployment(namespace=namespace))
-@ml.group()
-def databricks():
-    """Databricks MLOps  jobs, clusters, model serving, MLflow."""
-    pass
-@databricks.command("configure")
-@click.option("--host", prompt="Databricks workspace URL")
-@click.option("--token", prompt="Databricks PAT (dapi...)", hide_input=True)
-def databricks_configure(host, token):
-    """Configure Databricks credentials."""
-    api = _get_api()
-    api._save_provider_creds(
-        "databricks",
-        {
-            "databricks_host": host,
-            "databricks_token": token,
-        },
-    )
-    print(f"\u2705 Databricks credentials saved (host: {host})")
-@databricks.command("test")
-def databricks_test():
-    """Test Databricks connectivity."""
-    from terradev_cli.integrations.databricks_integration import test_connection
-
-    api = _get_api()
-    creds = api._provider_creds("databricks")
-    result = asyncio.run(test_connection(creds))
-    if result["status"] == "connected":
-        print(f"\u2705 Connected to Databricks at {result.get('host')}")
-        print(f"\U0001f5a5  Clusters: {result.get('clusters', 0)}")
-    else:
-        print(f"\u274c Connection failed: {result.get('error')}")
-@databricks.command("jobs")
-@click.option("--limit", "-n", default=25, type=int)
-@click.option(
-    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
-)
-def databricks_jobs(limit, fmt):
-    """List Databricks jobs."""
-    from terradev_cli.integrations.databricks_integration import list_jobs
-
-    api = _get_api()
-    creds = api._provider_creds("databricks")
-    result = asyncio.run(list_jobs(creds, limit=limit))
-
-    if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if not result.get("success"):
-            print(f"\u274c {result.get('error')}")
-            return
-        jobs = result.get("data", {}).get("jobs", [])
-        if not jobs:
-            print("  No jobs found.")
-            return
-        print(f"\n  {'Job ID':<12} {'Name':<40} {'Created'}")
-        print(f"  {'─'*10}  {'─'*38}  {'─'*20}")
-        for j in jobs:
-            jid = j.get("job_id", "?")
-            name = j.get("settings", {}).get("name", "?")[:38]
-            created = j.get("created_time", "?")
-            if isinstance(created, int):
-                from datetime import datetime
-
-                created = datetime.fromtimestamp(created / 1000).strftime(
-                    "%Y-%m-%d %H:%M"
-                )
-            print(f"  {jid:<12} {name:<40} {created}")
-        print()
-@databricks.command("run")
-@click.argument("job_id", type=int)
-@click.option(
-    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
-)
-def databricks_run(job_id, fmt):
-    """Trigger a Databricks job run."""
-    from terradev_cli.integrations.databricks_integration import run_job
-
-    api = _get_api()
-    creds = api._provider_creds("databricks")
-    result = asyncio.run(run_job(creds, job_id))
-
-    if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if result.get("success"):
-            run_id = result.get("data", {}).get("run_id", "?")
-            print(f"\U0001f680 Job {job_id} triggered  run_id: {run_id}")
-        else:
-            print(f"\u274c {result.get('error')}")
-@databricks.command("run-status")
-@click.argument("run_id", type=int)
-@click.option(
-    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
-)
-def databricks_run_status(run_id, fmt):
-    """Get status of a Databricks run."""
-    from terradev_cli.integrations.databricks_integration import get_run
-
-    api = _get_api()
-    creds = api._provider_creds("databricks")
-    result = asyncio.run(get_run(creds, run_id))
-
-    if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if not result.get("success"):
-            print(f"\u274c {result.get('error')}")
-            return
-        data = result.get("data", {})
-        state = data.get("state", {})
-        print(f"\n  Run {run_id}:")
-        print(f"  Life Cycle: {state.get('life_cycle_state', '?')}")
-        print(f"  Result:     {state.get('result_state', 'pending')}")
-        print(f"  Message:    {state.get('state_message', '')[:80]}")
-        task_name = data.get("task", {}).get("task_key") or data.get("run_name", "?")
-        print(f"  Task:       {task_name}\n")
-@databricks.command("clusters")
-@click.option(
-    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
-)
-def databricks_clusters(fmt):
-    """List Databricks clusters."""
-    from terradev_cli.integrations.databricks_integration import list_clusters
-
-    api = _get_api()
-    creds = api._provider_creds("databricks")
-    result = asyncio.run(list_clusters(creds))
-
-    if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if not result.get("success"):
-            print(f"\u274c {result.get('error')}")
-            return
-        clusters = result.get("data", {}).get("clusters", [])
-        if not clusters:
-            print("  No clusters found.")
-            return
-        print(f"\n  {'Cluster ID':<24} {'Name':<30} {'State':<14} {'Node Type'}")
-        print(f"  {'─'*22}  {'─'*28}  {'─'*12}  {'─'*20}")
-        for c in clusters:
-            cid = c.get("cluster_id", "?")[:22]
-            name = c.get("cluster_name", "?")[:28]
-            state = c.get("state", "?")[:12]
-            ntype = c.get("node_type_id", "?")[:20]
-            print(f"  {cid:<24} {name:<30} {state:<14} {ntype}")
-        print()
-@databricks.command("serving-endpoints")
-@click.option(
-    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
-)
-def databricks_serving_endpoints(fmt):
-    """List model serving endpoints."""
-    from terradev_cli.integrations.databricks_integration import list_serving_endpoints
-
-    api = _get_api()
-    creds = api._provider_creds("databricks")
-    result = asyncio.run(list_serving_endpoints(creds))
-
-    if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if not result.get("success"):
-            print(f"\u274c {result.get('error')}")
-            return
-        endpoints = result.get("data", {}).get("endpoints", [])
-        if not endpoints:
-            print("  No serving endpoints found.")
-            return
-        print(f"\n  {'Name':<30} {'State':<16} {'Creator'}")
-        print(f"  {'─'*28}  {'─'*14}  {'─'*24}")
-        for ep in endpoints:
-            name = ep.get("name", "?")[:28]
-            state = ep.get("state", {}).get("ready", "?")[:14]
-            creator = ep.get("creator", "?")[:24]
-            print(f"  {name:<30} {state:<16} {creator}")
-        print()
-@databricks.command("deploy-model")
-@click.option("--endpoint-name", required=True, help="Serving endpoint name")
-@click.option("--model-name", required=True, help="Registered model name")
-@click.option("--model-version", default="1", help="Model version")
-@click.option(
-    "--workload-size", default="Small", type=click.Choice(["Small", "Medium", "Large"])
-)
-@click.option("--scale-to-zero/--no-scale-to-zero", default=True)
-@click.option(
-    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
-)
-def databricks_deploy_model(
-    endpoint_name, model_name, model_version, workload_size, scale_to_zero, fmt
-):
-    """Deploy a model to a serving endpoint."""
-    from terradev_cli.integrations.databricks_integration import create_serving_endpoint
-
-    api = _get_api()
-    creds = api._provider_creds("databricks")
-    result = asyncio.run(
-        create_serving_endpoint(
-            creds,
-            endpoint_name,
-            model_name,
-            model_version,
-            workload_size=workload_size,
-            scale_to_zero=scale_to_zero,
-        )
-    )
-
-    if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if result.get("success"):
-            print(f"\U0001f680 Serving endpoint '{endpoint_name}' created")
-            print(f"  Model:    {model_name} v{model_version}")
-            print(f"  Workload: {workload_size}")
-        else:
-            print(f"\u274c {result.get('error')}")
-@databricks.command("query")
-@click.option("--endpoint", required=True, help="Serving endpoint name")
-@click.option("--prompt", required=True, help="Prompt text")
-@click.option(
-    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
-)
-def databricks_query(endpoint, prompt, fmt):
-    """Query a model serving endpoint."""
-    from terradev_cli.integrations.databricks_integration import query_serving_endpoint
-
-    api = _get_api()
-    creds = api._provider_creds("databricks")
-    inputs = [{"role": "user", "content": prompt}]
-    result = asyncio.run(query_serving_endpoint(creds, endpoint, inputs))
-
-    if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if result.get("success"):
-            data = result.get("data", {})
-            choices = data.get("choices", [])
-            if choices:
-                content = choices[0].get("message", {}).get("content", "")
-                print(f"\n{content}\n")
-            else:
-                print(json.dumps(data, indent=2, default=str))
-        else:
-            print(f"\u274c {result.get('error')}")
-@databricks.group()
-def mlflow():
-    """Databricks-hosted MLflow operations."""
-    pass
-@mlflow.command("experiments")
-@click.option("--limit", "-n", default=50, type=int)
-@click.option(
-    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
-)
-def databricks_mlflow_experiments(limit, fmt):
-    """List MLflow experiments."""
-    from terradev_cli.integrations.databricks_integration import mlflow_list_experiments
-
-    api = _get_api()
-    creds = api._provider_creds("databricks")
-    result = asyncio.run(mlflow_list_experiments(creds, max_results=limit))
-
-    if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if not result.get("success"):
-            print(f"\u274c {result.get('error')}")
-            return
-        exps = result.get("data", {}).get("experiments", [])
-        if not exps:
-            print("  No experiments found.")
-            return
-        print(f"\n  {'ID':<12} {'Name':<44} {'Lifecycle'}")
-        print(f"  {'─'*10}  {'─'*42}  {'─'*12}")
-        for e in exps:
-            eid = e.get("experiment_id", "?")
-            name = e.get("name", "?")[:42]
-            lifecycle = e.get("lifecycle_stage", "?")
-            print(f"  {eid:<12} {name:<44} {lifecycle}")
-        print()
-@mlflow.command("models")
-@click.option("--limit", "-n", default=50, type=int)
-@click.option(
-    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
-)
-def databricks_mlflow_models(limit, fmt):
-    """List registered models in Databricks Model Registry."""
-    from terradev_cli.integrations.databricks_integration import mlflow_list_registered_models
-
-    api = _get_api()
-    creds = api._provider_creds("databricks")
-    result = asyncio.run(mlflow_list_registered_models(creds, max_results=limit))
-
-    if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
-    else:
-        if not result.get("success"):
-            print(f"\u274c {result.get('error')}")
-            return
-        models = result.get("data", {}).get("registered_models", [])
-        if not models:
-            print("  No registered models found.")
-            return
-        print(f"\n  {'Name':<40} {'Latest Version':<16} {'Description'}")
-        print(f"  {'─'*38}  {'─'*14}  {'─'*30}")
-        for m in models:
-            name = m.get("name", "?")[:38]
-            versions = m.get("latest_versions", [])
-            latest = versions[0].get("version", "?") if versions else "?"
-            desc = (m.get("description") or "")[:30]
-            print(f"  {name:<40} {latest:<16} {desc}")
-        print()
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Ollama Local Model Commands
 # ═══════════════════════════════════════════════════════════════════════
-
 
 def _ollama_request(endpoint: str, method: str, path: str, data: Optional[Dict] = None, timeout: int = 30):
     """Make a synchronous JSON request to the Ollama HTTP API."""
@@ -2825,7 +2330,6 @@ def _ollama_request(endpoint: str, method: str, path: str, data: Optional[Dict] 
         raise RuntimeError(f"Ollama returned {e.code}: {body}")
     except urllib.error.URLError as e:
         raise RuntimeError(f"Cannot connect to Ollama at {endpoint}: {e.reason}")
-
 
 def _ollama_stream(endpoint: str, path: str, data: Dict, timeout: int = 600):
     """Stream an NDJSON response from the Ollama HTTP API and print progress."""
@@ -2855,12 +2359,10 @@ def _ollama_stream(endpoint: str, path: str, data: Dict, timeout: int = 600):
         body = e.read().decode("utf-8")
         raise RuntimeError(f"Ollama returned {e.code}: {body}")
 
-
 @ml.group()
 def ollama():
     """Local Ollama model management and inference."""
     pass
-
 
 @ollama.command("list")
 @click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
@@ -2879,7 +2381,6 @@ def ollama_list(endpoint):
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: {e}")
 
-
 @ollama.command("pull")
 @click.argument("model")
 @click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
@@ -2891,7 +2392,6 @@ def ollama_pull(model, endpoint):
         print(f"OK: {model} pulled successfully")
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: {e}")
-
 
 @ollama.command("generate")
 @click.argument("model")
@@ -2908,7 +2408,6 @@ def ollama_generate(model, prompt, endpoint, options):
         print(data.get("response", ""))
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: {e}")
-
 
 @ollama.command("chat")
 @click.argument("model")
@@ -2932,7 +2431,6 @@ def ollama_chat(model, message, system, endpoint, options):
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: {e}")
 
-
 @ollama.command("info")
 @click.argument("model")
 @click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
@@ -2943,7 +2441,6 @@ def ollama_info(model, endpoint):
         print(json.dumps(data, indent=2, default=str))
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: {e}")
-
 
 @ollama.command("ps")
 @click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
@@ -2963,11 +2460,9 @@ def ollama_ps(endpoint):
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: {e}")
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # DeepEval LLM Evaluation Commands
 # ═══════════════════════════════════════════════════════════════════════
-
 
 DEEPEVAL_METRICS = [
     "AnswerRelevancyMetric",
@@ -2984,12 +2479,10 @@ DEEPEVAL_METRICS = [
     "DAGMetric",
 ]
 
-
 @ml.group()
 def deepeval():
     """LLM evaluation with DeepEval."""
     pass
-
 
 @deepeval.command("install")
 @click.option("--upgrade", is_flag=True, help="Upgrade DeepEval")
@@ -3008,7 +2501,6 @@ def deepeval_install(upgrade):
             print(f"ERROR: {result.stderr}")
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: {e}")
-
 
 @deepeval.command("init")
 @click.option("--output", "-o", default="test_deepeval.py", help="Output test file path")
@@ -3034,7 +2526,6 @@ def test_llm():
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: {e}")
 
-
 @deepeval.command("run")
 @click.option("--file", "-f", default="test_deepeval.py", help="DeepEval test file")
 def deepeval_run(file):
@@ -3054,14 +2545,12 @@ def deepeval_run(file):
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: {e}")
 
-
 @deepeval.command("metrics")
 def deepeval_metrics():
     """List available DeepEval metrics."""
     print("Available DeepEval metrics:")
     for m in DEEPEVAL_METRICS:
         print(f"  {m}")
-
 
 @deepeval.command("evaluate")
 @click.option("--input", "-i", required=True, help="Test input/prompt")

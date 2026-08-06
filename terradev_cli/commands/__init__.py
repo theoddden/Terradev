@@ -74,12 +74,20 @@ from . import infrastructure  # noqa: F401,E402
 from . import inference       # noqa: F401,E402
 from . import ml         # noqa: F401,E402
 from . import training   # noqa: F401,E402
+from . import unsloth   # noqa: F401,E402
 from . import mlops      # noqa: F401,E402
 from . import platform   # noqa: F401,E402
 from . import gateway    # noqa: F401,E402
 from . import canary     # noqa: F401,E402
 from . import database   # noqa: F401,E402
+from . import weaviate   # noqa: F401,E402
 from . import vault      # noqa: F401,E402
+from . import letta   # noqa: F401,E402
 
 # Fold agentic-serving under the agent group
 platform.agent.add_command(mlops.agentic_serving)
+
+# Attach optional tool integrations
+training.train.add_command(unsloth.unsloth)
+database.database.add_command(weaviate.weaviate)
+platform.agent.add_command(letta.letta)

@@ -6,16 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from terradev_cli.commands import cli
 
-
 def _help_test(runner, mock_api, path):
     result = runner.invoke(cli, path.split() + ["--help"], obj={"api": mock_api})
     assert result.exit_code == 0
 
-
 def _missing_arg_test(runner, mock_api, path):
     result = runner.invoke(cli, path.split(), obj={"api": mock_api})
     assert result.exit_code != 0
-
 
 def test_ml_wandb_test_help(runner, mock_api):
     _help_test(runner, mock_api, "ml wandb test")
@@ -53,15 +50,6 @@ def test_ml_langchain_create_langgraph_help(runner, mock_api):
 def test_ml_langchain_create_pipeline_help(runner, mock_api):
     _help_test(runner, mock_api, "ml langchain create-pipeline")
 
-def test_ml_langchain_list_projects_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langchain list-projects")
-
-def test_ml_langchain_list_runs_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langchain list-runs")
-
-def test_ml_langchain_create_trace_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langchain create-trace")
-
 def test_ml_langgraph_test_help(runner, mock_api):
     _help_test(runner, mock_api, "ml langgraph test")
 
@@ -76,18 +64,6 @@ def test_ml_langgraph_deploy_help(runner, mock_api):
 
 def test_ml_kserve_test_help(runner, mock_api):
     _help_test(runner, mock_api, "ml kserve test")
-
-def test_ml_langsmith_test_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langsmith test")
-
-def test_ml_langsmith_list_projects_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langsmith list-projects")
-
-def test_ml_langsmith_create_project_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langsmith create-project")
-
-def test_ml_langsmith_export_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langsmith export")
 
 def test_ml_dvc_test_help(runner, mock_api):
     _help_test(runner, mock_api, "ml dvc test")
@@ -272,40 +248,6 @@ def test_ml_langfuse_otel_env_help(runner, mock_api):
 def test_ml_langfuse_k8s_help(runner, mock_api):
     _help_test(runner, mock_api, "ml langfuse k8s")
 
-def test_ml_databricks_configure_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks configure")
-
-def test_ml_databricks_test_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks test")
-
-def test_ml_databricks_jobs_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks jobs")
-
-def test_ml_databricks_run_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks run")
-
-def test_ml_databricks_run_status_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks run-status")
-
-def test_ml_databricks_clusters_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks clusters")
-
-def test_ml_databricks_serving_endpoints_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks serving-endpoints")
-
-def test_ml_databricks_deploy_model_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks deploy-model")
-
-def test_ml_databricks_query_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks query")
-
-def test_ml_databricks_mlflow_experiments_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks mlflow experiments")
-
-def test_ml_databricks_mlflow_models_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml databricks mlflow models")
-
-
 class TestFunctionalMl:
     """Functional tests for the heavy ML service test commands."""
 
@@ -342,14 +284,6 @@ class TestFunctionalMl:
                 "terradev_cli.ml_services.kserve_service",
                 "create_kserve_service_from_credentials",
                 "get_kserve_setup_instructions",
-                {"api_key": "test-key"},
-            ),
-            (
-                ["ml", "langsmith", "test"],
-                "langsmith",
-                "terradev_cli.ml_services.langsmith_service",
-                "create_langsmith_service_from_credentials",
-                "get_langsmith_setup_instructions",
                 {"api_key": "test-key"},
             ),
             (
@@ -405,14 +339,6 @@ class TestFunctionalMl:
                 "langfuse",
                 "terradev_cli.ml_services.langfuse_service",
                 "create_langfuse_service_from_credentials",
-                None,
-                {"api_key": "test-key"},
-            ),
-            (
-                ["ml", "databricks", "test"],
-                "databricks",
-                "terradev_cli.integrations.databricks_integration",
-                None,
                 None,
                 {"api_key": "test-key"},
             ),

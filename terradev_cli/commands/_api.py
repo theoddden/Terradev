@@ -461,13 +461,6 @@ class TerradevAPI:
             creds["cluster_endpoint"] = self.credentials.get(
                 "kserve_cluster_endpoint", ""
             )
-        elif provider_name == "langsmith":
-            creds["api_key"] = self.credentials.get("langsmith_api_key", "")
-            creds["endpoint"] = self.credentials.get(
-                "langsmith_endpoint", "https://api.smith.langchain.com"
-            )
-            creds["workspace_id"] = self.credentials.get("langsmith_workspace_id", "")
-            creds["project_name"] = self.credentials.get("langsmith_project_name", "")
         elif provider_name == "dvc":
             creds["repo_path"] = self.credentials.get("dvc_repo_path", ".")
             creds["remote_storage"] = self.credentials.get("dvc_remote_storage", "")

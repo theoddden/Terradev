@@ -5,9 +5,9 @@ Terradev MCP Server v5.7.12 - Complete Agentic GPU Infrastructure for Claude Cod
 237 MCP tools: GPU provisioning, Kubernetes clusters, Karpenter auto-provisioning,
 GitOps/ArgoCD automation, event-driven triggers, environment promotion, lineage tracking,
 cross-provider migration, vLLM/SGLang/Ollama inference, DeepEval LLM evaluation, Arize Phoenix trace observability,
-NeMo Guardrails output safety, Qdrant vector DB, Ray cluster management, W&B/LangSmith/MLflow/DVC,
+NeMo Guardrails output safety, Qdrant vector DB, Ray cluster management, W&B/MLflow/DVC,
 HuggingFace Hub, Datadog monitoring, data governance, cost optimization, FlashOptim training,
-Langfuse LLM observability, Databricks MLOps, vLLM auto-optimization/analysis/benchmarking,
+Langfuse LLM observability, vLLM auto-optimization/analysis/benchmarking,
 Enterprise SSO, Latitude.sh provider, and Terraform-powered parallel provisioning across 21+ cloud providers.
 """
 

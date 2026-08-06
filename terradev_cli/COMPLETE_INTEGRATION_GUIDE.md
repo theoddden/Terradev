@@ -220,7 +220,6 @@ terradev integrations --logs --provider elasticsearch --cluster production
 terradev integrations --logs --provider loki --cluster production
 
 # Distributed tracing
-terradev integrations --tracing --provider jaeger --cluster production
 terradev integrations --tracing --provider tempo --cluster production
 ```
 

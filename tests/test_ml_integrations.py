@@ -2,62 +2,9 @@
 
 import pytest
 
-
-# ══════════════════════════════════════════════════════════════════════════
-# Databricks Integration
-# ══════════════════════════════════════════════════════════════════════════
-
-class TestDatabricksIntegration:
-    @pytest.fixture
-    def mod(self):
-        from terradev_cli.integrations import databricks_integration
-        return databricks_integration
-
-    @pytest.fixture
-    def full_creds(self):
-        return {
-            "databricks_host": "https://dbc-abc123.cloud.databricks.com",
-            "databricks_token": "dapi-test-token",
-        }
-
-    def test_get_credential_prompts_returns_list(self, mod):
-        prompts = mod.get_credential_prompts()
-        assert isinstance(prompts, list)
-        assert len(prompts) >= 2
-
-    def test_credential_prompts_have_required_keys(self, mod):
-        for p in mod.get_credential_prompts():
-            assert "key" in p
-            assert "prompt" in p
-            assert "required" in p
-
-    def test_base_url_uses_host(self, mod, full_creds):
-        url = mod._base_url(full_creds)
-        assert "dbc-abc123" in url
-
-    def test_base_url_adds_https_if_missing(self, mod):
-        creds = {"databricks_host": "dbc-abc123.cloud.databricks.com"}
-        url = mod._base_url(creds)
-        assert url.startswith("https://")
-
-    def test_base_url_strips_trailing_slash(self, mod):
-        creds = {"databricks_host": "https://dbc-abc123.cloud.databricks.com/"}
-        url = mod._base_url(creds)
-        assert not url.endswith("/")
-
-    def test_auth_headers_contains_bearer(self, mod, full_creds):
-        headers = mod._auth_headers(full_creds)
-        assert "Authorization" in headers
-        assert "dapi-test-token" in headers["Authorization"]
-
-    def test_required_credentials_defined(self, mod):
-        assert "host" in mod.REQUIRED_CREDENTIALS
-        assert "token" in mod.REQUIRED_CREDENTIALS
-
-
-# ══════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════
 # Datadog Integration
-# ══════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════
 
 class TestDatadogIntegration:
     @pytest.fixture
@@ -149,7 +96,6 @@ class TestDatadogIntegration:
     def test_optional_credentials_defined(self, mod):
         assert "site" in mod.OPTIONAL_CREDENTIALS
 
-
 # ══════════════════════════════════════════════════════════════════════════
 # Helicone Integration
 # ══════════════════════════════════════════════════════════════════════════
@@ -212,7 +158,6 @@ class TestHeliconeIntegration:
 
     def test_optional_credentials_defined(self, mod):
         assert "eu" in mod.OPTIONAL_CREDENTIALS
-
 
 # ══════════════════════════════════════════════════════════════════════════
 # WandB Integration
@@ -329,7 +274,6 @@ class TestWandbIntegration:
 
     def test_required_credentials_defined(self, mod):
         assert "api_key" in mod.REQUIRED_CREDENTIALS
-
 
 # ══════════════════════════════════════════════════════════════════════════
 # Prometheus Integration

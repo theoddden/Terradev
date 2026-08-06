@@ -60,7 +60,3 @@ metrics:
   port: 8080
   path: /metrics
 
-# OpenTelemetry tracing
-tracing:
-  enabled: false
-  endpoint: http://jaeger:4318

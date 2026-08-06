@@ -331,9 +331,6 @@ configMaps:
           prometheus:
             enabled: true
             port: 8081
-          tracing:
-            enabled: true
-            endpoint: "http://jaeger:14268/api/traces"
         security:
           jwt:
             expiration: 3600

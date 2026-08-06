@@ -26,7 +26,6 @@ execute_terraform_command = executor.execute_terraform_command
 
 HANDLERS = {}
 
-
 async def _handle_hf_space_deploy(arguments, cmd_args, tool_name, execute_terradev_command):
     cmd_args.append(arguments["space_name"])
     cmd_args.extend(["--model-id", arguments["model_id"]])
@@ -38,7 +37,6 @@ async def _handle_hf_space_deploy(arguments, cmd_args, tool_name, execute_terrad
     return cmd_args
 
 HANDLERS['hf_space_deploy'] = _handle_hf_space_deploy
-
 
 async def _handle_hf_space_status(arguments, cmd_args, tool_name, execute_terradev_command):
     cmd_args = ["hf-spaces", "info", arguments["space_name"]]
@@ -53,7 +51,6 @@ async def _handle_hf_space_status(arguments, cmd_args, tool_name, execute_terrad
     )
 
 HANDLERS['hf_space_status'] = _handle_hf_space_status
-
 
 async def _handle_ray_status(arguments, cmd_args, tool_name, execute_terradev_command):
     cmd = ["ray", "status"]
@@ -102,7 +99,6 @@ async def _handle_ray_status(arguments, cmd_args, tool_name, execute_terradev_co
     return cmd_args
 
 HANDLERS['ray_status'] = _handle_ray_status
-
 
 async def _handle_ray_start(arguments, cmd_args, tool_name, execute_terradev_command):
     head = arguments.get("head", True)
@@ -160,7 +156,6 @@ async def _handle_ray_start(arguments, cmd_args, tool_name, execute_terradev_com
 
 HANDLERS['ray_start'] = _handle_ray_start
 
-
 async def _handle_ray_stop(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         result = await asyncio.create_subprocess_exec(
@@ -191,7 +186,6 @@ async def _handle_ray_stop(arguments, cmd_args, tool_name, execute_terradev_comm
     return cmd_args
 
 HANDLERS['ray_stop'] = _handle_ray_stop
-
 
 async def _handle_ray_submit_job(arguments, cmd_args, tool_name, execute_terradev_command):
     script = arguments["script"]
@@ -259,7 +253,6 @@ async def _handle_ray_submit_job(arguments, cmd_args, tool_name, execute_terrade
 
 HANDLERS['ray_submit_job'] = _handle_ray_submit_job
 
-
 async def _handle_ray_list_jobs(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         result = await asyncio.create_subprocess_exec(
@@ -290,7 +283,6 @@ async def _handle_ray_list_jobs(arguments, cmd_args, tool_name, execute_terradev
     return cmd_args
 
 HANDLERS['ray_list_jobs'] = _handle_ray_list_jobs
-
 
 async def _handle_ray_wide_ep_deploy(arguments, cmd_args, tool_name, execute_terradev_command):
     model_id = arguments["model_id"]
@@ -355,7 +347,6 @@ async def _handle_ray_wide_ep_deploy(arguments, cmd_args, tool_name, execute_ter
 
 HANDLERS['ray_wide_ep_deploy'] = _handle_ray_wide_ep_deploy
 
-
 async def _handle_ray_disagg_pd_deploy(arguments, cmd_args, tool_name, execute_terradev_command):
     model_id = arguments["model_id"]
     try:
@@ -416,7 +407,6 @@ async def _handle_ray_disagg_pd_deploy(arguments, cmd_args, tool_name, execute_t
 
 HANDLERS['ray_disagg_pd_deploy'] = _handle_ray_disagg_pd_deploy
 
-
 async def _handle_ray_parallelism_strategy(arguments, cmd_args, tool_name, execute_terradev_command):
     model_id = arguments["model_id"]
     gpu_count = arguments.get("gpu_count", 8)
@@ -462,7 +452,6 @@ async def _handle_ray_parallelism_strategy(arguments, cmd_args, tool_name, execu
     return cmd_args
 
 HANDLERS['ray_parallelism_strategy'] = _handle_ray_parallelism_strategy
-
 
 async def _handle_wandb_list_projects(arguments, cmd_args, tool_name, execute_terradev_command):
     api_key = arguments["api_key"]
@@ -514,7 +503,6 @@ async def _handle_wandb_list_projects(arguments, cmd_args, tool_name, execute_te
     return cmd_args
 
 HANDLERS['wandb_list_projects'] = _handle_wandb_list_projects
-
 
 async def _handle_wandb_list_runs(arguments, cmd_args, tool_name, execute_terradev_command):
     api_key = arguments["api_key"]
@@ -575,7 +563,6 @@ async def _handle_wandb_list_runs(arguments, cmd_args, tool_name, execute_terrad
 
 HANDLERS['wandb_list_runs'] = _handle_wandb_list_runs
 
-
 async def _handle_wandb_run_details(arguments, cmd_args, tool_name, execute_terradev_command):
     api_key = arguments["api_key"]
     run_id = arguments["run_id"]
@@ -611,146 +598,6 @@ async def _handle_wandb_run_details(arguments, cmd_args, tool_name, execute_terr
     return cmd_args
 
 HANDLERS['wandb_run_details'] = _handle_wandb_run_details
-
-
-async def _handle_langsmith_list_projects(arguments, cmd_args, tool_name, execute_terradev_command):
-    api_key = arguments["api_key"]
-    try:
-        async with aiohttp.ClientSession(
-            headers={"x-api-key": api_key}
-        ) as session:
-            async with session.get(
-                "https://api.smith.langchain.com/api/v1/projects",
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    output_text = "🔗 **LangSmith Projects**\n\n"
-                    for p in (
-                        data
-                        if isinstance(data, list)
-                        else data.get("projects", [])
-                    )[:50]:
-                        name = (
-                            p.get("name", "?")
-                            if isinstance(p, dict)
-                            else str(p)
-                        )
-                        output_text += f"  - **{name}**\n"
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=output_text)]
-                    )
-                else:
-                    body = await resp.text()
-                    return CallToolResult(
-                        content=[
-                            TextContent(
-                                type="text",
-                                text=f"❌ LangSmith {resp.status}: {body[:500]}",
-                            )
-                        ],
-                        isError=True,
-                    )
-    except Exception as e:  # noqa: BLE001
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"❌ {e}")], isError=True
-        )
-    return cmd_args
-
-HANDLERS['langsmith_list_projects'] = _handle_langsmith_list_projects
-
-
-async def _handle_langsmith_list_runs(arguments, cmd_args, tool_name, execute_terradev_command):
-    api_key = arguments["api_key"]
-    project = arguments.get("project", "default")
-    limit = arguments.get("limit", 50)
-    try:
-        async with aiohttp.ClientSession(
-            headers={"x-api-key": api_key}
-        ) as session:
-            async with session.get(
-                "https://api.smith.langchain.com/api/v1/runs",
-                params={"project_name": project, "limit": limit},
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    runs = (
-                        data
-                        if isinstance(data, list)
-                        else data.get("runs", [])
-                    )
-                    output_text = f"📋 **LangSmith Runs — {project}**\n\n"
-                    for r in runs[:limit]:
-                        name = (
-                            r.get("name", r.get("id", "?"))
-                            if isinstance(r, dict)
-                            else str(r)
-                        )
-                        output_text += f"  - **{name}**\n"
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=output_text)]
-                    )
-                else:
-                    body = await resp.text()
-                    return CallToolResult(
-                        content=[
-                            TextContent(
-                                type="text",
-                                text=f"❌ {resp.status}: {body[:500]}",
-                            )
-                        ],
-                        isError=True,
-                    )
-    except Exception as e:  # noqa: BLE001
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"❌ {e}")], isError=True
-        )
-    return cmd_args
-
-HANDLERS['langsmith_list_runs'] = _handle_langsmith_list_runs
-
-
-async def _handle_langsmith_gpu_correlate(arguments, cmd_args, tool_name, execute_terradev_command):
-    api_key = arguments["api_key"]
-    project = arguments.get("project", "default")
-    days = arguments.get("days", 7)
-    try:
-        from terradev_cli.ml_services.langsmith_service import (
-            LangSmithService,
-            LangSmithConfig,
-        )
-
-        svc = LangSmithService(LangSmithConfig(api_key=api_key))
-        correlation = await svc.correlate_runs_with_gpu_metrics(
-            project_name=project, days=days
-        )
-        output_text = (
-            f"🔗💰 **GPU-Correlated LangSmith Runs — {project}**\n\n"
-        )
-        output_text += f"```json\n{json.dumps(correlation, indent=2, default=str)[:3000]}\n```\n\n"
-        output_text += "**suggest_action:** Use this data to identify cost-efficient GPU/provider combos for your LLM workloads."
-        return CallToolResult(
-            content=[TextContent(type="text", text=output_text)]
-        )
-    except ImportError:
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text="❌ Terradev CLI not found.")
-            ],
-            isError=True,
-        )
-    except Exception as e:  # noqa: BLE001
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text=f"❌ Correlation failed: {e}")
-            ],
-            isError=True,
-        )
-    return cmd_args
-
-HANDLERS['langsmith_gpu_correlate'] = _handle_langsmith_gpu_correlate
-
 
 async def _handle_mlflow_list_experiments(arguments, cmd_args, tool_name, execute_terradev_command):
     uri = arguments["tracking_uri"]
@@ -798,7 +645,6 @@ async def _handle_mlflow_list_experiments(arguments, cmd_args, tool_name, execut
 
 HANDLERS['mlflow_list_experiments'] = _handle_mlflow_list_experiments
 
-
 async def _handle_mlflow_log_run(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.ml_services.mlflow_service import (
@@ -845,7 +691,6 @@ async def _handle_mlflow_log_run(arguments, cmd_args, tool_name, execute_terrade
 
 HANDLERS['mlflow_log_run'] = _handle_mlflow_log_run
 
-
 async def _handle_mlflow_register_model(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.ml_services.mlflow_service import (
@@ -890,7 +735,6 @@ async def _handle_mlflow_register_model(arguments, cmd_args, tool_name, execute_
 
 HANDLERS['mlflow_register_model'] = _handle_mlflow_register_model
 
-
 async def _handle_dvc_status(arguments, cmd_args, tool_name, execute_terradev_command):
     repo = arguments["repo_path"]
     try:
@@ -932,7 +776,6 @@ async def _handle_dvc_status(arguments, cmd_args, tool_name, execute_terradev_co
 
 HANDLERS['dvc_status'] = _handle_dvc_status
 
-
 async def _handle_dvc_diff(arguments, cmd_args, tool_name, execute_terradev_command):
     repo = arguments["repo_path"]
     cmd = ["dvc", "diff"]
@@ -965,7 +808,6 @@ async def _handle_dvc_diff(arguments, cmd_args, tool_name, execute_terradev_comm
     return cmd_args
 
 HANDLERS['dvc_diff'] = _handle_dvc_diff
-
 
 async def _handle_dvc_stage_checkpoint(arguments, cmd_args, tool_name, execute_terradev_command):
     repo = arguments["repo_path"]
@@ -1003,7 +845,6 @@ async def _handle_dvc_stage_checkpoint(arguments, cmd_args, tool_name, execute_t
 
 HANDLERS['dvc_stage_checkpoint'] = _handle_dvc_stage_checkpoint
 
-
 async def _handle_dvc_push(arguments, cmd_args, tool_name, execute_terradev_command):
     repo = arguments["repo_path"]
     cmd = ["dvc", "push"]
@@ -1034,7 +875,6 @@ async def _handle_dvc_push(arguments, cmd_args, tool_name, execute_terradev_comm
     return cmd_args
 
 HANDLERS['dvc_push'] = _handle_dvc_push
-
 
 async def _handle_hf_list_models(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
@@ -1080,7 +920,6 @@ async def _handle_hf_list_models(arguments, cmd_args, tool_name, execute_terrade
 
 HANDLERS['hf_list_models'] = _handle_hf_list_models
 
-
 async def _handle_hf_list_datasets(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         api_key = arguments["api_key"]
@@ -1124,7 +963,6 @@ async def _handle_hf_list_datasets(arguments, cmd_args, tool_name, execute_terra
     return cmd_args
 
 HANDLERS['hf_list_datasets'] = _handle_hf_list_datasets
-
 
 async def _handle_hf_model_info(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
@@ -1200,7 +1038,6 @@ async def _handle_hf_model_info(arguments, cmd_args, tool_name, execute_terradev
 
 HANDLERS['hf_model_info'] = _handle_hf_model_info
 
-
 async def _handle_hf_create_endpoint(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         api_key = arguments["api_key"]
@@ -1259,7 +1096,6 @@ async def _handle_hf_create_endpoint(arguments, cmd_args, tool_name, execute_ter
     return cmd_args
 
 HANDLERS['hf_create_endpoint'] = _handle_hf_create_endpoint
-
 
 async def _handle_hf_list_endpoints(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
@@ -1320,7 +1156,6 @@ async def _handle_hf_list_endpoints(arguments, cmd_args, tool_name, execute_terr
 
 HANDLERS['hf_list_endpoints'] = _handle_hf_list_endpoints
 
-
 async def _handle_hf_endpoint_info(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         api_key = arguments["api_key"]
@@ -1364,7 +1199,6 @@ async def _handle_hf_endpoint_info(arguments, cmd_args, tool_name, execute_terra
 
 HANDLERS['hf_endpoint_info'] = _handle_hf_endpoint_info
 
-
 async def _handle_hf_delete_endpoint(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         api_key = arguments["api_key"]
@@ -1402,7 +1236,6 @@ async def _handle_hf_delete_endpoint(arguments, cmd_args, tool_name, execute_ter
     return cmd_args
 
 HANDLERS['hf_delete_endpoint'] = _handle_hf_delete_endpoint
-
 
 async def _handle_hf_endpoint_infer(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
@@ -1446,7 +1279,6 @@ async def _handle_hf_endpoint_infer(arguments, cmd_args, tool_name, execute_terr
 
 HANDLERS['hf_endpoint_infer'] = _handle_hf_endpoint_infer
 
-
 async def _handle_hf_smart_template(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.core.hf_smart_templates import HFSmartTemplates
@@ -1480,7 +1312,6 @@ async def _handle_hf_smart_template(arguments, cmd_args, tool_name, execute_terr
 
 HANDLERS['hf_smart_template'] = _handle_hf_smart_template
 
-
 async def _handle_hf_hardware_recommend(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.core.hf_smart_templates import HFSmartTemplates
@@ -1511,7 +1342,6 @@ async def _handle_hf_hardware_recommend(arguments, cmd_args, tool_name, execute_
 
 HANDLERS['hf_hardware_recommend'] = _handle_hf_hardware_recommend
 
-
 async def _handle_hf_hardware_compare(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.core.hf_smart_templates import HFSmartTemplates
@@ -1538,7 +1368,6 @@ async def _handle_hf_hardware_compare(arguments, cmd_args, tool_name, execute_te
     return cmd_args
 
 HANDLERS['hf_hardware_compare'] = _handle_hf_hardware_compare
-
 
 async def _handle_langchain_create_workflow(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
@@ -1572,7 +1401,6 @@ async def _handle_langchain_create_workflow(arguments, cmd_args, tool_name, exec
 
 HANDLERS['langchain_create_workflow'] = _handle_langchain_create_workflow
 
-
 async def _handle_langchain_create_sglang_pipeline(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.ml_services.langchain_service import (
@@ -1601,139 +1429,6 @@ async def _handle_langchain_create_sglang_pipeline(arguments, cmd_args, tool_nam
     return cmd_args
 
 HANDLERS['langchain_create_sglang_pipeline'] = _handle_langchain_create_sglang_pipeline
-
-
-async def _handle_langsmith_create_project(arguments, cmd_args, tool_name, execute_terradev_command):
-    try:
-        api_key = arguments["api_key"]
-        payload = {"name": arguments["name"]}
-        if arguments.get("description"):
-            payload["description"] = arguments["description"]
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                "https://api.smith.langchain.com/api/v1/sessions",
-                headers={
-                    "x-api-key": api_key,
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                body = await resp.json(content_type=None)
-                if resp.status in (200, 201):
-                    output_text = f"✅ **LangSmith Project Created: {arguments['name']}**\n\n"
-                    output_text += f"**ID:** {body.get('id', 'N/A')}\n"
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=output_text)]
-                    )
-                else:
-                    return CallToolResult(
-                        content=[
-                            TextContent(
-                                type="text",
-                                text=f"❌ LangSmith {resp.status}: {json.dumps(body, default=str)[:500]}",
-                            )
-                        ],
-                        isError=True,
-                    )
-    except Exception as e:  # noqa: BLE001
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"❌ {e}")], isError=True
-        )
-    return cmd_args
-
-HANDLERS['langsmith_create_project'] = _handle_langsmith_create_project
-
-
-async def _handle_langsmith_get_workspaces(arguments, cmd_args, tool_name, execute_terradev_command):
-    try:
-        api_key = arguments["api_key"]
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "https://api.smith.langchain.com/api/v1/workspaces",
-                headers={"x-api-key": api_key},
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                if resp.status == 200:
-                    workspaces = await resp.json(content_type=None)
-                    items = (
-                        workspaces
-                        if isinstance(workspaces, list)
-                        else workspaces.get("workspaces", [workspaces])
-                    )
-                    output_text = (
-                        f"🔗 **LangSmith Workspaces** ({len(items)})\n\n"
-                    )
-                    for w in items:
-                        name = w.get(
-                            "display_name", w.get("name", w.get("id", "?"))
-                        )
-                        output_text += (
-                            f"- **{name}** (ID: {w.get('id', '?')})\n"
-                        )
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=output_text)]
-                    )
-                else:
-                    body = await resp.text()
-                    return CallToolResult(
-                        content=[
-                            TextContent(
-                                type="text",
-                                text=f"❌ LangSmith {resp.status}: {body[:500]}",
-                            )
-                        ],
-                        isError=True,
-                    )
-    except Exception as e:  # noqa: BLE001
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"❌ {e}")], isError=True
-        )
-    return cmd_args
-
-HANDLERS['langsmith_get_workspaces'] = _handle_langsmith_get_workspaces
-
-
-async def _handle_langsmith_create_trace(arguments, cmd_args, tool_name, execute_terradev_command):
-    try:
-        api_key = arguments["api_key"]
-        run_id = arguments["run_id"]
-        trace_data = arguments["trace_data"]
-        trace_data["id"] = run_id
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                "https://api.smith.langchain.com/api/v1/runs",
-                headers={
-                    "x-api-key": api_key,
-                    "Content-Type": "application/json",
-                },
-                json=trace_data,
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                if resp.status in (200, 201, 202):
-                    output_text = f"✅ **Trace Created: {run_id}**\n"
-                    return CallToolResult(
-                        content=[TextContent(type="text", text=output_text)]
-                    )
-                else:
-                    body = await resp.text()
-                    return CallToolResult(
-                        content=[
-                            TextContent(
-                                type="text",
-                                text=f"❌ LangSmith {resp.status}: {body[:500]}",
-                            )
-                        ],
-                        isError=True,
-                    )
-    except Exception as e:  # noqa: BLE001
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"❌ {e}")], isError=True
-        )
-    return cmd_args
-
-HANDLERS['langsmith_create_trace'] = _handle_langsmith_create_trace
-
 
 async def _handle_langgraph_create_workflow(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
@@ -1767,7 +1462,6 @@ async def _handle_langgraph_create_workflow(arguments, cmd_args, tool_name, exec
 
 HANDLERS['langgraph_create_workflow'] = _handle_langgraph_create_workflow
 
-
 async def _handle_langgraph_orchestrator_worker(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.ml_services.langgraph_service import (
@@ -1796,7 +1490,6 @@ async def _handle_langgraph_orchestrator_worker(arguments, cmd_args, tool_name, 
     return cmd_args
 
 HANDLERS['langgraph_orchestrator_worker'] = _handle_langgraph_orchestrator_worker
-
 
 async def _handle_langgraph_evaluation_workflow(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
@@ -1827,7 +1520,6 @@ async def _handle_langgraph_evaluation_workflow(arguments, cmd_args, tool_name, 
 
 HANDLERS['langgraph_evaluation_workflow'] = _handle_langgraph_evaluation_workflow
 
-
 async def _handle_langgraph_workflow_status(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.ml_services.langgraph_service import (
@@ -1857,7 +1549,6 @@ async def _handle_langgraph_workflow_status(arguments, cmd_args, tool_name, exec
 
 HANDLERS['langgraph_workflow_status'] = _handle_langgraph_workflow_status
 
-
 async def _handle_wandb_create_dashboard(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
@@ -1886,7 +1577,6 @@ async def _handle_wandb_create_dashboard(arguments, cmd_args, tool_name, execute
     return cmd_args
 
 HANDLERS['wandb_create_dashboard'] = _handle_wandb_create_dashboard
-
 
 async def _handle_wandb_create_terradev_dashboard(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
@@ -1929,7 +1619,6 @@ async def _handle_wandb_create_terradev_dashboard(arguments, cmd_args, tool_name
 
 HANDLERS['wandb_create_terradev_dashboard'] = _handle_wandb_create_terradev_dashboard
 
-
 async def _handle_wandb_create_report(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
@@ -1958,7 +1647,6 @@ async def _handle_wandb_create_report(arguments, cmd_args, tool_name, execute_te
     return cmd_args
 
 HANDLERS['wandb_create_report'] = _handle_wandb_create_report
-
 
 async def _handle_wandb_create_terradev_report(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
@@ -1989,7 +1677,6 @@ async def _handle_wandb_create_terradev_report(arguments, cmd_args, tool_name, e
 
 HANDLERS['wandb_create_terradev_report'] = _handle_wandb_create_terradev_report
 
-
 async def _handle_wandb_setup_alerts(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
@@ -2019,7 +1706,6 @@ async def _handle_wandb_setup_alerts(arguments, cmd_args, tool_name, execute_ter
 
 HANDLERS['wandb_setup_alerts'] = _handle_wandb_setup_alerts
 
-
 async def _handle_wandb_create_terradev_alerts(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.ml_services.wandb_enhanced import WandBEnhanced
@@ -2047,7 +1733,6 @@ async def _handle_wandb_create_terradev_alerts(arguments, cmd_args, tool_name, e
     return cmd_args
 
 HANDLERS['wandb_create_terradev_alerts'] = _handle_wandb_create_terradev_alerts
-
 
 async def _handle_wandb_dashboard_status(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
@@ -2077,14 +1762,12 @@ async def _handle_wandb_dashboard_status(arguments, cmd_args, tool_name, execute
 
 HANDLERS['wandb_dashboard_status'] = _handle_wandb_dashboard_status
 
-
 async def _handle_phoenix_projects(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("limit"):
         cmd_args.extend(["--limit", str(arguments["limit"])])
     return cmd_args
 
 HANDLERS['phoenix_projects'] = _handle_phoenix_projects
-
 
 async def _handle_phoenix_spans(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("project"):
@@ -2097,7 +1780,6 @@ async def _handle_phoenix_spans(arguments, cmd_args, tool_name, execute_terradev
 
 HANDLERS['phoenix_spans'] = _handle_phoenix_spans
 
-
 async def _handle_phoenix_trace(arguments, cmd_args, tool_name, execute_terradev_command):
     cmd_args.extend(["--trace-id", arguments["trace_id"]])
     if arguments.get("project"):
@@ -2106,14 +1788,12 @@ async def _handle_phoenix_trace(arguments, cmd_args, tool_name, execute_terradev
 
 HANDLERS['phoenix_trace'] = _handle_phoenix_trace
 
-
 async def _handle_phoenix_otel_env(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("project"):
         cmd_args.extend(["--project", arguments["project"]])
     return cmd_args
 
 HANDLERS['phoenix_otel_env'] = _handle_phoenix_otel_env
-
 
 async def _handle_phoenix_snippet(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("project"):
@@ -2122,14 +1802,12 @@ async def _handle_phoenix_snippet(arguments, cmd_args, tool_name, execute_terrad
 
 HANDLERS['phoenix_snippet'] = _handle_phoenix_snippet
 
-
 async def _handle_phoenix_k8s(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("namespace"):
         cmd_args.extend(["--namespace", arguments["namespace"]])
     return cmd_args
 
 HANDLERS['phoenix_k8s'] = _handle_phoenix_k8s
-
 
 async def _handle_guardrails_chat(arguments, cmd_args, tool_name, execute_terradev_command):
     cmd_args.extend(["--message", arguments["message"]])
@@ -2138,7 +1816,6 @@ async def _handle_guardrails_chat(arguments, cmd_args, tool_name, execute_terrad
     return cmd_args
 
 HANDLERS['guardrails_chat'] = _handle_guardrails_chat
-
 
 async def _handle_guardrails_generate_config(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("config_id"):
@@ -2149,14 +1826,12 @@ async def _handle_guardrails_generate_config(arguments, cmd_args, tool_name, exe
 
 HANDLERS['guardrails_generate_config'] = _handle_guardrails_generate_config
 
-
 async def _handle_guardrails_k8s(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("namespace"):
         cmd_args.extend(["--namespace", arguments["namespace"]])
     return cmd_args
 
 HANDLERS['guardrails_k8s'] = _handle_guardrails_k8s
-
 
 async def _handle_qdrant_create_collection(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("name"):
@@ -2167,14 +1842,12 @@ async def _handle_qdrant_create_collection(arguments, cmd_args, tool_name, execu
 
 HANDLERS['qdrant_create_collection'] = _handle_qdrant_create_collection
 
-
 async def _handle_qdrant_info(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("name"):
         cmd_args.extend(["--name", arguments["name"]])
     return cmd_args
 
 HANDLERS['qdrant_info'] = _handle_qdrant_info
-
 
 async def _handle_qdrant_count(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("name"):
@@ -2183,7 +1856,6 @@ async def _handle_qdrant_count(arguments, cmd_args, tool_name, execute_terradev_
 
 HANDLERS['qdrant_count'] = _handle_qdrant_count
 
-
 async def _handle_qdrant_k8s(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("namespace"):
         cmd_args.extend(["--namespace", arguments["namespace"]])
@@ -2191,22 +1863,17 @@ async def _handle_qdrant_k8s(arguments, cmd_args, tool_name, execute_terradev_co
 
 HANDLERS['qdrant_k8s'] = _handle_qdrant_k8s
 
-
 async def _handle_deepeval_run(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("file"):
         cmd_args.extend(["--file", arguments["file"]])
     return cmd_args
 
-
 HANDLERS['deepeval_run'] = _handle_deepeval_run
-
 
 async def _handle_deepeval_metrics(arguments, cmd_args, tool_name, execute_terradev_command):
     return cmd_args
 
-
 HANDLERS['deepeval_metrics'] = _handle_deepeval_metrics
-
 
 async def _handle_deepeval_evaluate(arguments, cmd_args, tool_name, execute_terradev_command):
     cmd_args.extend(["--input", arguments["input"]])
@@ -2222,14 +1889,11 @@ async def _handle_deepeval_evaluate(arguments, cmd_args, tool_name, execute_terr
         cmd_args.extend(["--threshold", str(arguments["threshold"])])
     return cmd_args
 
-
 HANDLERS['deepeval_evaluate'] = _handle_deepeval_evaluate
-
 
 async def _handle_deepeval_init(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("output"):
         cmd_args.extend(["--output", arguments["output"]])
     return cmd_args
-
 
 HANDLERS['deepeval_init'] = _handle_deepeval_init

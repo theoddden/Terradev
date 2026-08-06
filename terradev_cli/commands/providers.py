@@ -442,33 +442,6 @@ def configure(provider):
             )
             if langchain_key:
                 api.credentials["langchain_api_key"] = langchain_key
-            langsmith_key = click.prompt(
-                "LangSmith API Key (optional)",
-                hide_input=True,
-                default="",
-                show_default=False,
-            )
-            if langsmith_key:
-                api.credentials["langsmith_api_key"] = langsmith_key
-            langsmith_endpoint = click.prompt(
-                "LangSmith Endpoint (optional)",
-                default="https://api.smith.langchain.com",
-                show_default=False,
-            )
-            if langsmith_endpoint:
-                api.credentials["langsmith_endpoint"] = langsmith_endpoint
-            workspace_id = click.prompt(
-                "LangSmith Workspace ID (optional)", default="", show_default=False
-            )
-            if workspace_id:
-                api.credentials["workspace_id"] = workspace_id
-            project_name = click.prompt(
-                "LangSmith Project Name (optional, default: terradev)",
-                default="terradev",
-                show_default=False,
-            )
-            if project_name:
-                api.credentials["project_name"] = project_name
 
             # Enhanced LangChain options
             langchain_enhanced = click.prompt(
@@ -483,7 +456,7 @@ def configure(provider):
                 api.credentials["langchain_workflow_enabled"] = "true"
 
             print(
-                "   LangChain configured  chains, workflows, and LangSmith integration"
+                "   LangChain configured  chains and workflows"
             )
 
         # SGLang
@@ -564,27 +537,6 @@ def configure(provider):
             if kserve_kubeconfig:
                 api.credentials["kserve_kubeconfig_path"] = kserve_kubeconfig
             print("   KServe configured  model deployment on Kubernetes")
-
-        # LangSmith
-        langsmith_key = click.prompt(
-            "LangSmith API Key (optional)",
-            hide_input=True,
-            default="",
-            show_default=False,
-        )
-        if langsmith_key:
-            api.credentials["langsmith_api_key"] = langsmith_key
-            langsmith_workspace = click.prompt(
-                "LangSmith Workspace ID (optional)", default="", show_default=False
-            )
-            if langsmith_workspace:
-                api.credentials["langsmith_workspace_id"] = langsmith_workspace
-            langsmith_endpoint = click.prompt(
-                "LangSmith Endpoint (optional)", default="", show_default=False
-            )
-            if langsmith_endpoint:
-                api.credentials["langsmith_endpoint"] = langsmith_endpoint
-            print("   LangSmith configured  tracing and evaluation")
 
         # DVC
         dvc_config = click.prompt(

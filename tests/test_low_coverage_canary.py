@@ -702,20 +702,3 @@ class TestCanaryTerraformWrapper:
 
 
 # ---------------------------------------------------------------------------
-# integrations/databricks
-# ---------------------------------------------------------------------------
-
-
-class TestCanaryDatabricksIntegration:
-    def test_is_configured_false_without_env(self, monkeypatch):
-        from terradev_cli.integrations.databricks_integration import is_configured
-
-        monkeypatch.delenv("DATABRICKS_HOST", raising=False)
-        monkeypatch.delenv("DATABRICKS_TOKEN", raising=False)
-        assert is_configured({}) is False
-
-    def test_get_credential_prompts_returns_list(self):
-        from terradev_cli.integrations.databricks_integration import get_credential_prompts
-
-        prompts = get_credential_prompts()
-        assert isinstance(prompts, list)
