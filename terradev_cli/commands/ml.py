@@ -268,10 +268,11 @@ def wandb_dashboard_status():
             print(f"ERROR: Dashboard status failed: {result['error']}")
     except ImportError:
         print("ERROR: Enhanced W&B service not available.")
-@ml.group()
-def langchain():
-    """LangChain integration with workflows, LangGraph, and SGLang."""
-    pass
+langchain = click.Group(
+    "langchain", help="LangChain integration with workflows, LangGraph, and SGLang."
+)
+
+
 @langchain.command("test")
 def langchain_test():
     """Test connection to LangChain service."""
@@ -322,7 +323,7 @@ def langchain_create_workflow(workflow_name):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
             return
 
         service = create_langchain_service_from_credentials(creds)
@@ -352,7 +353,7 @@ def langchain_create_langgraph(graph_name):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
             return
 
         service = create_langchain_service_from_credentials(creds)
@@ -382,7 +383,7 @@ def langchain_create_pipeline(pipeline_name):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
             return
 
         service = create_langchain_service_from_credentials(creds)
@@ -401,10 +402,11 @@ def langchain_create_pipeline(pipeline_name):
             print(f"ERROR: Pipeline creation failed: {result['error']}")
     except ImportError:
         print("ERROR: Enhanced LangChain service not available.")
-@ml.group()
-def langgraph():
-    """LangGraph workflow orchestration with monitoring."""
-    pass
+langgraph = click.Group(
+    "langgraph", help="LangGraph workflow orchestration with monitoring."
+)
+
+
 @langgraph.command("test")
 def langgraph_test():
     """Test connection to LangGraph service."""
@@ -459,7 +461,7 @@ def langgraph_create_workflow(workflow_name, type):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
             return
 
         service = create_langgraph_service_from_credentials(creds)
@@ -500,7 +502,7 @@ def langgraph_status(workflow_id):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
             return
 
         service = create_langgraph_service_from_credentials(creds)
@@ -527,7 +529,7 @@ def langgraph_deploy(workflow_name):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev ml langchain configure' first.")
+            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
             return
 
         service = create_langgraph_service_from_credentials(creds)
@@ -1391,6 +1393,268 @@ def vllm_benchmark(endpoint, api_key, prompt, concurrent):
                 print(f"   WARNING:  {concurrent - successful} requests failed")
 
     asyncio.run(run_benchmark())
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# vLLM Model & LoRA Adapter Import / Management
+# ═══════════════════════════════════════════════════════════════════════
+
+@vllm.command("import-adapter")
+@click.argument("adapter_id")
+@click.option("--local-name", "-n", help="Local name for the adapter")
+@click.option("--hf-token", help="HuggingFace token for private repos")
+@click.option("--no-register", is_flag=True, help="Do not register in LoRA registry")
+def vllm_import_adapter(adapter_id, local_name, hf_token, no_register):
+    """Import a LoRA adapter from HuggingFace for vLLM.
+
+    Downloads the adapter, validates it, and optionally registers it in the
+    central LoRA registry so it can be linked to running vLLM servers.
+
+    Examples:
+        terradev ml vllm import-adapter organization/adapter-name
+        terradev ml vllm import-adapter organization/adapter-name -n customer-a
+    """
+    import asyncio
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+
+    async def run_import():
+        config = VLLMConfig(model_name="")
+        async with VLLMService(config) as svc:
+            result = await svc.import_peft_adapter(
+                adapter_id=adapter_id,
+                local_name=local_name,
+                hf_token=hf_token,
+                register=not no_register,
+            )
+            if result["status"] != "imported":
+                print(f"ERROR: {result.get('error')}")
+                return
+
+            print(f"OK: Imported adapter '{result['adapter_id']}'")
+            print(f"   Local path: {result['local_path']}")
+            print(f"   Base model: {result.get('base_model')}")
+            print(f"   Rank: {result.get('rank')}")
+            if result.get("registered"):
+                print(
+                    f"   Registered as '{result['adapter_name']}' "
+                    f"(version {result['version_id'][:8]}...)"
+                )
+
+    asyncio.run(run_import())
+
+
+@vllm.command("import-model")
+@click.argument("model_id")
+@click.option(
+    "--cache-dir",
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="Local cache directory",
+)
+@click.option("--hf-token", help="HuggingFace token for private repos")
+def vllm_import_model(model_id, cache_dir, hf_token):
+    """Import a base model from HuggingFace for vLLM serving.
+
+    Downloads weights to a local cache and prints a ready-to-run serve command.
+
+    Examples:
+        terradev ml vllm import-model meta-llama/Llama-2-7b-hf
+        terradev ml vllm import-model mistralai/Mistral-7B-v0.1 --hf-token $HF_TOKEN
+    """
+    import asyncio
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+
+    async def run_import():
+        config = VLLMConfig(model_name=model_id)
+        async with VLLMService(config) as svc:
+            result = await svc.import_base_model(
+                model_id=model_id,
+                cache_dir=Path(cache_dir) if cache_dir else None,
+                hf_token=hf_token,
+            )
+            if result["status"] != "imported":
+                print(f"ERROR: {result.get('error')}")
+                return
+
+            print(f"OK: Imported model '{result['model_id']}'")
+            print(f"   Local path: {result['local_path']}")
+            print(f"   Serve command:")
+            print(f"   {result['serve_command']}")
+
+    asyncio.run(run_import())
+
+
+@vllm.group()
+def lora():
+    """LoRA adapter management for vLLM serving engines."""
+    pass
+
+
+@lora.command("list")
+@click.option("--endpoint", "-e", required=True, help="vLLM endpoint")
+@click.option("--api-key", help="vLLM API key")
+def vllm_lora_list(endpoint, api_key):
+    """List LoRA adapters currently loaded on a vLLM server."""
+    import asyncio
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+
+    host, port = _parse_vllm_endpoint(endpoint)
+    config = VLLMConfig(model_name="", host=host, port=port, api_key=api_key)
+
+    async def run_list():
+        async with VLLMService(config) as svc:
+            result = await svc.lora_list()
+            if result["status"] != "success":
+                print(f"ERROR: {result.get('error')}")
+                return
+
+            print(f"Base models ({len(result.get('base_models', []))}):")
+            for m in result.get("base_models", []):
+                print(f"  {m.get('id', '?')}")
+
+            print(f"LoRA adapters ({len(result.get('lora_adapters', []))}):")
+            if result.get("lora_adapters"):
+                for a in result.get("lora_adapters", []):
+                    print(f"  {a.get('id', '?')}  (parent: {a.get('parent', '-')})")
+            else:
+                print("  (none)")
+
+    asyncio.run(run_list())
+
+
+@lora.command("load")
+@click.option("--endpoint", "-e", required=True, help="vLLM endpoint")
+@click.option("--name", "-n", required=True, help="Adapter name")
+@click.option("--path", required=True, help="Local path to adapter weights")
+@click.option("--api-key", help="vLLM API key")
+@click.option("--register", is_flag=True, help="Register in LoRA registry before loading")
+@click.option("--base-model", help="Base model name (required with --register)")
+@click.option("--rank", default=64, help="LoRA rank (default: 64)")
+def vllm_lora_load(endpoint, name, path, api_key, register, base_model, rank):
+    """Hot-load a LoRA adapter onto a running vLLM server.
+
+    Examples:
+        terradev ml vllm lora load -e http://localhost:8000 -n customer-a --path /adapters/customer-a
+        terradev ml vllm lora load -e http://localhost:8000 -n customer-a --path /adapters/customer-a --register --base-model meta-llama/Llama-2-7b-hf
+    """
+    import asyncio
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService, LoRAModule
+
+    host, port = _parse_vllm_endpoint(endpoint)
+    config = VLLMConfig(model_name="", host=host, port=port, api_key=api_key)
+
+    version_id = None
+    if register:
+        if not base_model:
+            print("ERROR: --base-model required when using --register")
+            return
+        from terradev_cli.ml_services.lora_registry import get_lora_registry
+
+        registry = get_lora_registry()
+        version = registry.register_adapter(
+            adapter_name=name,
+            base_model=base_model,
+            path=path,
+            rank=rank,
+        )
+        version_id = version.version_id
+        registry.mark_version_active(name, version_id)
+
+    async def run_load():
+        async with VLLMService(config) as svc:
+            result = await svc.lora_load(
+                LoRAModule(name=name, path=path),
+                version_id=version_id,
+            )
+            if result["status"] == "loaded":
+                print(f"OK: Loaded adapter '{name}' on {endpoint}")
+                print("   Use 'model': '{name}' in API requests")
+            else:
+                print(f"ERROR: {result.get('error')}")
+
+    asyncio.run(run_load())
+
+
+@lora.command("unload")
+@click.option("--endpoint", "-e", required=True, help="vLLM endpoint")
+@click.option("--name", "-n", required=True, help="Adapter name to unload")
+@click.option("--api-key", help="vLLM API key")
+def vllm_lora_unload(endpoint, name, api_key):
+    """Hot-unload a LoRA adapter from a running vLLM server."""
+    import asyncio
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+
+    host, port = _parse_vllm_endpoint(endpoint)
+    config = VLLMConfig(model_name="", host=host, port=port, api_key=api_key)
+
+    async def run_unload():
+        async with VLLMService(config) as svc:
+            result = await svc.lora_unload(name)
+            if result["status"] == "unloaded":
+                print(f"OK: Unloaded adapter '{name}' from {endpoint}")
+            else:
+                print(f"ERROR: {result.get('error')}")
+
+    asyncio.run(run_unload())
+
+
+@lora.command("link")
+@click.option("--endpoint", "-e", required=True, help="vLLM endpoint")
+@click.option("--name", "-n", required=True, help="Registered adapter name")
+@click.option("--api-key", help="vLLM API key")
+def vllm_lora_link(endpoint, name, api_key):
+    """Load the active registry version of an adapter onto a vLLM server.
+
+    This links the central LoRA registry with the running serving engine.
+
+    Examples:
+        terradev ml vllm lora link -e http://localhost:8000 -n customer-a
+    """
+    import asyncio
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+
+    host, port = _parse_vllm_endpoint(endpoint)
+    config = VLLMConfig(model_name="", host=host, port=port, api_key=api_key)
+
+    async def run_link():
+        async with VLLMService(config) as svc:
+            result = await svc.lora_load_from_registry(name)
+            if result["status"] == "loaded":
+                print(f"OK: Linked and loaded adapter '{name}' from registry to {endpoint}")
+                print("   Use 'model': '{name}' in API requests")
+            else:
+                print(f"ERROR: {result.get('error')}")
+
+    asyncio.run(run_link())
+
+
+@lora.command("sync")
+@click.option("--name", "-n", required=True, help="Registered adapter name")
+@click.option("--replicas", required=True, help="Comma-separated host:port list")
+def vllm_lora_sync(name, replicas):
+    """Synchronize an adapter from the registry across multiple vLLM replicas."""
+    import asyncio
+    from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
+
+    replica_list = []
+    for r in replicas.split(","):
+        host, port = r.split(":")
+        replica_list.append({"replica_id": r, "host": host, "port": int(port)})
+
+    async def run_sync():
+        config = VLLMConfig(model_name="")
+        svc = VLLMService(config)
+        result = await svc.lora_sync(name, replicas=replica_list)
+        if result["status"] == "success":
+            print(f"OK: Synchronized adapter '{name}' across {len(replica_list)} replica(s)")
+            final = result.get("final_consistency", {})
+            print(f"   Expected: {len(final.get('expected_replicas', []))}")
+            print(f"   Loaded: {len(final.get('loaded_replicas', []))}")
+        else:
+            print(f"ERROR: {result.get('error')}")
+
+    asyncio.run(run_sync())
+
+
 @ml.group()
 def phoenix():
     """Arize Phoenix LLM trace observability  traces, spans, OTEL."""

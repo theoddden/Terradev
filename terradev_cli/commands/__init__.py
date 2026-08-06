@@ -91,3 +91,7 @@ platform.agent.add_command(mlops.agentic_serving)
 training.train.add_command(unsloth.unsloth)
 database.database.add_command(weaviate.weaviate)
 platform.agent.add_command(letta.letta)
+
+# Agent-oriented workflow / graph frameworks
+platform.agent.add_command(ml.langchain)
+platform.agent.add_command(ml.langgraph)

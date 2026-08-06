@@ -1,1708 +1,1899 @@
 # Complete Terradev CLI Command Reference
 
-**All commands and subcommands for Terradev CLI v6.0.2**
+**All commands and subcommands for Terradev CLI v6.0.3**
 
 ---
 
-## Main Commands (217+ MCP Tools)
+## Main Commands
 
-### **Core Infrastructure Commands**
+### **provision**
 
-#### **provision** - Provision GPU instances across multiple providers
 ```bash
 terradev provision [OPTIONS]
-
-Options:
-  -g, --gpu-type TEXT          GPU type (required) [A100, H100, RTX4090, etc.]
-  -n, --count INTEGER          Number of instances [default: 1]
-  --max-price FLOAT            Maximum price per hour
-  --parallel INTEGER           Number of parallel queries [default: 6]
-  --dry-run                    Show plan without provisioning
-  --providers TEXT             Specific providers (multiple allowed)
-  --region TEXT                Target region
-  --spot                       Use spot instances
-  --ensure-numa-alignment      Ensure NUMA alignment
-  --enable-rdma                Enable RDMA/InfiniBand
-  --enable-gpudirect           Enable GPUDirect
 ```
 
-#### **status** - Show current status of all instances and usage
+### **status**
+
 ```bash
 terradev status [OPTIONS]
-
-Options:
-  -f, --format [table|json]    Output format [default: table]
-  --live                        Query providers for live instance status
-  --instance-id TEXT           Filter by specific instance ID
-  --provider TEXT               Filter by provider
-  --region TEXT                 Filter by region
-```
-
-#### **quote** - Get real-time quotes from all providers
-```bash
-terradev quote [OPTIONS]
-
-Options:
-  -g, --gpu-type TEXT          GPU type [default: A100]
-  -p, --providers TEXT         Specific providers (multiple allowed)
-  --parallel INTEGER           Number of parallel queries [default: 6]
-  --region TEXT                 Target region
-  --spot                        Include spot instances
-  --confidence FLOAT            Confidence level for price prediction
-```
-
-#### **availability** - Show GPU availability/stock status
-```bash
-terradev availability [OPTIONS]
-
-Options:
-  -g, --gpu-type TEXT          Filter by GPU type
-  -p, --provider TEXT           Filter by provider
-  -r, --region TEXT             Filter by region
-  --refresh                     Force refresh of availability data
-  --format [table|json]         Output format [default: table]
-```
-
-#### **manage** - Manage provisioned instances via real-time APIs
-```bash
-terradev manage [OPTIONS]
-
-Options:
-  -i, --instance-id TEXT        Instance ID (required)
-  -a, --action [start|stop|restart|terminate]
-                                Action to perform
-  --force                       Force action without confirmation
-```
-
-#### **execute** - Execute commands on provisioned instances
-```bash
-terradev execute [OPTIONS]
-
-Options:
-  -i, --instance-id TEXT        Instance ID (required)
-  -c, --command TEXT            Command to execute (required)
-  --async-exec                  Run asynchronously
-  --timeout INTEGER             Command timeout in seconds
-  --output-file TEXT            Save output to file
-```
-
-#### **cleanup** - Clean up unused resources and temporary files
-```bash
-terradev cleanup [OPTIONS]
-
-Options:
-  --dry-run                     Show what would be cleaned
-  --force                       Force cleanup without confirmation
-  --older-than INTEGER          Clean resources older than X hours
-  --type [all|instances|files|cache]
-                                Type of resources to clean
 ```
 
 ---
 
-### **Training & Distributed Computing Commands**
+### **agentic-serving** - `terradev agent agentic-serving`
 
-#### **train** - Launch a distributed training job
 ```bash
-terradev train [OPTIONS] SCRIPT
-
-Options:
-  --framework [torchrun|ray|accelerate|deepspeed]
-                                Training framework
-  --from-provision TEXT         Use latest provisioned instances
-  --tp-size INTEGER             Tensor parallel size
-  --pp-size INTEGER             Pipeline parallel size
-  --script-args TEXT             Additional script arguments
-  --kv-checkpointing            Enable KV cache checkpointing
-  --checkpoint-interval INTEGER Checkpoint interval in seconds
-  --checkpoint-backend [s3|gcs|azure|local]
-                                Checkpoint storage backend
-  --auto-recovery               Enable automatic recovery
-  --max-recovery-attempts INTEGER Max recovery attempts
-  --flashoptim [on|off]         Enable/disable FlashOptim
+terradev agent agentic-serving [OPTIONS] COMMAND [ARGS]...
 ```
-
-#### **train-resume** - Resume a training job from checkpoint
-```bash
-terradev train-resume [OPTIONS]
 
-Options:
-  --checkpoint-id TEXT          Checkpoint ID to resume from
-  --job-id TEXT                 Job ID to resume
-  --script-args TEXT            Additional script arguments
-```
+### **configure** - `terradev agent agentic-serving configure`
 
-#### **train-status** - Show training job status, GPU-hours, cost
 ```bash
-terradev train-status [OPTIONS]
-
-Options:
-  --job-id TEXT                 Filter by specific job ID
-  --format [table|json]         Output format [default: table]
-  --detailed                    Show detailed metrics
-  --gpu-utilization             Show GPU utilization
-  --cost-breakdown              Show cost breakdown
+terradev agent agentic-serving configure [OPTIONS]
 ```
 
-#### **train-stop** - Stop a running training job
-```bash
-terradev train-stop [OPTIONS]
+### **helm-values** - `terradev agent agentic-serving helm-values`
 
-Options:
-  --job-id TEXT                 Job ID to stop (required)
-  --force                       Force stop without confirmation
-  --save-checkpoint             Save final checkpoint before stopping
+```bash
+terradev agent agentic-serving helm-values [OPTIONS]
 ```
 
-#### **checkpoint** - Manage distributed checkpoints
-```bash
-terradev checkpoint [OPTIONS] COMMAND
+### **k8s** - `terradev agent agentic-serving k8s`
 
-Commands:
-  list                          List all checkpoints
-  create                        Create new checkpoint
-  restore                       Restore from checkpoint
-  validate                      Validate checkpoint integrity
-  delete                        Delete checkpoint
-  status                        Show checkpoint status
+```bash
+terradev agent agentic-serving k8s [OPTIONS]
 ```
 
-#### **stage** - Compress, chunk, and pre-position datasets
-```bash
-terradev stage [OPTIONS]
+### **launch-args** - `terradev agent agentic-serving launch-args`
 
-Options:
-  -d, --dataset TEXT            Dataset path, S3 URI, GCS URI, HTTP URL, or HuggingFace name (required)
-  --target-regions TEXT         Comma-separated target regions
-  --compression [auto|zstd|gzip|none]
-                                Compression type [default: auto]
-  --format [auto|parquet|json|arrow]
-                                Output format [default: auto]
-  --parallel-streams INTEGER    Number of parallel upload streams
-  --hf-dataset TEXT             HuggingFace dataset name
-  --split TEXT                  Dataset split
-  --process TEXT                Processing pipeline
-  --preprocess TEXT             Preprocessing steps
-  --max-size TEXT               Maximum dataset size
-  --sample-rate FLOAT           Sample rate
+```bash
+terradev agent agentic-serving launch-args [OPTIONS]
 ```
 
-#### **preflight** - Run preflight hardware validation on GPU nodes
-```bash
-terradev preflight [OPTIONS]
+### **lmcache-env** - `terradev agent agentic-serving lmcache-env`
 
-Options:
-  --detailed                    Run detailed validation
-  --network-test                Run network performance tests
-  --gpu-test                    Run GPU performance tests
-  --flashoptim-check            Check FlashOptim compatibility
-  --cluster-id TEXT             Specific cluster to validate
+```bash
+terradev agent agentic-serving lmcache-env [OPTIONS]
 ```
 
----
+### **show-config** - `terradev agent agentic-serving show-config`
 
-### **Inference & Model Serving Commands**
-
-#### **infer** - Deploy and manage inference endpoints
 ```bash
-terradev infer [OPTIONS] COMMAND
-
-Commands:
-  deploy                        Deploy inference endpoint
-  status                        Show endpoint status
-  scale                         Scale endpoint replicas
-  update                        Update endpoint configuration
-  delete                        Delete endpoint
-  list                          List all endpoints
+terradev agent agentic-serving show-config [OPTIONS]
 ```
 
-#### **infer-deploy** - Deploy inference endpoint
-```bash
-terradev infer-deploy [OPTIONS] MODEL_PATH
+### **cost** - `terradev agent cost`
 
-Options:
-  -n, --name TEXT               Endpoint name (required)
-  -p, --provider [runpod|vastai|lambda|baseten]
-                                Provider
-  -g, --gpu-type TEXT           GPU type (A100|H100|RTX4090)
-  --min-workers INTEGER         Minimum workers
-  --max-workers INTEGER         Maximum workers
-  --idle-timeout INTEGER        Idle timeout in seconds
-  --cost-optimize               Enable cost optimization
-  --dry-run                     Show deployment plan without deploying
+```bash
+terradev agent cost [OPTIONS]
 ```
 
-#### **infer-status** - Show inference endpoint health, latency, and failover status
-```bash
-terradev infer-status [OPTIONS]
+### **deploy** - `terradev agent deploy`
 
-Options:
-  --check                       Run live health probes before showing status
-  --endpoint TEXT               Filter by specific endpoint
-  --detailed                    Show detailed metrics
-  --format [table|json]         Output format [default: table]
+```bash
+terradev agent deploy [OPTIONS]
 ```
 
-#### **infer-failover** - Run health checks and auto-failover for inference endpoints
-```bash
-terradev infer-failover [OPTIONS]
+### **langchain** - `terradev agent langchain`
 
-Options:
-  --dry-run                     Show what would happen without executing failover
-  --endpoint TEXT               Specific endpoint to test
-  --test-load INTEGER           Load test with N requests
+```bash
+terradev agent langchain [OPTIONS] COMMAND [ARGS]...
 ```
 
-#### **infer-route** - Find the best inference endpoint using routing strategies
-```bash
-terradev infer-route [OPTIONS]
+### **create-langgraph** - `terradev agent langchain create-langgraph`
 
-Options:
-  -m, --model TEXT              Filter by model name
-  -s, --strategy [latency|cost|score]
-                                Routing strategy [default: latency]
-  --region TEXT                 Filter by region
-  --provider TEXT               Filter by provider
+```bash
+terradev agent langchain create-langgraph [OPTIONS] GRAPH_NAME
 ```
 
-#### **inferx** - InferX serverless inference platform
-```bash
-terradev inferx [OPTIONS] COMMAND
+### **create-pipeline** - `terradev agent langchain create-pipeline`
 
-Commands:
-  deploy                        Deploy serverless endpoint
-  status                        Check endpoint health
-  failover                      Run failover tests
-  cost-analysis                 Analyze costs
-  scale                         Scale serverless endpoints
-  update                        Update endpoint configuration
-  delete                        Delete endpoint
+```bash
+terradev agent langchain create-pipeline [OPTIONS] PIPELINE_NAME
 ```
 
-#### **vllm** - vLLM optimization and management commands
-```bash
-terradev vllm [OPTIONS] COMMAND
+### **create-workflow** - `terradev agent langchain create-workflow`
 
-Commands:
-  optimize                      Generate optimized vLLM configurations
-  auto-optimize                 Automatically optimize vLLM configuration
-  analyze                       Analyze current vLLM server workload
-  benchmark                     Benchmark vLLM endpoint performance
+```bash
+terradev agent langchain create-workflow [OPTIONS] WORKFLOW_NAME
 ```
 
-#### **sglang** - SGLang optimization and management with workload types
-```bash
-terradev sglang [OPTIONS] COMMAND
+### **test** - `terradev agent langchain test`
 
-Commands:
-  detect                        Auto-detect workload type and show optimization recommendations
-  install                       Install SGLang with optimization stack
-  optimize                      Auto-optimize SGLang configuration for workload type
-  router                        Generate cache-aware router command for multi-replica deployments
-  start                         Start optimized SGLang server
-  test                          Test SGLang installation and configuration
+```bash
+terradev agent langchain test [OPTIONS]
 ```
 
-#### **lora** - Manage LoRA adapters on a running vLLM server
-```bash
-terradev lora [OPTIONS] COMMAND
+### **langgraph** - `terradev agent langgraph`
 
-Commands:
-  add                           Add LoRA adapter
-  remove                        Remove LoRA adapter
-  list                          List loaded adapters
-  status                        Show adapter status
-  update                        Update adapter configuration
-  benchmark                     Benchmark adapter performance
+```bash
+terradev agent langgraph [OPTIONS] COMMAND [ARGS]...
 ```
 
----
+### **create-workflow** - `terradev agent langgraph create-workflow`
 
-### **Model Orchestration Commands**
-
-#### **orchestrator-start** - Start the model orchestrator for multi-model serving
 ```bash
-terradev orchestrator-start [OPTIONS]
-
-Options:
-  --port INTEGER                Orchestrator port [default: 8080]
-  --models TEXT                 Comma-separated list of models to load
-  --gpu-memory-fraction FLOAT   GPU memory fraction per model
-  --auto-scale                  Enable auto-scaling
+terradev agent langgraph create-workflow [OPTIONS] WORKFLOW_NAME
 ```
 
-#### **orchestrator-status** - Get orchestrator and model status
-```bash
-terradev orchestrator-status [OPTIONS]
+### **deploy** - `terradev agent langgraph deploy`
 
-Options:
-  --detailed                    Show detailed model information
-  --format [table|json]         Output format [default: table]
+```bash
+terradev agent langgraph deploy [OPTIONS] WORKFLOW_NAME
 ```
 
-#### **orchestrator-load** - Load a model into GPU memory
-```bash
-terradev orchestrator-load [OPTIONS] MODEL_PATH
+### **status** - `terradev agent langgraph status`
 
-Options:
-  --name TEXT                   Model name (required)
-  --priority [high|medium|low] Loading priority [default: medium]
-  --gpu-memory-fraction FLOAT   GPU memory fraction
+```bash
+terradev agent langgraph status [OPTIONS] WORKFLOW_ID
 ```
 
-#### **orchestrator-infer** - Test inference with a model
-```bash
-terradev orchestrator-infer [OPTIONS]
+### **test** - `terradev agent langgraph test`
 
-Options:
-  --model TEXT                  Model name (required)
-  --prompt TEXT                 Input prompt
-  --max-tokens INTEGER          Maximum tokens to generate
-  --temperature FLOAT           Temperature for sampling
+```bash
+terradev agent langgraph test [OPTIONS]
 ```
 
-#### **orchestrator-evict** - Evict a model from GPU memory
-```bash
-terradev orchestrator-evict [OPTIONS]
+### **letta** - `terradev agent letta`
 
-Options:
-  --model TEXT                  Model name to evict (required)
-  --force                       Force eviction without confirmation
+```bash
+terradev agent letta [OPTIONS] COMMAND [ARGS]...
 ```
 
-#### **orchestrator-register** - Register a model with the orchestrator
-```bash
-terradev orchestrator-register [OPTIONS] MODEL_PATH
+### **chat** - `terradev agent letta chat`
 
-Options:
-  --name TEXT                   Model name (required)
-  --type [llm|embedding|vision] Model type
-  --description TEXT            Model description
+```bash
+terradev agent letta chat [OPTIONS]
 ```
-
----
 
-### **Warm Pool Management Commands**
+### **create** - `terradev agent letta create`
 
-#### **warm-pool-start** - Start the warm pool manager for intelligent pre-warming
 ```bash
-terradev warm-pool-start [OPTIONS]
-
-Options:
-  --config-file TEXT            Configuration file path
-  --models TEXT                 Comma-separated list of models to pre-warm
-  --gpu-types TEXT              GPU types to pre-warm
-  --regions TEXT                Target regions
+terradev agent letta create [OPTIONS]
 ```
 
-#### **warm-pool-status** - Get warm pool manager status
-```bash
-terradev warm-pool-status [OPTIONS]
+### **delete** - `terradev agent letta delete`
 
-Options:
-  --detailed                    Show detailed warm pool information
-  --format [table|json]         Output format [default: table]
+```bash
+terradev agent letta delete [OPTIONS]
 ```
 
-#### **warm-pool-register** - Register a model with the warm pool manager
-```bash
-terradev warm-pool-register [OPTIONS] MODEL_PATH
+### **list** - `terradev agent letta list`
 
-Options:
-  --name TEXT                   Model name (required)
-  --priority [high|medium|low] Pre-warming priority [default: medium]
-  --regions TEXT                Target regions
-  --gpu-types TEXT              Preferred GPU types
+```bash
+terradev agent letta list [OPTIONS]
 ```
 
----
+### **remember** - `terradev agent letta remember`
 
-### **Optimization & Cost Management Commands**
-
-#### **optimize** - Multi-dimensional optimization: cost + performance
 ```bash
-terradev optimize [OPTIONS]
-
-Options:
-  --instance-id TEXT            Optimize specific instance ID
-  --auto-apply                  Automatically apply all recommended optimizations
-  --scope [all|compute|storage|networking]
-                                Optimization scope [default: all]
-  --objective [cost|performance|balanced]
-                                Optimization objective [default: balanced]
+terradev agent letta remember [OPTIONS]
 ```
 
-#### **analytics** - Show cost analytics from the cost tracking database
-```bash
-terradev analytics [OPTIONS]
+### **status** - `terradev agent letta status`
 
-Options:
-  -d, --days INTEGER            Number of days to analyze [default: 7]
-  -f, --format [table|json]     Output format [default: table]
-  --breakdown                   Show cost breakdown by category
-  --forecast                    Show cost forecast
+```bash
+terradev agent letta status [OPTIONS]
 ```
 
-#### **reliability** - Show provider reliability scores and error rates
-```bash
-terradev reliability [OPTIONS]
+### **list** - `terradev agent list`
 
-Options:
-  -p, --provider TEXT           Filter by provider
-  -r, --region TEXT             Filter by region
-  -d, --days INTEGER            Number of days [default: 30]
-  --format [table|json]         Output format [default: table]
+```bash
+terradev agent list [OPTIONS]
 ```
 
-#### **budget-optimize** - Find optimal deployment under budget constraints
-```bash
-terradev budget-optimize [OPTIONS]
+### **plan** - `terradev agent plan`
 
-Options:
-  --budget FLOAT                Budget amount (required)
-  --currency [USD|EUR|GBP]      Currency [default: USD]
-  --period [hourly|daily|monthly]
-                                Budget period [default: hourly]
-  --gpu-type TEXT               Preferred GPU type
-  --region TEXT                  Preferred region
+```bash
+terradev agent plan [OPTIONS]
 ```
 
-#### **cost-scaler-start** - Start the cost-aware scaling manager
-```bash
-terradev cost-scaler-start [OPTIONS]
+### **scale** - `terradev agent scale`
 
-Options:
-  --config-file TEXT            Configuration file
-  --budget FLOAT                Budget limit
-  --scale-down-threshold FLOAT Scale down threshold
-  --scale-up-threshold FLOAT    Scale up threshold
+```bash
+terradev agent scale [OPTIONS]
 ```
 
-#### **cost-scaler-status** - Get cost scaler status and recommendations
-```bash
-terradev cost-scaler-status [OPTIONS]
+### **skill** - `terradev agent skill`
 
-Options:
-  --detailed                    Show detailed recommendations
-  --format [table|json]         Output format [default: table]
+```bash
+terradev agent skill [OPTIONS] COMMAND [ARGS]...
 ```
 
-#### **cost-scaler-model-details** - Get cost details for a specific model
-```bash
-terradev cost-scaler-model-details [OPTIONS] MODEL_NAME
+### **attach** - `terradev agent skill attach`
 
-Options:
-  --region TEXT                 Region
-  --gpu-type TEXT               GPU type
-  --include-spot                Include spot pricing
+```bash
+terradev agent skill attach [OPTIONS]
 ```
 
----
+### **init** - `terradev agent skill init`
 
-### **ML Platform Integration Commands**
-
-#### **ml** - ML Platform Integration Commands
 ```bash
-terradev ml [OPTIONS] COMMAND
-
-Commands:
-  dvc                           DVC (Data Version Control) management
-  huggingface                   Hugging Face models, datasets, and inference endpoints
-  kserve                        KServe model deployment and management
-  kubernetes                    Enhanced Kubernetes cluster management with Karpenter and monitoring
-  langchain                     Enhanced LangChain integration with workflows, LangGraph, and monitoring
-  langgraph                     Enhanced LangGraph workflow orchestration with monitoring
-  langsmith                     LangSmith experiment tracking and monitoring
-  mlflow                        MLflow experiment tracking and model registry
-  ray                           Enhanced Ray distributed computing with monitoring and optimization
-  sglang                        Enhanced SGLang model serving with monitoring
-  wandb                         Enhanced Weights & Biases with dashboards, reports, and alerts
+terradev agent skill init [OPTIONS]
 ```
 
-#### **phoenix** - Arize Phoenix LLM trace observability
-```bash
-terradev phoenix [OPTIONS] COMMAND
+### **status** - `terradev agent status`
 
-Commands:
-  projects                      List Phoenix projects
-  spans                         View and filter traces
-  trace                         View specific trace
-  analyze                       Analyze traces
-  export                        Export traces
-  dashboard                     Manage dashboards
-  alert                         Manage alerts
-  integrate                     Integrate with other tools
-  k8s                           Deploy Phoenix on Kubernetes
-  otlp-env                      Generate OTLP environment variables
+```bash
+terradev agent status [OPTIONS]
 ```
 
-#### **qdrant** - Qdrant vector database — collections, embeddings
-```bash
-terradev qdrant [OPTIONS] COMMAND
+### **teardown** - `terradev agent teardown`
 
-Commands:
-  create-collection              Create new collection
-  list-collections              List all collections
-  info                          Get collection information
-  delete                        Delete collection
-  upsert                        Add documents to collection
-  search                        Search vectors
-  batch-upsert                  Batch add documents
-  batch-search                  Batch search
-  hybrid-search                 Hybrid search with filters
-  optimize                      Optimize collection
-  benchmark                     Benchmark performance
-  replicate                     Configure replication
-  monitor                       Monitor performance
-  backup                        Backup collection
+```bash
+terradev agent teardown [OPTIONS]
 ```
 
-#### **guardrails** - NeMo Guardrails — LLM output safety
-```bash
-terradev guardrails [OPTIONS] COMMAND
+### **vector-db** - `terradev agent vector-db`
 
-Commands:
-  deploy                        Deploy guardrails service
-  sidecar                       Deploy in sidecar mode
-  generate-config               Generate configuration files
-  test                          Test guardrails
-  chat                          Test with chat interface
-  add-policy                    Add custom policy
-  test-suite                    Run test suite
-  benchmark                     Benchmark performance
-  integrate                     Integrate with LLM providers
-  monitor                       Monitor guardrails
-  analytics                     Analytics and reporting
+```bash
+terradev agent vector-db [OPTIONS] COMMAND [ARGS]...
 ```
-
----
 
-### **Kubernetes & Container Orchestration Commands**
+### **down** - `terradev agent vector-db down`
 
-#### **k8s** - Kubernetes cluster management with GPU operators
 ```bash
-terradev k8s [OPTIONS] COMMAND
-
-Commands:
-  create                        Create multi-cloud Kubernetes GPU cluster
-  destroy                       Destroy Kubernetes cluster
-  info                          Get detailed cluster information
-  list                          List all Kubernetes clusters
-  gpu-operator                  Install GPU operator
-  monitoring                    Deploy monitoring stack
-  storage                       Configure storage
-  networking                    Configure networking
-  security                      Configure security policies
+terradev agent vector-db down [OPTIONS]
 ```
 
-#### **k8s create** - Create multi-cloud Kubernetes GPU cluster
-```bash
-terradev k8s create [OPTIONS] CLUSTER_NAME
+### **up** - `terradev agent vector-db up`
 
-Options:
-  -g, --gpu TEXT                GPU type (H100, A100, L40) (required)
-  -n, --count INTEGER           Number of GPU nodes (required)
-  --provider TEXT               Cloud provider
-  --region TEXT                 Region
-  --node-type TEXT              Node instance type
-  --addons TEXT                 Comma-separated list of addons
-  --dry-run                     Show creation plan
+```bash
+terradev agent vector-db up [OPTIONS]
 ```
 
-#### **k8s destroy** - Destroy Kubernetes cluster
-```bash
-terradev k8s destroy [OPTIONS] CLUSTER_NAME
+### **report** - `terradev canary report`
 
-Options:
-  --force                       Force destruction without confirmation
-  --preserve-volumes           Preserve persistent volumes
+```bash
+terradev canary report [OPTIONS]
 ```
 
-#### **helm-generate** - Generate Helm charts from Terradev workloads
-```bash
-terradev helm-generate [OPTIONS]
+### **tail** - `terradev canary tail`
 
-Options:
-  --workload-file TEXT          Workload configuration file
-  --output-dir TEXT             Output directory
-  --chart-name TEXT             Helm chart name
-  --version TEXT                Chart version
-  --values-file TEXT            Custom values file
+```bash
+terradev canary tail [OPTIONS]
 ```
 
-#### **gitops** - GitOps automation and infrastructure as code
-```bash
-terradev gitops [OPTIONS] COMMAND
+### **model-details** - `terradev cost-scaler model-details`
 
-Commands:
-  init                          Initialize GitOps repository
-  bootstrap                     Bootstrap GitOps tool on cluster
-  validate                      Validate GitOps configuration
-  sync                          Sync changes to cluster
-  status                        Show GitOps status
-  rollback                      Rollback to previous revision
-  add-policy                    Add policy as code
-  add-secrets                   Add secret management
-  rollout                       Progressive deployment
+```bash
+terradev cost-scaler model-details [OPTIONS] MODEL_ID
 ```
-
----
 
-### **Enterprise & Security Commands**
+### **start** - `terradev cost-scaler start`
 
-#### **configure** - Configure cloud provider credentials
 ```bash
-terradev configure [OPTIONS]
-
-Options:
-  -p, --provider TEXT           Configure specific provider
-  --api-key TEXT                API key
-  --secret-key TEXT             Secret key
-  --region TEXT                 Default region
-  --interactive                 Interactive configuration
+terradev cost-scaler start [OPTIONS]
 ```
 
-#### **sso** - Enterprise SSO authentication (Enterprise tier)
-```bash
-terradev sso [OPTIONS] COMMAND
+### **status** - `terradev cost-scaler status`
 
-Commands:
-  login                         Login with SSO
-  logout                        Logout from SSO
-  status                        Show SSO status
-  configure                     Configure SSO provider
-  test                          Test SSO configuration
+```bash
+terradev cost-scaler status [OPTIONS]
 ```
 
-#### **integrations** - Show status of observability & ML integrations
-```bash
-terradev integrations [OPTIONS]
+### **crud** - `terradev database crud`
 
-Options:
-  --export-wandb-script         Print W&B setup script
-  --deploy                      Deploy integration stack
-  --stack [monitoring|ml|full]  Integration stack to deploy
-  --cluster TEXT                Target cluster
+```bash
+terradev database crud [OPTIONS]
 ```
 
-#### **datadog** - Datadog FinOps monitoring — metrics, dashboards
-```bash
-terradev datadog [OPTIONS] COMMAND
+### **down** - `terradev database down`
 
-Commands:
-  test                          Test Datadog integration
-  dashboard                     Manage dashboards
-  monitor                       Manage monitors
-  alert                         Manage alerts
-  export                        Export configurations
+```bash
+terradev database down [OPTIONS]
 ```
 
-#### **upgrade** - Upgrade your Terradev subscription via Stripe
-```bash
-terradev upgrade [OPTIONS]
+### **qdrant** - `terradev database qdrant`
 
-Options:
-  -t, --tier [research_plus|enterprise|enterprise_plus]
-                                Target tier
-  --annual                      Annual billing (discount)
-  --preview                     Show upgrade preview
+```bash
+terradev database qdrant [OPTIONS] COMMAND [ARGS]...
 ```
-
----
 
-### **Monitoring & Observability Commands**
+### **create-collection** - `terradev database qdrant create-collection`
 
-#### **monitor** - Monitor GPU utilization, training metrics, costs
 ```bash
-terradev monitor [OPTIONS]
-
-Options:
-  --job TEXT                    Job ID to monitor
-  --live                        Live monitoring with auto-refresh
-  --refresh INTEGER             Refresh interval in seconds
-  --metrics TEXT                Comma-separated metrics to show
-  --format [table|json]         Output format [default: table]
-  --output-file TEXT            Save metrics to file
+terradev database qdrant create-collection [OPTIONS]
 ```
 
-#### **manifests** - List cached manifests and versions
-```bash
-terradev manifests [OPTIONS]
+### **delete-collection** - `terradev database qdrant delete-collection`
 
-Options:
-  --list                        List all cached manifests
-  --version TEXT                Filter by version
-  --provider TEXT               Filter by provider
-  --cleanup                     Clean old manifests
+```bash
+terradev database qdrant delete-collection [OPTIONS]
 ```
 
-#### **setup** - Get setup instructions for any cloud provider
-```bash
-terradev setup [OPTIONS] PROVIDER
+### **scroll** - `terradev database qdrant scroll`
 
-Options:
-  --detailed                    Show detailed setup instructions
-  --region TEXT                 Filter by region
-  --gpu-type TEXT               Filter by GPU type
+```bash
+terradev database qdrant scroll [OPTIONS]
 ```
 
-#### **smart-deploy** - Smart deployment with automatic optimization
-```bash
-terradev smart-deploy [OPTIONS] WORKLOAD_FILE
+### **search** - `terradev database qdrant search`
 
-Options:
-  --optimize-for [cost|performance|balanced]
-                                Optimization objective [default: balanced]
-  --dry-run                     Show deployment plan
-  --auto-apply                  Apply optimizations automatically
+```bash
+terradev database qdrant search [OPTIONS]
 ```
-
----
 
-### **Utility Commands**
+### **upsert** - `terradev database qdrant upsert`
 
-#### **job** - Run Terradev job from YAML configuration
 ```bash
-terradev job [OPTIONS] JOB_FILE
-
-Options:
-  --optimize [cost|latency|balanced]
-                                Optimization criteria
-  --dry-run                     Show job execution plan
-  --format [yaml|json]          Output format
+terradev database qdrant upsert [OPTIONS]
 ```
 
-#### **run** - Provision a GPU instance, deploy a Docker container
-```bash
-terradev run [OPTIONS]
+### **search** - `terradev database search`
 
-Options:
-  -g, --gpu TEXT                GPU type (A100, H100, RTX4090, etc.) (required)
-  -i, --image TEXT              Docker image (e.g. pytorch/pytorch:latest) (required)
-  -c, --command TEXT            Command to run inside the container
-  --name TEXT                   Instance name
-  --provider TEXT               Cloud provider
-  --region TEXT                 Region
-  --spot                        Use spot instances
+```bash
+terradev database search [OPTIONS]
 ```
 
-#### **rollback** - EXPLICIT ROLLBACK (versioned manifests)
-```bash
-terradev rollback [OPTIONS]
+### **sql** - `terradev database sql`
 
-Options:
-  --revision TEXT               Target revision
-  --cluster TEXT                Target cluster
-  --force                       Force rollback
-  --dry-run                     Show rollback plan
+```bash
+terradev database sql [OPTIONS]
 ```
 
-#### **up** - CLI-native provisioning with manifest cache
-```bash
-terradev up [OPTIONS] WORKLOAD_FILE
+### **up** - `terradev database up`
 
-Options:
-  --cache                       Use cached manifests
-  --refresh-cache               Refresh manifest cache
-  --dry-run                     Show deployment plan
+```bash
+terradev database up [OPTIONS]
 ```
 
-#### **onboarding** - Run the interactive onboarding flow
-```bash
-terradev onboarding [OPTIONS]
+### **weaviate** - `terradev database weaviate`
 
-Options:
-  --force                       Force onboarding even if already configured
-  --skip-providers             Skip provider configuration
+```bash
+terradev database weaviate [OPTIONS] COMMAND [ARGS]...
 ```
 
----
+### **create-collection** - `terradev database weaviate create-collection`
 
-##  **ML Subcommands**
-
-### **ml wandb** - Weights & Biases integration
 ```bash
-terradev ml wandb [OPTIONS] COMMAND
-
-Commands:
-  test                          Test W&B integration
-  projects                      List W&B projects
-  runs                          List runs
-  reports                       Generate reports
-  dashboards                    Manage dashboards
-  alerts                        Manage alerts
-  sweep                         Manage sweeps
+terradev database weaviate create-collection [OPTIONS]
 ```
 
-### **ml mlflow** - MLflow integration
-```bash
-terradev ml mlflow [OPTIONS] COMMAND
+### **delete-collection** - `terradev database weaviate delete-collection`
 
-Commands:
-  test                          Test MLflow integration
-  list-experiments              List experiments
-  create-experiment             Create new experiment
-  runs                          List runs
-  models                        List models
-  deploy                        Deploy model
+```bash
+terradev database weaviate delete-collection [OPTIONS]
 ```
 
-### **ml phoenix** - Phoenix integration
-```bash
-terradev ml phoenix [OPTIONS] COMMAND
+### **hybrid-search** - `terradev database weaviate hybrid-search`
 
-Commands:
-  projects                      List projects
-  spans                         View spans
-  trace                         View trace
-  analyze                       Analyze traces
-  dashboard                     Manage dashboards
+```bash
+terradev database weaviate hybrid-search [OPTIONS]
 ```
 
-### **ml qdrant** - Qdrant integration
-```bash
-terradev ml qdrant [OPTIONS] COMMAND
+### **insert** - `terradev database weaviate insert`
 
-Commands:
-  test                          Test Qdrant integration
-  collections                   Manage collections
-  search                        Search vectors
-  embeddings                    Generate embeddings
+```bash
+terradev database weaviate insert [OPTIONS]
 ```
 
-### **ml guardrails** - Guardrails integration
-```bash
-terradev ml guardrails [OPTIONS] COMMAND
+### **list-collections** - `terradev database weaviate list-collections`
 
-Commands:
-  test                          Test guardrails
-  config                        Manage configurations
-  policies                      Manage policies
-  chat                          Test chat interface
+```bash
+terradev database weaviate list-collections [OPTIONS]
 ```
-
----
 
-##  **SGLang Subcommands**
+### **query** - `terradev database weaviate query`
 
-### **sglang optimize** - Auto-optimize SGLang configuration
 ```bash
-terradev sglang optimize [OPTIONS] MODEL
-
-Options:
-  --workload [agentic-chat|high-throughput|low-latency|moe|pd-disaggregated|structured-output|hardware-specific]
-                                Workload type
-  --gpu-type TEXT               GPU type
-  --output-file TEXT            Save configuration to file
-  --dry-run                     Show optimization plan
+terradev database weaviate query [OPTIONS]
 ```
 
-### **sglang detect** - Auto-detect workload type
-```bash
-terradev sglang detect [OPTIONS] MODEL
+### **up** - `terradev database weaviate up`
 
-Options:
-  --description TEXT            User description of use case
-  --sample-prompts TEXT         Sample prompts
-  --output-format [json|table]  Output format
+```bash
+terradev database weaviate up [OPTIONS]
 ```
 
-### **sglang start** - Start optimized SGLang server
-```bash
-terradev sglang start [OPTIONS] MODEL
+### **approve** - `terradev environments approve`
 
-Options:
-  --config-file TEXT            Configuration file
-  --port INTEGER               Server port [default: 30000]
-  --host TEXT                   Server host [default: 0.0.0.0]
-  --workload TEXT               Workload type
-  --gpu-type TEXT               GPU type
+```bash
+terradev environments approve [OPTIONS] PROMOTION_ID
 ```
 
-### **sglang test** - Test SGLang installation and configuration
-```bash
-terradev sglang test [OPTIONS]
+### **history** - `terradev environments history`
 
-Options:
-  --endpoint TEXT               SGLang endpoint
-  --workload TEXT               Test specific workload
-  --test-file TEXT              Test file with prompts
-  --benchmark                   Run benchmark tests
+```bash
+terradev environments history [OPTIONS]
 ```
 
-### **sglang install** - Install SGLang with optimization stack
-```bash
-terradev sglang install [OPTIONS]
+### **list** - `terradev environments list`
 
-Options:
-  --version TEXT                SGLang version
-  --gpu-type TEXT               GPU type for optimizations
-  --cuda-version TEXT           CUDA version
-  --force                       Force reinstallation
+```bash
+terradev environments list [OPTIONS]
 ```
 
-### **sglang router** - Generate cache-aware router command
-```bash
-terradev sglang router [OPTIONS]
+### **promote** - `terradev environments promote`
 
-Options:
-  --replicas INTEGER            Number of replicas
-  --endpoint TEXT               SGLang endpoint
-  --output-file TEXT            Save router script
-  --cache-type [redis|memory]   Cache backend
+```bash
+terradev environments promote [OPTIONS] ARTIFACT_NAME
 ```
 
----
+### **compare** - `terradev eval compare`
 
-##  **vLLM Subcommands**
-
-### **vllm optimize** - Generate optimized vLLM configurations
 ```bash
-terradev vllm optimize [OPTIONS] MODEL
-
-Options:
-  --workload [chat|completion|embedding|batch]
-                                Workload type
-  --gpu-type TEXT               GPU type
-  --max-batch-size INTEGER      Maximum batch size
-  --tensor-parallel-size INTEGER Tensor parallel size
-  --output-file TEXT            Save configuration
+terradev eval compare [OPTIONS] MODEL_A MODEL_B
 ```
 
-### **vllm auto-optimize** - Automatically optimize vLLM configuration
-```bash
-terradev vllm auto-optimize [OPTIONS] ENDPOINT
+### **evaluation** - `terradev eval evaluation`
 
-Options:
-  --duration INTEGER            Analysis duration in seconds
-  --objective [latency|throughput|memory]
-                                Optimization objective
-  --apply                       Apply optimizations automatically
+```bash
+terradev eval evaluation [OPTIONS]
 ```
 
-### **vllm analyze** - Analyze current vLLM server workload
-```bash
-terradev vllm analyze [OPTIONS] ENDPOINT
+### **baseten** - `terradev gateway baseten`
 
-Options:
-  --duration INTEGER            Analysis duration
-  --metrics TEXT                Metrics to analyze
-  --output-file TEXT            Save analysis report
+```bash
+terradev gateway baseten [OPTIONS] COMMAND [ARGS]...
 ```
 
-### **vllm benchmark** - Benchmark vLLM endpoint performance
-```bash
-terradev vllm benchmark [OPTIONS] ENDPOINT
+### **chat** - `terradev gateway baseten chat`
 
-Options:
-  --concurrent-requests INTEGER Concurrent requests
-  --duration INTEGER            Benchmark duration
-  --prompts-file TEXT           File with test prompts
-  --output-format [json|csv]     Output format
+```bash
+terradev gateway baseten chat [OPTIONS]
 ```
-
----
 
-##  **LoRA Subcommands**
+### **configure** - `terradev gateway baseten configure`
 
-### **lora add** - Add LoRA adapter
 ```bash
-terradev lora add [OPTIONS]
-
-Options:
-  -e, --endpoint TEXT           vLLM endpoint (required)
-  -n, --name TEXT               Adapter name (required)
-  -p, --path TEXT               Adapter path (required)
-  --priority [high|medium|low]  Loading priority
-  --force                       Override existing adapter
+terradev gateway baseten configure [OPTIONS]
 ```
 
-### **lora remove** - Remove LoRA adapter
-```bash
-terradev lora remove [OPTIONS]
+### **delete** - `terradev gateway baseten delete`
 
-Options:
-  -e, --endpoint TEXT           vLLM endpoint (required)
-  -n, --name TEXT               Adapter name (required)
-  --force                       Force removal
+```bash
+terradev gateway baseten delete [OPTIONS] ENDPOINT_ID
 ```
 
-### **lora list** - List loaded adapters
-```bash
-terradev lora list [OPTIONS]
+### **deploy** - `terradev gateway baseten deploy`
 
-Options:
-  -e, --endpoint TEXT           vLLM endpoint (required)
-  --format [table|json]         Output format
-  --detailed                    Show detailed information
+```bash
+terradev gateway baseten deploy [OPTIONS]
 ```
 
-### **lora status** - Show adapter status
-```bash
-terradev lora status [OPTIONS]
+### **list** - `terradev gateway baseten list`
 
-Options:
-  -e, --endpoint TEXT           vLLM endpoint (required)
-  -name TEXT                    Filter by adapter name
-  --metrics                     Show performance metrics
+```bash
+terradev gateway baseten list [OPTIONS]
 ```
 
-### **lora update** - Update adapter configuration
-```bash
-terradev lora update [OPTIONS]
+### **models** - `terradev gateway baseten models`
 
-Options:
-  -e, --endpoint TEXT           vLLM endpoint (required)
-  -n, --name TEXT               Adapter name (required)
-  -p, --path TEXT               New adapter path
-  --priority TEXT               New priority
+```bash
+terradev gateway baseten models [OPTIONS]
 ```
 
-### **lora benchmark** - Benchmark adapter performance
-```bash
-terradev lora benchmark [OPTIONS]
+### **status** - `terradev gateway baseten status`
 
-Options:
-  -e, --endpoint TEXT           vLLM endpoint (required)
-  -n, --name TEXT               Adapter name
-  --prompts-file TEXT           Test prompts file
-  --duration INTEGER            Benchmark duration
+```bash
+terradev gateway baseten status [OPTIONS] ENDPOINT_ID
 ```
 
----
+### **huggingface** - `terradev gateway huggingface`
 
-##  **Checkpoint Subcommands**
-
-### **checkpoint list** - List all checkpoints
 ```bash
-terradev checkpoint list [OPTIONS]
-
-Options:
-  --job-id TEXT                 Filter by job ID
-  --format [table|json]         Output format
-  --detailed                    Show detailed information
-  --verify                      Verify checkpoint integrity
+terradev gateway huggingface [OPTIONS] COMMAND [ARGS]...
 ```
 
-### **checkpoint create** - Create new checkpoint
-```bash
-terradev checkpoint create [OPTIONS]
+### **chat** - `terradev gateway huggingface chat`
 
-Options:
-  --job-id TEXT                 Job ID (required)
-  --name TEXT                   Checkpoint name
-  --force                       Force checkpoint creation
-  --compress                    Compress checkpoint
+```bash
+terradev gateway huggingface chat [OPTIONS]
 ```
 
-### **checkpoint restore** - Restore from checkpoint
-```bash
-terradev checkpoint restore [OPTIONS]
+### **configure** - `terradev gateway huggingface configure`
 
-Options:
-  --checkpoint-id TEXT          Checkpoint ID (required)
-  --job-id TEXT                 Job ID
-  --verify                      Verify before restore
+```bash
+terradev gateway huggingface configure [OPTIONS]
 ```
 
-### **checkpoint validate** - Validate checkpoint integrity
-```bash
-terradev checkpoint validate [OPTIONS] CHECKPOINT_ID
+### **delete** - `terradev gateway huggingface delete`
 
-Options:
-  --detailed                    Show detailed validation results
-  --repair                      Attempt repair if corrupted
+```bash
+terradev gateway huggingface delete [OPTIONS] ENDPOINT_ID
 ```
 
-### **checkpoint delete** - Delete checkpoint
-```bash
-terradev checkpoint delete [OPTIONS] CHECKPOINT_ID
+### **deploy** - `terradev gateway huggingface deploy`
 
-Options:
-  --force                       Force deletion
-  --backup                      Backup before deletion
+```bash
+terradev gateway huggingface deploy [OPTIONS]
 ```
 
-### **checkpoint status** - Show checkpoint status
-```bash
-terradev checkpoint status [OPTIONS]
+### **list** - `terradev gateway huggingface list`
 
-Options:
-  --job-id TEXT                 Job ID
-  --checkpoint-id TEXT          Checkpoint ID
-  --detailed                    Show detailed status
+```bash
+terradev gateway huggingface list [OPTIONS]
 ```
 
----
+### **models** - `terradev gateway huggingface models`
 
-##  **InferX Subcommands**
-
-### **inferx deploy** - Deploy serverless endpoint
 ```bash
-terradev inferx deploy [OPTIONS]
-
-Options:
-  --endpoint TEXT               Endpoint name (required)
-  --model-id TEXT               Model ID (required)
-  --hardware TEXT               Hardware type
-  --max-concurrency INTEGER     Maximum concurrency
-  --min-concurrency INTEGER     Minimum concurrency
-  --region TEXT                 Region
+terradev gateway huggingface models [OPTIONS]
 ```
 
-### **inferx status** - Check endpoint health
-```bash
-terradev inferx status [OPTIONS]
+### **status** - `terradev gateway huggingface status`
 
-Options:
-  --endpoint TEXT               Endpoint name
-  --detailed                    Show detailed status
-  --metrics                     Show performance metrics
+```bash
+terradev gateway huggingface status [OPTIONS] ENDPOINT_ID
 ```
 
-### **inferx failover** - Run failover tests
-```bash
-terradev inferx failover [OPTIONS]
+### **inferx** - `terradev gateway inferx`
 
-Options:
-  --endpoint TEXT               Endpoint name
-  --test-load INTEGER           Test load
-  --duration INTEGER            Test duration
+```bash
+terradev gateway inferx [OPTIONS] COMMAND [ARGS]...
 ```
 
-### **inferx cost-analysis** - Analyze costs
-```bash
-terradev inferx cost-analysis [OPTIONS]
+### **chat** - `terradev gateway inferx chat`
 
-Options:
-  --endpoint TEXT               Endpoint name
-  --days INTEGER                Number of days [default: 30]
-  --format [table|json]         Output format
+```bash
+terradev gateway inferx chat [OPTIONS]
 ```
 
----
+### **configure** - `terradev gateway inferx configure`
 
-##  **Phoenix Subcommands**
-
-### **phoenix projects** - List Phoenix projects
 ```bash
-terradev phoenix projects [OPTIONS]
-
-Options:
-  --format [table|json]         Output format
-  --limit INTEGER               Limit results
+terradev gateway inferx configure [OPTIONS]
 ```
 
-### **phoenix spans** - View and filter traces
-```bash
-terradev phoenix spans [OPTIONS]
+### **delete** - `terradev gateway inferx delete`
 
-Options:
-  --project TEXT                 Project name (required)
-  --limit INTEGER               Limit results [default: 100]
-  --filter TEXT                 Filter expression
-  --format [table|json]         Output format
+```bash
+terradev gateway inferx delete [OPTIONS] ENDPOINT_ID
 ```
 
-### **phoenix trace** - View specific trace
-```bash
-terradev phoenix trace [OPTIONS] TRACE_ID
+### **deploy** - `terradev gateway inferx deploy`
 
-Options:
-  --project TEXT                 Project name
-  --format [table|json]         Output format
-  --detailed                    Show detailed trace
+```bash
+terradev gateway inferx deploy [OPTIONS]
 ```
 
-### **phoenix analyze** - Analyze traces
-```bash
-terradev phoenix analyze [OPTIONS]
+### **list** - `terradev gateway inferx list`
 
-Options:
-  --project TEXT                 Project name (required)
-  --metric [latency|error-rate|throughput]
-                                Metric to analyze
-  --time-range TEXT             Time range
+```bash
+terradev gateway inferx list [OPTIONS]
 ```
 
-### **phoenix k8s** - Deploy Phoenix on Kubernetes
-```bash
-terradev phoenix k8s [OPTIONS]
+### **models** - `terradev gateway inferx models`
 
-Options:
-  --namespace TEXT              Namespace [default: observability]
-  --project TEXT                Project name
-  --replicas INTEGER            Number of replicas [default: 2]
-  --storage-class TEXT          Storage class
+```bash
+terradev gateway inferx models [OPTIONS]
 ```
 
-### **phoenix otlp-env** - Generate OTLP environment variables
-```bash
-terradev phoenix otlp-env [OPTIONS]
+### **status** - `terradev gateway inferx status`
 
-Options:
-  --endpoint TEXT               Phoenix endpoint [default: http://phoenix:6006]
-  --project TEXT                Project name
-  --service-name TEXT           Service name
-  --export-format [env|yaml]    Export format
+```bash
+terradev gateway inferx status [OPTIONS] ENDPOINT_ID
 ```
-
----
 
-##  **Qdrant Subcommands**
+### **serve** - `terradev gateway serve`
 
-### **qdrant create-collection** - Create new collection
 ```bash
-terradev qdrant create-collection [OPTIONS]
-
-Options:
-  --name TEXT                   Collection name (required)
-  --vector-size INTEGER         Vector size (required)
-  --distance [Cosine|Euclidean|DotProduct]
-                                Distance metric [default: Cosine]
-  --hnsw-m INTEGER              HNSW M parameter
-  --hnsw-ef INTEGER             HNSW ef parameter
+terradev gateway serve [OPTIONS]
 ```
 
-### **qdrant upsert** - Add documents to collection
-```bash
-terradev qdrant upsert [OPTIONS]
+### **siliconflow** - `terradev gateway siliconflow`
 
-Options:
-  --name TEXT                   Collection name (required)
-  --file TEXT                   File with documents
-  --batch-size INTEGER          Batch size [default: 1000]
-  --format [json|csv]          File format
+```bash
+terradev gateway siliconflow [OPTIONS] COMMAND [ARGS]...
 ```
 
-### **qdrant search** - Search vectors
-```bash
-terradev qdrant search [OPTIONS]
+### **chat** - `terradev gateway siliconflow chat`
 
-Options:
-  --name TEXT                   Collection name (required)
-  --query TEXT                  Search query
-  --limit INTEGER               Limit results [default: 10]
-  --score-threshold FLOAT       Score threshold
-  --filter TEXT                 Filter expression
+```bash
+terradev gateway siliconflow chat [OPTIONS]
 ```
 
-### **qdrant k8s** - Deploy Qdrant on Kubernetes
-```bash
-terradev qdrant k8s [OPTIONS]
+### **configure** - `terradev gateway siliconflow configure`
 
-Options:
-  --namespace TEXT              Namespace [default: vector-db]
-  --replicas INTEGER            Number of replicas [default: 3]
-  --storage-class TEXT          Storage class [default: ssd]
-  --embedding-model TEXT        Embedding model
+```bash
+terradev gateway siliconflow configure [OPTIONS]
 ```
 
----
+### **delete** - `terradev gateway siliconflow delete`
 
-##  **Guardrails Subcommands**
-
-### **guardrails deploy** - Deploy guardrails service
 ```bash
-terradev guardrails deploy [OPTIONS]
-
-Options:
-  --config-path TEXT            Configuration path
-  --port INTEGER                Service port [default: 8080]
-  --mode [standalone|sidecar]   Deployment mode
-  --memory-backend [memory|redis] Memory backend
+terradev gateway siliconflow delete [OPTIONS] ENDPOINT_ID
 ```
 
-### **guardrails sidecar** - Deploy in sidecar mode
-```bash
-terradev guardrails sidecar [OPTIONS]
+### **deploy** - `terradev gateway siliconflow deploy`
 
-Options:
-  --llm-endpoint TEXT           LLM endpoint (required)
-  --deployment-mode TEXT        Deployment mode [default: sidecar]
-  --memory-backend TEXT         Memory backend [default: redis]
+```bash
+terradev gateway siliconflow deploy [OPTIONS]
 ```
 
-### **guardrails generate-config** - Generate configuration files
-```bash
-terradev guardrails generate-config [OPTIONS]
+### **list** - `terradev gateway siliconflow list`
 
-Options:
-  --output TEXT                 Output directory [default: ./guardrails]
-  --enable-topical              Enable topical filtering
-  --enable-jailbreak            Enable jailbreak detection
-  --enable-pii                  Enable PII filtering
-  --enable-factcheck            Enable fact checking
+```bash
+terradev gateway siliconflow list [OPTIONS]
 ```
 
-### **guardrails test** - Test guardrails
-```bash
-terradev guardrails test [OPTIONS]
+### **models** - `terradev gateway siliconflow models`
 
-Options:
-  --config-id TEXT              Configuration ID
-  --message TEXT                Test message
-  --test-suite TEXT             Test suite
+```bash
+terradev gateway siliconflow models [OPTIONS]
 ```
 
-### **guardrails chat** - Test with chat interface
-```bash
-terradev guardrails chat [OPTIONS]
+### **status** - `terradev gateway siliconflow status`
 
-Options:
-  --config-id TEXT              Configuration ID (required)
-  --message TEXT                Message to test
-  --interactive                 Interactive chat mode
+```bash
+terradev gateway siliconflow status [OPTIONS] ENDPOINT_ID
 ```
-
----
 
-##  **GitOps Subcommands**
+### **status** - `terradev gateway status`
 
-### **gitops init** - Initialize GitOps repository
 ```bash
-terradev gitops init [OPTIONS]
-
-Options:
-  --provider TEXT               Git provider [github|gitlab|bitbucket] (required)
-  --repo TEXT                   Repository name (required)
-  --tool TEXT                   GitOps tool [argocd|flux] (required)
-  --cluster TEXT                Cluster name (required)
-  --branch TEXT                 Git branch [default: main]
+terradev gateway status [OPTIONS]
 ```
+
+### **bootstrap** - `terradev gitops bootstrap`
 
-### **gitops bootstrap** - Bootstrap GitOps tool on cluster
 ```bash
 terradev gitops bootstrap [OPTIONS]
-
-Options:
-  --tool TEXT                   GitOps tool [argocd|flux] (required)
-  --cluster TEXT                Cluster name (required)
-  --namespace TEXT              Namespace [default: gitops]
 ```
 
-### **gitops validate** - Validate GitOps configuration
+### **init** - `terradev gitops init`
+
 ```bash
-terradev gitops validate [OPTIONS]
-
-Options:
-  --cluster TEXT                Cluster name
-  --dry-run                     Dry run validation
-  --path TEXT                   Specific path to validate
+terradev gitops init [OPTIONS]
 ```
 
-### **gitops sync** - Sync changes to cluster
+### **sync** - `terradev gitops sync`
+
 ```bash
 terradev gitops sync [OPTIONS]
-
-Options:
-  --cluster TEXT                Cluster name
-  --force                       Force sync
-  --dry-run                     Dry run sync
 ```
 
-### **gitops rollback** - Rollback to previous revision
+### **validate** - `terradev gitops validate`
+
 ```bash
-terradev gitops rollback [OPTIONS]
-
-Options:
-  --cluster TEXT                Cluster name
-  --revision TEXT               Target revision
-  --force                       Force rollback
+terradev gitops validate [OPTIONS]
 ```
 
----
+### **deploy** - `terradev infer deploy`
 
-##  **Qdrant Subcommands**
-
-### **qdrant** - Vector database for RAG
 ```bash
-terradev qdrant [SUBCOMMAND]
-
-Subcommands:
-  test           Test Qdrant connection
-  collections    List all collections
-  create-collection  Create a new collection
-  info           Get collection info
-  count          Count points in collection
-  k8s            Deploy Qdrant on Kubernetes
+terradev infer deploy [OPTIONS]
 ```
 
-### **qdrant create-collection**
+### **endpoint** - `terradev infer endpoint`
+
 ```bash
-terradev qdrant create-collection [OPTIONS]
-
-Options:
-  -n, --name TEXT               Collection name
-  -e, --embedding-model TEXT    Embedding model (e.g., sentence-transformers/all-MiniLM-L6-v2)
-  --dimension INTEGER          Vector dimension (auto-detected from model)
+terradev infer endpoint [OPTIONS] MODEL_PATH
 ```
 
----
+### **failover** - `terradev infer failover`
 
-##  **Phoenix Subcommands**
-
-### **phoenix** - Arize Phoenix LLM tracing
 ```bash
-terradev phoenix [SUBCOMMAND]
-
-Subcommands:
-  test           Test Phoenix connection
-  projects       List Phoenix projects
-  spans          Query spans
-  trace          Get specific trace
-  otel-env       Generate OTLP environment variables
-  snippet        Generate tracing code snippet
-  k8s            Deploy Phoenix on Kubernetes
+terradev infer failover [OPTIONS]
 ```
 
-### **phoenix spans**
+### **route** - `terradev infer route`
+
 ```bash
-terradev phoenix spans [OPTIONS]
-
-Options:
-  -p, --project TEXT           Project name
-  -f, --filter TEXT            SpanQuery DSL filter
-  -l, --limit INTEGER          Max spans to return
+terradev infer route [OPTIONS]
 ```
 
----
+### **status** - `terradev infer status`
 
-##  **Guardrails Subcommands**
-
-### **guardrails** - NeMo Guardrails output safety
 ```bash
-terradev guardrails [SUBCOMMAND]
-
-Subcommands:
-  test           Test Guardrails connection
-  chat           Chat with guardrails
-  generate-config  Generate Colang config
-  k8s            Deploy Guardrails on Kubernetes
+terradev infer status [OPTIONS]
 ```
 
-### **guardrails generate-config**
+### **deploy** - `terradev inferx deploy`
+
 ```bash
-terradev guardrails generate-config [OPTIONS]
-
-Options:
-  -c, --config-type TEXT       Config type (topical, jailbreak, pii, factcheck)
-  -o, --output PATH            Output file path
+terradev inferx deploy [OPTIONS]
 ```
 
----
+### **inferx-configure** - `terradev inferx inferx-configure`
 
-##  **Langfuse Subcommands**
-
-### **langfuse** - LLM observability
 ```bash
-terradev langfuse [SUBCOMMAND]
-
-Subcommands:
-  configure      Set Langfuse credentials
-  test           Test connection
-  traces         List traces
-  trace          Get specific trace
-  scores         List scores
-  score          Add a score
-  datasets       List datasets
-  export-training-data  Export training data
-  quality        Quality metrics
-  otel-env       Generate OTLP environment
-  k8s            Deploy on Kubernetes
+terradev inferx inferx-configure [OPTIONS]
 ```
 
-### **langfuse configure**
+### **inferx-delete** - `terradev inferx inferx-delete`
+
 ```bash
-terradev langfuse configure [OPTIONS]
-
-Options:
-  --public-key TEXT            Langfuse public key
-  --secret-key TEXT            Langfuse secret key
-  --host TEXT                  Langfuse host URL
+terradev inferx inferx-delete [OPTIONS]
 ```
 
----
+### **inferx-optimize** - `terradev inferx inferx-optimize`
 
-##  **Databricks Subcommands**
-
-### **databricks** - Databricks MLOps integration
 ```bash
-terradev databricks [SUBCOMMAND]
-
-Subcommands:
-  configure      Set Databricks credentials
-  test           Test connection
-  jobs           List jobs
-  run            Run a job
-  run-status     Get job run status
-  clusters       List clusters
-  serving-endpoints  List serving endpoints
-  deploy-model   Deploy model to serving endpoint
-  query          Query a serving endpoint
-  mlflow         MLflow operations
+terradev inferx inferx-optimize [OPTIONS]
 ```
 
-### **databricks deploy-model**
+### **inferx-quote** - `terradev inferx inferx-quote`
+
 ```bash
-terradev databricks deploy-model [OPTIONS]
-
-Options:
-  --endpoint-name TEXT         Endpoint name (required)
-  --model-name TEXT            Model name (required)
-  --model-version TEXT         Model version
-  --workload-size TEXT         Small|Medium|Large
-  --scale-to-zero              Enable scale-to-zero
-  --no-scale-to-zero           Disable scale-to-zero
+terradev inferx inferx-quote [OPTIONS]
 ```
 
----
+### **inferx-status** - `terradev inferx inferx-status`
 
-##  **Retrain Subcommands**
-
-### **retrain** - Automated model retraining
 ```bash
-terradev retrain [SUBCOMMAND]
-
-Subcommands:
-  detect         Detect drift
-  trigger        Trigger retraining
-  deploy         Deploy retrained model
+terradev inferx inferx-status [OPTIONS]
 ```
 
-### **retrain detect**
+### **list** - `terradev inferx list`
+
+```bash
+terradev inferx list [OPTIONS]
+```
+
+### **usage** - `terradev inferx usage`
+
+```bash
+terradev inferx usage [OPTIONS]
+```
+
+### **create** - `terradev k8s create`
+
+```bash
+terradev k8s create [OPTIONS] CLUSTER_NAME
+```
+
+### **destroy** - `terradev k8s destroy`
+
+```bash
+terradev k8s destroy [OPTIONS] CLUSTER_NAME
+```
+
+### **info** - `terradev k8s info`
+
+```bash
+terradev k8s info [OPTIONS] CLUSTER_NAME
+```
+
+### **list** - `terradev k8s list`
+
+```bash
+terradev k8s list [OPTIONS]
+```
+
+### **add-input** - `terradev lineage add-input`
+
+```bash
+terradev lineage add-input [OPTIONS] EXECUTION_ID
+```
+
+### **add-output** - `terradev lineage add-output`
+
+```bash
+terradev lineage add-output [OPTIONS] EXECUTION_ID
+```
+
+### **auto** - `terradev lineage auto`
+
+```bash
+terradev lineage auto [OPTIONS]
+```
+
+### **complete** - `terradev lineage complete`
+
+```bash
+terradev lineage complete [OPTIONS] EXECUTION_ID
+```
+
+### **diff** - `terradev lineage diff`
+
+```bash
+terradev lineage diff [OPTIONS] VERSION1 VERSION2
+```
+
+### **export** - `terradev lineage export`
+
+```bash
+terradev lineage export [OPTIONS]
+```
+
+### **graph** - `terradev lineage graph`
+
+```bash
+terradev lineage graph [OPTIONS] ARTIFACT_ID
+```
+
+### **production** - `terradev lineage production`
+
+```bash
+terradev lineage production [OPTIONS]
+```
+
+### **register** - `terradev lineage register`
+
+```bash
+terradev lineage register [OPTIONS]
+```
+
+### **show** - `terradev lineage show`
+
+```bash
+terradev lineage show [OPTIONS] MODEL_IDENTIFIER
+```
+
+### **trace** - `terradev lineage trace`
+
+```bash
+terradev lineage trace [OPTIONS]
+```
+
+### **pool** - `terradev local pool`
+
+```bash
+terradev local pool [OPTIONS]
+```
+
+### **register** - `terradev local register`
+
+```bash
+terradev local register [OPTIONS]
+```
+
+### **scan** - `terradev local scan`
+
+```bash
+terradev local scan [OPTIONS]
+```
+
+### **activate** - `terradev lora activate`
+
+```bash
+terradev lora activate [OPTIONS]
+```
+
+### **add** - `terradev lora add`
+
+```bash
+terradev lora add [OPTIONS]
+```
+
+### **cost-report** - `terradev lora cost-report`
+
+```bash
+terradev lora cost-report [OPTIONS]
+```
+
+### **drift-check** - `terradev lora drift-check`
+
+```bash
+terradev lora drift-check [OPTIONS]
+```
+
+### **list** - `terradev lora list`
+
+```bash
+terradev lora list [OPTIONS]
+```
+
+### **lorax** - `terradev lora lorax`
+
+```bash
+terradev lora lorax [OPTIONS] COMMAND [ARGS]...
+```
+
+### **deploy** - `terradev lora lorax deploy`
+
+```bash
+terradev lora lorax deploy [OPTIONS]
+```
+
+### **generate** - `terradev lora lorax generate`
+
+```bash
+terradev lora lorax generate [OPTIONS]
+```
+
+### **list-adapters** - `terradev lora lorax list-adapters`
+
+```bash
+terradev lora lorax list-adapters [OPTIONS]
+```
+
+### **load-adapter** - `terradev lora lorax load-adapter`
+
+```bash
+terradev lora lorax load-adapter [OPTIONS]
+```
+
+### **sync-registry** - `terradev lora lorax sync-registry`
+
+```bash
+terradev lora lorax sync-registry [OPTIONS]
+```
+
+### **test** - `terradev lora lorax test`
+
+```bash
+terradev lora lorax test [OPTIONS]
+```
+
+### **unload-adapter** - `terradev lora lorax unload-adapter`
+
+```bash
+terradev lora lorax unload-adapter [OPTIONS]
+```
+
+### **peft** - `terradev lora peft`
+
+```bash
+terradev lora peft [OPTIONS] COMMAND [ARGS]...
+```
+
+### **delete** - `terradev lora peft delete`
+
+```bash
+terradev lora peft delete [OPTIONS]
+```
+
+### **import** - `terradev lora peft import`
+
+```bash
+terradev lora peft import [OPTIONS]
+```
+
+### **list** - `terradev lora peft list`
+
+```bash
+terradev lora peft list [OPTIONS]
+```
+
+### **validate** - `terradev lora peft validate`
+
+```bash
+terradev lora peft validate [OPTIONS]
+```
+
+### **register** - `terradev lora register`
+
+```bash
+terradev lora register [OPTIONS]
+```
+
+### **remove** - `terradev lora remove`
+
+```bash
+terradev lora remove [OPTIONS]
+```
+
+### **rollback** - `terradev lora rollback`
+
+```bash
+terradev lora rollback [OPTIONS]
+```
+
+### **sync** - `terradev lora sync`
+
+```bash
+terradev lora sync [OPTIONS]
+```
+
+### **versions** - `terradev lora versions`
+
+```bash
+terradev lora versions [OPTIONS]
+```
+
+### **list-workloads** - `terradev migrate list-workloads`
+
+```bash
+terradev migrate list-workloads [OPTIONS]
+```
+
+### **migration** - `terradev migrate migration`
+
+```bash
+terradev migrate migration [OPTIONS]
+```
+
+### **deepeval** - `terradev ml deepeval`
+
+```bash
+terradev ml deepeval [OPTIONS] COMMAND [ARGS]...
+```
+
+### **evaluate** - `terradev ml deepeval evaluate`
+
+```bash
+terradev ml deepeval evaluate [OPTIONS]
+```
+
+### **init** - `terradev ml deepeval init`
+
+```bash
+terradev ml deepeval init [OPTIONS]
+```
+
+### **install** - `terradev ml deepeval install`
+
+```bash
+terradev ml deepeval install [OPTIONS]
+```
+
+### **metrics** - `terradev ml deepeval metrics`
+
+```bash
+terradev ml deepeval metrics [OPTIONS]
+```
+
+### **run** - `terradev ml deepeval run`
+
+```bash
+terradev ml deepeval run [OPTIONS]
+```
+
+### **dvc** - `terradev ml dvc`
+
+```bash
+terradev ml dvc [OPTIONS] COMMAND [ARGS]...
+```
+
+### **add-data** - `terradev ml dvc add-data`
+
+```bash
+terradev ml dvc add-data [OPTIONS] DATA_PATH
+```
+
+### **add-remote** - `terradev ml dvc add-remote`
+
+```bash
+terradev ml dvc add-remote [OPTIONS] REMOTE_SPEC
+```
+
+### **init** - `terradev ml dvc init`
+
+```bash
+terradev ml dvc init [OPTIONS]
+```
+
+### **pull** - `terradev ml dvc pull`
+
+```bash
+terradev ml dvc pull [OPTIONS]
+```
+
+### **push** - `terradev ml dvc push`
+
+```bash
+terradev ml dvc push [OPTIONS]
+```
+
+### **status** - `terradev ml dvc status`
+
+```bash
+terradev ml dvc status [OPTIONS]
+```
+
+### **test** - `terradev ml dvc test`
+
+```bash
+terradev ml dvc test [OPTIONS]
+```
+
+### **guardrails** - `terradev ml guardrails`
+
+```bash
+terradev ml guardrails [OPTIONS] COMMAND [ARGS]...
+```
+
+### **chat** - `terradev ml guardrails chat`
+
+```bash
+terradev ml guardrails chat [OPTIONS]
+```
+
+### **generate-config** - `terradev ml guardrails generate-config`
+
+```bash
+terradev ml guardrails generate-config [OPTIONS]
+```
+
+### **k8s** - `terradev ml guardrails k8s`
+
+```bash
+terradev ml guardrails k8s [OPTIONS]
+```
+
+### **test** - `terradev ml guardrails test`
+
+```bash
+terradev ml guardrails test [OPTIONS]
+```
+
+### **kserve** - `terradev ml kserve`
+
+```bash
+terradev ml kserve [OPTIONS] COMMAND [ARGS]...
+```
+
+### **test** - `terradev ml kserve test`
+
+```bash
+terradev ml kserve test [OPTIONS]
+```
+
+### **langfuse** - `terradev ml langfuse`
+
+```bash
+terradev ml langfuse [OPTIONS] COMMAND [ARGS]...
+```
+
+### **configure** - `terradev ml langfuse configure`
+
+```bash
+terradev ml langfuse configure [OPTIONS]
+```
+
+### **datasets** - `terradev ml langfuse datasets`
+
+```bash
+terradev ml langfuse datasets [OPTIONS]
+```
+
+### **export-training-data** - `terradev ml langfuse export-training-data`
+
+```bash
+terradev ml langfuse export-training-data [OPTIONS]
+```
+
+### **k8s** - `terradev ml langfuse k8s`
+
+```bash
+terradev ml langfuse k8s [OPTIONS]
+```
+
+### **otel-env** - `terradev ml langfuse otel-env`
+
+```bash
+terradev ml langfuse otel-env [OPTIONS]
+```
+
+### **quality** - `terradev ml langfuse quality`
+
+```bash
+terradev ml langfuse quality [OPTIONS]
+```
+
+### **score** - `terradev ml langfuse score`
+
+```bash
+terradev ml langfuse score [OPTIONS]
+```
+
+### **scores** - `terradev ml langfuse scores`
+
+```bash
+terradev ml langfuse scores [OPTIONS]
+```
+
+### **test** - `terradev ml langfuse test`
+
+```bash
+terradev ml langfuse test [OPTIONS]
+```
+
+### **trace** - `terradev ml langfuse trace`
+
+```bash
+terradev ml langfuse trace [OPTIONS] TRACE_ID
+```
+
+### **traces** - `terradev ml langfuse traces`
+
+```bash
+terradev ml langfuse traces [OPTIONS]
+```
+
+### **mlflow-legacy** - `terradev ml mlflow-legacy`
+
+```bash
+terradev ml mlflow-legacy [OPTIONS] COMMAND [ARGS]...
+```
+
+### **create-experiment** - `terradev ml mlflow-legacy create-experiment`
+
+```bash
+terradev ml mlflow-legacy create-experiment [OPTIONS] EXPERIMENT_NAME
+```
+
+### **export** - `terradev ml mlflow-legacy export`
+
+```bash
+terradev ml mlflow-legacy export [OPTIONS] EXPERIMENT_ID
+```
+
+### **list-experiments** - `terradev ml mlflow-legacy list-experiments`
+
+```bash
+terradev ml mlflow-legacy list-experiments [OPTIONS]
+```
+
+### **list-runs** - `terradev ml mlflow-legacy list-runs`
+
+```bash
+terradev ml mlflow-legacy list-runs [OPTIONS] EXPERIMENT_ID
+```
+
+### **test** - `terradev ml mlflow-legacy test`
+
+```bash
+terradev ml mlflow-legacy test [OPTIONS]
+```
+
+### **ollama** - `terradev ml ollama`
+
+```bash
+terradev ml ollama [OPTIONS] COMMAND [ARGS]...
+```
+
+### **chat** - `terradev ml ollama chat`
+
+```bash
+terradev ml ollama chat [OPTIONS] MODEL
+```
+
+### **generate** - `terradev ml ollama generate`
+
+```bash
+terradev ml ollama generate [OPTIONS] MODEL
+```
+
+### **info** - `terradev ml ollama info`
+
+```bash
+terradev ml ollama info [OPTIONS] MODEL
+```
+
+### **list** - `terradev ml ollama list`
+
+```bash
+terradev ml ollama list [OPTIONS]
+```
+
+### **ps** - `terradev ml ollama ps`
+
+```bash
+terradev ml ollama ps [OPTIONS]
+```
+
+### **pull** - `terradev ml ollama pull`
+
+```bash
+terradev ml ollama pull [OPTIONS] MODEL
+```
+
+### **phoenix** - `terradev ml phoenix`
+
+```bash
+terradev ml phoenix [OPTIONS] COMMAND [ARGS]...
+```
+
+### **k8s** - `terradev ml phoenix k8s`
+
+```bash
+terradev ml phoenix k8s [OPTIONS]
+```
+
+### **otel-env** - `terradev ml phoenix otel-env`
+
+```bash
+terradev ml phoenix otel-env [OPTIONS]
+```
+
+### **projects** - `terradev ml phoenix projects`
+
+```bash
+terradev ml phoenix projects [OPTIONS]
+```
+
+### **snippet** - `terradev ml phoenix snippet`
+
+```bash
+terradev ml phoenix snippet [OPTIONS]
+```
+
+### **spans** - `terradev ml phoenix spans`
+
+```bash
+terradev ml phoenix spans [OPTIONS]
+```
+
+### **test** - `terradev ml phoenix test`
+
+```bash
+terradev ml phoenix test [OPTIONS]
+```
+
+### **trace** - `terradev ml phoenix trace`
+
+```bash
+terradev ml phoenix trace [OPTIONS]
+```
+
+### **qdrant** - `terradev ml qdrant`
+
+```bash
+terradev ml qdrant [OPTIONS] COMMAND [ARGS]...
+```
+
+### **collections** - `terradev ml qdrant collections`
+
+```bash
+terradev ml qdrant collections [OPTIONS]
+```
+
+### **count** - `terradev ml qdrant count`
+
+```bash
+terradev ml qdrant count [OPTIONS]
+```
+
+### **create-collection** - `terradev ml qdrant create-collection`
+
+```bash
+terradev ml qdrant create-collection [OPTIONS]
+```
+
+### **info** - `terradev ml qdrant info`
+
+```bash
+terradev ml qdrant info [OPTIONS]
+```
+
+### **k8s** - `terradev ml qdrant k8s`
+
+```bash
+terradev ml qdrant k8s [OPTIONS]
+```
+
+### **test** - `terradev ml qdrant test`
+
+```bash
+terradev ml qdrant test [OPTIONS]
+```
+
+### **ray** - `terradev ml ray`
+
+```bash
+terradev ml ray [OPTIONS] COMMAND [ARGS]...
+```
+
+### **dashboard** - `terradev ml ray dashboard`
+
+```bash
+terradev ml ray dashboard [OPTIONS]
+```
+
+### **install** - `terradev ml ray install`
+
+```bash
+terradev ml ray install [OPTIONS]
+```
+
+### **list-nodes** - `terradev ml ray list-nodes`
+
+```bash
+terradev ml ray list-nodes [OPTIONS]
+```
+
+### **start** - `terradev ml ray start`
+
+```bash
+terradev ml ray start [OPTIONS]
+```
+
+### **status** - `terradev ml ray status`
+
+```bash
+terradev ml ray status [OPTIONS]
+```
+
+### **stop** - `terradev ml ray stop`
+
+```bash
+terradev ml ray stop [OPTIONS]
+```
+
+### **test** - `terradev ml ray test`
+
+```bash
+terradev ml ray test [OPTIONS]
+```
+
+### **sglang** - `terradev ml sglang`
+
+```bash
+terradev ml sglang [OPTIONS] COMMAND [ARGS]...
+```
+
+### **detect** - `terradev ml sglang detect`
+
+```bash
+terradev ml sglang detect [OPTIONS] MODEL_PATH
+```
+
+### **install** - `terradev ml sglang install`
+
+```bash
+terradev ml sglang install [OPTIONS]
+```
+
+### **router** - `terradev ml sglang router`
+
+```bash
+terradev ml sglang router [OPTIONS] MODEL_PATH
+```
+
+### **sglang-optimize** - `terradev ml sglang sglang-optimize`
+
+```bash
+terradev ml sglang sglang-optimize [OPTIONS] MODEL_PATH
+```
+
+### **start** - `terradev ml sglang start`
+
+```bash
+terradev ml sglang start [OPTIONS] MODEL_PATH
+```
+
+### **test** - `terradev ml sglang test`
+
+```bash
+terradev ml sglang test [OPTIONS]
+```
+
+### **vllm** - `terradev ml vllm`
+
+```bash
+terradev ml vllm [OPTIONS] COMMAND [ARGS]...
+```
+
+### **analyze** - `terradev ml vllm analyze`
+
+```bash
+terradev ml vllm analyze [OPTIONS]
+```
+
+### **auto-optimize** - `terradev ml vllm auto-optimize`
+
+```bash
+terradev ml vllm auto-optimize [OPTIONS]
+```
+
+### **benchmark** - `terradev ml vllm benchmark`
+
+```bash
+terradev ml vllm benchmark [OPTIONS]
+```
+
+### **import-adapter** - `terradev ml vllm import-adapter`
+
+```bash
+terradev ml vllm import-adapter [OPTIONS] ADAPTER_ID
+```
+
+### **import-model** - `terradev ml vllm import-model`
+
+```bash
+terradev ml vllm import-model [OPTIONS] MODEL_ID
+```
+
+### **lora** - `terradev ml vllm lora`
+
+```bash
+terradev ml vllm lora [OPTIONS] COMMAND [ARGS]...
+```
+
+### **link** - `terradev ml vllm lora link`
+
+```bash
+terradev ml vllm lora link [OPTIONS]
+```
+
+### **list** - `terradev ml vllm lora list`
+
+```bash
+terradev ml vllm lora list [OPTIONS]
+```
+
+### **load** - `terradev ml vllm lora load`
+
+```bash
+terradev ml vllm lora load [OPTIONS]
+```
+
+### **sync** - `terradev ml vllm lora sync`
+
+```bash
+terradev ml vllm lora sync [OPTIONS]
+```
+
+### **unload** - `terradev ml vllm lora unload`
+
+```bash
+terradev ml vllm lora unload [OPTIONS]
+```
+
+### **optimize** - `terradev ml vllm optimize`
+
+```bash
+terradev ml vllm optimize [OPTIONS]
+```
+
+### **wandb** - `terradev ml wandb`
+
+```bash
+terradev ml wandb [OPTIONS] COMMAND [ARGS]...
+```
+
+### **create-dashboard** - `terradev ml wandb create-dashboard`
+
+```bash
+terradev ml wandb create-dashboard [OPTIONS]
+```
+
+### **create-project** - `terradev ml wandb create-project`
+
+```bash
+terradev ml wandb create-project [OPTIONS] PROJECT_NAME
+```
+
+### **create-report** - `terradev ml wandb create-report`
+
+```bash
+terradev ml wandb create-report [OPTIONS]
+```
+
+### **dashboard-status** - `terradev ml wandb dashboard-status`
+
+```bash
+terradev ml wandb dashboard-status [OPTIONS]
+```
+
+### **list-projects** - `terradev ml wandb list-projects`
+
+```bash
+terradev ml wandb list-projects [OPTIONS]
+```
+
+### **list-runs** - `terradev ml wandb list-runs`
+
+```bash
+terradev ml wandb list-runs [OPTIONS]
+```
+
+### **setup-alerts** - `terradev ml wandb setup-alerts`
+
+```bash
+terradev ml wandb setup-alerts [OPTIONS]
+```
+
+### **test** - `terradev ml wandb test`
+
+```bash
+terradev ml wandb test [OPTIONS]
+```
+
+### **classify** - `terradev model-router classify`
+
+```bash
+terradev model-router classify [OPTIONS] TEXT
+```
+
+### **configure** - `terradev model-router configure`
+
+```bash
+terradev model-router configure [OPTIONS]
+```
+
+### **llmd-config** - `terradev model-router llmd-config`
+
+```bash
+terradev model-router llmd-config [OPTIONS]
+```
+
+### **stats** - `terradev model-router stats`
+
+```bash
+terradev model-router stats [OPTIONS]
+```
+
+### **test** - `terradev model-router test`
+
+```bash
+terradev model-router test [OPTIONS]
+```
+
+### **gateway** - `terradev observe gateway`
+
+```bash
+terradev observe gateway [OPTIONS] GATEWAY_ENDPOINT
+```
+
+### **status** - `terradev observe status`
+
+```bash
+terradev observe status [OPTIONS] TRACE_ID
+```
+
+### **evict** - `terradev orchestrator evict`
+
+```bash
+terradev orchestrator evict [OPTIONS] MODEL_ID
+```
+
+### **infer** - `terradev orchestrator infer`
+
+```bash
+terradev orchestrator infer [OPTIONS] MODEL_ID
+```
+
+### **load** - `terradev orchestrator load`
+
+```bash
+terradev orchestrator load [OPTIONS] MODEL_ID
+```
+
+### **register** - `terradev orchestrator register`
+
+```bash
+terradev orchestrator register [OPTIONS] MODEL_ID MODEL_PATH
+```
+
+### **start** - `terradev orchestrator start`
+
+```bash
+terradev orchestrator start [OPTIONS]
+```
+
+### **status** - `terradev orchestrator status`
+
+```bash
+terradev orchestrator status [OPTIONS]
+```
+
+### **export-example** - `terradev providers export-example`
+
+```bash
+terradev providers export-example [OPTIONS]
+```
+
+### **list-profiles** - `terradev providers list-profiles`
+
+```bash
+terradev providers list-profiles [OPTIONS]
+```
+
+### **load-profiles** - `terradev providers load-profiles`
+
+```bash
+terradev providers load-profiles [OPTIONS]
+```
+
+### **remove-profile** - `terradev providers remove-profile`
+
+```bash
+terradev providers remove-profile [OPTIONS] NAME
+```
+
+### **show-profile** - `terradev providers show-profile`
+
+```bash
+terradev providers show-profile [OPTIONS] NAME
+```
+
+### **start** - `terradev record start`
+
+```bash
+terradev record start [OPTIONS]
+```
+
+### **stop** - `terradev record stop`
+
+```bash
+terradev record stop [OPTIONS]
+```
+
+### **deploy** - `terradev retrain deploy`
+
+```bash
+terradev retrain deploy [OPTIONS]
+```
+
+### **detect** - `terradev retrain detect`
+
 ```bash
 terradev retrain detect [OPTIONS]
-
-Options:
-  -m, --model TEXT              Model ID (required)
-  --source phoenix-traces       Use Phoenix traces as data source
-  --method lora                 Use LoRA fine-tuning
-  --eval-threshold FLOAT        Evaluation threshold
-  --deploy canary|direct        Deployment strategy
-  --auto-swap                   Auto-swap after deployment
-  --phoenix-endpoint TEXT       Phoenix endpoint URL
-  --phoenix-project TEXT        Phoenix project name
-  -e, --endpoint TEXT          vLLM endpoint URL
-  --vllm-api-key TEXT           vLLM API key
-  --baseline FLOAT             Baseline performance
-  --threshold FLOAT             Drift threshold
-  --min-samples INTEGER         Minimum samples
 ```
 
----
+### **drift** - `terradev retrain drift`
 
-##  **Migrate Subcommands**
-
-### **migrate** - Cross-cloud migration
 ```bash
-terradev migrate [SUBCOMMAND]
-
-Subcommands:
-  plan           Plan migration
-  execute        Execute migration
-  status         Migration status
-  rollback       Rollback migration
+terradev retrain drift [OPTIONS]
 ```
 
----
+### **history** - `terradev retrain history`
 
-##  **Eval Subcommands**
-
-### **eval** - Model evaluation
 ```bash
-terradev eval [SUBCOMMAND]
-
-Subcommands:
-  run            Run evaluation
-  compare        Compare models
-  benchmark      Benchmark performance
+terradev retrain history [OPTIONS]
 ```
 
----
+### **job** - `terradev schedule job`
 
-##  **Triggers Subcommands**
-
-### **triggers** - Event-driven automation
 ```bash
-terradev triggers [SUBCOMMAND]
-
-Subcommands:
-  list           List triggers
-  create         Create trigger
-  delete         Delete trigger
-  enable         Enable trigger
-  disable        Disable trigger
+terradev schedule job [OPTIONS] COMMAND GPU_TYPE
 ```
 
----
+### **list** - `terradev schedule list`
 
-##  **Environments Subcommands**
-
-### **environments** - Environment management
 ```bash
-terradev environments [SUBCOMMAND]
-
-Subcommands:
-  list           List environments
-  create         Create environment
-  delete         Delete environment
-  promote        Promote to next environment
-  rollback       Rollback environment
+terradev schedule list [OPTIONS]
 ```
 
----
+### **windows** - `terradev schedule windows`
 
-##  **Lineage Subcommands**
-
-### **lineage** - Data/model lineage tracking
 ```bash
-terradev lineage [SUBCOMMAND]
-
-Subcommands:
-  trace          Trace data flow
-  graph          Generate lineage graph
-  export         Export lineage data
+terradev schedule windows [OPTIONS]
 ```
 
----
+### **configure** - `terradev sso configure`
 
-##  **HF Spaces Subcommands**
-
-### **hf-spaces** - Create, list, manage, and delete HuggingFace Spaces
 ```bash
-terradev hf-spaces [SUBCOMMAND]
-
-Subcommands:
-  create     Create a new Space with auto-generated app
-  list       List HuggingFace Spaces
-  info       Get Space details
-  delete     Delete a Space
-  restart    Restart a Space (factory reboot)
-  pause      Pause a running Space (stops billing)
-  resume     Resume a paused Space
-  hardware   Show or change hardware tier
-  logs       Show Space build/run logs
+terradev sso configure [OPTIONS]
 ```
 
----
+### **status** - `terradev sso status`
 
-##  **Complete Command Summary**
+```bash
+terradev sso status [OPTIONS]
+```
 
-### **Total Commands: 60+ Main Commands + 200+ Subcommands**
+### **test** - `terradev sso test`
 
-| Category | Commands | Key Features |
-|----------|----------|-------------|
-| **Core Infrastructure** | 15 | Provisioning, management, execution |
-| **Training & Distributed** | 10 | Distributed training, checkpoints, staging |
-| **Inference & Serving** | 12 | Model deployment, routing, optimization |
-| **Model Orchestration** | 6 | Multi-model serving, memory management |
-| **Warm Pool** | 3 | Pre-warming, intelligent scaling |
-| **Optimization & Cost** | 10 | Cost optimization, analytics, arbitrage |
-| **ML Integrations** | 40+ | External ML platform integrations |
-| **Kubernetes** | 10+ | K8s cluster management, GPU operators |
-| **Enterprise** | 8 | SSO, security, billing |
-| **Monitoring** | 6 | Observability, metrics, status |
-| **Utilities** | 10 | Job management, deployment, setup |
+```bash
+terradev sso test [OPTIONS]
+```
 
-**All commands are production-ready and fully documented with comprehensive options and examples.** 
+### **resume** - `terradev train resume`
+
+```bash
+terradev train resume [OPTIONS]
+```
+
+### **start** - `terradev train start`
+
+```bash
+terradev train start [OPTIONS] [SCRIPT_ARGS]...
+```
+
+### **status** - `terradev train status`
+
+```bash
+terradev train status [OPTIONS]
+```
+
+### **stop** - `terradev train stop`
+
+```bash
+terradev train stop [OPTIONS]
+```
+
+### **unsloth** - `terradev train unsloth`
+
+```bash
+terradev train unsloth [OPTIONS] COMMAND [ARGS]...
+```
+
+### **run** - `terradev train unsloth run`
+
+```bash
+terradev train unsloth run [OPTIONS]
+```
+
+### **start** - `terradev train unsloth start`
+
+```bash
+terradev train unsloth start [OPTIONS]
+```
+
+### **stop** - `terradev train unsloth stop`
+
+```bash
+terradev train unsloth stop [OPTIONS]
+```
+
+### **create** - `terradev triggers create`
+
+```bash
+terradev triggers create [OPTIONS] NAME PIPELINE
+```
+
+### **disable** - `terradev triggers disable`
+
+```bash
+terradev triggers disable [OPTIONS] NAME
+```
+
+### **enable** - `terradev triggers enable`
+
+```bash
+terradev triggers enable [OPTIONS] NAME
+```
+
+### **fire** - `terradev triggers fire`
+
+```bash
+terradev triggers fire [OPTIONS] EVENT_TYPE
+```
+
+### **list** - `terradev triggers list`
+
+```bash
+terradev triggers list [OPTIONS]
+```
+
+### **env** - `terradev vault env`
+
+```bash
+terradev vault env [OPTIONS] PROVIDER
+```
+
+### **get** - `terradev vault get`
+
+```bash
+terradev vault get [OPTIONS] PROVIDER KEY
+```
+
+### **list** - `terradev vault list`
+
+```bash
+terradev vault list [OPTIONS]
+```
+
+### **remove** - `terradev vault remove`
+
+```bash
+terradev vault remove [OPTIONS] PROVIDER [KEY]
+```
+
+### **run** - `terradev vault run`
+
+```bash
+terradev vault run [OPTIONS] COMMAND...
+```
+
+### **set** - `terradev vault set`
+
+```bash
+terradev vault set [OPTIONS] PROVIDER KEY
+```
+
+### **sync** - `terradev vault sync`
+
+```bash
+terradev vault sync [OPTIONS]
+```
+
+### **verify** - `terradev vault verify`
+
+```bash
+terradev vault verify [OPTIONS]
+```
+
+### **register** - `terradev warm-pool register`
+
+```bash
+terradev warm-pool register [OPTIONS] MODEL_ID
+```
+
+### **start** - `terradev warm-pool start`
+
+```bash
+terradev warm-pool start [OPTIONS]
+```
+
+### **status** - `terradev warm-pool status`
+
+```bash
+terradev warm-pool status [OPTIONS]
+```

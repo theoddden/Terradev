@@ -38,29 +38,29 @@ def test_ml_wandb_setup_alerts_help(runner, mock_api):
 def test_ml_wandb_dashboard_status_help(runner, mock_api):
     _help_test(runner, mock_api, "ml wandb dashboard-status")
 
-def test_ml_langchain_test_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langchain test")
+def test_agent_langchain_test_help(runner, mock_api):
+    _help_test(runner, mock_api, "agent langchain test")
 
-def test_ml_langchain_create_workflow_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langchain create-workflow")
+def test_agent_langchain_create_workflow_help(runner, mock_api):
+    _help_test(runner, mock_api, "agent langchain create-workflow")
 
-def test_ml_langchain_create_langgraph_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langchain create-langgraph")
+def test_agent_langchain_create_langgraph_help(runner, mock_api):
+    _help_test(runner, mock_api, "agent langchain create-langgraph")
 
-def test_ml_langchain_create_pipeline_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langchain create-pipeline")
+def test_agent_langchain_create_pipeline_help(runner, mock_api):
+    _help_test(runner, mock_api, "agent langchain create-pipeline")
 
-def test_ml_langgraph_test_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langgraph test")
+def test_agent_langgraph_test_help(runner, mock_api):
+    _help_test(runner, mock_api, "agent langgraph test")
 
-def test_ml_langgraph_create_workflow_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langgraph create-workflow")
+def test_agent_langgraph_create_workflow_help(runner, mock_api):
+    _help_test(runner, mock_api, "agent langgraph create-workflow")
 
-def test_ml_langgraph_status_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langgraph status")
+def test_agent_langgraph_status_help(runner, mock_api):
+    _help_test(runner, mock_api, "agent langgraph status")
 
-def test_ml_langgraph_deploy_help(runner, mock_api):
-    _help_test(runner, mock_api, "ml langgraph deploy")
+def test_agent_langgraph_deploy_help(runner, mock_api):
+    _help_test(runner, mock_api, "agent langgraph deploy")
 
 def test_ml_kserve_test_help(runner, mock_api):
     _help_test(runner, mock_api, "ml kserve test")
@@ -252,7 +252,7 @@ class TestFunctionalMl:
                 {"api_key": "test-key"},
             ),
             (
-                ["ml", "langchain", "test"],
+                ["agent", "langchain", "test"],
                 "langchain",
                 "terradev_cli.ml_services.langchain_service",
                 "create_langchain_service_from_credentials",
@@ -260,7 +260,7 @@ class TestFunctionalMl:
                 {"api_key": "test-key"},
             ),
             (
-                ["ml", "langgraph", "test"],
+                ["agent", "langgraph", "test"],
                 "langchain",
                 "terradev_cli.ml_services.langgraph_service",
                 "create_langgraph_service_from_credentials",

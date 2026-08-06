@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Optional
 
 import click
@@ -57,7 +58,18 @@ def _get_client(environment: str = "cloud"):
 @click.option(
     "--memory-blocks",
     default="[]",
-    help="JSON list of memory blocks [{\"label\": ..., \"value\": ...}]",
+    help='JSON list of memory blocks [{"label": ..., "value": ...}]',
+)
+@click.option(
+    "--vector-db",
+    default=None,
+    help='Vector DB connection string or JSON config for agent memory',
+)
+@click.option(
+    "--skill",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help='Path to a skill.md to embed as an agent memory block',
 )
 @click.option(
     "--environment",
@@ -72,13 +84,16 @@ def _get_client(environment: str = "cloud"):
     type=click.Choice(["json", "text"]),
     default="text",
 )
-def letta_create(name, model, human, persona, memory_blocks, environment, fmt):
+def letta_create(name, model, human, persona, memory_blocks, vector_db, skill, environment, fmt):
     """Create a new stateful Letta agent.
 
     Examples:
       terradev agent letta create --name my-agent --model openai/gpt-4.1
       terradev agent letta create --name devops \
         --human "Name: Timber" --persona "I am a helpful SRE"
+      terradev agent letta create --name rag \
+        --vector-db qdrant://localhost:6333 \
+        --skill ./research.skill.md
     """
     client = _get_client(environment)
 
@@ -87,6 +102,15 @@ def letta_create(name, model, human, persona, memory_blocks, environment, fmt):
         blocks.append({"label": "human", "value": human})
     if persona:
         blocks.append({"label": "persona", "value": persona})
+    if vector_db:
+        blocks.append({"label": "vector_db", "value": vector_db})
+    if skill:
+        skill_path = Path(skill)
+        if skill_path.exists():
+            blocks.append({"label": "skill", "value": skill_path.read_text()})
+        else:
+            click.echo(f"ERROR: skill file not found: {skill}", err=True)
+            sys.exit(1)
 
     try:
         agent = client.agents.create(

@@ -7,6 +7,7 @@ High-performance LLM inference server deployment and management
 import aiohttp
 import subprocess
 import statistics
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
@@ -1025,6 +1026,191 @@ systemctl daemon-reload
                 timeout=timeout,
             )
             return result
+        except ImportError:
+            return {
+                "status": "failed",
+                "error": "LoRAConsistencyManager not available. Install terradev with full dependencies.",
+            }
+        except Exception as e:  # noqa: BLE001
+            return {"status": "failed", "error": str(e)}
+
+    # ═══════════════════════════════════════════════════════════════════
+    # Model & LoRA Adapter Import / Registry Link
+    # ═══════════════════════════════════════════════════════════════════
+
+    async def import_peft_adapter(
+        self,
+        adapter_id: str,
+        local_name: Optional[str] = None,
+        hf_token: Optional[str] = None,
+        register: bool = True,
+    ) -> Dict[str, Any]:
+        """Import a LoRA adapter from HuggingFace and optionally register it.
+
+        Wraps PEFTImportService so vLLM serving commands can pull adapters
+        directly from the Hub and link them to the Terradev LoRA registry.
+        """
+        try:
+            from .peft_import_service import get_peft_import_service
+            from .lora_registry import get_lora_registry
+
+            service = get_peft_import_service()
+            config = service.download_adapter(
+                adapter_id=adapter_id,
+                local_name=local_name,
+                token=hf_token,
+            )
+
+            result = {
+                "status": "imported",
+                "adapter_id": config.adapter_id,
+                "local_path": str(config.local_path),
+                "base_model": config.base_model,
+                "rank": config.rank,
+                "alpha": config.alpha,
+                "peft_type": config.peft_type,
+                "target_modules": config.target_modules,
+            }
+
+            if register and config.base_model and config.rank:
+                registry = get_lora_registry()
+                version = registry.register_adapter(
+                    adapter_name=local_name or adapter_id.replace("/", "--"),
+                    base_model=config.base_model,
+                    path=str(config.local_path),
+                    rank=config.rank,
+                    metadata={
+                        "peft_type": config.peft_type,
+                        "alpha": config.alpha,
+                        "target_modules": config.target_modules,
+                        "hf_adapter_id": adapter_id,
+                    },
+                )
+                result["registered"] = True
+                result["version_id"] = version.version_id
+                result["adapter_name"] = version.adapter_name
+            else:
+                result["registered"] = False
+
+            return result
+        except ImportError:
+            return {
+                "status": "failed",
+                "error": "huggingface_hub is required. Install with: pip install huggingface_hub",
+            }
+        except Exception as e:  # noqa: BLE001
+            return {"status": "failed", "error": str(e)}
+
+    async def import_base_model(
+        self,
+        model_id: str,
+        cache_dir: Optional[Path] = None,
+        hf_token: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Import a base model from HuggingFace for vLLM serving.
+
+        Downloads weights to a local cache and returns the path and a ready-to-run
+        vLLM serve command. If the model is already cached, snapshot_download will
+        only fetch missing files.
+        """
+        try:
+            from huggingface_hub import snapshot_download
+
+            local_dir = (
+                cache_dir
+                or Path.home() / ".terradev" / "models" / model_id.replace("/", "--")
+            )
+            local_dir.mkdir(parents=True, exist_ok=True)
+
+            downloaded_path = snapshot_download(
+                repo_id=model_id,
+                local_dir=local_dir,
+                local_dir_use_symlinks=False,
+                token=hf_token,
+            )
+
+            serve_cmd = (
+                f"vllm serve {model_id} "
+                f"--host {self.config.host} "
+                f"--port {self.config.port} "
+                f"--gpu-memory-utilization {self.config.gpu_memory_utilization}"
+            )
+
+            return {
+                "status": "imported",
+                "model_id": model_id,
+                "local_path": downloaded_path,
+                "serve_command": serve_cmd,
+            }
+        except ImportError:
+            return {
+                "status": "failed",
+                "error": "huggingface_hub is required. Install with: pip install huggingface_hub",
+            }
+        except Exception as e:  # noqa: BLE001
+            return {"status": "failed", "error": str(e)}
+
+    async def lora_load_from_registry(
+        self,
+        adapter_name: str,
+    ) -> Dict[str, Any]:
+        """Load the active version of an adapter from the LoRA registry onto this server.
+
+        This links the central LoRA registry with the running vLLM serving engine.
+        """
+        try:
+            from .lora_registry import get_lora_registry
+
+            registry = get_lora_registry()
+            version = registry.get_active_version(adapter_name)
+
+            if not version:
+                return {
+                    "status": "failed",
+                    "error": f"No active version for adapter '{adapter_name}' in registry",
+                }
+
+            return await self.lora_load(
+                LoRAModule(
+                    name=version.adapter_name,
+                    path=version.path,
+                    base_model_name=version.base_model,
+                ),
+                version_id=version.version_id,
+            )
+        except Exception as e:  # noqa: BLE001
+            return {"status": "failed", "error": str(e)}
+
+    async def lora_sync(
+        self,
+        adapter_name: str,
+        replicas: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Synchronize an adapter from the registry across a set of vLLM replicas.
+
+        Loads the active registry version on every replica and records the state.
+        """
+        try:
+            from .lora_registry import get_lora_registry
+            from ..core.lora_consistency import LoRAConsistencyManager
+
+            registry = get_lora_registry()
+            version = registry.get_active_version(adapter_name)
+
+            if not version:
+                return {
+                    "status": "failed",
+                    "error": f"No active version for adapter '{adapter_name}' in registry",
+                }
+
+            consistency_mgr = LoRAConsistencyManager(
+                registry=registry,
+                replicas=replicas or [],
+            )
+            return await consistency_mgr.sync_adapter_state(
+                adapter_name=adapter_name,
+                version_id=version.version_id,
+            )
         except ImportError:
             return {
                 "status": "failed",

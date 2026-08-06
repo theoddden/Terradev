@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """Commands for the Terradev CLI."""
 
+import asyncio
+import json
 import logging
 import sys
+from pathlib import Path
 
 import click
 from . import cli
 from terradev_cli.commands._api import TerradevAPI
+from terradev_cli.core.universal_manifest import UniversalManifest, Component
+from terradev_cli.core.adapters.orchestrator import UniversalOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -955,6 +960,171 @@ def agent_teardown(fleet_id, yes):
     provisioner = AgenticProvisioner()
     result = asyncio.run(provisioner.teardown_fleet(fleet_id))
     click.echo(_json.dumps(result, indent=2))
+def _agent_vector_db_manifest(name: str, adapter: str, config: str) -> UniversalManifest:
+    """Build a manifest for an agent-facing vector database."""
+    cfg = json.loads(config) if config else {}
+    component = Component(
+        kind="vector_store",
+        name=name,
+        adapter=adapter,
+        config=cfg,
+    )
+    return UniversalManifest(
+        name=f"agent-vdb-{name}",
+        version="0.1.0",
+        components=[component],
+    )
+
+
+@agent.group("vector-db")
+def vector_db():
+    """Provision vector databases for agent memory and retrieval.
+
+    Examples:
+      terradev agent vector-db up --name agent-memory --adapter qdrant
+      terradev agent vector-db up --name docs-weaviate --adapter weaviate
+      terradev agent vector-db down --name agent-memory
+    """
+    pass
+
+
+@vector_db.command("up")
+@click.option("--name", "-n", default="agent-memory", help="Vector DB name")
+@click.option(
+    "--adapter",
+    "-a",
+    default="qdrant",
+    type=click.Choice(["qdrant", "weaviate"]),
+    help="Vector DB adapter",
+)
+@click.option("--config", "-c", default="{}", help="JSON adapter config")
+@click.option("--manifest", "-m", type=click.Path(exists=False), help="Path to universal manifest")
+def vector_db_up(name, adapter, config, manifest):
+    """Provision a vector database for an agent fleet."""
+    if manifest:
+        m = UniversalManifest.load(Path(manifest))
+    else:
+        m = _agent_vector_db_manifest(name, adapter, config)
+
+    orchestrator = UniversalOrchestrator(m)
+
+    async def _main():
+        await orchestrator.initialize()
+        return orchestrator.to_result().result
+
+    try:
+        result = asyncio.run(_main())
+        click.echo(f"OK: Vector DB '{name}' ({adapter}) is ready")
+        click.echo(json.dumps(result, indent=2, default=str))
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Failed to provision vector DB: {e}", err=True)
+        raise SystemExit(1)
+
+
+@vector_db.command("down")
+@click.option("--name", "-n", default="agent-memory", help="Vector DB name")
+@click.option(
+    "--adapter",
+    "-a",
+    default="qdrant",
+    type=click.Choice(["qdrant", "weaviate"]),
+    help="Vector DB adapter",
+)
+@click.option("--config", "-c", default="{}", help="JSON adapter config")
+@click.option("--manifest", "-m", type=click.Path(exists=False), help="Path to universal manifest")
+def vector_db_down(name, adapter, config, manifest):
+    """Teardown a vector database provisioned for an agent fleet."""
+    if manifest:
+        m = UniversalManifest.load(Path(manifest))
+    else:
+        m = _agent_vector_db_manifest(name, adapter, config)
+
+    orchestrator = UniversalOrchestrator(m)
+
+    try:
+        asyncio.run(orchestrator.teardown())
+        click.echo(f"OK: Vector DB '{name}' torn down")
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Failed to teardown vector DB: {e}", err=True)
+        raise SystemExit(1)
+
+
+@agent.group("skill")
+def skill():
+    """Manage skill.md files and attach them to Letta agents."""
+    pass
+
+
+@skill.command("init")
+@click.option("--name", "-n", required=True, help="Skill name")
+@click.option("--output", "-o", default=None, help="Output path (default: <name>.skill.md)")
+@click.option("--description", "-d", default="", help="Short description")
+@click.option("--tools", default="", help="Comma-separated tool names")
+def skill_init(name, output, description, tools):
+    """Create a skill.md template for an agent."""
+    path = Path(output) if output else Path(f"{name}.skill.md")
+    tool_list = [t.strip() for t in tools.split(",") if t.strip()]
+
+    content = f"""# Skill: {name}
+
+## Description
+{description or "Describe what this skill does."}
+
+## Tools
+{chr(10).join(f"- {t}" for t in tool_list) or "- "}
+
+## Instructions
+Write the step-by-step instructions the agent should follow when this skill is active.
+
+## Example
+Show a short example interaction or expected output.
+"""
+    path.write_text(content)
+    click.echo(f"OK: Created skill template: {path}")
+
+
+@skill.command("attach")
+@click.option("--agent-id", "-a", required=True, help="Letta agent ID")
+@click.option(
+    "--skill",
+    "-s",
+    type=click.Path(exists=True, dir_okay=False),
+    required=True,
+    help="Path to skill.md",
+)
+@click.option("--label", "-l", default="skill", help="Memory block label")
+@click.option(
+    "--environment",
+    "-e",
+    default="cloud",
+    type=click.Choice(["cloud", "local"]),
+    help="Letta environment",
+)
+def skill_attach(agent_id, skill, label, environment):
+    """Attach a skill.md to a Letta agent as a durable memory block."""
+    from . import letta
+
+    try:
+        client = letta._get_client(environment)
+    except SystemExit:
+        return
+
+    content = Path(skill).read_text()
+    try:
+        client.agents.core_memory.append(
+            agent_id=agent_id,
+            label=label,
+            value=content,
+        )
+    except AttributeError:
+        client.agents.messages.create(
+            agent_id=agent_id,
+            input=f"Skill '{label}' instructions:\n{content}",
+        )
+
+    click.echo(f"OK: Attached skill '{skill}' to agent {agent_id} under '{label}'")
+
+
 @cli.group()
 def observe():
     """Unified observability pipeline - W&B, Phoenix, Cost Analytics with shared trace ID"""

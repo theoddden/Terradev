@@ -63,6 +63,34 @@ class TestAgent:
         result = runner.invoke(cli, ["agent", "teardown"], obj={"api": mock_api})
         assert result.exit_code != 0
 
+    def test_vector_db_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["agent", "vector-db", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+
+    def test_vector_db_up_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["agent", "vector-db", "up", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+
+    def test_skill_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["agent", "skill", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+
+    def test_skill_init_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["agent", "skill", "init", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+
+    def test_skill_attach_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["agent", "skill", "attach", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+
+    def test_letta_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["agent", "letta", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+
+    def test_letta_create_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["agent", "letta", "create", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+
 class TestLocal:
     def test_group_help(self, runner, mock_api):
         result = runner.invoke(cli, ["local", "--help"], obj={"api": mock_api})
