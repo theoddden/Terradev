@@ -216,6 +216,35 @@ def _terradev_command() -> List[str]:
         return ["terradev"]
     return [sys.executable, "-m", "terradev_cli"]
 
+def build_cli_args(arguments: Dict[str, Any], cmd_args: List[str], positional: List[str]) -> List[str]:
+    """Convert MCP tool arguments into a CLI argument list.
+
+    - Positional argument names are appended in the order given.
+    - Other arguments are appended as `--<key> <value>` (underscores become
+      hyphens). Boolean True becomes a bare flag; False/None are ignored.
+    """
+    extra: List[str] = []
+    for name in positional:
+        if name in arguments:
+            value = arguments[name]
+            if isinstance(value, list):
+                extra.extend(str(v) for v in value)
+            else:
+                extra.append(str(value))
+    for key, value in arguments.items():
+        if key in positional or value is None or value is False:
+            continue
+        flag = "--" + key.replace("_", "-")
+        if isinstance(value, bool):
+            extra.append(flag)
+        elif isinstance(value, list):
+            for item in value:
+                extra.extend([flag, str(item)])
+        else:
+            extra.extend([flag, str(value)])
+    return cmd_args + extra
+
+
 async def execute_terradev_command(args: List[str]) -> Dict[str, Any]:
     """Execute terradev CLI command with helpful error messages."""
     try:
