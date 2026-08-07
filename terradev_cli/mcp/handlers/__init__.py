@@ -15,6 +15,8 @@ from .pricing import HANDLERS as _pricing_handlers
 from .training import HANDLERS as _training_handlers
 
 HANDLERS = {}
+from .unsloth import HANDLERS as _unsloth_handlers
+from .weaviate import HANDLERS as _weaviate_handlers
 from .vllm_lora import HANDLERS as _vllm_lora_handlers
 from .agentic import HANDLERS as _agentic_handlers
 HANDLERS.update(_compute_handlers)
@@ -32,3 +34,5 @@ HANDLERS.update(_pricing_handlers)
 HANDLERS.update(_training_handlers)
 HANDLERS.update(_agentic_handlers)
 HANDLERS.update(_vllm_lora_handlers)
+HANDLERS.update(_weaviate_handlers)
+HANDLERS.update(_unsloth_handlers)

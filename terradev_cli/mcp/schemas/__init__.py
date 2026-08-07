@@ -15,6 +15,8 @@ from .pricing import TOOLS as _pricing_tools
 from .training import TOOLS as _training_tools
 
 TOOLS = []
+from .unsloth import TOOLS as _unsloth_tools
+from .weaviate import TOOLS as _weaviate_tools
 from .vllm_lora import TOOLS as _vllm_lora_tools
 from .agentic import TOOLS as _agentic_tools
 TOOLS.extend(_compute_tools)
@@ -32,3 +34,5 @@ TOOLS.extend(_pricing_tools)
 TOOLS.extend(_training_tools)
 TOOLS.extend(_agentic_tools)
 TOOLS.extend(_vllm_lora_tools)
+TOOLS.extend(_weaviate_tools)
+TOOLS.extend(_unsloth_tools)
