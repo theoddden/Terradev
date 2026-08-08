@@ -22,6 +22,38 @@ logger = logging.getLogger(__name__)
 INFERENCE_PROVIDERS = {"huggingface", "baseten", "siliconflow", "inferx"}
 
 
+class GatewayCommand(click.Command):
+    """Click command that catches unexpected runtime failures and exits cleanly."""
+
+    def invoke(self, ctx):
+        try:
+            rv = super().invoke(ctx)
+        except (click.ClickException, SystemExit):
+            raise
+        except Exception as exc:  # noqa: BLE001
+            click.echo(f"ERROR: {exc}", err=True)
+            raise click.exceptions.Exit(1) from exc
+
+        output = ctx.obj.get("terradev_output") if ctx.obj else None
+        if output is not None and (rv is None or rv == 0):
+            messages = getattr(output, "_messages", [])
+            if any(m.level == "error" for m in messages):
+                raise click.exceptions.Exit(1)
+        return rv
+
+
+class GatewayGroup(click.Group):
+    """Click group that uses GatewayCommand for leaf subcommands."""
+
+    def command(self, *args, **kwargs):
+        kwargs.setdefault("cls", GatewayCommand)
+        return super().command(*args, **kwargs)
+
+    def group(self, *args, **kwargs):
+        kwargs.setdefault("cls", GatewayGroup)
+        return super().group(*args, **kwargs)
+
+
 def _run_async(coro):
     return asyncio.run(coro)
 
@@ -107,6 +139,11 @@ def _register_endpoint(
     url = result.get("endpoint_url") or result.get("endpoint") or ""
     price = result.get("price_per_hour") or result.get("price") or 0.0
 
+    try:
+        price_per_hour = float(price)
+    except (TypeError, ValueError):
+        price_per_hour = 0.0
+
     router = InferenceRouter()
     router.register_endpoint(
         endpoint_id=endpoint_id,
@@ -115,11 +152,15 @@ def _register_endpoint(
         model=model,
         gpu_type=gpu_type,
         region=region or "",
-        price_per_hour=float(price),
+        price_per_hour=price_per_hour,
     )
 
     if "inference_endpoints" not in api.usage:
         api.usage["inference_endpoints"] = []
+    # Idempotent: replace any existing record with the same endpoint id.
+    api.usage["inference_endpoints"] = [
+        e for e in api.usage["inference_endpoints"] if e.get("id") != endpoint_id
+    ]
     api.usage["inference_endpoints"].append(
         {
             "id": endpoint_id,
@@ -257,7 +298,7 @@ ADAPTERS = {
 }
 
 
-@cli.group(name="gateway", invoke_without_command=True)
+@cli.group(name="gateway", invoke_without_command=True, cls=GatewayGroup)
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind the gateway server")
 @click.option("--port", "-p", default=8000, type=int, help="Port for the gateway server")
 @click.option("--openai", is_flag=True, default=True, help="Enable OpenAI-compatible endpoints")
@@ -369,7 +410,7 @@ def gateway_status(ctx, host, port):
 
 def _build_provider_group(provider: str):
     """Build a Click group for a single inference provider."""
-    group = click.Group(
+    group = GatewayGroup(
         name=provider,
         help=f"{provider.title()} inference provider commands",
     )

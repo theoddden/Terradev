@@ -3,10 +3,8 @@
 
 import asyncio
 import json
-import os  # noqa: F401
 import subprocess
 import sys
-import time  # noqa: F401
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -30,11 +28,44 @@ def _parse_vllm_endpoint(endpoint: str):
     p = urlparse(endpoint if "://" in endpoint else f"http://{endpoint}")
     return p.hostname or "127.0.0.1", p.port or 8000
 
+
+class MLCommand(click.Command):
+    """Click command that catches runtime failures and returns non-zero on errors."""
+
+    def invoke(self, ctx):
+        try:
+            rv = super().invoke(ctx)
+        except (click.ClickException, SystemExit):
+            raise
+        except Exception as exc:  # noqa: BLE001
+            click.echo(f"ERROR: {exc}", err=True)
+            raise click.exceptions.Exit(1) from exc
+
+        output = ctx.obj.get("terradev_output") if ctx.obj else None
+        if output is not None and (rv is None or rv == 0):
+            messages = getattr(output, "_messages", [])
+            if any(m.level == "error" for m in messages):
+                raise click.exceptions.Exit(1)
+        return rv
+
+
+class MLGroup(click.Group):
+    """Click group that uses MLCommand for leaf subcommands and MLGroup for nested groups."""
+
+    def command(self, *args, **kwargs):
+        kwargs.setdefault("cls", MLCommand)
+        return super().command(*args, **kwargs)
+
+    def group(self, *args, **kwargs):
+        kwargs.setdefault("cls", MLGroup)
+        return super().group(*args, **kwargs)
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # ML Services Commands
 # ═══════════════════════════════════════════════════════════════════════
 
-@cli.group()
+@cli.group(cls=MLGroup)
 def ml():
     """ML Platform Integration Commands"""
     pass
@@ -268,7 +299,7 @@ def wandb_dashboard_status():
             print(f"ERROR: Dashboard status failed: {result['error']}")
     except ImportError:
         print("ERROR: Enhanced W&B service not available.")
-langchain = click.Group(
+langchain = MLGroup(
     "langchain", help="LangChain integration with workflows, LangGraph, and SGLang."
 )
 
@@ -402,7 +433,7 @@ def langchain_create_pipeline(pipeline_name):
             print(f"ERROR: Pipeline creation failed: {result['error']}")
     except ImportError:
         print("ERROR: Enhanced LangChain service not available.")
-langgraph = click.Group(
+langgraph = MLGroup(
     "langgraph", help="LangGraph workflow orchestration with monitoring."
 )
 
