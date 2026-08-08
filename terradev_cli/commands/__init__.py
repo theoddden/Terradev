@@ -83,6 +83,7 @@ from . import database   # noqa: F401,E402
 from . import weaviate   # noqa: F401,E402
 from . import vault      # noqa: F401,E402
 from . import letta   # noqa: F401,E402
+from . import agent_infra  # noqa: F401,E402
 
 # Fold agentic-serving under the agent group
 platform.agent.add_command(mlops.agentic_serving)

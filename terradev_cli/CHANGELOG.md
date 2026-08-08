@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.7] - 2026-08-08
+
+### 🚀 **Agent subcommands are now real, downloadable, and no longer placeholders**
+- New `terradev agent sandbox` — hardware-isolated execution with real `bwrap`, `runsc`, `firecracker`, and Linux Landlock LSM runtimes, all discoverable/downloadable through `DependencyManager`.
+- New `terradev agent mesh` — peer-to-peer agent mesh with real `libp2p` (`go-libp2p-daemon` + `p2pclient`), A2A HTTP, and `WireGuard` encrypted transports.
+- New `terradev agent mcp` — dynamic Model Context Protocol bridge with stdio and HTTP transports and a multi-server bridge.
+- Added `terradev_cli/commands/agent_infra/dependency_manager.py` to locate or download `p2pd`, `runsc`, `firecracker`, `bwrap`, `wg`, and `wireguard-go` binaries.
+- All agent subcommands integrate with OpenTelemetry tracing via the existing TerradevTelemetry/NodeSpanStream pipeline.
+
+---
+
 ## [5.7.3] - 2026-08-01
 
 ### 🔧 **Fixes & Polish**
