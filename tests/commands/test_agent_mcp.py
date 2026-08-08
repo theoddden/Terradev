@@ -21,9 +21,10 @@ from terradev_cli.commands.agent_infra.mcp import (
     McpServerConnection,
     McpServerDefinition,
     SchemaCompiler,
+    StdioMcpTransport,
     mcp,
 )
-from terradev_cli.commands.agent_infra.core import JsonRpcMessage
+from terradev_cli.commands.agent_infra.core import JsonRpcMessage, McpError, McpTool
 
 
 def _run(coro):
@@ -220,3 +221,54 @@ def test_mcp_registry_cli(runner: CliRunner, tmp_path: Path):
     result = runner.invoke(mcp, ["registry", "list", "--config", str(path)])
     assert result.exit_code == 0
     assert "echo" in result.output
+
+
+def test_mcp_registry_load_invalid_json(tmp_path: Path):
+    """McpRegistry.load fails gracefully when the registry file is not valid JSON."""
+    path = tmp_path / "mcp_registry.json"
+    path.write_text("{not valid json")
+    with pytest.raises(McpError):
+        McpRegistry.load(path)
+
+
+def test_mcp_bridge_add_server_is_idempotent(monkeypatch):
+    """Re-adding a server closes the previous connection and keeps the latest."""
+
+    monkeypatch.setattr(
+        "terradev_cli.commands.agent_infra.mcp._create_transport",
+        lambda server: FakeTransport(tools=[]),
+    )
+
+    async def _main():
+        bridge = McpBridge()
+        definition = McpServerDefinition(name="fake", command="echo")
+        conn = McpServerConnection(
+            "fake",
+            definition,
+            FakeTransport(tools=[McpTool(name="add", inputSchema={"type": "object"})]),
+        )
+        await conn.start()
+        bridge.servers["fake"] = conn
+
+        new_conn = await bridge.add_server(
+            "fake",
+            McpServerDefinition(name="fake", command="echo"),
+        )
+        assert new_conn is bridge.servers["fake"]
+        assert conn.transport.closed
+
+    _run(_main())
+
+
+def test_stdio_mcp_transport_fails_gracefully_missing_command():
+    """StdioMcpTransport.start raises McpError when the command is missing."""
+
+    async def _main():
+        transport = StdioMcpTransport(
+            command="definitely_not_a_real_binary",
+            args=[],
+        )
+        with pytest.raises(McpError):
+            await transport.start()
+
+    _run(_main())

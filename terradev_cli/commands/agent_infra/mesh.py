@@ -65,7 +65,7 @@ class HttpTransport(MeshTransport):
         self.app: Optional[web.Application] = None
         self.runner: Optional[web.AppRunner] = None
         self.site: Optional[web.TCPSite] = None
-        self._cards: List[AgentCard] = []
+        self._cards: Dict[str, AgentCard] = {}
 
     async def start(self, config: MeshConfig) -> None:
         self.config = config
@@ -92,14 +92,20 @@ class HttpTransport(MeshTransport):
 
     async def stop(self) -> None:
         if self.site:
-            await self.site.stop()
+            try:
+                await self.site.stop()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("HTTP site stop failed: %s", exc)
         if self.runner:
-            await self.runner.cleanup()
+            try:
+                await self.runner.cleanup()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("HTTP runner cleanup failed: %s", exc)
 
     async def publish_card(self, card: AgentCard) -> None:
         # Publish this node's actual bound endpoint, not a wildcard like :0.
         card.endpoint = self._self_endpoint()
-        self._cards.append(card)
+        self._cards[card.endpoint] = card
         InMemoryRegistry.cards[card.endpoint] = card
 
     async def discover_cards(self, skills: Optional[List[str]] = None) -> List[AgentCard]:
@@ -119,14 +125,14 @@ class HttpTransport(MeshTransport):
             raise MeshError(f"Failed to delegate task to {card.endpoint}: {exc}") from exc
 
     async def _handle_card(self, request: web.Request) -> web.Response:
-        if not self._cards:
+        endpoint = self._self_endpoint()
+        card = self._cards.get(endpoint)
+        if not card:
             card = AgentCard(
                 name="default",
-                endpoint=self._self_endpoint(),
+                endpoint=endpoint,
                 skills=[],
             )
-        else:
-            card = self._cards[0]
         return web.json_response(card.model_dump())
 
     async def _handle_task(self, request: web.Request) -> web.Response:
@@ -187,7 +193,6 @@ class Libp2pTransport(MeshTransport):
     async def start(self, config: MeshConfig) -> None:
         from p2pclient.daemon import GoDaemon, get_unused_tcp_port
         from p2pclient.p2pclient import Client
-        from p2pclient.libp2p_stubs.peer.id import ID
 
         self.config = config
         p2pd_path = str(DependencyManager().find_p2pd())
@@ -209,7 +214,7 @@ class Libp2pTransport(MeshTransport):
         with self._tracer.trace("libp2p.daemon.start"):
             try:
                 await asyncio.wait_for(self._daemon.wait_until_ready(), timeout=30)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 raise MeshError(f"libp2p daemon failed to start: {exc}") from exc
 
         self._client = Client(control_maddr=control_maddr, listen_maddr=listen_maddr)
@@ -497,14 +502,29 @@ class MeshNode:
         self.config = config
         self.transport = transport or TransportFactory.create(config.transport)
         self.tracer = tracer or get_tracer("terradev.agent.mesh")
+        self._started = False
 
     async def start(self) -> None:
         with self.tracer.trace("agent.mesh.start", {"transport": self.config.transport}):
+            if self._started:
+                raise MeshError("Mesh node is already started")
+            if not await self.transport.is_available():
+                raise MeshError(
+                    f"Mesh transport '{self.config.transport}' is not available "
+                    "(missing dependency or unsupported platform)"
+                )
             await self.transport.start(self.config)
+            self._started = True
 
     async def stop(self) -> None:
         with self.tracer.trace("agent.mesh.stop", {"transport": self.config.transport}):
-            await self.transport.stop()
+            if not self._started:
+                return
+            try:
+                await self.transport.stop()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Mesh transport stop failed: %s", exc)
+            self._started = False
 
     async def publish_card(self, card: AgentCard) -> None:
         with self.tracer.trace("agent.mesh.publish_card", {"name": card.name, "skills": card.skills}):
@@ -615,7 +635,9 @@ def mesh_node_join(protocol, transport, topology, listen, bootstrap, config, tim
 
     try:
         asyncio.run(_main())
-    except MeshError as exc:
+    except (click.ClickException, SystemExit):
+        raise
+    except Exception as exc:  # noqa: BLE001
         click.echo(f"ERROR: {exc}", err=True)
         raise SystemExit(1)
 
@@ -656,7 +678,9 @@ def mesh_card_publish(name, endpoint, skills, version, listen, transport):
 
     try:
         asyncio.run(_main())
-    except MeshError as exc:
+    except (click.ClickException, SystemExit):
+        raise
+    except Exception as exc:  # noqa: BLE001
         click.echo(f"ERROR: {exc}", err=True)
         raise SystemExit(1)
 
@@ -717,7 +741,9 @@ def mesh_task_create(input, skills, peer, slo, listen, transport, format):
 
     try:
         asyncio.run(_main())
-    except MeshError as exc:
+    except (click.ClickException, SystemExit):
+        raise
+    except Exception as exc:  # noqa: BLE001
         click.echo(f"ERROR: {exc}", err=True)
         raise SystemExit(1)
 
@@ -747,7 +773,13 @@ def mesh_peers(skills, listen, transport, format):
         finally:
             await node.stop()
 
-    asyncio.run(_main())
+    try:
+        asyncio.run(_main())
+    except (click.ClickException, SystemExit):
+        raise
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"ERROR: {exc}", err=True)
+        raise SystemExit(1)
 
 
 @mesh.command("route")
@@ -777,4 +809,10 @@ def mesh_route(task_id, skills, listen, transport, format):
         finally:
             await node.stop()
 
-    asyncio.run(_main())
+    try:
+        asyncio.run(_main())
+    except (click.ClickException, SystemExit):
+        raise
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"ERROR: {exc}", err=True)
+        raise SystemExit(1)

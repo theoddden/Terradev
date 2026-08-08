@@ -8,7 +8,6 @@ that implements ``SandboxRuntime``.  New runtimes (Kata, seccomp, Landlock v5,
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -18,12 +17,11 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Dict, List, Optional, Type
 
 import click
 
 from .core import (
-    AgentError,
     NetworkPolicy,
     ResourceLimits,
     RunResult,
@@ -32,7 +30,6 @@ from .core import (
     SandboxTimeoutError,
     UnsupportedRuntimeError,
     _parse_size,
-    _resolve_command,
 )
 from .dependency_manager import DependencyError, DependencyManager
 from .otel import Span, Tracer, get_tracer
@@ -61,8 +58,10 @@ class LocalRuntime(SandboxRuntime):
             or os.environ.get("TERRADEV_AGENT_SANDBOX_LOCAL", "0") == "1"
         )
 
-    async def is_available(self) -> bool:
+    async def is_available(self, config: Optional[SandboxConfig] = None) -> bool:
         # Only usable in dev mode or with explicit opt-in.
+        if config is not None and config.dev_mode:
+            return True
         return os.environ.get("TERRADEV_AGENT_SANDBOX_LOCAL", "0") == "1"
 
     async def run(
@@ -106,7 +105,7 @@ class LocalRuntime(SandboxRuntime):
             return result
         finally:
             try:
-                cwd.rmdir()
+                shutil.rmtree(cwd, ignore_errors=True)
             except OSError:
                 pass
 
@@ -117,7 +116,7 @@ class BwrapRuntime(SandboxRuntime):
     name = "bwrap"
     priority = 20
 
-    async def is_available(self) -> bool:
+    async def is_available(self, config: Optional[SandboxConfig] = None) -> bool:
         try:
             DependencyManager().find_bwrap(allow_download=False)
             return True
@@ -192,7 +191,7 @@ class GvisorRuntime(SandboxRuntime):
     name = "gvisor"
     priority = 30
 
-    async def is_available(self) -> bool:
+    async def is_available(self, config: Optional[SandboxConfig] = None) -> bool:
         try:
             DependencyManager().find_runsc(allow_download=False)
             return True
@@ -251,7 +250,7 @@ class FirecrackerRuntime(SandboxRuntime):
     name = "firecracker"
     priority = 40
 
-    async def is_available(self) -> bool:
+    async def is_available(self, config: Optional[SandboxConfig] = None) -> bool:
         try:
             DependencyManager().find_firecracker(allow_download=False)
             return True
@@ -357,7 +356,7 @@ class LandlockRuntime(SandboxRuntime):
     name = "landlock"
     priority = 25
 
-    async def is_available(self) -> bool:
+    async def is_available(self, config: Optional[SandboxConfig] = None) -> bool:
         from .landlock import _is_available
 
         return _is_available()
@@ -372,7 +371,6 @@ class LandlockRuntime(SandboxRuntime):
         import json
         import tempfile
 
-        from .landlock import apply_landlock
 
         if platform.system().lower() != "linux":
             raise UnsupportedRuntimeError("landlock is only available on Linux 5.13+")
@@ -462,12 +460,23 @@ class RuntimeFactory:
         ``auto`` walks the registered runtimes from highest priority to lowest.
         A named runtime is used if it is available; otherwise the command fails
         closed rather than silently falling back.
+
+        When ``config.dev_mode`` is set, the local runtime is preferred so that
+        developers and tests do not unexpectedly hit higher-priority runtimes
+        that may be unavailable in their environment.
         """
         if config.runtime == "auto":
+            if config.dev_mode:
+                local_cls = cls._runtimes.get("local")
+                if local_cls:
+                    local = local_cls()
+                    if await local.is_available(config):
+                        return local
+
             candidates = sorted(cls._runtimes.values(), key=lambda c: -c.priority)
             for runtime_cls in candidates:
                 runtime = runtime_cls()
-                if await runtime.is_available():
+                if await runtime.is_available(config):
                     return runtime
             raise UnsupportedRuntimeError(
                 "No sandbox runtime is available. "
@@ -479,7 +488,7 @@ class RuntimeFactory:
             raise UnsupportedRuntimeError(f"Unknown runtime: {config.runtime}")
 
         runtime = runtime_cls()
-        if not await runtime.is_available():
+        if not await runtime.is_available(config):
             raise UnsupportedRuntimeError(f"Runtime {config.runtime} is not available")
         return runtime
 
@@ -671,21 +680,19 @@ def sandbox_run(
     if not payload_text and not stdin:
         raise click.BadArgumentUsage("Provide PAYLOAD or --stdin")
 
-    command = shlex.split(payload_text) if payload_text else []
+    try:
+        command = shlex.split(payload_text) if payload_text else []
+    except ValueError as exc:
+        raise click.BadArgumentUsage(f"Could not parse payload as a command: {exc}") from exc
+    if not command:
+        raise click.BadArgumentUsage("Provide a non-empty PAYLOAD or --stdin")
 
     async def _main():
         runner = SandboxRunner(cfg)
-        try:
-            if dry_run:
-                result = await runner.dry_run(command)
-            else:
-                result = await runner.run(command)
-        except UnsupportedRuntimeError as exc:
-            click.echo(f"ERROR: {exc}", err=True)
-            raise SystemExit(1)
-        except SandboxTimeoutError as exc:
-            click.echo(f"ERROR: {exc}", err=True)
-            raise SystemExit(124)
+        if dry_run:
+            result = await runner.dry_run(command)
+        else:
+            result = await runner.run(command)
 
         if format == "json":
             click.echo(json.dumps(result.to_dict(), indent=2, default=str))
@@ -698,4 +705,13 @@ def sandbox_run(
 
         return result.exit_code
 
-    return asyncio.run(_main())
+    try:
+        return asyncio.run(_main())
+    except SandboxTimeoutError as exc:
+        click.echo(f"ERROR: {exc}", err=True)
+        raise SystemExit(124)
+    except (click.ClickException, SystemExit):
+        raise
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"ERROR: {exc}", err=True)
+        raise SystemExit(1)

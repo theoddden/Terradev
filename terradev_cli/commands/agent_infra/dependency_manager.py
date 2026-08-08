@@ -23,7 +23,6 @@ import stat
 import subprocess
 import tarfile
 import urllib.request
-import zipfile
 from pathlib import Path
 from typing import Optional
 

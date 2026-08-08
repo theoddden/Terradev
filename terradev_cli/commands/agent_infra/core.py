@@ -9,20 +9,18 @@ from __future__ import annotations
 
 import asyncio
 import re
-import shlex
 import shutil
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Protocol, Type, TypeVar
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 import click
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .otel import Span, get_tracer
+from .otel import Span
 
 T = TypeVar("T")
 
@@ -183,7 +181,7 @@ class SandboxRuntime(ABC):
     priority: int = 0
 
     @abstractmethod
-    async def is_available(self) -> bool:
+    async def is_available(self, config: Optional[SandboxConfig] = None) -> bool:
         """Return True if this runtime can be used on the current host."""
 
     @abstractmethod
@@ -207,14 +205,34 @@ class SandboxRuntime(ABC):
         input_data: Optional[bytes] = None,
     ) -> RunResult:
         """Execute a process asynchronously and capture both streams."""
+        if not cmd:
+            return RunResult(
+                exit_code=127,
+                stdout="",
+                stderr="No command provided to sandbox runtime",
+                runtime=self.name,
+                duration_ms=0.0,
+            )
+
         start = asyncio.get_event_loop().time()
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            stdin=asyncio.subprocess.PIPE if input_data is not None else None,
-            env=env,
-        )
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                stdin=asyncio.subprocess.PIPE if input_data is not None else None,
+                env=env,
+            )
+        except (FileNotFoundError, PermissionError, NotADirectoryError, ValueError) as exc:
+            exit_code = 127 if isinstance(exc, (FileNotFoundError, ValueError)) else 126
+            return RunResult(
+                exit_code=exit_code,
+                stdout="",
+                stderr=f"{type(exc).__name__}: {exc}",
+                runtime=self.name,
+                duration_ms=0.0,
+            )
+
         try:
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(input_data),
@@ -339,6 +357,10 @@ class MeshTransport(ABC):
     """Abstract transport for agent-to-agent communication."""
 
     name: str = "abstract"
+
+    async def is_available(self) -> bool:
+        """Return True if the transport can be started on this host."""
+        return True
 
     @abstractmethod
     async def start(self, config: MeshConfig) -> None:

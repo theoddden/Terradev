@@ -18,7 +18,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Type
 
 import aiohttp
 import click
@@ -123,8 +123,11 @@ class McpRegistry(BaseModel):
     def load(cls, path: Path) -> "McpRegistry":
         if not path.exists():
             return cls()
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError as exc:
+            raise McpError(f"Invalid MCP registry JSON at {path}: {exc}") from exc
         if isinstance(data, list):
             return cls(servers=[McpServerDefinition.model_validate(s) for s in data])
         return cls(servers=[McpServerDefinition.model_validate(s) for s in data.get("servers", [])])
@@ -182,14 +185,17 @@ class StdioMcpTransport(McpTransport):
 
     async def start(self) -> None:
         env = {**dict(os.environ), **self.env}
-        self.proc = await asyncio.create_subprocess_exec(
-            self.command,
-            *self.args,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
-        )
+        try:
+            self.proc = await asyncio.create_subprocess_exec(
+                self.command,
+                *self.args,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+            )
+        except (OSError, ValueError) as exc:
+            raise McpError(f"Failed to start stdio MCP server '{self.command}': {exc}") from exc
         if not self.proc.stdin or not self.proc.stdout:
             raise McpError("Failed to start stdio MCP server")
 
@@ -433,6 +439,12 @@ class McpBridge:
         self.tracer = tracer or get_tracer("terradev.agent.mcp.bridge")
 
     async def add_server(self, name: str, server: McpServerDefinition) -> McpServerConnection:
+        if name in self.servers:
+            old = self.servers[name]
+            try:
+                await old.close()
+            except Exception:  # noqa: BLE001
+                pass
         transport = _create_transport(server)
         conn = McpServerConnection(name, server, transport, tracer=self.tracer)
         await conn.start()
@@ -495,7 +507,13 @@ class McpBridge:
         if method == "tools/call":
             name = params.get("name")
             arguments = params.get("arguments", {})
-            result = await self.call_tool(name, arguments)
+            try:
+                result = await self.call_tool(name, arguments)
+            except McpError as exc:
+                return JsonRpcMessage(
+                    id=msg.id,
+                    error={"code": -32603, "message": str(exc)},
+                )
             return JsonRpcMessage(id=msg.id, result=result)
 
         if method == "prompts/list":
@@ -587,7 +605,11 @@ class McpServer:
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, host, port)
-        await site.start()
+        try:
+            await site.start()
+        except OSError as exc:
+            await runner.cleanup()
+            raise McpError(f"Failed to start MCP HTTP server on {host}:{port}: {exc}") from exc
 
         # Resolve the actual bound port when port=0 was requested.
         bound_port = port
@@ -657,18 +679,24 @@ def mcp_registry_add(
         k, v = e.split("=", 1)
         env_dict[k] = v
 
-    server = McpServerDefinition(
-        name=name,
-        transport=transport,
-        command=command,
-        args=[a.strip() for a in args.split(",") if a.strip()],
-        url=url,
-        env=env_dict,
-        network_allow=list(network_allow),
-        isolation=isolation,
-    )
+    try:
+        server = McpServerDefinition(
+            name=name,
+            transport=transport,
+            command=command,
+            args=[a.strip() for a in args.split(",") if a.strip()],
+            url=url,
+            env=env_dict,
+            network_allow=list(network_allow),
+            isolation=isolation,
+        )
+    except ValidationError as exc:
+        raise click.BadOptionUsage("--name", f"Invalid MCP server definition: {exc}") from exc
 
-    reg = McpRegistry.load(Path(config_path))
+    try:
+        reg = McpRegistry.load(Path(config_path))
+    except McpError as exc:
+        raise click.BadOptionUsage("--config", f"{exc}") from exc
     reg.add(server)
     reg.save(Path(config_path))
     click.echo(f"OK: Added MCP server {name} to {config_path}")
@@ -679,7 +707,10 @@ def mcp_registry_add(
 @click.option("--format", type=click.Choice(["text", "json"]), default="text")
 def mcp_registry_list(config_path, format):
     """List MCP servers in the registry."""
-    reg = McpRegistry.load(Path(config_path))
+    try:
+        reg = McpRegistry.load(Path(config_path))
+    except McpError as exc:
+        raise click.BadOptionUsage("--config", f"{exc}") from exc
     if format == "json":
         click.echo(json.dumps([s.model_dump() for s in reg.servers], indent=2, default=str))
     else:
@@ -726,7 +757,9 @@ def mcp_serve(transport, config, port, host):
 
     try:
         asyncio.run(_main())
-    except McpError as exc:
+    except (click.ClickException, SystemExit):
+        raise
+    except Exception as exc:  # noqa: BLE001
         click.echo(f"ERROR: {exc}", err=True)
         raise SystemExit(1)
 
@@ -749,13 +782,17 @@ def mcp_call(server, tool, input, config, timeout, format):
             if not definition:
                 raise click.BadOptionUsage("--server", f"Server {server} not found in registry")
 
+            if not tool:
+                raise click.BadOptionUsage("--tool", "--tool is required")
+            try:
+                arguments = json.loads(input) if input else {}
+            except json.JSONDecodeError as exc:
+                raise click.BadOptionUsage("--input", f"Invalid JSON: {exc}") from exc
+
             transport = _create_transport(definition)
             conn = McpServerConnection(server, definition, transport)
             await conn.start()
             try:
-                if not tool:
-                    raise click.BadOptionUsage("--tool", "--tool is required")
-                arguments = json.loads(input) if input else {}
                 result = await conn.call_tool(tool, arguments)
 
                 if format == "json":
@@ -770,6 +807,8 @@ def mcp_call(server, tool, input, config, timeout, format):
 
     try:
         asyncio.run(_main())
-    except McpError as exc:
+    except (click.ClickException, SystemExit):
+        raise
+    except Exception as exc:  # noqa: BLE001
         click.echo(f"ERROR: {exc}", err=True)
         raise SystemExit(1)

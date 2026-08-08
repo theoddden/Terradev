@@ -10,7 +10,6 @@ build-time dependencies.
 from __future__ import annotations
 
 import ctypes
-import errno
 import os
 import platform
 from typing import List

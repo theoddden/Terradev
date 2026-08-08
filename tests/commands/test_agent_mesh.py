@@ -9,9 +9,11 @@ import json
 import pytest
 from click.testing import CliRunner
 
+from terradev_cli.commands.agent_infra.core import MeshError, MeshTransport
 from terradev_cli.commands.agent_infra.mesh import (
     AgentCard,
     HttpTransport,
+    InMemoryRegistry,
     MeshConfig,
     MeshNode,
     Task,
@@ -22,6 +24,12 @@ from terradev_cli.commands.agent_infra.mesh import (
 
 def _run(coro):
     return asyncio.run(coro)
+
+
+@pytest.fixture(autouse=True)
+def _reset_mesh_registry():
+    """Keep in-memory mesh state isolated between tests."""
+    InMemoryRegistry.reset()
 
 
 def test_agent_card_validation():
@@ -145,3 +153,58 @@ def test_mesh_peers_help(runner: CliRunner):
     result = runner.invoke(mesh, ["peers", "--help"])
     assert result.exit_code == 0
     assert "--transport" in result.output
+
+
+def test_http_card_publish_is_idempotent():
+    """Publishing the same card twice updates the existing entry, not duplicates."""
+
+    async def _main():
+        cfg = MeshConfig(listen="127.0.0.1:0", transport="http")
+        transport = HttpTransport()
+        await transport.start(cfg)
+        try:
+            card = AgentCard(name="node", endpoint="http://127.0.0.1:0", skills=["search"])
+            await transport.publish_card(card)
+            updated = AgentCard(name="node", endpoint="http://127.0.0.1:0", skills=["search", "math"])
+            await transport.publish_card(updated)
+            assert len(transport._cards) == 1
+            assert InMemoryRegistry.cards[transport._self_endpoint()].skills == ["search", "math"]
+        finally:
+            await transport.stop()
+
+    _run(_main())
+
+
+def test_mesh_node_start_fails_gracefully_unavailable_transport():
+    """MeshNode.start raises MeshError when the transport is unavailable."""
+
+    class UnavailableTransport(MeshTransport):
+        name = "unavailable"
+
+        async def start(self, config: MeshConfig) -> None:
+            pass
+
+        async def stop(self) -> None:
+            pass
+
+        async def publish_card(self, card: AgentCard) -> None:
+            pass
+
+        async def discover_cards(self, skills=None):
+            return []
+
+        async def delegate_task(self, card: AgentCard, task: Task) -> Task:
+            return task
+
+        async def is_available(self) -> bool:
+            return False
+
+    async def _main():
+        node = MeshNode(
+            MeshConfig(transport="unavailable"),
+            transport=UnavailableTransport(),
+        )
+        with pytest.raises(MeshError):
+            await node.start()
+
+    _run(_main())

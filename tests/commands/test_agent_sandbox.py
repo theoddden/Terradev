@@ -15,6 +15,7 @@ from terradev_cli.commands.agent_infra.sandbox import (
     LocalRuntime,
     RuntimeFactory,
     SandboxRunner,
+    SandboxRuntime,
     sandbox,
 )
 from terradev_cli.commands.agent_infra.core import (
@@ -147,3 +148,32 @@ def test_runtime_factory_priority():
     names = RuntimeFactory.list_runtimes()
     assert "local" in names
     assert "firecracker" in names
+
+
+def test_runtime_factory_prefers_local_in_dev_mode():
+    cfg = SandboxConfig(runtime="auto", payload="echo test", dev_mode=True)
+    runtime = asyncio.run(RuntimeFactory.select(cfg))
+    assert isinstance(runtime, LocalRuntime)
+
+
+def test_sandbox_exec_missing_command_returns_127():
+    class TestRuntime(SandboxRuntime):
+        name = "test"
+
+        async def is_available(self, config=None):
+            return True
+
+        async def run(self, config, *, command, span=None):
+            return await self._exec(command)
+
+    result = asyncio.run(TestRuntime()._exec(["definitely_not_a_real_binary"]))
+    assert result.exit_code == 127
+    assert "FileNotFoundError" in result.stderr
+
+
+def test_sandbox_run_invalid_payload_raises(runner: CliRunner):
+    result = runner.invoke(
+        sandbox,
+        ["run", "--runtime", "local", "--dev", "echo 'unclosed"],
+    )
+    assert result.exit_code != 0
