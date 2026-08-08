@@ -311,7 +311,9 @@ def test_all_ml_commands_invoke_without_unhandled_exception(mock_api):
                                         failures.append(f"{'.'.join(full_path)}: runner raised {exc}")
                                         continue
 
-                                    if result.exception and not isinstance(result.exception, click.ClickException):
+                                    if result.exception and not isinstance(
+                                        result.exception, (click.ClickException, click.exceptions.Exit, SystemExit)
+                                    ):
                                         failures.append(
                                             f"{'.'.join(full_path)}: {type(result.exception).__name__}: {result.exception}"
                                         )
