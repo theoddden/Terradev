@@ -101,7 +101,7 @@ def _is_available() -> bool:
         if err == errno.ENOSYS or err == errno.EOPNOTSUPP:
             return False
         return False
-    except Exception:
+    except (LandlockError, OSError, AttributeError):
         return False
 
 

@@ -176,7 +176,7 @@ class Libp2pTransport(MeshTransport):
     async def is_available(self) -> bool:
         try:
             import p2pclient  # noqa: F401
-        except Exception:
+        except (ImportError, OSError):
             return False
         try:
             DependencyManager().find_p2pd(allow_download=False)
@@ -381,7 +381,7 @@ class WireGuardTransport(MeshTransport):
     async def is_available(self) -> bool:
         try:
             import wireguard  # noqa: F401
-        except Exception:
+        except (ImportError, OSError):
             return False
         try:
             DependencyManager().find_wg(allow_download=False)

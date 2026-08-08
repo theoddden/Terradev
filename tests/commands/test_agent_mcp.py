@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from pydantic import ValidationError
 
 from terradev_cli.commands.agent_infra.mcp import (
     JsonRpcCodec,
@@ -58,7 +59,7 @@ def test_schema_compiler_validates():
         "properties": {"query": {"type": "string"}},
         "required": ["query"],
     }
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         SchemaCompiler.validate("search", schema, {"limit": 5})
 
 
