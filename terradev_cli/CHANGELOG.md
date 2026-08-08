@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.8] - 2026-08-08
+
+### 🐛 **CI hardening for agent subcommands**
+- Added Landlock ABI-version detection and masked access bits to only those supported by the running kernel, fixing the `landlock_add_rule(/)` failure on GitHub Actions runners.
+- Landlock runtime availability now performs a real smoke test (ruleset creation + path rule) instead of only checking for the syscall, preventing auto-selection on broken or incompatible kernels.
+- Fixed `test_libp2p_transport_lifecycle` to skip when the optional `p2pclient`/`p2pd` dependency is not installed.
+- Bumped version to **6.0.8**.
+
+---
+
 ## [6.0.7] - 2026-08-08
 
 ### 🚀 **Agent subcommands are now real, downloadable, and no longer placeholders**

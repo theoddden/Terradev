@@ -8,7 +8,7 @@ try:
 
     __version__ = version("terradev-cli")
 except PackageNotFoundError:
-    __version__ = "6.0.7"
+    __version__ = "6.0.8"
 
 __author__ = "Terradev Team"
-__description__ = "Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration."
+__description__ = "Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration with agent sandbox, mesh, and MCP subcommands."

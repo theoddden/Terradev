@@ -1,6 +1,6 @@
-# Terradev CLI v6.0.6
+# Terradev CLI v6.0.8
 
-**Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration.**
+**Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration with agent sandbox, mesh, and MCP subcommands.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
@@ -16,6 +16,13 @@ Combines quoting, provisioning, topology optimization, training orchestration, i
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
+
+**NOTES ON 6.0.8**
+
+- **New agent subcommands** — `terradev agent sandbox`, `terradev agent mesh`, and `terradev agent mcp` are now real, dependency-resolving commands instead of placeholders:
+  - `terradev agent sandbox` runs untrusted payloads with hardware-isolated runtimes (`bwrap`, `runsc`, `firecracker`, and Linux Landlock LSM), all discoverable/downloadable via `DependencyManager`.
+  - `terradev agent mesh` creates a decentralized peer-to-peer agent mesh using real `libp2p` (`go-libp2p-daemon` + `p2pclient`), A2A HTTP, and `WireGuard` encrypted transports.
+  - `terradev agent mcp` is a dynamic Model Context Protocol bridge with stdio and HTTP transports and a multi-server bridge.
 
 **NOTES ON 6.0.0**
 
