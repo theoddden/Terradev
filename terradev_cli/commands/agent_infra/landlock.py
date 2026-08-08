@@ -55,16 +55,20 @@ _LANDLOCK_ACCESS_FS_ALL = (
     | _LANDLOCK_ACCESS_FS_TRUNCATE
 )
 
+# Landlock create-ruleset flag to request the ABI version instead of a fd.
+_LANDLOCK_CREATE_RULESET_VERSION = 1 << 4
+
 
 class _RulesetAttr(ctypes.Structure):
     _fields_ = [("handled_access_fs", ctypes.c_uint64)]
 
 
 class _PathBeneathAttr(ctypes.Structure):
+    _pack_ = 1
     _fields_ = [
         ("allowed_access", ctypes.c_uint64),
         ("parent_fd", ctypes.c_int32),
-        ("_padding", ctypes.c_uint8 * 4),
+        ("__reserved", ctypes.c_uint32),
     ]
 
 
@@ -82,6 +86,42 @@ def _landlock_syscalls() -> tuple:
     raise LandlockError(f"Landlock syscall numbers not known for {machine}")
 
 
+def _get_abi_version() -> int:
+    """Return the Landlock ABI version, or 0 if the kernel does not support it."""
+    if platform.system().lower() != "linux":
+        return 0
+    libc = _libc()
+    create_nr, _, _ = _landlock_syscalls()
+    ret = libc.syscall(create_nr, None, 0, _LANDLOCK_CREATE_RULESET_VERSION)
+    if ret < 0:
+        return 0
+    return int(ret)
+
+
+def _supported_fs_access(abi_version: int) -> int:
+    """Return the filesystem access bits supported by the running kernel."""
+    bits = (
+        _LANDLOCK_ACCESS_FS_EXECUTE
+        | _LANDLOCK_ACCESS_FS_WRITE_FILE
+        | _LANDLOCK_ACCESS_FS_READ_FILE
+        | _LANDLOCK_ACCESS_FS_READ_DIR
+        | _LANDLOCK_ACCESS_FS_REMOVE_DIR
+        | _LANDLOCK_ACCESS_FS_REMOVE_FILE
+        | _LANDLOCK_ACCESS_FS_MAKE_CHAR
+        | _LANDLOCK_ACCESS_FS_MAKE_DIR
+        | _LANDLOCK_ACCESS_FS_MAKE_REG
+        | _LANDLOCK_ACCESS_FS_MAKE_SOCK
+        | _LANDLOCK_ACCESS_FS_MAKE_FIFO
+        | _LANDLOCK_ACCESS_FS_MAKE_BLOCK
+        | _LANDLOCK_ACCESS_FS_MAKE_SYM
+    )
+    if abi_version >= 2:
+        bits |= _LANDLOCK_ACCESS_FS_REFER
+    if abi_version >= 3:
+        bits |= _LANDLOCK_ACCESS_FS_TRUNCATE
+    return bits
+
+
 def _libc() -> ctypes.CDLL:
     return ctypes.CDLL(None, use_errno=True)
 
@@ -91,16 +131,23 @@ def _is_available() -> bool:
         return False
     try:
         _landlock_syscalls()
-        libc = _libc()
-        attr = _RulesetAttr(handled_access_fs=_LANDLOCK_ACCESS_FS_READ_FILE)
-        ret = libc.syscall(_landlock_syscalls()[0], ctypes.byref(attr), ctypes.sizeof(attr), 0)
-        if ret >= 0:
-            os.close(ret)
-            return True
-        err = ctypes.get_errno()
-        if err == errno.ENOSYS or err == errno.EOPNOTSUPP:
+        abi = _get_abi_version()
+        if abi < 1:
             return False
-        return False
+        mask = _supported_fs_access(abi)
+        # Smoke test: the kernel must accept a real path rule, not just
+        # ruleset creation.  Restricting the test process is not required.
+        ruleset_fd = _create_ruleset(mask)
+        try:
+            read_access = (
+                _LANDLOCK_ACCESS_FS_READ_FILE
+                | _LANDLOCK_ACCESS_FS_READ_DIR
+                | _LANDLOCK_ACCESS_FS_EXECUTE
+            ) & mask
+            _add_path(ruleset_fd, "/", read_access)
+        finally:
+            os.close(ruleset_fd)
+        return True
     except (LandlockError, OSError, AttributeError):
         return False
 
@@ -114,11 +161,11 @@ def _set_no_new_privs() -> None:
         raise LandlockError(f"prctl(PR_SET_NO_NEW_PRIVS) failed: {os.strerror(ctypes.get_errno())}")
 
 
-def _create_ruleset() -> int:
+def _create_ruleset(handled_access_fs: int) -> int:
     """Create a Landlock ruleset and return its file descriptor."""
     libc = _libc()
     create_nr, _, _ = _landlock_syscalls()
-    attr = _RulesetAttr(handled_access_fs=_LANDLOCK_ACCESS_FS_ALL)
+    attr = _RulesetAttr(handled_access_fs=handled_access_fs)
     ret = libc.syscall(create_nr, ctypes.byref(attr), ctypes.sizeof(attr), 0)
     if ret < 0:
         raise LandlockError(
@@ -166,15 +213,19 @@ def apply_landlock(
     The ruleset is installed in the current thread and is inherited by any
     child process created after this call (including ``exec``-ed programs).
     """
+    abi = _get_abi_version()
+    if abi < 1:
+        raise LandlockError("Landlock is not supported by the running kernel")
+    mask = _supported_fs_access(abi)
     read_access = (
         _LANDLOCK_ACCESS_FS_READ_FILE
         | _LANDLOCK_ACCESS_FS_READ_DIR
         | _LANDLOCK_ACCESS_FS_EXECUTE
-    )
-    write_access = _LANDLOCK_ACCESS_FS_ALL
+    ) & mask
+    write_access = mask
 
     _set_no_new_privs()
-    ruleset_fd = _create_ruleset()
+    ruleset_fd = _create_ruleset(mask)
     try:
         for path in read_dirs:
             if os.path.isdir(path):

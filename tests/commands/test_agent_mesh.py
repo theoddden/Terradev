@@ -53,6 +53,9 @@ def test_wireguard_is_not_available_without_wg():
 def test_libp2p_transport_lifecycle():
     from terradev_cli.commands.agent_infra.mesh import Libp2pTransport, MeshConfig
 
+    if not _run(Libp2pTransport().is_available()):
+        pytest.skip("libp2p (p2pclient/p2pd) not available")
+
     async def _main():
         transport = Libp2pTransport()
         await transport.start(MeshConfig(listen="127.0.0.1:0", transport="libp2p"))
