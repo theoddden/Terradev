@@ -17,7 +17,39 @@ from . import cli
 from terradev_cli.commands._api import TerradevAPI
 
 
-@cli.group()
+class InferenceCommand(click.Command):
+    """Click command that catches runtime failures and returns non-zero on errors."""
+
+    def invoke(self, ctx):
+        try:
+            rv = super().invoke(ctx)
+        except (click.ClickException, SystemExit):
+            raise
+        except Exception as exc:  # noqa: BLE001
+            click.echo(f"ERROR: {exc}", err=True)
+            raise click.exceptions.Exit(1) from exc
+
+        output = ctx.obj.get("terradev_output") if ctx.obj else None
+        if output is not None and (rv is None or rv == 0):
+            messages = getattr(output, "_messages", [])
+            if any(m.level == "error" for m in messages):
+                raise click.exceptions.Exit(1)
+        return rv
+
+
+class InferenceGroup(click.Group):
+    """Click group that uses InferenceCommand for leaf subcommands and InferenceGroup for nested groups."""
+
+    def command(self, *args, **kwargs):
+        kwargs.setdefault("cls", InferenceCommand)
+        return super().command(*args, **kwargs)
+
+    def group(self, *args, **kwargs):
+        kwargs.setdefault("cls", InferenceGroup)
+        return super().group(*args, **kwargs)
+
+
+@cli.group(cls=InferenceGroup)
 def orchestrator():
     """Model orchestrator for multi-model inference"""
     pass
@@ -213,7 +245,7 @@ def orchestrator_infer(model_id):
     asyncio.run(test_inference())
 
 
-@cli.group(name="warm-pool")
+@cli.group(name="warm-pool", cls=InferenceGroup)
 def warm_pool():
     """Warm pool manager for intelligent pre-warming"""
     pass
@@ -316,7 +348,7 @@ def warm_pool_status():
     print(f"  Cost saved: ${status['cost_saved_usd']:.2f}")
 
 
-@cli.group()
+@cli.group(cls=InferenceGroup)
 def cost_scaler():
     """Cost-aware scaling manager for inference optimization"""
     pass
@@ -436,7 +468,7 @@ def cost_scaler_model_details(model_id):
 
 
 
-@cli.group()
+@cli.group(cls=InferenceGroup)
 def inferx():
     """InferX serverless inference platform - <2s cold starts, 90% GPU utilization"""
     pass
@@ -594,7 +626,7 @@ def inferx_status(model_id):
         print(f" Requests/min: {result.get('requests_per_minute', 0)}")
         print(f" GPU Utilization: {result.get('gpu_utilization', 0)}%")
         print(f"PACKAGE: Models on GPU: {result.get('models_on_gpu', 0)}")
-        print(f"ERROR: Error Rate: {result.get('error_rate', 0)}%")
+        print(f"   Error rate: {result.get('error_rate', 0)}%")
 
     except Exception as e:  # noqa: BLE001
         print(f"ERROR: Failed to get status: {e}")
@@ -995,7 +1027,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
     return node_ips, resolved_ssh_key
 
 
-@cli.command()
+@cli.command(cls=InferenceCommand)
 @click.option(
     "--nodes",
     "-n",
@@ -1067,7 +1099,7 @@ def preflight(nodes, ssh_user, ssh_key, provision_group, quick, fmt):
 
 
 
-@cli.group()
+@cli.group(cls=InferenceGroup)
 def infer():
     """Deploy and manage inference endpoints"""
     pass
@@ -1445,7 +1477,7 @@ def infer_endpoint(
         pass
 
 
-@cli.command()
+@cli.command(cls=InferenceCommand)
 @click.option(
     "--gpu",
     "-g",

@@ -56,11 +56,11 @@ class TestQuoteCommand:
         assert result.exit_code == 0
 
     def test_region_filter_no_match_reports_error(self, runner, mock_api):
-        """A region with no quotes should report an error, not crash."""
+        """A region with no quotes should report an error and exit non-zero."""
         result = runner.invoke(
             cli, ["quote", "-g", "A100-80GB", "--region", "ap-southeast-99"], obj={"api": mock_api}
         )
-        assert result.exit_code == 0
+        assert result.exit_code == 1
         assert "ERROR" in result.output or "No quotes" in result.output
 
     def test_no_quotes_from_all_providers(self, runner, mock_api):
@@ -69,7 +69,7 @@ class TestQuoteCommand:
         mock_api.get_vastai_quotes = AsyncMock(return_value=[])
         mock_api.get_tensordock_quotes = AsyncMock(return_value=[])
         result = runner.invoke(cli, ["quote", "-g", "A100-80GB"], obj={"api": mock_api})
-        assert result.exit_code == 0
+        assert result.exit_code == 1
         assert "ERROR" in result.output or "No quotes" in result.output
 
     def test_various_gpu_types_accepted(self, runner, mock_api):
@@ -106,7 +106,10 @@ class TestConfigureCommand:
 
     def test_aws_echoes_provider_name(self, runner, mock_api):
         result = runner.invoke(
-            cli, ["configure", "--provider", "aws"], obj={"api": mock_api}, input="test-key\n"
+            cli,
+            ["configure", "--provider", "aws"],
+            obj={"api": mock_api},
+            input="test-key\ntest-secret\n",
         )
         assert result.exit_code == 0
         assert "AWS" in result.output

@@ -18,7 +18,39 @@ from ._api import (
 logger = logging.getLogger(__name__)
 
 
-@cli.command()
+class ProvidersCommand(click.Command):
+    """Click command that catches runtime failures and returns non-zero on errors."""
+
+    def invoke(self, ctx):
+        try:
+            rv = super().invoke(ctx)
+        except (click.ClickException, SystemExit):
+            raise
+        except Exception as exc:  # noqa: BLE001
+            click.echo(f"ERROR: {exc}", err=True)
+            raise click.exceptions.Exit(1) from exc
+
+        output = ctx.obj.get("terradev_output") if ctx.obj else None
+        if output is not None and (rv is None or rv == 0):
+            messages = getattr(output, "_messages", [])
+            if any(m.level == "error" for m in messages):
+                raise click.exceptions.Exit(1)
+        return rv
+
+
+class ProvidersGroup(click.Group):
+    """Click group that uses ProvidersCommand for leaf subcommands and ProvidersGroup for nested groups."""
+
+    def command(self, *args, **kwargs):
+        kwargs.setdefault("cls", ProvidersCommand)
+        return super().command(*args, **kwargs)
+
+    def group(self, *args, **kwargs):
+        kwargs.setdefault("cls", ProvidersGroup)
+        return super().group(*args, **kwargs)
+
+
+@cli.command(cls=ProvidersCommand)
 @click.option(
     "--force", is_flag=True, help="Force onboarding even if already configured"
 )
@@ -48,7 +80,7 @@ def onboarding(force):
 # Entire upgrade function body removed - tier system eliminated (open source CLI)
 
 
-@cli.command()
+@cli.command(cls=ProvidersCommand)
 @click.option(
     "--provider", "-p", help="Configure specific provider (e.g., runpod, vastai, aws)"
 )
@@ -246,8 +278,17 @@ def configure(provider):
                     "   Enter GCP Project ID", default="my-project"
                 )
                 existing_creds[provider.lower()] = {
-                    "service_account_key": api_key.strip(),
+                    "credentials_file": api_key.strip(),
                     "project_id": project_id,
+                }
+            elif provider.lower() == "aws":
+                # AWS needs both access key and secret key
+                secret_key = click.prompt(
+                    "   Enter AWS Secret Access Key", hide_input=True
+                )
+                existing_creds[provider.lower()] = {
+                    "api_key": api_key.strip(),
+                    "secret_key": secret_key.strip(),
                 }
             elif provider.lower() == "azure":
                 # Azure needs multiple credentials
@@ -568,7 +609,7 @@ def configure(provider):
         print("\nOpen Source Mode: Unlimited access")
 
 
-@cli.command()
+@cli.command(cls=ProvidersCommand)
 @click.option(
     "--gpu-type",
     "-g",
@@ -779,7 +820,7 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
         print(f"   Dry run:   terradev provision -g {gpu_type} --dry-run")
 
 
-@cli.command()
+@cli.command(cls=ProvidersCommand)
 @click.argument(
     "provider",
     type=click.Choice(
@@ -1031,7 +1072,7 @@ def setup(provider, quick):
 
 
 # Provider Profiles Commands
-@cli.group()
+@cli.group(cls=ProvidersGroup)
 def providers():
     """Manage custom provider profiles for intelligent routing"""
     pass
