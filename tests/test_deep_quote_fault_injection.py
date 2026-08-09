@@ -89,7 +89,7 @@ class TestQuoteFaultInjection:
         assert "RunPod" in result.output
 
     def test_quote_handles_all_providers_failing(self, runner, mock_api, monkeypatch):
-        """When every provider fails, quote should report the empty state cleanly."""
+        """When every provider fails, quote should report the empty state and exit non-zero."""
         for attr in [
             "get_runpod_quotes",
             "get_vastai_quotes",
@@ -106,7 +106,7 @@ class TestQuoteFaultInjection:
 
         result = runner.invoke(cli, ["quote", "-g", "A100"], obj={"api": mock_api})
 
-        assert result.exit_code == 0, result.output
+        assert result.exit_code == 1, result.output
         assert "No quotes returned" in result.output
 
     def test_quote_region_filter_still_works_with_partial_failures(self, runner, mock_api, monkeypatch):

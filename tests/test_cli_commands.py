@@ -159,7 +159,7 @@ class TestQuoteCommand:
         result = CliRunner().invoke(
             cli, ["quote", "-g", "A100", "-r", "ap-southeast-99"], obj={"api": api}
         )
-        assert result.exit_code == 0
+        assert result.exit_code == 1
         assert "ERROR" in result.output or "No quotes" in result.output
 
     def test_no_quotes_shows_error(self):
@@ -168,7 +168,7 @@ class TestQuoteCommand:
         api.get_vastai_quotes = AsyncMock(return_value=[])
         api.get_tensordock_quotes = AsyncMock(return_value=[])
         result = CliRunner().invoke(cli, ["quote", "-g", "A100"], obj={"api": api})
-        assert result.exit_code == 0
+        assert result.exit_code == 1
         assert "ERROR" in result.output or "No quotes" in result.output
 
     def test_output_contains_provider_table(self):
@@ -354,7 +354,10 @@ class TestConfigureCommand:
     def test_aws_echoes_name(self):
         api = _make_api()
         result = CliRunner().invoke(
-            cli, ["configure", "--provider", "aws"], obj={"api": api}, input="test-key\n"
+            cli,
+            ["configure", "--provider", "aws"],
+            obj={"api": api},
+            input="test-key\ntest-secret\n",
         )
         assert result.exit_code == 0
         assert "AWS" in result.output
