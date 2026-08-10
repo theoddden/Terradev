@@ -16,7 +16,7 @@ TERRADEV_COMMAND_MAP = {
     "inferx_status": ["inferx", "status"],
     "inferx_list": ["inferx", "list"],
     "inferx_optimize": ["inferx", "optimize"],
-    "hf_space_deploy": ["hf-spaces", "create"],
+    "hf_space_deploy": ["huggingface", "spaces", "create"],
     "status": ["status"],
     "manage_instance": ["manage"],
     "analytics": ["analytics"],
@@ -69,7 +69,7 @@ TERRADEV_COMMAND_MAP = {
     "inferx_delete": ["inferx", "delete"],
     "inferx_usage": ["inferx", "usage"],
     "inferx_quote": ["inferx", "quote"],
-    "hf_space_status": ["hf-spaces", "info"],
+    "hf_space_status": ["huggingface", "spaces", "info"],
     "run_workflow": ["workflow", "run"],
     "active_context": ["status"],  # Composite — handled specially
     # v3.5.0: Multi-LoRA

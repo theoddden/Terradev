@@ -511,9 +511,10 @@ from terradev_cli.cli_karpenter import register_karpenter_commands
 
 register_karpenter_commands(cli, TerradevAPI)
 
+from terradev_cli.core.hf_cli_integration import hf
 from terradev_cli.cli_hf_spaces import register_hf_spaces_commands
 
-register_hf_spaces_commands(cli, TerradevAPI)
+register_hf_spaces_commands(hf, TerradevAPI)
 
 
 # MCP Server Command

@@ -35,13 +35,13 @@ def _hf_api(method, path, token, body=None):
         raise Exception(f"HF API {e.code}: {e.read().decode()[:200]}")
 
 
-def register_hf_spaces_commands(cli, TerradevAPI):
-    @cli.group("hf-spaces")
-    def hf_spaces():
-        """HuggingFace Spaces — create, list, manage, delete."""
+def register_hf_spaces_commands(huggingface, TerradevAPI):
+    @huggingface.group("spaces")
+    def spaces():
+        """HuggingFace Spaces management — create, list, manage, delete."""
         pass
 
-    @hf_spaces.command("create")
+    @spaces.command("create")
     @click.argument("space_name")
     @click.option("--model-id", required=True)
     @click.option(
@@ -90,7 +90,7 @@ def register_hf_spaces_commands(cli, TerradevAPI):
             else f"\u274c {r['error']}"
         )
 
-    @hf_spaces.command("list")
+    @spaces.command("list")
     @click.option("--author", default=None)
     @click.option("--limit", "-n", default=20, type=int)
     @click.option(
@@ -107,7 +107,7 @@ def register_hf_spaces_commands(cli, TerradevAPI):
         for s in (spaces or [])[:limit]:
             print(f"  {s.get('id','?'):<44} sdk={s.get('sdk','?')}")
 
-    @hf_spaces.command("info")
+    @spaces.command("info")
     @click.argument("space_id")
     @click.option(
         "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
@@ -125,7 +125,7 @@ def register_hf_spaces_commands(cli, TerradevAPI):
             f"  {d.get('id','?')}  sdk={d.get('sdk','?')}  hw={hw}  private={d.get('private',False)}"
         )
 
-    @hf_spaces.command("delete")
+    @spaces.command("delete")
     @click.argument("space_id")
     @click.option("--yes", "-y", is_flag=True)
     def delete(space_id, yes):
@@ -140,28 +140,28 @@ def register_hf_spaces_commands(cli, TerradevAPI):
         )
         print(f"\u2705 Deleted {space_id}")
 
-    @hf_spaces.command("restart")
+    @spaces.command("restart")
     @click.argument("space_id")
     def restart(space_id):
         """Restart a Space (factory reboot)."""
         _hf_api("POST", f"/spaces/{space_id}/restart", _get_hf_token(TerradevAPI))
         print(f"\u2705 Restarting {space_id}")
 
-    @hf_spaces.command("pause")
+    @spaces.command("pause")
     @click.argument("space_id")
     def pause(space_id):
         """Pause a running Space (stops billing)."""
         _hf_api("POST", f"/spaces/{space_id}/pause", _get_hf_token(TerradevAPI))
         print(f"\u2705 Paused {space_id}")
 
-    @hf_spaces.command("resume")
+    @spaces.command("resume")
     @click.argument("space_id")
     def resume(space_id):
         """Resume a paused Space."""
         _hf_api("POST", f"/spaces/{space_id}/resume", _get_hf_token(TerradevAPI))
         print(f"\u2705 Resumed {space_id}")
 
-    @hf_spaces.command("hardware")
+    @spaces.command("hardware")
     @click.argument("space_id")
     @click.option(
         "--set",
@@ -186,7 +186,7 @@ def register_hf_spaces_commands(cli, TerradevAPI):
                 f"  Current: {hw.get('current','?')}  Requested: {hw.get('requested','?')}"
             )
 
-    @hf_spaces.command("logs")
+    @spaces.command("logs")
     @click.argument("space_id")
     def logs(space_id):
         """Show Space build/run logs."""

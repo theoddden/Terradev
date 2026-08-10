@@ -504,6 +504,5 @@ def _save_deployment(result: Dict[str, Any], template_config: Dict[str, Any]):
 
 # Add the HF commands to the main CLI
 def register_hf_commands(cli):
-    """Register HuggingFace top-level commands with the main CLI."""
+    """Register the unified HuggingFace top-level command with the main CLI."""
     cli.add_command(hf, name="huggingface")
-    cli.add_command(hf, name="hf")

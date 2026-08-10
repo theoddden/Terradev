@@ -108,7 +108,7 @@ class TestHfSpacesGroup:
             {"id": "user/space2", "sdk": "streamlit"},
         ]
         result = runner.invoke(
-            cli, ["hf-spaces", "list"], obj={"api": mock_api}
+            cli, ["huggingface", "spaces", "list"], obj={"api": mock_api}
         )
         assert result.exit_code == 0, result.output
         assert "user/space1" in result.output
@@ -122,7 +122,7 @@ class TestHfSpacesGroup:
             "runtime": {"hardware": {"current": "cpu-basic"}},
         }
         result = runner.invoke(
-            cli, ["hf-spaces", "info", "user/space1"], obj={"api": mock_api}
+            cli, ["huggingface", "spaces", "info", "user/space1"], obj={"api": mock_api}
         )
         assert result.exit_code == 0, result.output
         assert "user/space1" in result.output
@@ -131,7 +131,7 @@ class TestHfSpacesGroup:
     def test_hf_spaces_restart(self, mock_hf_api, runner, mock_api, _hf_token_env):
         mock_hf_api.return_value = {"status": "restarted"}
         result = runner.invoke(
-            cli, ["hf-spaces", "restart", "user/space1"], obj={"api": mock_api}
+            cli, ["huggingface", "spaces", "restart", "user/space1"], obj={"api": mock_api}
         )
         assert result.exit_code == 0, result.output
         assert "Restarting" in result.output

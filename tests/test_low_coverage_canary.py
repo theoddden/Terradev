@@ -244,12 +244,12 @@ class TestCanaryHFCliIntegration:
 
         cli = click.Group()
         register_hf_commands(cli)
-        # Verify an hf-spaces command was registered.
-        assert any("hf" in name.lower() for name in cli.commands)
+        # Verify the unified HuggingFace command was registered.
+        assert "huggingface" in cli.commands
 
     def test_cli_help(self):
         runner = CliRunner()
-        result = runner.invoke(terradev_cli.cli.cli, ["hf-spaces", "--help"])
+        result = runner.invoke(terradev_cli.cli.cli, ["huggingface", "spaces", "--help"])
         assert result.exit_code == 0
 
 
