@@ -96,3 +96,8 @@ platform.agent.add_command(letta.letta)
 # Agent-oriented workflow / graph frameworks
 platform.agent.add_command(ml.langchain)
 platform.agent.add_command(ml.langgraph)
+
+# HuggingFace top-level commands (HF Spaces + hardware optimization)
+from terradev_cli.core.hf_cli_integration import register_hf_commands  # noqa: F401,E402
+
+register_hf_commands(cli)
