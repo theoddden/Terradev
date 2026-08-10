@@ -1,4 +1,4 @@
-# Terradev CLI v6.0.9
+# Terradev CLI v6.0.10
 
 **Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration with agent sandbox, mesh, and MCP subcommands.**
 
