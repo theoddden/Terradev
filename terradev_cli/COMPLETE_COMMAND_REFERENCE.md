@@ -1773,9 +1773,9 @@ Options:
 
 ##  **HF Spaces Subcommands**
 
-### **hf-spaces** - Create, list, manage, and delete HuggingFace Spaces
+### **huggingface spaces** - Create, list, manage, and delete HuggingFace Spaces
 ```bash
-terradev hf-spaces [SUBCOMMAND]
+terradev huggingface spaces [SUBCOMMAND]
 
 Subcommands:
   create     Create a new Space with auto-generated app

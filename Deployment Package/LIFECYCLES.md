@@ -657,7 +657,7 @@ terradev configure --provider huggingface
 
 ```bash
 # Create space (space_name is positional argument)
-terradev hf-spaces create my-space \
+terradev huggingface spaces create my-space \
   --model-id meta-llama/Llama-2-7b-chat-hf \
   --template llm \
   --hardware cpu-upgrade \
@@ -670,55 +670,55 @@ terradev hf-spaces create my-space \
 
 ```bash
 # List all spaces
-terradev hf-spaces list
+terradev huggingface spaces list
 
 # List spaces in organization
-terradev hf-spaces list --org my-org
+terradev huggingface spaces list --org my-org
 ```
 
 ### Phase 4: Get Space Info
 
 ```bash
 # Get space info (space_name is positional argument)
-terradev hf-spaces info my-space
+terradev huggingface spaces info my-space
 ```
 
 ### Phase 5: Manage Hardware
 
 ```bash
 # Upgrade hardware (space_name is positional argument)
-terradev hf-spaces hardware my-space --hardware gpu-a10g-large
+terradev huggingface spaces hardware my-space --hardware gpu-a10g-large
 ```
 
 ### Phase 6: Restart Space
 
 ```bash
 # Restart space (space_name is positional argument)
-terradev hf-spaces restart my-space
+terradev huggingface spaces restart my-space
 ```
 
 ### Phase 7: Pause/Resume Space
 
 ```bash
 # Pause space (space_name is positional argument)
-terradev hf-spaces pause my-space
+terradev huggingface spaces pause my-space
 
 # Resume space (space_name is positional argument)
-terradev hf-spaces resume my-space
+terradev huggingface spaces resume my-space
 ```
 
 ### Phase 8: View Logs
 
 ```bash
 # View logs (space_name is positional argument)
-terradev hf-spaces logs my-space --follow
+terradev huggingface spaces logs my-space --follow
 ```
 
 ### Phase 9: Delete Space
 
 ```bash
 # Delete space (space_name is positional argument)
-terradev hf-spaces delete my-space
+terradev huggingface spaces delete my-space
 ```
 
 ---
