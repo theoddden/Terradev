@@ -25,10 +25,11 @@ class InstanceStatus(str, Enum):
 
 
 class GPUVendor(str, Enum):
-    """GPU manufacturer"""
+    """GPU / accelerator manufacturer"""
     NVIDIA = "nvidia"
     AMD = "amd"
     INTEL = "intel"
+    GOOGLE = "google"
 
 
 @dataclass

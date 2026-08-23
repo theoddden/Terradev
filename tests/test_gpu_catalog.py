@@ -200,3 +200,29 @@ class TestGPUSpecs:
         assert spec.vendor == GPUVendor.INTEL
         assert spec.vram_gb == 96
         assert spec.nvlink is False
+
+    def test_gpu_specs_tpu_variants(self):
+        """Google Cloud TPU specs have correct structure"""
+        spec = GPU_SPECS["TPU-V6E-8T"]
+        assert spec.name == "TPU-V6E-8T"
+        assert spec.vendor == GPUVendor.GOOGLE
+        assert spec.count == 8
+        assert spec.nvlink is False
+
+
+class TestTPUNormalize:
+    """Test TPU normalization"""
+
+    def test_normalize_tpu_variants(self):
+        """Normalize TPU variants"""
+        assert normalize("TPU-V6E-8T").name == "TPU-V6E-8T"
+        assert normalize("tpu-v6e-8t").name == "TPU-V6E-8T"
+        assert normalize("TPU-V6E-8").name == "TPU-V6E-8T"
+        assert normalize("tpu-v6e-8").name == "TPU-V6E-8T"
+        assert normalize("TPU-V5P-4T").name == "TPU-V5P-4T"
+        assert normalize("TPU-V7X-4T").name == "TPU-V7X-4T"
+
+    def test_get_canonical_name_tpu(self):
+        """Get canonical name for TPU"""
+        assert get_canonical_name("tpu-v6e-8t") == "TPU-V6E-8T"
+        assert get_canonical_name("TPU-V5P-4T") == "TPU-V5P-4T"

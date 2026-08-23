@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from click.testing import CliRunner
@@ -108,3 +109,109 @@ class TestCanaryTail:
         result = runner.invoke(cli, ["canary", "tail", "--file", path])
         assert result.exit_code == 0
         assert "No canary records found" in result.output
+
+
+class TestCanaryDrift:
+    def test_drift_help(self, runner):
+        result = runner.invoke(cli, ["canary", "drift", "--help"])
+        assert result.exit_code == 0
+        assert "--all" in result.output
+        assert "--provider" in result.output
+
+    def _contract(self, expected=None, method="POST"):
+        return f"""
+provider: test
+base_url: https://api.example.com/graphql
+auth_type: Bearer
+auth_header: Authorization
+endpoints:
+  - name: list_gpus
+    method: {method}
+    required_fields: [query]
+    expected_response_fields: [data, gpuTypes]
+    smoke_test_query: "query {{ gpuTypes {{ id }} }}"
+"""
+
+    def _make_fake_requests(self, body, status=200):
+        def post(url, **kwargs):
+            r = MagicMock()
+            r.status_code = status
+            r.ok = (status == 200)
+            r.json.return_value = body
+            return r
+
+        def get(url, **kwargs):
+            return post(url, **kwargs)
+
+        return post, get
+
+    def test_drift_all_healthy_json(self, runner, tmp_path, monkeypatch):
+        contracts = tmp_path / "contracts"
+        contracts.mkdir()
+        contract = contracts / "test.yaml"
+        contract.write_text(self._contract())
+
+        post, get = self._make_fake_requests({"data": {"gpuTypes": [{"id": "A100"}]}})
+        monkeypatch.setattr("terradev_cli.drift_monitor.agent.requests.post", post)
+        monkeypatch.setattr("terradev_cli.drift_monitor.agent.requests.get", get)
+        monkeypatch.setenv("TERRADEV_TEST_KEY", "fake-key")
+
+        result = runner.invoke(
+            cli,
+            [
+                "--format",
+                "json",
+                "canary",
+                "drift",
+                "--all",
+                "--contracts-dir",
+                str(contracts),
+            ],
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["total_providers"] == 1
+        assert data["healthy"] == 1
+        assert data["drifted"] == 0
+
+    def test_drift_missing_field(self, runner, tmp_path, monkeypatch):
+        contracts = tmp_path / "contracts"
+        contracts.mkdir()
+        contract = contracts / "test.yaml"
+        contract.write_text(self._contract())
+
+        post, get = self._make_fake_requests({"data": {}})
+        monkeypatch.setattr("terradev_cli.drift_monitor.agent.requests.post", post)
+        monkeypatch.setattr("terradev_cli.drift_monitor.agent.requests.get", get)
+        monkeypatch.setenv("TERRADEV_TEST_KEY", "fake-key")
+
+        result = runner.invoke(
+            cli,
+            [
+                "--format",
+                "json",
+                "canary",
+                "drift",
+                "--all",
+                "--contracts-dir",
+                str(contracts),
+            ],
+        )
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["drifted"] == 1
+        assert data["drift_providers"] == ["test"]
+
+    def test_drift_missing_credentials(self, runner, tmp_path):
+        contracts = tmp_path / "contracts"
+        contracts.mkdir()
+        contract = contracts / "test.yaml"
+        contract.write_text(self._contract())
+
+        result = runner.invoke(
+            cli,
+            ["canary", "drift", "--all", "--contracts-dir", str(contracts)],
+            env={"TERRADEV_SKIP_ONBOARDING": "1"},
+        )
+        assert result.exit_code == 0
+        assert "skipped" in result.output

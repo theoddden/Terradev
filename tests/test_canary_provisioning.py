@@ -348,9 +348,23 @@ def _check_ssh_connectivity(ip: str, port: int = 22, timeout: int = 60) -> bool:
         return False
 
 
-async def _run_lifecycle_probe(provider, instance_id: str, ip: str) -> Dict[str, Any]:
-    """Run lightweight commands on the instance to verify CUDA and container runtime."""
-    result = {"cuda_visible": None, "nvidia_smi": None, "container_runtime": None, "ssh_reachable": False}
+def _is_tpu_request(gpu_type: Optional[str]) -> bool:
+    """Return True if the requested accelerator is a TPU."""
+    return bool(gpu_type and str(gpu_type).upper().startswith("TPU-"))
+
+
+async def _run_lifecycle_probe(
+    provider, instance_id: str, ip: str, gpu_type: Optional[str] = None
+) -> Dict[str, Any]:
+    """Run lightweight commands on the instance to verify CUDA/TPU and container runtime."""
+    result = {
+        "cuda_visible": None,
+        "nvidia_smi": None,
+        "tpu_visible": None,
+        "tpu_devices": None,
+        "container_runtime": None,
+        "ssh_reachable": False,
+    }
     if not ip:
         return result
 
@@ -361,11 +375,18 @@ async def _run_lifecycle_probe(provider, instance_id: str, ip: str) -> Dict[str,
     if not hasattr(provider, "execute_command") or not callable(getattr(provider, "execute_command")):
         return result
 
-    commands = [
-        ("nvidia_smi", "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader"),
-        ("cuda_visible", "python3 -c 'import torch; print(torch.cuda.is_available(), torch.cuda.device_count())'"),
-        ("container_runtime", "docker --version || podman --version || crictl --version"),
-    ]
+    if _is_tpu_request(gpu_type):
+        commands = [
+            ("tpu_devices", "ls /dev/accel* 2>/dev/null | wc -l"),
+            ("tpu_visible", "python3 -c 'import jax; print(jax.device_count(), jax.devices()[0].device_kind)'"),
+            ("container_runtime", "docker --version || podman --version || crictl --version"),
+        ]
+    else:
+        commands = [
+            ("nvidia_smi", "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader"),
+            ("cuda_visible", "python3 -c 'import torch; print(torch.cuda.is_available(), torch.cuda.device_count())'"),
+            ("container_runtime", "docker --version || podman --version || crictl --version"),
+        ]
 
     for key, command in commands:
         try:
@@ -491,6 +512,9 @@ async def _canary_for_provider(
         result["instance_type"] = instance_type
         result["region"] = quote_region
         result["price"] = price
+        if provision_result.get("tpu_type"):
+            result["tpu_type"] = provision_result["tpu_type"]
+            result["tpu_chips"] = provision_result.get("tpu_chips")
 
         logger.info(f"[{provider_name}] Provisioned {instance_id}, polling for RUNNING...")
 
@@ -511,9 +535,9 @@ async def _canary_for_provider(
             result["port"] = port
             result["ssh_reachable"] = _check_ssh_connectivity(ip, int(port))
 
-            # Step 6: Optional lifecycle probe (CUDA, container runtime)
+            # Step 6: Optional lifecycle probe (CUDA/TPU, container runtime)
             if TERRADEV_CANARY_LIFECYCLE:
-                probe = await _run_lifecycle_probe(provider, instance_id, ip)
+                probe = await _run_lifecycle_probe(provider, instance_id, ip, gpu)
                 result["lifecycle"] = probe
 
             # Step 7: Quote-to-provision validation

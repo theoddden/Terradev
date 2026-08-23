@@ -6,15 +6,17 @@ and produces a human-readable or JSON summary.
 """
 
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import click
 
 from . import cli
 from terradev_cli.core.output import get_output
+from terradev_cli.drift_monitor.agent import DriftMonitor
 
 
 def _default_canary_output() -> Path:
@@ -58,6 +60,8 @@ def _summarize_records(records: List[Dict[str, Any]]) -> Dict[str, Any]:
             "providers": {},
             "regions": {},
             "gpu_types": {},
+            "tpu_types": {},
+            "tpu_chips": {},
             "first_seen": None,
             "last_seen": None,
             "duration_ms": {"min": None, "max": None, "avg": None},
@@ -70,6 +74,8 @@ def _summarize_records(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     providers: Dict[str, int] = {}
     regions: Dict[str, int] = {}
     gpu_types: Dict[str, int] = {}
+    tpu_types: Dict[str, int] = {}
+    tpu_chips: Dict[str, int] = {}
     durations = []
     timestamps = []
 
@@ -77,6 +83,11 @@ def _summarize_records(records: List[Dict[str, Any]]) -> Dict[str, Any]:
         providers[r.get("provider", "unknown")] = providers.get(r.get("provider", "unknown"), 0) + 1
         regions[r.get("region", "unknown")] = regions.get(r.get("region", "unknown"), 0) + 1
         gpu_types[r.get("gpu_type", "unknown")] = gpu_types.get(r.get("gpu_type", "unknown"), 0) + 1
+        if r.get("tpu_type"):
+            tpu_types[r["tpu_type"]] = tpu_types.get(r["tpu_type"], 0) + 1
+        if r.get("tpu_chips"):
+            key = f"{r['tpu_chips']} chips"
+            tpu_chips[key] = tpu_chips.get(key, 0) + 1
 
         if "duration_ms" in r and isinstance(r["duration_ms"], (int, float)):
             durations.append(r["duration_ms"])
@@ -96,6 +107,8 @@ def _summarize_records(records: List[Dict[str, Any]]) -> Dict[str, Any]:
         "providers": providers,
         "regions": regions,
         "gpu_types": gpu_types,
+        "tpu_types": tpu_types,
+        "tpu_chips": tpu_chips,
         "first_seen": min(timestamps).isoformat() if timestamps else None,
         "last_seen": max(timestamps).isoformat() if timestamps else None,
         "duration_ms": {
@@ -199,6 +212,18 @@ def canary_report(output, file, provider, gpu):
         for g, count in sorted(summary["gpu_types"].items(), key=lambda x: -x[1]):
             print(f"  {g:<20} {count}")
 
+    if summary["tpu_types"]:
+        print("-" * 60)
+        print("By TPU type:")
+        for t, count in sorted(summary["tpu_types"].items(), key=lambda x: -x[1]):
+            print(f"  {t:<20} {count}")
+
+    if summary["tpu_chips"]:
+        print("-" * 60)
+        print("By TPU chip count:")
+        for t, count in sorted(summary["tpu_chips"].items(), key=lambda x: -x[1]):
+            print(f"  {t:<20} {count}")
+
     print("=" * 60)
 
 
@@ -227,3 +252,222 @@ def canary_tail(file, limit):
         return
     for rec in recent:
         print(json.dumps(rec, indent=2, default=str))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Provider API Drift Monitor
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+_DRIFT_PROVIDER_ALIASES = {
+    "lambda": ["lambda", "lambda_labs", "lambdalabs"],
+    "vast": ["vast", "vastai"],
+    "runpod": ["runpod"],
+    "coreweave": ["coreweave"],
+    "hyperstack": ["hyperstack"],
+}
+
+
+def _default_contracts_dir() -> Path:
+    """Return the bundled provider contract directory."""
+    return Path(__file__).resolve().parent.parent / "providers" / "contracts"
+
+
+def _drift_provider_aliases(provider: str) -> List[str]:
+    return _DRIFT_PROVIDER_ALIASES.get(provider, [provider])
+
+
+def _load_drift_env_key(provider: str) -> Optional[str]:
+    """Look for a raw API key in the environment."""
+    for alias in _drift_provider_aliases(provider):
+        name = alias.upper().replace("-", "_")
+        for env in (
+            f"TERRADEV_{name}_KEY",
+            f"TERRADEV_{name}_API_KEY",
+            f"CANARY_{name}_KEY",
+        ):
+            value = os.environ.get(env)
+            if value:
+                return value
+    return None
+
+
+def _load_drift_env_creds(provider: str) -> Optional[str]:
+    """Look for a JSON credential object in the environment."""
+    for alias in _drift_provider_aliases(provider):
+        name = alias.upper().replace("-", "_")
+        for env in (f"TERRADEV_{name}_CREDS", f"CANARY_{name}_CREDS"):
+            raw = os.environ.get(env)
+            if raw:
+                try:
+                    data = json.loads(raw)
+                    if isinstance(data, dict) and "api_key" in data:
+                        return data["api_key"]
+                except json.JSONDecodeError:
+                    pass
+    return None
+
+
+def _load_drift_credentials_file(provider: str, data: Dict[str, Any]) -> Optional[str]:
+    """Extract a provider key from ``~/.terradev/credentials.json``."""
+    for alias in _drift_provider_aliases(provider):
+        for key in (alias, f"{alias}_api_key"):
+            if key in data:
+                value = data[key]
+                if isinstance(value, dict) and "api_key" in value:
+                    return value["api_key"]
+                if isinstance(value, str):
+                    return value
+    return None
+
+
+def _load_drift_credentials(providers: List[str]) -> Dict[str, str]:
+    """Resolve API keys for the requested providers."""
+    creds: Dict[str, str] = {}
+
+    creds_path = Path.home() / ".terradev" / "credentials.json"
+    file_data: Dict[str, Any] = {}
+    if creds_path.exists():
+        try:
+            with open(creds_path, "r", encoding="utf-8") as f:
+                file_data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            file_data = {}
+
+    for provider in providers:
+        key = _load_drift_env_key(provider)
+        if key:
+            creds[provider] = key
+            continue
+        key = _load_drift_env_creds(provider)
+        if key:
+            creds[provider] = key
+            continue
+        key = _load_drift_credentials_file(provider, file_data)
+        if key:
+            creds[provider] = key
+
+    return creds
+
+
+def _render_drift_human(summary: Dict[str, Any]) -> None:
+    """Print a human-readable drift report."""
+    date = summary["checked_at"][:10]
+    width = 50
+    print(f"Provider Drift Report — {date}")
+    print("─" * width)
+
+    for p in summary["providers"]:
+        if p["drift_detected"]:
+            symbol, status = "✗", "DRIFT"
+        elif p["status"] == "skipped_no_credentials":
+            symbol, status = "⊘", "skipped"
+        else:
+            symbol, status = "✓", "healthy"
+
+        total = len(p.get("endpoints", []))
+        ok = sum(1 for ep in p.get("endpoints", []) if not ep.get("drift"))
+
+        if status == "DRIFT":
+            reasons = "; ".join(
+                {
+                    ep.get("drift_summary") or ep.get("error") or "drift"
+                    for ep in p.get("endpoints", [])
+                    if ep.get("drift")
+                }
+            )
+            detail = reasons
+        elif status == "skipped":
+            detail = "no credentials"
+        else:
+            detail = f"{ok}/{total} endpoints"
+
+        print(f"{symbol} {p['provider']:<15} {status:<10} {detail}")
+
+    print("─" * width)
+    print(f"{summary['healthy']} healthy  |  {summary['drifted']} drifted  |  {summary['skipped']} skipped")
+
+
+@canary.command("drift")
+@click.option(
+    "--all",
+    "drift_all",
+    is_flag=True,
+    help="Check all provider contracts.",
+)
+@click.option(
+    "--provider",
+    "-p",
+    default=None,
+    help="Check a specific provider contract (matches contract filename or provider field).",
+)
+@click.option(
+    "--contracts-dir",
+    "-d",
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    default=None,
+    help="Directory containing provider contract YAML files.",
+)
+@click.option(
+    "--format",
+    "drift_format",
+    type=click.Choice(["human", "json", "jsonl"]),
+    default=None,
+    help="Output format for the drift report.",
+)
+@click.pass_context
+def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format):
+    """Run a provider API drift check against live endpoints."""
+    if not drift_all and not provider:
+        get_output(ctx).error("Specify --all or --provider <name>")
+        ctx.exit(2)
+        return
+
+    contracts_path = Path(contracts_dir) if contracts_dir else _default_contracts_dir()
+    if not contracts_path.exists():
+        get_output(ctx).error(f"Contracts directory not found: {contracts_path}")
+        ctx.exit(2)
+        return
+
+    contract_files = sorted(contracts_path.glob("*.yaml"))
+    if provider:
+        provider_lower = provider.lower()
+        contract_files = [
+            p
+            for p in contract_files
+            if p.stem.lower() == provider_lower or provider_lower in p.stem.lower()
+        ]
+
+    if not contract_files:
+        get_output(ctx).error(f"No matching provider contracts in {contracts_path}")
+        ctx.exit(2)
+        return
+
+    providers = [p.stem for p in contract_files]
+    credentials = _load_drift_credentials(providers)
+    monitor = DriftMonitor(str(contracts_path), credentials)
+    monitor.run_all()
+    summary = monitor.summary()
+
+    out = get_output(ctx)
+    if drift_format:
+        out.set_format(drift_format)
+
+    if out.format == "json":
+        out._closed = True  # noqa: SLF001
+        sys.stdout.write(json.dumps(summary, indent=2, default=str) + "\n")
+        if summary["drifted"]:
+            ctx.exit(1)
+        return
+
+    if out.format == "jsonl":
+        out._closed = True  # noqa: SLF001
+        for r in summary["providers"]:
+            sys.stdout.write(json.dumps(r, default=str) + "\n")
+        if summary["drifted"]:
+            ctx.exit(1)
+        return
+
+    _render_drift_human(summary)
+    if summary["drifted"]:
+        ctx.exit(1)

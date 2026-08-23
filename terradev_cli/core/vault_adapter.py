@@ -34,6 +34,7 @@ PROVIDER_SCHEMAS: Dict[str, List[str]] = {
     "baseten": ["api_key"],
     "oracle": ["api_key", "tenancy_ocid", "compartment_ocid", "region"],
     "crusoe": ["access_key", "secret_key", "project_id"],
+    "telinea": ["api_key", "workspace_id", "project_id"],
 }
 
 # Convenience aliases for keys that are named differently in env vars.

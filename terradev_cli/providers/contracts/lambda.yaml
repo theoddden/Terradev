@@ -1,0 +1,16 @@
+provider: lambda
+base_url: https://cloud.lambdalabs.com/api/v1
+auth_type: Basic
+auth_header: Authorization
+last_verified: 2026-08-23
+endpoints:
+  - name: list_instance_types
+    method: GET
+    path: /instance-types
+    expected_response_fields: [data]
+    optional_response_fields: [error]
+
+  - name: list_regions
+    method: GET
+    path: /regions
+    expected_response_fields: [data]

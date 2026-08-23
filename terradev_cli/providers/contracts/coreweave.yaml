@@ -1,0 +1,11 @@
+provider: coreweave
+base_url: https://api.coreweave.com
+auth_type: Bearer
+auth_header: Authorization
+last_verified: 2026-08-23
+endpoints:
+  - name: list_gateways
+    method: GET
+    path: /v1alpha1/inference/gateways
+    expected_response_fields: [items]
+    optional_response_fields: [next_page_token]

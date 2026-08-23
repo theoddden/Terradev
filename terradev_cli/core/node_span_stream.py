@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional
 from .redis_span_exporter import RedisSpanExporter
 from .result import ErrorCode, ErrorCategory, Severity, TerradevError
 from .telemetry import Span, TerradevTelemetry, get_telemetry
+from .telinea.connector import maybe_attach_telinea
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ class NodeSpanStream:
         self._heartbeat_thread: Optional[threading.Thread] = None
         self._heartbeat_stop = threading.Event()
         self._lock = threading.RLock()
+        self._telinea_connector: Any = None
 
     @property
     def active(self) -> bool:
@@ -135,6 +137,12 @@ class NodeSpanStream:
                 logger.info(f"Started Redis span stream {self.stream_key}")
 
             self._attach()
+
+            # Attach Telinea cloud connector if the user has configured an API key.
+            # This is a no-op when TELINEA_API_KEY is not set, keeping the local
+            # Redis stream air-gapped by default.
+            if self._telinea_connector is None:
+                self._telinea_connector = maybe_attach_telinea(self)
 
             # If requested, register an atexit handler so the stream is
             # gracefully closed when the sidecar process exits.
@@ -296,6 +304,13 @@ class NodeSpanStream:
                 self.exporter.end_stream(self.stream_key, span, tombstone_ttl=tombstone_ttl)
                 logger.info(f"Ended Redis span stream {self.stream_key}")
 
+            # Flush any queued Telinea telemetry. Fail-safe wrapper.
+            if self._telinea_connector is not None:
+                try:
+                    self._telinea_connector.close(extra={"stream_status": "ended"})
+                except Exception:  # noqa: BLE001
+                    logger.debug("Telinea connector close failed", exc_info=True)
+
         return self
 
     def destroy(self, attributes: Optional[Dict[str, Any]] = None) -> "NodeSpanStream":
@@ -314,6 +329,13 @@ class NodeSpanStream:
             self.exporter.append_span(self.stream_key, span)
             self.exporter.delete_stream(self.stream_key)
             logger.info(f"Destroyed Redis span stream {self.stream_key}")
+
+        # Flush any queued Telinea telemetry. Fail-safe wrapper.
+        if self._telinea_connector is not None:
+            try:
+                self._telinea_connector.close(extra={"stream_status": "destroyed"})
+            except Exception:  # noqa: BLE001
+                logger.debug("Telinea connector close failed", exc_info=True)
 
         return self
 

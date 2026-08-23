@@ -23,6 +23,20 @@ from .types import GPUDescriptor, GPUVendor
 # Keys are case-insensitive lookup; values are canonical names from GPU_SPECS
 
 GPU_ALIASES: Dict[str, str] = {
+    # ── Google Cloud TPU (Compute Engine machine types) ───────────────────
+    "TPU-V6E-1T": "TPU-V6E-1T",
+    "tpu-v6e-1t": "TPU-V6E-1T",
+    "TPU-V6E-4T": "TPU-V6E-4T",
+    "tpu-v6e-4t": "TPU-V6E-4T",
+    "TPU-V6E-8T": "TPU-V6E-8T",
+    "tpu-v6e-8t": "TPU-V6E-8T",
+    "TPU-V6E-8": "TPU-V6E-8T",
+    "tpu-v6e-8": "TPU-V6E-8T",
+    "TPU-V5P-4T": "TPU-V5P-4T",
+    "tpu-v5p-4t": "TPU-V5P-4T",
+    "TPU-V7X-4T": "TPU-V7X-4T",
+    "tpu-v7x-4t": "TPU-V7X-4T",
+
     # ── H100 ─────────────────────────────────────────────────────────────
     "NVIDIA_H100_SXM5_80G": "H100-80GB",
     "NVIDIA_H100_80G": "H100-80GB",
@@ -558,6 +572,54 @@ GPU_SPECS: Dict[str, GPUDescriptor] = {
         bandwidth_gb_s=616,
         nvlink=False,
         compute_capability="7.5",
+    ),
+
+    # ── Google Cloud TPU (Compute Engine machine types) ────────────────────
+    # vram_gb maps to per-chip HBM for display / comparison.
+    "TPU-V6E-1T": GPUDescriptor(
+        name="TPU-V6E-1T",
+        vendor=GPUVendor.GOOGLE,
+        vram_gb=32,
+        count=1,
+        tflops_bf16=197.0,
+        nvlink=False,
+        compute_capability="N/A",
+    ),
+    "TPU-V6E-4T": GPUDescriptor(
+        name="TPU-V6E-4T",
+        vendor=GPUVendor.GOOGLE,
+        vram_gb=128,
+        count=4,
+        tflops_bf16=788.0,
+        nvlink=False,
+        compute_capability="N/A",
+    ),
+    "TPU-V6E-8T": GPUDescriptor(
+        name="TPU-V6E-8T",
+        vendor=GPUVendor.GOOGLE,
+        vram_gb=256,
+        count=8,
+        tflops_bf16=1576.0,
+        nvlink=False,
+        compute_capability="N/A",
+    ),
+    "TPU-V5P-4T": GPUDescriptor(
+        name="TPU-V5P-4T",
+        vendor=GPUVendor.GOOGLE,
+        vram_gb=380,
+        count=4,
+        tflops_bf16=1836.0,
+        nvlink=False,
+        compute_capability="N/A",
+    ),
+    "TPU-V7X-4T": GPUDescriptor(
+        name="TPU-V7X-4T",
+        vendor=GPUVendor.GOOGLE,
+        vram_gb=768,
+        count=4,
+        tflops_bf16=4612.0,
+        nvlink=False,
+        compute_capability="N/A",
     ),
 }
 

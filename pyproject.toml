@@ -232,6 +232,7 @@ terradev_cli = [
     "core/semantic_signals/*.yaml",
     "integrations/*.png",
     "kubernetes/*.yaml",
+    "providers/contracts/*.yaml",
     "terraform/*.tf",
     "terraform/modules/**/*.tf",
     "terraform/modules/**/*.sh",

@@ -138,6 +138,122 @@ class GCPProvider(BaseProvider):
 
     REGIONS = ["us-central1", "us-west1", "us-east1", "europe-west1", "asia-east1"]
 
+    # -- TPU / accelerator-optimized machine family -----------------------
+    # Compute Engine is the supported path for v5p, v6e, and TPU7x.
+    # Prices are on-demand USD per chip-hour. VM price = price_per_chip_hour * chips.
+    # Zones are sourced from https://cloud.google.com/tpu/docs/regions-zones
+    TPU_V6E_ZONES = [
+        "asia-northeast1-b",
+        "europe-west4-a",
+        "southamerica-west1-a",
+        "us-central1-b",
+        "us-east1-d",
+        "us-east5-a",
+        "us-east5-b",
+        "us-south1-ai1b",
+    ]
+    TPU_V5P_ZONES = [
+        "europe-west4-b",
+        "us-central1-a",
+        "us-east5-a",
+    ]
+    TPU_V7X_ZONES = [
+        "us-central1-ai1a",
+        "us-central1-c",
+    ]
+
+    TPU_MACHINE_MAP = {
+        "TPU-V6E-1T": {
+            "machine_type": "ct6e-standard-1t",
+            "tpu_chips": 1,
+            "vcpus": 44,
+            "mem": 176,
+            "hbm_gib": 32,
+            "price_per_chip_hour": 2.70,
+            "image_project": "ubuntu-os-accelerator-images",
+            "image_family": "ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e",
+            "preferred_zone": "us-east5-a",
+            "zones": TPU_V6E_ZONES,
+            "regions": [
+                "asia-northeast1",
+                "europe-west4",
+                "southamerica-west1",
+                "us-central1",
+                "us-east1",
+                "us-east5",
+                "us-south1",
+            ],
+        },
+        "TPU-V6E-4T": {
+            "machine_type": "ct6e-standard-4t",
+            "tpu_chips": 4,
+            "vcpus": 180,
+            "mem": 720,
+            "hbm_gib": 128,
+            "price_per_chip_hour": 2.70,
+            "image_project": "ubuntu-os-accelerator-images",
+            "image_family": "ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e",
+            "preferred_zone": "us-east5-a",
+            "zones": TPU_V6E_ZONES,
+            "regions": [
+                "asia-northeast1",
+                "europe-west4",
+                "southamerica-west1",
+                "us-central1",
+                "us-east1",
+                "us-east5",
+                "us-south1",
+            ],
+        },
+        "TPU-V6E-8T": {
+            "machine_type": "ct6e-standard-8t",
+            "tpu_chips": 8,
+            "vcpus": 360,
+            "mem": 1440,
+            "hbm_gib": 256,
+            "price_per_chip_hour": 2.70,
+            "image_project": "ubuntu-os-accelerator-images",
+            "image_family": "ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e",
+            "preferred_zone": "us-east5-a",
+            "zones": TPU_V6E_ZONES,
+            "regions": [
+                "asia-northeast1",
+                "europe-west4",
+                "southamerica-west1",
+                "us-central1",
+                "us-east1",
+                "us-east5",
+                "us-south1",
+            ],
+        },
+        "TPU-V5P-4T": {
+            "machine_type": "ct5p-hightpu-4t",
+            "tpu_chips": 4,
+            "vcpus": 208,
+            "mem": 448,
+            "hbm_gib": 380,
+            "price_per_chip_hour": 4.20,
+            "image_project": "ubuntu-os-accelerator-images",
+            "image_family": "ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e",
+            "preferred_zone": "us-east5-a",
+            "zones": TPU_V5P_ZONES,
+            "regions": ["europe-west4", "us-central1", "us-east5"],
+        },
+        "TPU-V7X-4T": {
+            "machine_type": "tpu7x-standard-4t",
+            "tpu_chips": 4,
+            "vcpus": 224,
+            "mem": 960,
+            "hbm_gib": 768,
+            "price_per_chip_hour": 12.00,
+            "image_project": "ubuntu-os-accelerator-images",
+            "image_family": "ubuntu-accel-2404-amd64-tpu-tpu7x",
+            "preferred_zone": "us-central1-c",
+            "zones": TPU_V7X_ZONES,
+            "regions": ["us-central1"],
+        },
+    }
+
     # -- BaseProvider implementation -------------------------------------
 
     async def get_instance_quotes(
@@ -148,11 +264,15 @@ class GCPProvider(BaseProvider):
         if not self.credentials:
             return []
 
+        target_region = region or self.zone.rsplit("-", 1)[0]
+
+        # TPU requests are routed through Compute Engine machine types, not GPU maps
+        if self._is_tpu_type(gpu_type):
+            return await self._get_tpu_quotes(gpu_type, target_region)
+
         configs = self.GPU_INSTANCE_MAP.get(gpu_type, [])
         if not configs:
             return []
-
-        target_region = region or self.zone.rsplit("-", 1)[0]
 
         # CRITICAL: Check zone availability first
         zone_availability = await self._check_zone_availability(gpu_type, target_region)
@@ -249,19 +369,137 @@ class GCPProvider(BaseProvider):
             )
         return quotes
 
+    def _is_tpu_type(self, gpu_type: str) -> bool:
+        """Return True if the requested accelerator is a TPU."""
+        return self._normalize_tpu_key(gpu_type) in self.TPU_MACHINE_MAP
+
+    def _normalize_tpu_key(self, gpu_type: str) -> str:
+        """Normalize a TPU request key (e.g. 'tpu-v6e-8t' -> 'TPU-V6E-8T')."""
+        if not gpu_type:
+            return ""
+        key = gpu_type.strip().upper()
+        # Accept an optional trailing digit without a 'T' suffix
+        if key.startswith("TPU-") and not key.endswith("T"):
+            # Map TPU-V6E-8 -> TPU-V6E-8T for convenience
+            candidate = f"{key}T"
+            if candidate in self.TPU_MACHINE_MAP:
+                return candidate
+        return key
+
+    def _tpu_zone_for_region(self, cfg: Dict[str, Any], region: str) -> Optional[str]:
+        """Return a supported TPU zone in the requested region, or None."""
+        candidates = [z for z in cfg.get("zones", []) if z.startswith(region)]
+        if not candidates:
+            return None
+        if self.zone in candidates:
+            return self.zone
+        return candidates[0]
+
+    async def _get_tpu_quotes(
+        self, tpu_key: str, region: str
+    ) -> List[Dict[str, Any]]:
+        """Return a Compute Engine TPU quote for the requested accelerator."""
+        key = self._normalize_tpu_key(tpu_key)
+        cfg = self.TPU_MACHINE_MAP.get(key)
+        if not cfg:
+            return []
+
+        target_region = region or self.zone.rsplit("-", 1)[0]
+        region_supported = target_region in cfg["regions"]
+        if not region_supported:
+            # Do not advertise TPU quotes in regions where this machine type
+            # has no known zones; avoids provisioning in the wrong location.
+            return []
+
+        target_zone = self._tpu_zone_for_region(cfg, target_region)
+        if not target_zone:
+            return []
+
+        # The quote region must be the zone's region for consistency.
+        target_region = target_zone.rsplit("-", 1)[0]
+
+        price_per_hour = round(cfg["price_per_chip_hour"] * cfg["tpu_chips"], 2)
+
+        return [
+            {
+                "instance_type": cfg["machine_type"],
+                "gpu_type": key,
+                "price_per_hour": price_per_hour,
+                "region": target_region,
+                "available": True,
+                "provider": "gcp",
+                "vcpus": cfg["vcpus"],
+                "memory_gb": cfg["mem"],
+                "gpu_count": cfg["tpu_chips"],
+                "tpu_chips": cfg["tpu_chips"],
+                "tpu_hbm_gib": cfg["hbm_gib"],
+                "tpu_type": cfg["machine_type"],
+                "requires_reservation": False,
+                "zone_availability": {
+                    "status": "available",
+                    "available_zones": [target_zone],
+                    "recommended_zone": target_zone,
+                    "recommended_region": target_region,
+                },
+                "tpu_image": f"projects/{cfg['image_project']}/global/images/family/{cfg['image_family']}",
+                "tpu_non_cuda_warning": (
+                    "TPU requires JAX, PyTorch XLA, or TensorFlow; "
+                    "CUDA-dependent code will not run."
+                ),
+            }
+        ]
+
     async def provision_instance(
         self, instance_type: str, region: str, gpu_type: str, ssh_public_key: str = ""
     ) -> Dict[str, Any]:
         if not self.instances_client or not self.project_id:
             raise RuntimeError("GCP client not initialised – configure credentials first")
 
-        zone = f"{region}-a"
-        instance_name = (
-            f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        )
-
         try:
             from google.cloud import compute_v1
+
+            instance_name = (
+                f"terradev-{gpu_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            )
+
+            is_tpu = self._is_tpu_type(gpu_type)
+
+            if is_tpu:
+                tpu_key = self._normalize_tpu_key(gpu_type)
+                cfg = self.TPU_MACHINE_MAP[tpu_key]
+                zone = self._tpu_zone_for_region(cfg, region) or cfg.get("preferred_zone") or f"{region}-a"
+
+                disk_image = (
+                    f"projects/{cfg['image_project']}"
+                    f"/global/images/family/{cfg['image_family']}"
+                )
+
+                labels = {
+                    "managed-by": "terradev",
+                    "accelerator": "tpu",
+                    "tpu-type": tpu_key.lower(),
+                }
+
+                scheduling = compute_v1.Scheduling(
+                    on_host_maintenance="TERMINATE",
+                    provisioning_model="STANDARD",
+                )
+
+                tpu_metadata = {
+                    "tpu_chips": str(cfg["tpu_chips"]),
+                    "tpu_machine_type": cfg["machine_type"],
+                    "tpu_software_stack": cfg["image_family"],
+                    "tpu_non_cuda_warning": (
+                        "TPU requires JAX, PyTorch XLA, or TensorFlow; "
+                        "CUDA-dependent code will not run."
+                    ),
+                }
+            else:
+                zone = f"{region}-a"
+                disk_image = "projects/deeplearning-platform-release/global/images/family/common-cu121-debian-11-py310"
+                labels = {"managed-by": "terradev", "gpu-type": gpu_type.lower()}
+                scheduling = compute_v1.Scheduling()
+                tpu_metadata = {}
 
             instance_resource = compute_v1.Instance()
             instance_resource.name = instance_name
@@ -273,7 +511,7 @@ class GCPProvider(BaseProvider):
             disk.auto_delete = True
             disk.boot = True
             init = compute_v1.AttachedDiskInitializeParams()
-            init.source_image = "projects/deeplearning-platform-release/global/images/family/common-cu121-debian-11-py310"
+            init.source_image = disk_image
             init.disk_size_gb = 200
             disk.initialize_params = init
             instance_resource.disks = [disk]
@@ -285,10 +523,15 @@ class GCPProvider(BaseProvider):
             net.access_configs = [access]
             instance_resource.network_interfaces = [net]
 
-            instance_resource.labels = {
-                "managed-by": "terradev",
-                "gpu-type": gpu_type.lower(),
-            }
+            instance_resource.labels = labels
+            instance_resource.scheduling = scheduling
+
+            if tpu_metadata:
+                items = [
+                    compute_v1.Items(key=k, value=v)
+                    for k, v in tpu_metadata.items()
+                ]
+                instance_resource.metadata = compute_v1.Metadata(items=items)
 
             request = compute_v1.InsertInstanceRequest(
                 project=self.project_id, zone=zone, instance_resource=instance_resource
@@ -297,7 +540,7 @@ class GCPProvider(BaseProvider):
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self.instances_client.insert, request)
 
-            return {
+            result: Dict[str, Any] = {
                 "instance_id": instance_name,
                 "instance_type": instance_type,
                 "region": region,
@@ -306,12 +549,28 @@ class GCPProvider(BaseProvider):
                 "provider": "gcp",
                 "metadata": {"project": self.project_id, "zone": zone},
             }
+            if is_tpu:
+                result["tpu_chips"] = cfg["tpu_chips"]
+                result["tpu_type"] = cfg["machine_type"]
+                result["tpu_image"] = disk_image
+            return result
         except Exception as e:  # noqa: BLE001
             raise RuntimeError(f"GCP provision failed: {e}") from e
 
-    async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
-        if not self.instances_client or not self.project_id:
-            raise Exception("GCP client not initialised")
+    async def _resolve_zone(self, instance_id: str) -> Optional[str]:
+        """Return the zone for an instance, falling back to a project search.
+
+        The zone stored in credentials may not be the zone where a TPU VM was
+        actually created (e.g. the TPU type only exists in us-east5-a). We try
+        self.zone first, then ask gcloud to locate the instance.
+        """
+        if not self.project_id:
+            return self.zone
+        if not hasattr(self, "_zone_cache"):
+            self._zone_cache: Dict[str, str] = {}
+        if instance_id in self._zone_cache:
+            return self._zone_cache[instance_id]
+
         try:
             from google.cloud import compute_v1
 
@@ -319,12 +578,61 @@ class GCPProvider(BaseProvider):
                 project=self.project_id, zone=self.zone, instance=instance_id
             )
             loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self.instances_client.get, request)
+            self._zone_cache[instance_id] = self.zone
+            return self.zone
+        except Exception:
+            pass
+
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                [
+                    "gcloud",
+                    "compute",
+                    "instances",
+                    "list",
+                    "--project",
+                    self.project_id,
+                    "--filter",
+                    f"name={instance_id}",
+                    "--format",
+                    "value(zone)",
+                    "--quiet",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0:
+                zones = [z.strip() for z in result.stdout.strip().splitlines() if z.strip()]
+                if zones:
+                    zone = zones[0]
+                    self._zone_cache[instance_id] = zone
+                    return zone
+        except Exception:
+            pass
+
+        return self.zone
+
+    async def get_instance_status(self, instance_id: str) -> Dict[str, Any]:
+        if not self.instances_client or not self.project_id:
+            raise Exception("GCP client not initialised")
+        try:
+            from google.cloud import compute_v1
+
+            zone = await self._resolve_zone(instance_id)
+            request = compute_v1.GetInstanceRequest(
+                project=self.project_id, zone=zone, instance=instance_id
+            )
+            loop = asyncio.get_running_loop()
             inst = await loop.run_in_executor(None, self.instances_client.get, request)
             return {
                 "instance_id": instance_id,
                 "status": inst.status.lower(),
                 "instance_type": inst.machine_type.split("/")[-1],
-                "region": self.zone.rsplit("-", 1)[0],
+                "region": zone.rsplit("-", 1)[0],
                 "provider": "gcp",
             }
         except Exception as e:  # noqa: BLE001
@@ -335,8 +643,9 @@ class GCPProvider(BaseProvider):
             raise Exception("GCP client not initialised")
         from google.cloud import compute_v1
 
+        zone = await self._resolve_zone(instance_id)
         request = compute_v1.StopInstanceRequest(
-            project=self.project_id, zone=self.zone, instance=instance_id
+            project=self.project_id, zone=zone, instance=instance_id
         )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.instances_client.stop, request)
@@ -347,8 +656,9 @@ class GCPProvider(BaseProvider):
             raise Exception("GCP client not initialised")
         from google.cloud import compute_v1
 
+        zone = await self._resolve_zone(instance_id)
         request = compute_v1.StartInstanceRequest(
-            project=self.project_id, zone=self.zone, instance=instance_id
+            project=self.project_id, zone=zone, instance=instance_id
         )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.instances_client.start, request)
@@ -359,8 +669,9 @@ class GCPProvider(BaseProvider):
             raise Exception("GCP client not initialised")
         from google.cloud import compute_v1
 
+        zone = await self._resolve_zone(instance_id)
         request = compute_v1.DeleteInstanceRequest(
-            project=self.project_id, zone=self.zone, instance=instance_id
+            project=self.project_id, zone=zone, instance=instance_id
         )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.instances_client.delete, request)
@@ -408,6 +719,8 @@ class GCPProvider(BaseProvider):
         try:
             import subprocess
 
+            zone = await self._resolve_zone(instance_id)
+
             # Try gcloud compute ssh first (handles IAP tunneling, OS Login, etc.)
             gcloud_cmd = [
                 "gcloud",
@@ -417,7 +730,7 @@ class GCPProvider(BaseProvider):
                 "--project",
                 self.project_id,
                 "--zone",
-                self.zone,
+                zone,
                 "--command",
                 command,
                 "--quiet",
@@ -592,18 +905,18 @@ class GCPProvider(BaseProvider):
 
         GCP actively pushes TPUs for inference. Compare costs and performance.
         """
-        # TPU mapping for GPU alternatives
+        # TPU mapping for GPU alternatives (Compute Engine machine types)
         tpu_alternatives = {
             "A100": {
-                "tpu_type": "tpu-v4-podslice-8",
-                "performance_ratio": 0.8,  # TPU is ~80% of A100 performance
-                "cost_ratio": 0.6,  # TPU is ~40% cheaper
+                "tpu_type": "TPU-V6E-4T",
+                "performance_ratio": 0.85,
+                "cost_ratio": 0.55,
                 "use_case": "training",
             },
             "H100": {
-                "tpu_type": "tpu-v5p-podslice-8",
-                "performance_ratio": 0.9,  # TPU is ~90% of H100 performance
-                "cost_ratio": 0.5,  # TPU is ~50% cheaper
+                "tpu_type": "TPU-V6E-8T",
+                "performance_ratio": 0.95,
+                "cost_ratio": 0.50,
                 "use_case": "training",
             },
         }
