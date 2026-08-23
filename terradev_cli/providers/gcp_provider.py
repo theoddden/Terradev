@@ -581,8 +581,8 @@ class GCPProvider(BaseProvider):
             await loop.run_in_executor(None, self.instances_client.get, request)
             self._zone_cache[instance_id] = self.zone
             return self.zone
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"Zone resolution via client failed for {instance_id}: {exc}")
 
         try:
             import subprocess
@@ -611,8 +611,8 @@ class GCPProvider(BaseProvider):
                     zone = zones[0]
                     self._zone_cache[instance_id] = zone
                     return zone
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"Zone resolution via gcloud failed for {instance_id}: {exc}")
 
         return self.zone
 
