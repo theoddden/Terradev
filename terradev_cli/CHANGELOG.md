@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.1.0] - 2026-08-23
+
+### 🚀 Drift monitor, no-auth REST providers, and CI scheduling
+- Added `auth_required: false` support to provider drift contracts so public REST endpoints can be monitored without an API key.
+- Scheduled the `provider_drift.yml` GitHub Actions workflow to run at 13:00 UTC (morning EDT/PDT).
+- Added `REQUIRES_AUTH` flag to `BaseProvider`; quote functions now cleanly skip auth-required providers that have no credentials while still running no-auth providers (HuggingFace, Oracle, Crusoe, Baseten).
+- Bumped version to **6.1.0**.
+
+---
+
 ## [6.0.8] - 2026-08-08
 
 ### 🐛 **CI hardening for agent subcommands**

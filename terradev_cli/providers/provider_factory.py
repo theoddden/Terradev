@@ -105,6 +105,14 @@ class ProviderFactory:
         """Get list of supported providers"""
         return list(self._loaders.keys())
 
+    def requires_auth(self, provider_name: str) -> bool:
+        """Return False if the provider can quote without credentials."""
+        try:
+            provider_class = self._resolve(provider_name)
+        except (ValueError, ImportError):
+            return True
+        return getattr(provider_class, "REQUIRES_AUTH", True)
+
     def register_provider(self, provider_name: str, provider_class: type) -> None:
         """Register a new provider class"""
         if not issubclass(provider_class, BaseProvider):

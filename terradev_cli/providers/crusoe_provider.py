@@ -22,6 +22,7 @@ class CrusoeProvider(BaseProvider):
     """Crusoe Cloud provider for GPU instances"""
 
     API_BASE = "https://api.crusoecloud.com/v1alpha5"
+    REQUIRES_AUTH = False  # Static GPU_PRICING table is used when no Crusoe keys
 
     def __init__(self, credentials: Dict[str, str]):
         super().__init__(credentials)

@@ -2,7 +2,7 @@ name: Provider API Drift Monitor
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # 6am UTC daily
+    - cron: '0 13 * * *'  # 9am EDT / 6am PDT — morning run
   workflow_dispatch:
 
 permissions:

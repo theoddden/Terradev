@@ -14,6 +14,7 @@ class OracleProvider(BaseProvider):
     """Oracle Cloud Infrastructure provider for GPU instances"""
 
     API_BASE = "https://iaas.{region}.oraclecloud.com/20160918"
+    REQUIRES_AUTH = False  # Static GPU_SHAPES table is used when no OCI creds
 
     def __init__(self, credentials: Dict[str, str]):
         super().__init__(credentials)

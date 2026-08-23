@@ -138,6 +138,10 @@ class BaseProvider(ABC):
     # Override this in providers that expose a dedicated health/ping endpoint.
     _health_endpoint: Optional[str] = None
 
+    # Providers that can return quotes without credentials (static/public fallbacks)
+    # should set this to False.
+    REQUIRES_AUTH: bool = True
+
     async def check_health(self) -> HealthStatus:
         """
         Default health check: lightweight HEAD request against the provider

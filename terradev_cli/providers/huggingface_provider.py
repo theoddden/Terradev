@@ -18,6 +18,7 @@ class HuggingFaceProvider(BaseProvider):
 
     API_BASE = "https://api.endpoints.huggingface.cloud/v2"
     INFERENCE_API = "https://api-inference.huggingface.co"
+    REQUIRES_AUTH = False  # Static GPU_PRICING is returned when no token is set
 
     def __init__(self, credentials: Dict[str, str]):
         super().__init__(credentials)

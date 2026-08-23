@@ -14,6 +14,7 @@ class BasetenProvider(BaseProvider):
     """Baseten provider for inference-optimized GPU instances"""
 
     API_BASE = "https://api.baseten.co/v1"
+    REQUIRES_AUTH = False  # Can quote from the static GPU_PRICING table
 
     def __init__(self, credentials: Dict[str, str]):
         super().__init__(credentials)
