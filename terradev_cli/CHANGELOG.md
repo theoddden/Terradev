@@ -10,7 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🚀 Drift monitor, no-auth REST providers, and CI scheduling
 - Added `auth_required: false` support to provider drift contracts so public REST endpoints can be monitored without an API key.
 - Scheduled the `provider_drift.yml` GitHub Actions workflow to run at 13:00 UTC (morning EDT/PDT).
-- Added `REQUIRES_AUTH` flag to `BaseProvider`; quote functions now cleanly skip auth-required providers that have no credentials while still running no-auth providers (HuggingFace, Oracle, Crusoe, Baseten).
+- Added `REQUIRES_AUTH` flag to `BaseProvider` and `ProviderFactory` for provider auth-intent discovery.
+- Fixed `_get_provider_quotes` so it no longer pre-emptively skips auth-required providers; each provider's `get_instance_quotes` handles missing credentials and returns cleanly (preserving the original resilience tests and avoiding a forced short-circuit).
+- `REQUIRES_AUTH` remains available for drift/contract logic while public REST providers (HuggingFace, Oracle, Crusoe, Baseten) continue to return static quotes without credentials.
 - Bumped version to **6.1.0**.
 
 ---

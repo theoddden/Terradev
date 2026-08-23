@@ -557,14 +557,6 @@ class TerradevAPI:
             factory = ProviderFactory()
             creds = self._provider_creds(provider_name)
 
-            # Skip auth-required providers when no credentials are present.
-            # No-auth providers (static/public fallbacks) still run.
-            if factory.requires_auth(provider_name) and not validate_credentials(
-                provider_name, creds
-            ):
-                logger.debug(f"Skipping {provider_name} quotes: no credentials")
-                return []
-
             provider = factory.create_provider(provider_name, creds)
             try:
                 raw_quotes = await provider.get_instance_quotes(gpu_type)
