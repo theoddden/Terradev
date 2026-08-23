@@ -85,7 +85,7 @@ from . import vault      # noqa: F401,E402
 from . import letta   # noqa: F401,E402
 from . import agent_infra  # noqa: F401,E402
 from . import login      # noqa: F401,E402
-from . import sso        # noqa: F401,E402
+# SSO commands are provided by platform.py to avoid duplicate group registration
 from . import telinea    # noqa: F401,E402
 
 # Fold agentic-serving under the agent group
