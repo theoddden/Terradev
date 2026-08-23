@@ -240,6 +240,24 @@ def configure(provider):
                 "help": "Get from: InferX dashboard → API Keys",
                 "example": "ix_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             },
+            "e2enetworks": {
+                "name": "E2E Networks",
+                "key_name": "API Key",
+                "help": "Get from: https://e2enetworks.com",
+                "example": "e2e_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            },
+            "latitude": {
+                "name": "Latitude.sh",
+                "key_name": "API Key",
+                "help": "Get from: https://latitude.sh/account/api-keys",
+                "example": "lat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            },
+            "yottalabs": {
+                "name": "Yotta Labs",
+                "key_name": "API Key",
+                "help": "Get from: https://yottalabs.ai",
+                "example": "yotta_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            },
         }
 
         config = provider_configs.get(provider.lower())
@@ -342,6 +360,60 @@ def configure(provider):
                 existing_creds[provider.lower()] = {
                     "api_key": api_key.strip(),
                     "namespace": namespace.strip(),
+                }
+            elif provider.lower() == "alibaba":
+                # Alibaba Cloud needs Access Key ID and Secret
+                access_key_secret = click.prompt(
+                    "   Enter Alibaba Access Key Secret", hide_input=True
+                )
+                region_id = click.prompt(
+                    "   Enter Alibaba Region ID", default="cn-beijing"
+                )
+                existing_creds[provider.lower()] = {
+                    "access_key_id": api_key.strip(),
+                    "access_key_secret": access_key_secret.strip(),
+                    "region_id": region_id.strip(),
+                }
+            elif provider.lower() == "ovhcloud":
+                # OVHcloud needs multiple credentials
+                application_secret = click.prompt(
+                    "   Enter OVHcloud Application Secret", hide_input=True
+                )
+                consumer_key = click.prompt("   Enter OVHcloud Consumer Key")
+                project_id = click.prompt("   Enter OVHcloud Project ID")
+                endpoint = click.prompt(
+                    "   Enter OVHcloud Endpoint", default="ovh-eu"
+                )
+                existing_creds[provider.lower()] = {
+                    "application_key": api_key.strip(),
+                    "application_secret": application_secret.strip(),
+                    "consumer_key": consumer_key.strip(),
+                    "project_id": project_id.strip(),
+                    "endpoint": endpoint.strip(),
+                }
+            elif provider.lower() == "hetzner":
+                # Hetzner uses an API token, plus optional Robot credentials
+                robot_user = click.prompt(
+                    "   Enter Hetzner Robot User (optional)", default=""
+                )
+                robot_password = click.prompt(
+                    "   Enter Hetzner Robot Password (optional)",
+                    hide_input=True,
+                    default="",
+                )
+                existing_creds[provider.lower()] = {
+                    "api_token": api_key.strip(),
+                    "robot_user": robot_user.strip(),
+                    "robot_password": robot_password.strip(),
+                }
+            elif provider.lower() == "e2enetworks":
+                # E2E Networks optionally supports a project ID
+                project_id = click.prompt(
+                    "   Enter E2E Networks Project ID (optional)", default=""
+                )
+                existing_creds[provider.lower()] = {
+                    "api_key": api_key.strip(),
+                    "project_id": project_id.strip(),
                 }
             else:
                 existing_creds[provider.lower()] = {"api_key": api_key.strip()}
@@ -734,6 +806,19 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             ("coreweave", api.get_coreweave_quotes),
             ("oracle", api.get_oracle_quotes),
             ("crusoe", api.get_crusoe_quotes),
+            ("alibaba", api.get_alibaba_quotes),
+            ("baseten", api.get_baseten_quotes),
+            ("digitalocean", api.get_digitalocean_quotes),
+            ("e2enetworks", api.get_e2enetworks_quotes),
+            ("fluidstack", api.get_fluidstack_quotes),
+            ("hetzner", api.get_hetzner_quotes),
+            ("huggingface", api.get_huggingface_quotes),
+            ("hyperstack", api.get_hyperstack_quotes),
+            ("inferx", api.get_inferx_quotes),
+            ("latitude", api.get_latitude_quotes),
+            ("ovhcloud", api.get_ovhcloud_quotes),
+            ("siliconflow", api.get_siliconflow_quotes),
+            ("yottalabs", api.get_yottalabs_quotes),
         ]
         for pname, fn in provider_list:
             if not providers or pname in providers:
@@ -827,15 +912,27 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
         [
             "runpod",
             "vastai",
+            "aws",
+            "gcp",
+            "azure",
             "lambda_labs",
             "tensordock",
             "crusoe",
             "baseten",
             "coreweave",
-            "gcp",
-            "aws",
-            "azure",
             "oracle",
+            "huggingface",
+            "siliconflow",
+            "fluidstack",
+            "hetzner",
+            "ovhcloud",
+            "alibaba",
+            "hyperstack",
+            "digitalocean",
+            "inferx",
+            "e2enetworks",
+            "latitude",
+            "yottalabs",
         ]
     ),
 )
@@ -1030,7 +1127,22 @@ def setup(provider, quick):
         },
     }
 
-    info = setup_instructions[provider]
+    info = setup_instructions.get(provider)
+    if not info:
+        name = provider.replace("_", " ").title()
+        info = {
+            "name": name,
+            "time": "10 minutes",
+            "difficulty": "MODERATE",
+            "url": f"https://{provider}.com",
+            "steps": [
+                f"Create an account at {provider}'s website",
+                "Generate an API key from the dashboard",
+                f'Copy and run:\nexport {provider.upper()}_API_KEY="paste-your-key-here"\necho \'export {provider.upper()}_API_KEY="paste-your-key-here"\' >> ~/.bashrc\nsource ~/.bashrc',
+                f"Test it:\nterradev quote --providers {provider} --gpu a100",
+            ],
+            "env_vars": [f"{provider.upper()}_API_KEY"],
+        }
 
     if quick:
         print(f"{info['name']} Quick Setup ({info['time']})")

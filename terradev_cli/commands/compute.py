@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
     "--gpu-type",
     "-g",
     required=True,
-    help="GPU type (required: A100, H100, RTX4090, L40S, etc.)",
+    help="GPU/TPU type (required: A100, H100, RTX4090, TPU-V6E-8T, etc.)",
 )
 @click.option(
     "--count", "-n", default=1, help="Number of instances to provision (default: 1)"
@@ -571,7 +571,12 @@ def provision(
         print(f"{'#':<4} {'Provider':<14} {'Region':<14} {'$/hr':<10} {'VRAM':<8} {'Instance':<20} {'Spot'}")
         print("-" * 78)
         for i, q in enumerate(quotes):
-            vram_str = f"{q.get('memory_gb', 0):.0f}GB" if q.get('memory_gb') else "N/A"
+            if q.get("tpu_chips"):
+                vram_str = f"{q['tpu_chips']}xTPU"
+            elif q.get("memory_gb"):
+                vram_str = f"{q.get('memory_gb', 0):.0f}GB"
+            else:
+                vram_str = "N/A"
             spot_mark = "✓" if q.get("availability") == "spot" else ""
             instance_short = q.get("instance_type", "N/A")[:20]
             print(f"{i+1:<4} {q['provider']:<14} {q['region']:<14} ${q['price']:<9.2f} {vram_str:<8} {instance_short:<20} {spot_mark}")
@@ -2205,10 +2210,11 @@ def job(job_file, optimize):
     "--gpu",
     "-g",
     required=True,
-    help="GPU type (required: A100, H100, RTX4090, L40S, etc.)",
+    help="GPU/TPU type (required: A100, H100, RTX4090, TPU-V6E-8T, etc.)",
 )
 @click.option(
     "--image",
+    "-i",
     required=True,
     help="Docker image (required: e.g., pytorch/pytorch:latest)",
 )
@@ -2216,6 +2222,12 @@ def job(job_file, optimize):
     "--cmd",
     default=None,
     help='Command to run inside the container (e.g., "python train.py")',
+)
+@click.option(
+    "--model",
+    "-M",
+    default="meta-llama/Llama-3.1-8B",
+    help="Model ID for vLLM / inference images (default: meta-llama/Llama-3.1-8B)",
 )
 @click.option(
     "--mount",
@@ -2249,7 +2261,7 @@ def job(job_file, optimize):
     help="Keep instance running after command completes (for serving)",
 )
 @click.option("--dry-run", is_flag=True, help="Show deployment plan without executing")
-def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry_run):
+def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_alive, dry_run):
     """One-command GPU provisioning, Docker deployment, and workload execution.
 
     Combines provision + deploy + execute into a single step for rapid prototyping.
@@ -2261,6 +2273,7 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
       terradev run -g H100 -i vllm/vllm-openai:latest --keep-alive --port 8000
       terradev run -g A100 -i my-training:latest -m ./data:/workspace/data -e WANDB_KEY=xxx
       terradev run -g RTX4090 -i ubuntu:latest -c "nvidia-smi" --dry-run
+      terradev run -g TPU-V6E-8T -i vllm/vllm-tpu:latest --model meta-llama/Llama-3.1-8B --keep-alive --port 8000
 
     Use Cases:
       - Quick training runs: terradev run -g A100 -i pytorch/pytorch:latest -c "python train.py"
@@ -2296,9 +2309,14 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
 
     # Tier gate removed - unlimited monthly provisions (open source)
 
+    is_tpu = str(gpu).upper().startswith("TPU-")
+    is_vllm_tpu = is_tpu and "vllm-tpu" in image.lower()
+
     print("Deploying terradev run")
-    print(f"   GPU:     {gpu}")
+    print(f"   {'TPU' if is_tpu else 'GPU'}:     {gpu}")
     print(f"   Image:   {image}")
+    if model:
+        print(f"   Model:   {model}")
     if cmd:
         print(f"   Command: {cmd}")
     if mount:
@@ -2327,6 +2345,19 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
             ("coreweave", api.get_coreweave_quotes),
             ("oracle", api.get_oracle_quotes),
             ("crusoe", api.get_crusoe_quotes),
+            ("alibaba", api.get_alibaba_quotes),
+            ("baseten", api.get_baseten_quotes),
+            ("digitalocean", api.get_digitalocean_quotes),
+            ("e2enetworks", api.get_e2enetworks_quotes),
+            ("fluidstack", api.get_fluidstack_quotes),
+            ("hetzner", api.get_hetzner_quotes),
+            ("huggingface", api.get_huggingface_quotes),
+            ("hyperstack", api.get_hyperstack_quotes),
+            ("inferx", api.get_inferx_quotes),
+            ("latitude", api.get_latitude_quotes),
+            ("ovhcloud", api.get_ovhcloud_quotes),
+            ("siliconflow", api.get_siliconflow_quotes),
+            ("yottalabs", api.get_yottalabs_quotes),
         ]
         for pname, fn in provider_list:
             if not providers or pname in providers:
@@ -2395,7 +2426,8 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
         pname = best["provider"].lower().replace(" ", "_")
         creds = api._provider_creds(pname)
         provider = factory.create_provider(pname, creds)
-        itype = f"{pname}-ondemand-{gpu.lower()}"
+        # Use the provider-specific machine type from the quote (critical for GCP TPUs)
+        itype = best.get("instance_type") or f"{pname}-ondemand-{gpu.lower()}"
         result = await provider.provision_instance(
             itype,
             best.get("region", "us-east-1"),
@@ -2427,6 +2459,9 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
         "image": image,
         "created_at": datetime.now().isoformat(),
     }
+    if prov_result.get("tpu_chips"):
+        inst_data["tpu_chips"] = prov_result["tpu_chips"]
+        inst_data["tpu_type"] = prov_result.get("tpu_type")
     api.usage["instances_created"].append(inst_data)
     api.save_usage()
 
@@ -2449,13 +2484,33 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
     # ── Step 3: Deploy Docker container ──
     print(f"\n Deploying container: {image}")
 
-    docker_cmd_parts = ["docker", "run", "-d", "--gpus", "all"]
+    if is_tpu:
+        # TPU VMs require privileged mode, host networking and large /dev/shm.
+        # See https://docs.vllm.ai/projects/tpu/en/latest/getting_started/installation/
+        docker_cmd_parts = [
+            "docker",
+            "run",
+            "-d",
+            "--privileged",
+            "--net=host",
+            "--shm-size=150gb",
+            "-v",
+            "/dev/shm:/dev/shm",
+        ]
+    else:
+        docker_cmd_parts = ["docker", "run", "-d", "--gpus", "all"]
     for m in mount:
         docker_cmd_parts.extend(["-v", m])
     for p in port:
         docker_cmd_parts.extend(["-p", f"{p}:{p}"])
     for e_var in env:
         docker_cmd_parts.extend(["-e", e_var])
+
+    # TPU / vLLM TPU defaults
+    if is_tpu:
+        docker_cmd_parts.extend(["-e", "VLLM_TARGET_DEVICE=tpu"])
+        if is_vllm_tpu:
+            docker_cmd_parts.extend(["-e", "VLLM_USE_V1=1"])
 
     # Auto-inject W&B env vars if configured
     try:
@@ -2472,6 +2527,25 @@ def run(gpu, image, cmd, mount, port, env, max_price, providers, keep_alive, dry
     except Exception as _exc:  # noqa: BLE001
         logger.exception(_exc)
         pass
+
+    # Default vLLM TPU serve command if the user didn't supply one
+    if is_vllm_tpu and not cmd:
+        tpu_chips = prov_result.get("tpu_chips") or best.get("tpu_chips")
+        if not tpu_chips:
+            # Fallback: parse the chip count from the TPU key
+            import re as _re
+            match = _re.search(r"(\d+)T", str(gpu).upper())
+            tpu_chips = int(match.group(1)) if match else 1
+        first_port = port[0] if port else 8000
+        cmd = (
+            f"vllm serve '{model}' "
+            f"--host 0.0.0.0 "
+            f"--port {first_port} "
+            f"--tensor-parallel-size {tpu_chips} "
+            f"--max-model-len 2048 "
+            f"--download-dir /tmp"
+        )
+        print(f"   Default vLLM TPU command: {cmd}")
 
     docker_cmd_parts.extend(["--name", f"terradev-{instance_id[:12]}"])
     docker_cmd_parts.append(image)

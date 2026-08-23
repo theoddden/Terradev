@@ -19,7 +19,11 @@ class OracleProvider(BaseProvider):
         super().__init__(credentials)
         self.name = "oracle"
         self.api_key = credentials.get("api_key", "")
-        self.tenancy_id = credentials.get("secret_key", "")  # OCI tenancy OCID
+        self.tenancy_id = credentials.get(
+            "secret_key", ""
+        ) or credentials.get(
+            "tenancy_ocid", ""
+        )  # OCI tenancy OCID
         self.region = credentials.get("region", "us-ashburn-1")
 
     GPU_SHAPES = {

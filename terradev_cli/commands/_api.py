@@ -41,18 +41,29 @@ except ImportError:
 def validate_credentials(provider: str, credentials: Dict[str, str]) -> bool:
     """Validate that all required credentials are present for a provider"""
     required_creds = {
+        "alibaba": ["access_key_id", "access_key_secret"],
         "aws": ["api_key", "secret_key"],
-        "gcp": ["project_id", "credentials_file"],
         "azure": ["subscription_id", "tenant_id", "client_id", "client_secret"],
-        "runpod": ["api_key"],
-        "vastai": ["api_key"],
-        "lambda_labs": ["api_key"],
-        "coreweave": ["api_key"],
-        "tensordock": ["api_key", "api_token"],
-        "huggingface": ["api_key", "namespace"],
         "baseten": ["api_key"],
-        "oracle": ["api_key", "tenancy_ocid", "compartment_ocid", "region"],
+        "coreweave": ["api_key"],
         "crusoe": ["access_key", "secret_key", "project_id"],
+        "digitalocean": ["api_key"],
+        "e2enetworks": ["api_key"],
+        "fluidstack": ["api_key"],
+        "gcp": ["project_id", "credentials_file"],
+        "hetzner": ["api_token"],
+        "huggingface": ["api_key", "namespace"],
+        "hyperstack": ["api_key"],
+        "inferx": ["api_key"],
+        "lambda_labs": ["api_key"],
+        "latitude": ["api_key"],
+        "oracle": ["api_key", "tenancy_ocid", "compartment_ocid", "region"],
+        "ovhcloud": ["application_key", "application_secret", "consumer_key", "project_id"],
+        "runpod": ["api_key"],
+        "siliconflow": ["api_key"],
+        "tensordock": ["api_key", "api_token"],
+        "vastai": ["api_key"],
+        "yottalabs": ["api_key"],
     }
 
     provider_lower = provider.lower()
@@ -451,6 +462,13 @@ class TerradevAPI:
                 "inferx_api_endpoint", "https://api.inferx.net"
             )
             creds["region"] = self.credentials.get("inferx_region", "us-west-2")
+        elif provider_name == "e2enetworks":
+            creds["api_key"] = self.credentials.get("e2enetworks_api_key", "")
+            creds["project_id"] = self.credentials.get("e2enetworks_project_id", "")
+        elif provider_name == "latitude":
+            creds["api_key"] = self.credentials.get("latitude_api_key", "")
+        elif provider_name == "yottalabs":
+            creds["api_key"] = self.credentials.get("yottalabs_api_key", "")
         # ML Services
         elif provider_name == "kserve":
             creds["namespace"] = self.credentials.get("kserve_namespace", "default")
@@ -547,18 +565,27 @@ class TerradevAPI:
             # Normalise to CLI display format
             quotes = []
             for q in raw_quotes:
-                quotes.append(
-                    {
-                        "provider": provider_name.replace("_", " ").title(),
-                        "price": q.get("price_per_hour", 0),
-                        "gpu_type": q.get("gpu_type", gpu_type),
-                        "region": q.get("region", "unknown"),
-                        "availability": "spot" if q.get("spot") else "on-demand",
-                        "gpu_count": q.get("gpu_count", 1),
-                        "instance_type": q.get("instance_type", "N/A"),
-                        "memory_gb": q.get("memory_gb", 0),
-                    }
-                )
+                # Skip quotes that the provider already marked as unavailable
+                # (e.g. TPU requested in an unsupported region).
+                if not q.get("available", True):
+                    continue
+                quote = {
+                    "provider": provider_name.replace("_", " ").title(),
+                    "price": q.get("price_per_hour", 0),
+                    "gpu_type": q.get("gpu_type", gpu_type),
+                    "region": q.get("region", "unknown"),
+                    "availability": "spot" if q.get("spot") else "on-demand",
+                    "gpu_count": q.get("gpu_count", 1),
+                    "instance_type": q.get("instance_type", "N/A"),
+                    "memory_gb": q.get("memory_gb", 0),
+                }
+                # TPU fields: keep them so the CLI can build TPU-aware workloads
+                if q.get("tpu_chips"):
+                    quote["tpu_chips"] = q["tpu_chips"]
+                    quote["tpu_type"] = q.get("tpu_type")
+                    quote["tpu_image"] = q.get("tpu_image")
+                    quote["tpu_non_cuda_warning"] = q.get("tpu_non_cuda_warning")
+                quotes.append(quote)
             return quotes
         except Exception as _exc:  # noqa: BLE001
             logger.exception(_exc)
@@ -615,6 +642,45 @@ class TerradevAPI:
 
     async def get_crusoe_quotes(self, gpu_type: str):
         return await self._get_provider_quotes("crusoe", gpu_type)
+
+    async def get_alibaba_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("alibaba", gpu_type)
+
+    async def get_baseten_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("baseten", gpu_type)
+
+    async def get_digitalocean_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("digitalocean", gpu_type)
+
+    async def get_e2enetworks_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("e2enetworks", gpu_type)
+
+    async def get_fluidstack_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("fluidstack", gpu_type)
+
+    async def get_hetzner_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("hetzner", gpu_type)
+
+    async def get_huggingface_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("huggingface", gpu_type)
+
+    async def get_hyperstack_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("hyperstack", gpu_type)
+
+    async def get_inferx_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("inferx", gpu_type)
+
+    async def get_latitude_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("latitude", gpu_type)
+
+    async def get_ovhcloud_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("ovhcloud", gpu_type)
+
+    async def get_siliconflow_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("siliconflow", gpu_type)
+
+    async def get_yottalabs_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("yottalabs", gpu_type)
 
 
 def run_interactive_onboarding(api: TerradevAPI):

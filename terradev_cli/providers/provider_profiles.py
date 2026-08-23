@@ -318,8 +318,8 @@ PROVIDER_PROFILES: dict[str, ProviderProfile] = {
         isolation_level="vm",
         supports_stop_start=True,
     ),
-    "e2e_networks": ProviderProfile(
-        name="e2e_networks",
+    "e2enetworks": ProviderProfile(
+        name="e2enetworks",
         api_style="rest",
         auth_type="bearer",
         requires_instance_type_mapping=False,
