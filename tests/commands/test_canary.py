@@ -215,3 +215,44 @@ endpoints:
         )
         assert result.exit_code == 0
         assert "skipped" in result.output
+
+    def _no_auth_contract(self, expected=None):
+        return f"""
+provider: public
+base_url: https://api.example.com
+auth_required: false
+endpoints:
+  - name: list_gpus
+    path: /gpus
+    method: GET
+    expected_response_fields: [data, gpuTypes]
+"""
+
+    def test_drift_no_auth(self, runner, tmp_path, monkeypatch):
+        contracts = tmp_path / "contracts"
+        contracts.mkdir()
+        contract = contracts / "public.yaml"
+        contract.write_text(self._no_auth_contract())
+
+        post, get = self._make_fake_requests({"data": {"gpuTypes": [{"id": "A100"}]}})
+        monkeypatch.setattr("terradev_cli.drift_monitor.agent.requests.post", post)
+        monkeypatch.setattr("terradev_cli.drift_monitor.agent.requests.get", get)
+
+        result = runner.invoke(
+            cli,
+            [
+                "--format",
+                "json",
+                "canary",
+                "drift",
+                "--all",
+                "--contracts-dir",
+                str(contracts),
+            ],
+            env={"TERRADEV_SKIP_ONBOARDING": "1"},
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["healthy"] == 1
+        assert data["skipped"] == 0
+        assert data["providers"][0]["status"] == "healthy"

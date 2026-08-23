@@ -91,8 +91,9 @@ class DriftMonitor:
             "status": "healthy",
         }
 
-        api_key = self.credentials.get(provider)
-        if not api_key:
+        auth_required = contract.get("auth_required", True)
+        api_key = self.credentials.get(provider, "")
+        if auth_required and not api_key:
             result["status"] = "skipped_no_credentials"
             return result
 
@@ -206,6 +207,11 @@ class DriftMonitor:
         auth_header = contract.get("auth_header", "Authorization")
 
         headers: Dict[str, str] = {}
+        payload: Dict[str, Any] = {}
+
+        if not contract.get("auth_required", True):
+            return url, headers, payload
+
         if auth_in == "query":
             param = contract.get("auth_query_param", "api_key")
             sep = "&" if "?" in url else "?"
@@ -223,7 +229,6 @@ class DriftMonitor:
             if endpoint.get("method", "GET").upper() == "POST":
                 headers.setdefault("Content-Type", "application/json")
 
-        payload: Dict[str, Any] = {}
         if endpoint.get("smoke_test_query"):
             payload["query"] = endpoint["smoke_test_query"]
         if endpoint.get("smoke_test_variables"):
