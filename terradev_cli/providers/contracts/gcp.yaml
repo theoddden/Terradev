@@ -1,0 +1,7 @@
+provider: gcp
+base_url: https://compute.googleapis.com/compute/v1
+auth_required: true
+auth_type: Bearer
+auth_header: Authorization
+last_verified: '2026-08-24'
+endpoints: []

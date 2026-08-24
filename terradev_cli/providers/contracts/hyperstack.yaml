@@ -1,10 +1,17 @@
 provider: hyperstack
 base_url: https://infrahub-api.nexgencloud.com/v1
-auth_header: api_key
-last_verified: 2026-08-23
+auth_header: apiKey
+auth_required: true
+last_verified: '2026-08-24'
 endpoints:
-  - name: list_virtual_machines
-    method: GET
-    path: /core/virtual-machines
-    expected_response_fields: [status, instances]
-    optional_response_fields: [message, page, page_size, count]
+- name: list_virtual_machines
+  method: GET
+  path: core/virtual-machines
+  expected_response_fields:
+  - status
+  - instances
+  optional_response_fields:
+  - message
+  - page
+  - page_size
+  - count

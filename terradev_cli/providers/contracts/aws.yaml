@@ -1,0 +1,8 @@
+provider: aws
+base_url: https://ec2.us-east-1.amazonaws.com
+auth_required: true
+auth_in: header
+auth_type: SigV4
+auth_header: Authorization
+last_verified: '2026-08-24'
+endpoints: []

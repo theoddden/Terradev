@@ -1,0 +1,11 @@
+provider: inferx
+base_url: https://api.inferx.net
+auth_type: Bearer
+auth_header: Authorization
+auth_required: true
+last_verified: '2026-08-24'
+endpoints:
+- name: list_models
+  method: GET
+  path: v1/models
+  expected_response_fields: []

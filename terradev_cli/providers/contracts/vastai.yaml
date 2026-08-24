@@ -1,0 +1,17 @@
+provider: vastai
+base_url: https://cloud.vast.ai/api/v0
+auth_required: false
+auth_type: Bearer
+auth_header: Authorization
+last_verified: '2026-08-24'
+endpoints:
+- name: list_instances
+  method: GET
+  path: bundles/
+  expected_response_fields:
+  - offers
+  optional_response_fields:
+  - offers.id
+  - offers.gpu_name
+  - offers.num_gpus
+  - offers.dph_total

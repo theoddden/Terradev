@@ -1,0 +1,12 @@
+provider: crusoe
+base_url: https://api.crusoecloud.com/v1alpha5
+auth_required: true
+auth_in: header
+auth_type: HMAC
+auth_header: Authorization
+last_verified: '2026-08-24'
+endpoints:
+- name: list_projects
+  method: GET
+  path: projects
+  expected_response_fields: []

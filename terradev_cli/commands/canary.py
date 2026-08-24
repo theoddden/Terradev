@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import click
+import yaml
 
 from . import cli
 from terradev_cli.core.output import get_output
@@ -260,11 +261,29 @@ def canary_tail(file, limit):
 
 
 _DRIFT_PROVIDER_ALIASES = {
-    "lambda": ["lambda", "lambda_labs", "lambdalabs"],
-    "vast": ["vast", "vastai"],
+    "aws": ["aws"],
+    "gcp": ["gcp"],
+    "azure": ["azure"],
     "runpod": ["runpod"],
+    "vastai": ["vastai", "vast"],
+    "lambda_labs": ["lambda_labs", "lambda", "lambdalabs"],
     "coreweave": ["coreweave"],
+    "tensordock": ["tensordock"],
+    "huggingface": ["huggingface", "hf"],
+    "baseten": ["baseten"],
+    "oracle": ["oracle", "oci"],
+    "crusoe": ["crusoe"],
     "hyperstack": ["hyperstack"],
+    "digitalocean": ["digitalocean", "digital_ocean"],
+    "alibaba": ["alibaba", "ali"],
+    "ovhcloud": ["ovhcloud", "ovh"],
+    "fluidstack": ["fluidstack"],
+    "hetzner": ["hetzner"],
+    "siliconflow": ["siliconflow"],
+    "inferx": ["inferx"],
+    "latitude": ["latitude"],
+    "yottalabs": ["yottalabs", "yotta"],
+    "e2enetworks": ["e2enetworks", "e2e"],
 }
 
 
@@ -415,8 +434,22 @@ def _render_drift_human(summary: Dict[str, Any]) -> None:
     default=None,
     help="Output format for the drift report.",
 )
+@click.option(
+    "--timeout",
+    "drift_timeout",
+    type=int,
+    default=30,
+    help="HTTP timeout in seconds for each drift endpoint call.",
+)
+@click.option(
+    "--no-credentials",
+    "no_credentials",
+    is_flag=True,
+    default=False,
+    help="Run drift checks without loading any credentials (only public/no-auth endpoints).",
+)
 @click.pass_context
-def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format):
+def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format, drift_timeout, no_credentials):
     """Run a provider API drift check against live endpoints."""
     if not drift_all and not provider:
         get_output(ctx).error("Specify --all or --provider <name>")
@@ -432,20 +465,32 @@ def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format):
     contract_files = sorted(contracts_path.glob("*.yaml"))
     if provider:
         provider_lower = provider.lower()
-        contract_files = [
-            p
-            for p in contract_files
-            if p.stem.lower() == provider_lower or provider_lower in p.stem.lower()
-        ]
+        matching_files = []
+        for p in contract_files:
+            with open(p, "r", encoding="utf-8") as f:
+                contract = yaml.safe_load(f) or {}
+            contract_provider = (contract.get("provider") or p.stem).lower()
+            if (
+                p.stem.lower() == provider_lower
+                or provider_lower in p.stem.lower()
+                or contract_provider == provider_lower
+                or provider_lower in contract_provider
+            ):
+                matching_files.append(p)
+        contract_files = matching_files
 
     if not contract_files:
         get_output(ctx).error(f"No matching provider contracts in {contracts_path}")
         ctx.exit(2)
         return
 
-    providers = [p.stem for p in contract_files]
-    credentials = _load_drift_credentials(providers)
-    monitor = DriftMonitor(str(contracts_path), credentials)
+    providers = []
+    for p in contract_files:
+        with open(p, "r", encoding="utf-8") as f:
+            contract = yaml.safe_load(f) or {}
+        providers.append(contract.get("provider") or p.stem)
+    credentials = {} if no_credentials else _load_drift_credentials(providers)
+    monitor = DriftMonitor(str(contracts_path), credentials, timeout=drift_timeout)
     monitor.run_all()
     summary = monitor.summary()
 

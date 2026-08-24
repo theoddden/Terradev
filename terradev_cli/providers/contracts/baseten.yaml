@@ -1,0 +1,12 @@
+provider: baseten
+base_url: https://api.baseten.co/v1
+auth_type: Bearer
+auth_header: Authorization
+auth_required: true
+last_verified: '2026-08-24'
+endpoints:
+- name: list_models
+  method: GET
+  path: models
+  expected_response_fields:
+  - models

@@ -1,0 +1,12 @@
+provider: e2enetworks
+base_url: https://api.e2enetworks.com/myaccount/api/v1
+auth_type: Bearer
+auth_header: Authorization
+auth_required: true
+last_verified: '2026-08-24'
+endpoints:
+- name: list_nodes
+  method: GET
+  path: nodes
+  expected_response_fields:
+  - nodes

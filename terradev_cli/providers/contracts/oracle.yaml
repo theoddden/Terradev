@@ -1,0 +1,12 @@
+provider: oracle
+base_url: https://iaas.us-ashburn-1.oraclecloud.com/20160918
+auth_required: true
+auth_in: header
+auth_type: RSA
+auth_header: Authorization
+last_verified: '2026-08-24'
+endpoints:
+- name: list_shapes
+  method: GET
+  path: shapes
+  expected_response_fields: []

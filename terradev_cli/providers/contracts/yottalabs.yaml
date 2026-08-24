@@ -1,0 +1,11 @@
+provider: yottalabs
+base_url: https://api.yottalabs.ai/v2
+auth_header: X-Api-Key
+auth_required: true
+last_verified: '2026-08-24'
+endpoints:
+- name: list_nodes
+  method: GET
+  path: nodes
+  expected_response_fields:
+  - nodes

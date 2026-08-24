@@ -1,0 +1,12 @@
+provider: digitalocean
+base_url: https://api.digitalocean.com/v2
+auth_type: Bearer
+auth_header: Authorization
+auth_required: true
+last_verified: '2026-08-24'
+endpoints:
+- name: list_droplets
+  method: GET
+  path: droplets
+  expected_response_fields:
+  - droplets
