@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "6.1.0"
-description = "Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration with agent mesh and MCP subcommands."
+version = "6.1.1"
+description = "Cross-cloud GPU infrastructure and training pipeline CLI for SFT, DPO, GRPO, and multi-stage LLM training orchestration."
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [

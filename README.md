@@ -1,6 +1,6 @@
-# Terradev CLI v6.1.0
+# Terradev CLI v6.1.1
 
-**Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration with agent mesh and MCP subcommands.**
+**Cross-cloud GPU infrastructure and training pipeline CLI for SFT, DPO, GRPO, and multi-stage LLM training orchestration.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
@@ -17,15 +17,17 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON Multi-Stage Training Pipeline**
+**NOTES ON Multi-Stage Training Pipeline (v6.1.1)**
 
 - New `terradev train` subcommands for the full post-pretraining lifecycle:
   - `terradev train sft --model <id> --data <path> --nodes <ips>`
   - `terradev train dpo --base-checkpoint <sft-ckpt> --data <pairs> --algorithm <dpo|simpo|kto|orpo>`
-  - `terradev train grpo --base-checkpoint <dpo-ckpt> --data <prompts> --framework <openrlhf|trl>`
+  - `terradev train grpo --base-checkpoint <dpo-ckpt> --data <prompts> --framework <unsloth|openrlhf|trl>`
   - `terradev train pipeline --config examples/training_pipeline.yaml`
 - `terradev_cli/core/training_stages.py` and `terradev_cli/core/training_pipeline.py` provide declarative SFT / DPO / GRPO stage configs, provider-aware quote selection, auto-provisioning, checkpoint handoff, and DAG sequencing via the Rust/Py `DAGExecutor`.
-- Supports `unsloth`, `trl`, `openrlhf`, `axolotl`, `llama-factory`, and `ms-swift` with wrapper scripts so the existing `TrainingOrchestrator` can launch them through `torchrun` / `deepspeed` / `accelerate`.
+- `TrainingOrchestrator` now supports multi-node remote SSH launch and end-to-end completion tracking. Training scripts and embedded configs are staged to every node and the master process is polled until the job finishes.
+- Unsloth GRPO uses the native `unsloth.GRPOTrainer` with a default rule-based reward instead of a TRL fallback.
+- CLI-style frameworks (`axolotl`, `llama-factory`, `ms-swift`, `trl`, `openrlhf`) are wrapped in self-contained Python scripts that write their embedded config files at runtime, so they are safe to copy to remote nodes.
 - See `examples/training_pipeline.yaml` for a SFT → DPO → GRPO pipeline sample.
 
 **NOTES ON 6.0.8**

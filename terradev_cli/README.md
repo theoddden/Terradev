@@ -1,6 +1,6 @@
-# Terradev CLI v6.1.0
+# Terradev CLI v6.1.1
 
-**Cross-cloud GPU infrastructure CLI for training, inference, and AI workload orchestration.**
+**Cross-cloud GPU infrastructure and training pipeline CLI for SFT, DPO, GRPO, and multi-stage LLM training orchestration.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
@@ -16,9 +16,12 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON Multi-Stage Training Pipeline**
+**NOTES ON Multi-Stage Training Pipeline (v6.1.1)**
 
 - New `terradev train` subcommands for SFT, DPO/SimPO/KTO/ORPO, GRPO/RLVR, and full DAG-sequenced pipelines.
+- Multi-node remote SSH launch and completion tracking: scripts and embedded configs are staged to every node, and the master process is polled until the stage finishes.
+- Native Unsloth GRPO via `unsloth.GRPOTrainer` with a default rule-based reward.
+- CLI-style frameworks (`axolotl`, `llama-factory`, `ms-swift`, `trl`, `openrlhf`) are wrapped in self-contained Python scripts that write their embedded config files at runtime, making them safe to copy to remote nodes.
 - See `examples/training_pipeline.yaml` for a SFT → DPO → GRPO pipeline sample.
 
 **NOTES ON 5.7.5**
