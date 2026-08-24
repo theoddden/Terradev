@@ -17,6 +17,17 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
+**NOTES ON Multi-Stage Training Pipeline**
+
+- New `terradev train` subcommands for the full post-pretraining lifecycle:
+  - `terradev train sft --model <id> --data <path> --nodes <ips>`
+  - `terradev train dpo --base-checkpoint <sft-ckpt> --data <pairs> --algorithm <dpo|simpo|kto|orpo>`
+  - `terradev train grpo --base-checkpoint <dpo-ckpt> --data <prompts> --framework <openrlhf|trl>`
+  - `terradev train pipeline --config examples/training_pipeline.yaml`
+- `terradev_cli/core/training_stages.py` and `terradev_cli/core/training_pipeline.py` provide declarative SFT / DPO / GRPO stage configs, provider-aware quote selection, auto-provisioning, checkpoint handoff, and DAG sequencing via the Rust/Py `DAGExecutor`.
+- Supports `unsloth`, `trl`, `openrlhf`, `axolotl`, `llama-factory`, and `ms-swift` with wrapper scripts so the existing `TrainingOrchestrator` can launch them through `torchrun` / `deepspeed` / `accelerate`.
+- See `examples/training_pipeline.yaml` for a SFT → DPO → GRPO pipeline sample.
+
 **NOTES ON 6.0.8**
 
 - **New agent subcommands** — `terradev agent sandbox`, `terradev agent mesh`, and `terradev agent mcp` are now real, dependency-resolving commands instead of placeholders:

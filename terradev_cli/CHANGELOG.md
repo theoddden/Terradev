@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🚀 Multi-stage LLM training pipeline (`terradev train`)
+- Added `terradev train sft`, `terradev train dpo`, `terradev train grpo`, and `terradev train pipeline` commands.
+- Added `terradev_cli/core/training_stages.py` with declarative `StageConfig` / `PipelineConfig` and command builders for `unsloth`, `trl`, `openrlhf`, `axolotl`, `llama-factory`, and `ms-swift`.
+- Added `terradev_cli/core/training_pipeline.py` with DAG-based orchestration using the existing Rust/Py `DAGExecutor`, provider-aware quote selection, auto-provisioning via `ParallelProvisioner`, checkpoint handoff, and optional teardown.
+- Added `examples/training_pipeline.yaml` sample pipeline covering SFT → DPO → GRPO with provider-agnostic resource selection.
+- Wrapped CLI-style training frameworks (`trl`, `openrlhf`, `axolotl`, `llama-factory`, `ms-swift`) in throw-away Python scripts so the existing `TrainingOrchestrator` can launch them with `torchrun`/`deepspeed`/`accelerate`.
+
 ## [6.1.0] - 2026-08-23
 
 ### 🚀 Drift monitor, no-auth REST providers, and CI scheduling

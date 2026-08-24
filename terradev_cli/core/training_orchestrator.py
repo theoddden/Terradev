@@ -18,7 +18,9 @@ import json
 import logging
 import os
 import shlex
+import shutil
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -84,6 +86,7 @@ class TrainingConfig:
     """Declarative training job — can come from YAML, dict, or CLI args."""
 
     name: str = "training-job"
+    run_id: str = ""  # unique per launch; used for remote work dir
     framework: str = "torchrun"  # torchrun | deepspeed | accelerate | megatron
     backend: str = "native"  # native | ray  (native = zero deps, ray = optional)
     script: str = "train.py"
@@ -92,6 +95,7 @@ class TrainingConfig:
     gpus_per_node: int = 8
     ssh_user: str = "root"
     ssh_key: str = ""
+    hostfile: str = ""  # remote hostfile path for deepspeed
     # Parallelism
     tp_size: int = 1
     pp_size: int = 1
@@ -497,6 +501,7 @@ def _build_torchrun_cmd(
     if n_nodes > 1:
         parts.extend(
             [
+                f"--rdzv_id={config.run_id or 'terradev'}",
                 "--rdzv_backend=c10d",
                 f"--rdzv_endpoint={master_addr}:{config.rdzv_port}",
                 f"--max_restarts={config.max_restarts}",
@@ -518,6 +523,9 @@ def _build_deepspeed_cmd(
             f"--num_nodes={n_nodes}",
             f"--master_addr={master_addr}",
             "--master_port=29500",
+            f"--ssh_user={config.ssh_user}",
+            "--ssh_port=22",
+            "--launcher=ssh",
         ]
     else:
         parts = [
@@ -537,6 +545,7 @@ def _build_accelerate_cmd(
         "launch",
         f"--num_processes={total_gpus}",
         f"--num_machines={n_nodes}",
+        f"--machine_rank=0",
         f"--main_process_ip={master_addr}",
         "--main_process_port=29500",
     ]
@@ -667,22 +676,34 @@ def _build_artifacts(ctx: Dict[str, Any]) -> Dict[str, Any]:
     total_gpus = n_nodes * config.gpus_per_node
     master_addr = config.nodes[0] if config.nodes else "localhost"
 
+    # Stage training script and hostfile into a deterministic remote work dir.
+    # All nodes will use the same absolute path, so launchers can just copy the
+    # files and run the command from there.
+    work_dir = f"/tmp/terradev-train/{config.run_id or 'default'}"
+    os.makedirs(work_dir, exist_ok=True)
+
+    staged_script = os.path.join(work_dir, "train.py")
+    if os.path.isfile(config.script):
+        shutil.copy(config.script, staged_script)
+    else:
+        # The "script" may be a module / already a remote path; write as-is
+        with open(staged_script, "w") as _sf:
+            _sf.write(str(config.script))
+    config.script = staged_script
+
     # Hostfile (only needed for multi-node deepspeed).
     # Written here — not deferred to _launch_native — so the file always exists
     # by the time --hostfile is passed to deepspeed, even if the DAG fails later.
     hostfile_path = ""
     hostfile_content = ""
     if n_nodes > 1:
-        import tempfile
-
-        _hf_fd, hostfile_path = tempfile.mkstemp(
-            prefix=".terradev_hostfile_", suffix=f"_{os.getpid()}"
-        )
+        hostfile_path = os.path.join(work_dir, "hostfile")
         hostfile_content = "\n".join(
             f"{node} slots={config.gpus_per_node}" for node in config.nodes
         )
-        with os.fdopen(_hf_fd, "w") as _hf:
+        with open(hostfile_path, "w") as _hf:
             _hf.write(hostfile_content)
+        config.hostfile = hostfile_path
 
     # Build launch command
     if config.framework == "deepspeed":
@@ -729,22 +750,192 @@ def _build_artifacts(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _is_local(host: Optional[str]) -> bool:
+    return not host or host in ("localhost", "127.0.0.1", "0.0.0.0")
+
+
+def _push_file_to_node(
+    local_path: str,
+    host: Optional[str],
+    user: str,
+    key: Optional[str],
+    remote_path: str,
+) -> Tuple[int, str, str]:
+    """Copy a local file to a remote (or local) node at the same absolute path."""
+    if _is_local(host):
+        os.makedirs(os.path.dirname(remote_path), exist_ok=True)
+        shutil.copy(local_path, remote_path)
+        return 0, "", ""
+
+    ssh_base = [
+        "ssh",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ConnectTimeout=10",
+        "-o",
+        "BatchMode=yes",
+    ]
+    if key:
+        ssh_base.extend(["-i", key])
+
+    # Make the remote directory
+    r1 = subprocess.run(
+        ssh_base + [f"{user}@{host}", f"mkdir -p {shlex.quote(os.path.dirname(remote_path))}"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if r1.returncode != 0:
+        return r1.returncode, "", r1.stderr
+
+    # Push the file via ssh cat
+    with open(local_path, "rb") as f:
+        r2 = subprocess.run(
+            ssh_base + [f"{user}@{host}", f"cat > {shlex.quote(remote_path)}"],
+            stdin=f,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    return r2.returncode, "", r2.stderr
+
+
+def _build_worker_command(
+    config: TrainingConfig,
+    cmd_parts: List[str],
+    work_dir: str,
+) -> str:
+    """Build a nohup shell command that runs cmd_parts in work_dir and writes an exit code."""
+    env: Dict[str, str] = {}
+    env.update(config.nccl_env)
+    env.update(config.env_vars)
+    env["MASTER_ADDR"] = (config.nodes[0] if config.nodes else "localhost")
+    env["MASTER_PORT"] = "29500"
+    env["WORLD_SIZE"] = str(max(len(config.nodes), 1) * config.gpus_per_node)
+    if len(config.nodes) > 1:
+        env.setdefault("NCCL_IB_DISABLE", "0")
+        env.setdefault("NCCL_DEBUG", "WARN")
+    env.setdefault("PYTHONUNBUFFERED", "1")
+
+    env_exports = " ".join(f"{shlex.quote(k)}={shlex.quote(str(v))}" for k, v in env.items())
+    log_path = os.path.join(work_dir, "train.log")
+    exitcode_path = os.path.join(work_dir, "exitcode.txt")
+
+    inner = (
+        f"source {shlex.quote('~/.bashrc')} 2>/dev/null; "
+        f"{env_exports} "
+        f"cd {shlex.quote(work_dir)}; "
+        + " ".join(shlex.quote(p) for p in cmd_parts)
+        + f"; echo $? > {shlex.quote(exitcode_path)}"
+    )
+
+    return f"nohup bash -lc {shlex.quote(inner)} > {shlex.quote(log_path)} 2>&1 & echo $!"
+
+
+def _start_worker(
+    host: Optional[str],
+    config: TrainingConfig,
+    cmd_parts: List[str],
+    work_dir: str,
+) -> Dict[str, Any]:
+    """Start a training worker on a node and return its remote PID / log info."""
+    outer = _build_worker_command(config, cmd_parts, work_dir)
+    if _is_local(host):
+        r = subprocess.run(
+            ["bash", "-lc", outer],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    else:
+        ssh = [
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ConnectTimeout=10",
+            "-o",
+            "BatchMode=yes",
+        ]
+        if config.ssh_key:
+            ssh.extend(["-i", config.ssh_key])
+        r = subprocess.run(
+            ssh + [f"{config.ssh_user}@{host}", outer],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    if r.returncode != 0:
+        return {"status": "failed", "node": host, "error": (r.stderr or r.stdout).strip()[:500]}
+
+    pid = 0
+    for line in reversed((r.stdout or "").strip().splitlines()):
+        if line.strip().isdigit():
+            pid = int(line.strip())
+            break
+    return {
+        "status": "started",
+        "node": host,
+        "pid": pid,
+        "work_dir": work_dir,
+    }
+
+
+def _local_pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def _remote_pid_alive(host: Optional[str], pid: int, user: str, key: Optional[str]) -> bool:
+    rc, _, _ = _run_on(host, f"kill -0 {pid}", user, key, timeout=10)
+    return rc == 0
+
+
+def _read_exitcode(
+    host: Optional[str],
+    work_dir: str,
+    user: str,
+    key: Optional[str],
+) -> Optional[int]:
+    path = os.path.join(work_dir, "exitcode.txt")
+    if _is_local(host):
+        if not os.path.exists(path):
+            return None
+        with open(path) as f:
+            text = f.read().strip()
+        try:
+            return int(text)
+        except ValueError:
+            return 1
+
+    rc, stdout, _ = _run_on(host, f"cat {path}", user, key, timeout=10)
+    if rc != 0:
+        return None
+    try:
+        return int(stdout.strip())
+    except ValueError:
+        return 1
+
+
+def _kill_worker(host: Optional[str], pid: int, user: str, key: Optional[str]) -> None:
+    _run_on(host, f"kill -9 {pid} 2>/dev/null || true", user, key, timeout=10)
+
+
 def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
-    """Launch via subprocess (zero deps — the default path)."""
+    """Launch via subprocess / SSH (zero deps — the default path)."""
     deps = ctx.get("__deps__", {})
     artifacts = deps.get("build_artifacts", {})
     config = ctx.get("config")
     if not isinstance(config, TrainingConfig) or "error" in artifacts:
         return {"status": "failed", "error": artifacts.get("error", "No config")}
 
-    # Build environment
-    env = os.environ.copy()
-    env.update(artifacts.get("env", {}))
-
-    # Build full command
     cmd_parts = artifacts["cmd_parts"]
     # SECURITY: Validate cmd_parts to prevent shell injection
-    # Only allow safe characters in command parts
     import re
 
     for part in cmd_parts:
@@ -752,89 +943,95 @@ def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
             logger.error(f"Unsafe character in command part: {part}")
             return {"status": "failed", "error": "Unsafe command characters detected"}
 
-    cmd = " ".join(cmd_parts)
-    stdout_target = None
-    stderr_target = None
-    if config.log_path:
-        # Validate log path: resolve to absolute path and assert it stays within
-        # an allowed directory root to prevent path traversal attacks.
-        _allowed_roots = (
-            Path.home(),
-            Path("/tmp"),
-            Path("/var/log"),
+    n_nodes = artifacts.get("n_nodes", 1)
+    master_addr = artifacts.get("master_addr", "localhost")
+    work_dir = f"/tmp/terradev-train/{config.run_id or 'default'}"
+    nodes: List[Optional[str]] = list(config.nodes) if config.nodes else [None]
+
+    os.makedirs(work_dir, exist_ok=True)
+
+    # Stage training script to every node
+    remote_script = os.path.join(work_dir, "train.py")
+    for node in nodes:
+        rc, _, err = _push_file_to_node(
+            config.script, node, config.ssh_user, config.ssh_key or None, remote_script
         )
-        try:
-            resolved_log = Path(config.log_path).resolve()
-        except Exception:  # noqa: BLE001
-            return {"status": "failed", "error": "Invalid log path"}
-        if not any(resolved_log.is_relative_to(root) for root in _allowed_roots):
-            logger.error(f"Log path outside allowed roots: {resolved_log}")
-            return {"status": "failed", "error": "Log path outside allowed directory"}
-        os.makedirs(str(resolved_log.parent), exist_ok=True)
-        stdout_target = open(resolved_log, "wb")
-        stderr_target = subprocess.STDOUT
+        if rc != 0:
+            return {"status": "failed", "error": f"Failed to stage script to {node}: {err}"}
+
+    # Stage deepspeed hostfile if present
+    if config.framework == "deepspeed" and config.hostfile and os.path.isfile(config.hostfile):
+        remote_hostfile = os.path.join(work_dir, "hostfile")
+        for node in nodes:
+            rc, _, err = _push_file_to_node(
+                config.hostfile, node, config.ssh_user, config.ssh_key or None, remote_hostfile
+            )
+            if rc != 0:
+                return {"status": "failed", "error": f"Failed to stage hostfile to {node}: {err}"}
 
     # Pre-install FlashOptim if auto-enabled (non-blocking, fail-safe)
     flashoptim_info = artifacts.get("flashoptim", {})
     if flashoptim_info.get("enabled") and flashoptim_info.get("pip_install"):
         pip_cmd = flashoptim_info["pip_install"]
         logger.info(f"FlashOptim pre-install: {pip_cmd}")
-        node_list = config.nodes or [None]
-        for node in node_list:
+        for node in nodes:
             _run_on(node, pip_cmd, config.ssh_user, config.ssh_key or None, timeout=120)
 
-    logger.info(f"Launching: {cmd}")
+    logger.info(f"Launching {config.framework} on {n_nodes} node(s): {' '.join(cmd_parts)}")
+
+    pids: List[Dict[str, Any]] = []
+    launched = True
+    launch_error = ""
+
     try:
-        # SECURITY: use the validated argv list and redirect to the log file directly
-        process = subprocess.Popen(
-            cmd_parts,
-            shell=False,
-            env=env,
-            stdout=stdout_target,
-            stderr=stderr_target,
-            start_new_session=True,
-        )
-
-        # Deploy spot-preemption sidecar on every node (local process, no SSH needed at preemption time)
-        # Runs alongside training — polls cloud metadata and SIGUSR1s training PID if preempted
-        try:
-            import tempfile
-
-            _sp_fd, sidecar_path = tempfile.mkstemp(
-                prefix=".terradev_spot_sidecar_", suffix=".sh"
-            )
-            os.close(_sp_fd)
-            _sl_fd, sidecar_log = tempfile.mkstemp(
-                prefix=".terradev_spot_sidecar_", suffix=".log"
-            )
-            os.close(_sl_fd)
-            node_list = config.nodes or [None]
-            for node in node_list:
-                _run_on(
-                    node,
-                    f"cat > '{sidecar_path}' << 'SIDECAR_EOF'\n{_SPOT_SIDECAR_SH}\nSIDECAR_EOF\n"
-                    f"chmod +x '{sidecar_path}' && "
-                    f"nohup '{sidecar_path}' {process.pid} > '{sidecar_log}' 2>&1 &",
-                    config.ssh_user,
-                    config.ssh_key or None,
-                    timeout=15,
-                )
-            logger.info(f"Spot-preemption sidecar deployed to {len(node_list)} node(s)")
-        except Exception as sidecar_err:  # noqa: BLE001
-            logger.debug(f"Spot sidecar deploy failed (non-fatal): {sidecar_err}")
-
-        return {
-            "status": "launched",
-            "pid": process.pid,
-            "command": cmd,
-            "total_gpus": artifacts.get("total_gpus", 0),
-            "framework": config.framework,
-            "backend": "native",
-            "master_addr": artifacts.get("master_addr", "localhost"),
-            "flashoptim": flashoptim_info,
-        }
+        if config.framework == "deepspeed":
+            # Deepspeed master SSHs to workers using the hostfile
+            master = nodes[0]
+            res = _start_worker(master, config, cmd_parts, work_dir)
+            if res["status"] == "failed":
+                launched = False
+                launch_error = res.get("error", "master start failed")
+            else:
+                pids.append(res)
+        else:
+            # torchrun / accelerate / megatron: start a worker on each node.
+            # For torchrun the master should open the rendezvous first.
+            for i, node in enumerate(nodes):
+                node_cmd = list(cmd_parts)
+                if config.framework == "accelerate":
+                    node_cmd = [
+                        p.replace("--machine_rank=0", f"--machine_rank={i}") for p in node_cmd
+                    ]
+                res = _start_worker(node, config, node_cmd, work_dir)
+                if res["status"] == "failed":
+                    launched = False
+                    launch_error = res.get("error", f"worker {i} start failed")
+                    break
+                pids.append(res)
+                if i == 0 and len(nodes) > 1 and config.framework == "torchrun":
+                    time.sleep(2)  # Give master a moment to open the c10d rendezvous
     except Exception as e:  # noqa: BLE001
-        return {"status": "failed", "error": str(e)}
+        launched = False
+        launch_error = str(e)
+
+    if not launched:
+        for p in pids:
+            _kill_worker(p["node"], p["pid"], config.ssh_user, config.ssh_key or None)
+        return {"status": "failed", "error": launch_error}
+
+    return {
+        "status": "launched",
+        "pids": pids,
+        "command": " ".join(cmd_parts),
+        "total_gpus": artifacts.get("total_gpus", 0),
+        "framework": config.framework,
+        "backend": "native",
+        "master_addr": master_addr,
+        "work_dir": work_dir,
+        "flashoptim": flashoptim_info,
+        "ssh_user": config.ssh_user,
+        "ssh_key": config.ssh_key,
+    }
 
 
 def _launch_ray(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -889,6 +1086,7 @@ class TrainingOrchestrator:
 
     def __init__(self, state_manager: Optional[JobStateManager] = None):
         self.state_manager = state_manager or JobStateManager()
+        self._jobs: Dict[str, Dict[str, Any]] = {}
 
     def launch(
         self, config: TrainingConfig, skip_preflight: bool = False
@@ -902,6 +1100,9 @@ class TrainingOrchestrator:
             total_steps=config.total_steps,
         )
         self.state_manager.update_job_status(job.id, JobStatus.PREFLIGHT)
+
+        # Ensure the launch has a unique run id / remote work directory
+        config.run_id = config.run_id or job.id
 
         # Build DAG
         dag = DAGExecutor(max_workers=4, name=f"launch_{job.id[:8]}")
@@ -947,15 +1148,20 @@ class TrainingOrchestrator:
             }
 
         self.state_manager.update_job_status(job.id, JobStatus.RUNNING)
+        master_pid = launch_out.get("pids", [{}])[0].get("pid") if launch_out.get("pids") else None
+        self._jobs[job.id] = dict(launch_out)
+
         return {
             "job_id": job.id,
             "status": launch_out.get("status", "unknown"),
-            "pid": launch_out.get("pid"),
+            "pid": master_pid,
+            "pids": launch_out.get("pids", []),
             "framework": config.framework,
             "backend": launch_out.get("backend", "native"),
             "total_gpus": launch_out.get("total_gpus", 0),
             "nodes": config.nodes or ["localhost"],
             "master_addr": launch_out.get("master_addr"),
+            "work_dir": launch_out.get("work_dir"),
             "preflight": preflight_out,
             "flashoptim": launch_out.get("flashoptim", {}),
         }
@@ -1031,6 +1237,55 @@ class TrainingOrchestrator:
 
         self.state_manager.update_job_status(job_id, JobStatus.CANCELLED)
         return {"job_id": job_id, "status": "stopped"}
+
+    def wait_for_completion(
+        self,
+        job_id: str,
+        timeout_s: int = 0,
+        poll_s: int = 30,
+    ) -> Dict[str, Any]:
+        """Block until a job finishes and return its final status."""
+        runtime = self._jobs.get(job_id, {})
+        pids = runtime.get("pids", [])
+        if not pids:
+            return {"status": "failed", "error": "No launch record for job"}
+
+        master = pids[0]
+        master_node = master.get("node")
+        master_pid = master.get("pid", 0)
+        work_dir = master.get("work_dir", f"/tmp/terradev-train/{job_id}")
+        user = master.get("ssh_user") or runtime.get("ssh_user", "root")
+        key = master.get("ssh_key") or runtime.get("ssh_key") or None
+
+        started = time.time()
+        while True:
+            if _is_local(master_node):
+                alive = _local_pid_alive(master_pid)
+            else:
+                alive = _remote_pid_alive(master_node, master_pid, user, key)
+            if not alive:
+                break
+            if timeout_s and time.time() - started > timeout_s:
+                return {"status": "failed", "error": "Timeout waiting for training"}
+            time.sleep(poll_s)
+
+        # Wait a beat for the exitcode file to be written
+        time.sleep(1)
+        exit_code = _read_exitcode(master_node, work_dir, user, key)
+
+        if exit_code == 0:
+            self.state_manager.update_job_status(job_id, JobStatus.COMPLETED)
+            return {"status": "completed", "exit_code": 0}
+        if exit_code is None:
+            self.state_manager.update_job_status(
+                job_id, JobStatus.FAILED, error_message="Could not read exit code"
+            )
+            return {"status": "failed", "error": "Could not read exit code"}
+
+        self.state_manager.update_job_status(
+            job_id, JobStatus.FAILED, error_message=f"Training exited with code {exit_code}"
+        )
+        return {"status": "failed", "exit_code": exit_code, "error": f"Training exited with code {exit_code}"}
 
     def status(self, job_id: Optional[str] = None) -> Dict[str, Any]:
         """Get job status (single job or all running)."""

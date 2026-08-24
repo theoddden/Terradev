@@ -16,6 +16,11 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
+**NOTES ON Multi-Stage Training Pipeline**
+
+- New `terradev train` subcommands for SFT, DPO/SimPO/KTO/ORPO, GRPO/RLVR, and full DAG-sequenced pipelines.
+- See `examples/training_pipeline.yaml` for a SFT → DPO → GRPO pipeline sample.
+
 **NOTES ON 5.7.5**
 
 - Expanded Python 3.9 support with a compatibility shim for the MCP SDK, plus bundled `EnterpriseAuthManager` and `SAMLProvider` scaffolding for enterprise SSO.

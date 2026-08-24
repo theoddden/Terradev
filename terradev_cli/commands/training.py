@@ -5,11 +5,16 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from typing import List, Optional
 
 import click
 from . import cli
 from .inference import _resolve_provision_nodes
 from .ml import _parse_vllm_endpoint
+from terradev_cli.core.training_stages import (
+    DPO_ALGORITHM_CHOICES,
+    FRAMEWORK_CHOICES,
+)
 
 @cli.group()
 def train():
@@ -1603,4 +1608,406 @@ def retrain_history(limit, fmt):
             score = m.get("eval_score", 0)
             started = m.get("started_at", "?")[:19]
             print(f"  {cid:<24} {model:<24} {status:<14} {score:<8.4f} {started}")
+        print()
+
+
+# ── New multi-stage training commands (SFT / DPO / GRPO / pipeline) ─────────
+
+
+@train.command("sft")
+@click.option("--model", required=True, help="Base model ID or path")
+@click.option("--data", required=True, help="Training data path (local dir or s3://)")
+@click.option(
+    "--framework",
+    default="unsloth",
+    type=click.Choice(FRAMEWORK_CHOICES),
+    help="Training framework",
+)
+@click.option("--provider", default="auto", help="Cloud provider, or 'auto' for cheapest quote")
+@click.option("--checkpoint", default="", help="Output checkpoint directory")
+@click.option("--gpu-type", default="", help="GPU type (A100, H100, etc.)")
+@click.option("--gpu-count", default=1, type=int, help="Total GPUs")
+@click.option("--node-count", default=1, type=int, help="Number of nodes")
+@click.option("--gpus-per-node", default=8, type=int, help="GPUs per node")
+@click.option("--spot/--no-spot", default=False, help="Use spot/preemptible instances")
+@click.option("--max-price", default=0.0, type=float, help="Max $/hr per GPU")
+@click.option("--num-train-epochs", default=1, type=int)
+@click.option("--per-device-batch-size", default=1, type=int)
+@click.option("--gradient-accumulation-steps", default=4, type=int)
+@click.option("--learning-rate", default=2e-4, type=float)
+@click.option("--warmup-ratio", default=0.1, type=float)
+@click.option("--max-seq-length", default=2048, type=int)
+@click.option("--lora-rank", default=64, type=int)
+@click.option("--lora-alpha", default=16, type=int)
+@click.option("--from-provision", default="", help='Use provision group, or "latest"')
+@click.option("--nodes", "-n", multiple=True, help="Node IP addresses")
+@click.option("--output-bucket", default="", help="s3:// bucket to sync checkpoint")
+@click.option("--dry-run", is_flag=True, help="Print the command but do not launch")
+@click.option(
+    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
+)
+@click.argument("extra", nargs=-1, type=click.UNPROCESSED)
+def train_sft(
+    model,
+    data,
+    framework,
+    provider,
+    checkpoint,
+    gpu_type,
+    gpu_count,
+    node_count,
+    gpus_per_node,
+    spot,
+    max_price,
+    num_train_epochs,
+    per_device_batch_size,
+    gradient_accumulation_steps,
+    learning_rate,
+    warmup_ratio,
+    max_seq_length,
+    lora_rank,
+    lora_alpha,
+    from_provision,
+    nodes,
+    output_bucket,
+    dry_run,
+    fmt,
+    extra,
+):
+    """Run supervised fine-tuning (SFT) stage."""
+    from terradev_cli.core.training_pipeline import TrainingPipeline
+    from terradev_cli.core.training_stages import PipelineConfig, StageConfig
+
+    resolved_nodes = list(nodes) if nodes else []
+    ssh_key = ""
+    if from_provision and not resolved_nodes:
+        resolved_nodes, ssh_key = _resolve_provision_nodes(from_provision, fmt)
+
+    if not resolved_nodes:
+        print("ERROR: Provide --nodes, --from-provision, or let --provider auto provision")
+        sys.exit(1)
+
+    stage = StageConfig(
+        type="sft",
+        model=model,
+        data=data,
+        checkpoint=checkpoint,
+        framework=framework,
+        provider=provider,
+        gpu_type=gpu_type,
+        gpu_count=gpu_count,
+        node_count=node_count,
+        gpus_per_node=gpus_per_node,
+        spot=spot,
+        max_price=max_price,
+        num_train_epochs=num_train_epochs,
+        per_device_batch_size=per_device_batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        learning_rate=learning_rate,
+        warmup_ratio=warmup_ratio,
+        max_seq_length=max_seq_length,
+        lora_rank=lora_rank,
+        lora_alpha=lora_alpha,
+        output_bucket=output_bucket,
+        extra_args=list(extra),
+    )
+    config = PipelineConfig(name=stage.name, stages=[stage], teardown=False)
+    pipeline = TrainingPipeline(config)
+    if dry_run:
+        result = pipeline.run(dry_run=True, nodes=resolved_nodes, ssh_key=ssh_key)
+        _print_stage_result(result[0] if result else None, fmt)
+        return
+    result = pipeline.run(dry_run=False, nodes=resolved_nodes, ssh_key=ssh_key)
+    _print_stage_result(result[0] if result else None, fmt)
+
+
+@train.command("dpo")
+@click.option("--base-checkpoint", required=True, help="SFT checkpoint to start from")
+@click.option("--data", required=True, help="Preference pairs data path")
+@click.option("--model", default="", help="Optional model override (defaults to base-checkpoint)")
+@click.option(
+    "--algorithm",
+    default="dpo",
+    type=click.Choice(DPO_ALGORITHM_CHOICES),
+    help="Preference optimization algorithm",
+)
+@click.option(
+    "--framework",
+    default="trl",
+    type=click.Choice(FRAMEWORK_CHOICES),
+    help="Training framework",
+)
+@click.option("--provider", default="auto", help="Cloud provider, or 'auto'")
+@click.option("--checkpoint", default="", help="Output checkpoint directory")
+@click.option("--gpu-type", default="", help="GPU type (A100, H100, etc.)")
+@click.option("--gpu-count", default=1, type=int)
+@click.option("--node-count", default=1, type=int)
+@click.option("--gpus-per-node", default=8, type=int)
+@click.option("--spot/--no-spot", default=False)
+@click.option("--max-price", default=0.0, type=float)
+@click.option("--num-train-epochs", default=1, type=int)
+@click.option("--per-device-batch-size", default=1, type=int)
+@click.option("--gradient-accumulation-steps", default=4, type=int)
+@click.option("--learning-rate", default=2e-4, type=float)
+@click.option("--warmup-ratio", default=0.1, type=float)
+@click.option("--beta", default=0.1, type=float, help="DPO beta / SimPO beta")
+@click.option("--max-seq-length", default=2048, type=int)
+@click.option("--lora-rank", default=64, type=int)
+@click.option("--lora-alpha", default=16, type=int)
+@click.option("--from-provision", default="")
+@click.option("--nodes", "-n", multiple=True)
+@click.option("--output-bucket", default="")
+@click.option("--dry-run", is_flag=True)
+@click.option(
+    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
+)
+@click.argument("extra", nargs=-1, type=click.UNPROCESSED)
+def train_dpo(
+    base_checkpoint,
+    data,
+    model,
+    algorithm,
+    framework,
+    provider,
+    checkpoint,
+    gpu_type,
+    gpu_count,
+    node_count,
+    gpus_per_node,
+    spot,
+    max_price,
+    num_train_epochs,
+    per_device_batch_size,
+    gradient_accumulation_steps,
+    learning_rate,
+    warmup_ratio,
+    beta,
+    max_seq_length,
+    lora_rank,
+    lora_alpha,
+    from_provision,
+    nodes,
+    output_bucket,
+    dry_run,
+    fmt,
+    extra,
+):
+    """Run preference optimization (DPO / SimPO / KTO / ORPO)."""
+    from terradev_cli.core.training_pipeline import TrainingPipeline
+    from terradev_cli.core.training_stages import PipelineConfig, StageConfig
+
+    resolved_nodes = list(nodes) if nodes else []
+    ssh_key = ""
+    if from_provision and not resolved_nodes:
+        resolved_nodes, ssh_key = _resolve_provision_nodes(from_provision, fmt)
+    if not resolved_nodes:
+        print("ERROR: Provide --nodes, --from-provision, or let --provider auto provision")
+        sys.exit(1)
+
+    stage = StageConfig(
+        type="dpo",
+        model=model or base_checkpoint,
+        data=data,
+        base_checkpoint=base_checkpoint,
+        checkpoint=checkpoint,
+        framework=framework,
+        algorithm=algorithm,
+        provider=provider,
+        gpu_type=gpu_type,
+        gpu_count=gpu_count,
+        node_count=node_count,
+        gpus_per_node=gpus_per_node,
+        spot=spot,
+        max_price=max_price,
+        num_train_epochs=num_train_epochs,
+        per_device_batch_size=per_device_batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        learning_rate=learning_rate,
+        warmup_ratio=warmup_ratio,
+        beta=beta,
+        max_seq_length=max_seq_length,
+        lora_rank=lora_rank,
+        lora_alpha=lora_alpha,
+        output_bucket=output_bucket,
+        extra_args=list(extra),
+    )
+    config = PipelineConfig(name=stage.name, stages=[stage], teardown=False)
+    pipeline = TrainingPipeline(config)
+    if dry_run:
+        result = pipeline.run(dry_run=True, nodes=resolved_nodes, ssh_key=ssh_key)
+        _print_stage_result(result[0] if result else None, fmt)
+        return
+    result = pipeline.run(dry_run=False, nodes=resolved_nodes, ssh_key=ssh_key)
+    _print_stage_result(result[0] if result else None, fmt)
+
+
+@train.command("grpo")
+@click.option("--base-checkpoint", required=True, help="DPO/SFT checkpoint to start from")
+@click.option("--data", required=True, help="Prompt / rollout data path")
+@click.option("--model", default="", help="Optional model override")
+@click.option("--reward-fn", default="verifiable", help="Reward function name")
+@click.option("--rollout-provider", default="auto", help="Provider for rollout workers")
+@click.option("--trainer-provider", default="auto", help="Provider for GRPO trainer")
+@click.option(
+    "--framework",
+    default="openrlhf",
+    type=click.Choice(FRAMEWORK_CHOICES),
+    help="GRPO framework (openrlhf or trl)",
+)
+@click.option("--provider", default="auto", help="Combined provider override")
+@click.option("--checkpoint", default="", help="Output checkpoint directory")
+@click.option("--gpu-type", default="", help="GPU type for trainer")
+@click.option("--gpu-count", default=8, type=int)
+@click.option("--node-count", default=2, type=int)
+@click.option("--gpus-per-node", default=8, type=int)
+@click.option("--num-generations", default=8, type=int, help="GRPO group size")
+@click.option("--spot/--no-spot", default=False)
+@click.option("--max-price", default=0.0, type=float)
+@click.option("--num-train-epochs", default=1, type=int)
+@click.option("--per-device-batch-size", default=1, type=int)
+@click.option("--gradient-accumulation-steps", default=4, type=int)
+@click.option("--learning-rate", default=2e-4, type=float)
+@click.option("--warmup-ratio", default=0.1, type=float)
+@click.option("--max-seq-length", default=2048, type=int)
+@click.option("--from-provision", default="")
+@click.option("--nodes", "-n", multiple=True)
+@click.option("--output-bucket", default="")
+@click.option("--dry-run", is_flag=True)
+@click.option(
+    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
+)
+@click.argument("extra", nargs=-1, type=click.UNPROCESSED)
+def train_grpo(
+    base_checkpoint,
+    data,
+    model,
+    reward_fn,
+    rollout_provider,
+    trainer_provider,
+    framework,
+    provider,
+    checkpoint,
+    gpu_type,
+    gpu_count,
+    node_count,
+    gpus_per_node,
+    num_generations,
+    spot,
+    max_price,
+    num_train_epochs,
+    per_device_batch_size,
+    gradient_accumulation_steps,
+    learning_rate,
+    warmup_ratio,
+    max_seq_length,
+    from_provision,
+    nodes,
+    output_bucket,
+    dry_run,
+    fmt,
+    extra,
+):
+    """Run GRPO / RLVR stage."""
+    from terradev_cli.core.training_pipeline import TrainingPipeline
+    from terradev_cli.core.training_stages import PipelineConfig, StageConfig
+
+    resolved_nodes = list(nodes) if nodes else []
+    ssh_key = ""
+    if from_provision and not resolved_nodes:
+        resolved_nodes, ssh_key = _resolve_provision_nodes(from_provision, fmt)
+    if not resolved_nodes:
+        print("ERROR: Provide --nodes, --from-provision, or let --provider auto provision")
+        sys.exit(1)
+
+    stage = StageConfig(
+        type="grpo",
+        model=model or base_checkpoint,
+        data=data,
+        base_checkpoint=base_checkpoint,
+        checkpoint=checkpoint,
+        framework=framework,
+        reward_fn=reward_fn,
+        rollout_provider=rollout_provider,
+        trainer_provider=trainer_provider,
+        provider=provider,
+        gpu_type=gpu_type,
+        gpu_count=gpu_count,
+        node_count=node_count,
+        gpus_per_node=gpus_per_node,
+        num_generations=num_generations,
+        spot=spot,
+        max_price=max_price,
+        num_train_epochs=num_train_epochs,
+        per_device_batch_size=per_device_batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        learning_rate=learning_rate,
+        warmup_ratio=warmup_ratio,
+        max_seq_length=max_seq_length,
+        output_bucket=output_bucket,
+        extra_args=list(extra),
+    )
+    config = PipelineConfig(name=stage.name, stages=[stage], teardown=False)
+    pipeline = TrainingPipeline(config)
+    if dry_run:
+        result = pipeline.run(dry_run=True, nodes=resolved_nodes, ssh_key=ssh_key)
+        _print_stage_result(result[0] if result else None, fmt)
+        return
+    result = pipeline.run(dry_run=False, nodes=resolved_nodes, ssh_key=ssh_key)
+    _print_stage_result(result[0] if result else None, fmt)
+
+
+@train.command("pipeline")
+@click.option("--config", "-c", required=True, type=click.Path(exists=True), help="Pipeline YAML")
+@click.option("--dry-run", is_flag=True, help="Print the DAG plan without launching")
+@click.option("--teardown", is_flag=True, help="Tear down provisioned nodes after each stage")
+@click.option(
+    "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
+)
+def train_pipeline(config, dry_run, teardown, fmt):
+    """Run a multi-stage training pipeline from a YAML file."""
+    from terradev_cli.core.training_pipeline import run_pipeline_from_yaml
+
+    if dry_run:
+        from terradev_cli.core.training_stages import PipelineConfig
+        from terradev_cli.core.dag_executor import DAGExecutor
+
+        pc = PipelineConfig.from_yaml(config)
+        dag = DAGExecutor(max_workers=4, name="training_pipeline_dry_run")
+        prev = None
+        for i, stage in enumerate(pc.stages):
+            name = stage.name or f"stage_{i}"
+            if prev:
+                dag.add_node(name, lambda _ctx: stage.__dict__, depends_on={prev})
+            else:
+                dag.add_node(name, lambda _ctx: stage.__dict__)
+            prev = name
+        print(json.dumps(dag.describe(), indent=2, default=str))
+        return
+
+    results = run_pipeline_from_yaml(config, dry_run=False)
+    if fmt == "json":
+        print(json.dumps([r.__dict__ for r in results], indent=2, default=str))
+    else:
+        print(f"\nPipeline finished: {len(results)} stage(s)")
+        for r in results:
+            print(f"  {r.name or 'stage'}: {r.status}  job={r.job_id}  nodes={len(r.nodes)}")
+
+
+def _print_stage_result(result, fmt: str):
+    if result is None:
+        print("ERROR: stage produced no result")
+        sys.exit(1)
+    if fmt == "json":
+        print(json.dumps(result.__dict__, indent=2, default=str))
+    else:
+        print(f"\nTraining Stage: {result.name}")
+        print(f"  Status: {result.status}")
+        print(f"  Job ID: {result.job_id}")
+        print(f"  Output: {result.output_dir}")
+        if result.description:
+            print(f"  Description: {result.description}")
+        if result.command:
+            print(f"  Command: {' '.join(str(c) for c in result.command)}")
+        if result.error:
+            print(f"  Error: {result.error}")
         print()

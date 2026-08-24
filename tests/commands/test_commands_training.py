@@ -252,3 +252,60 @@ class TestFunctionalTraining:
         result = runner.invoke(cli, ["lora", "peft", "list"], obj={"api": mock_api})
         assert result.exit_code == 0
         assert "a1" in result.output
+
+
+class TestTrainStages:
+    """Tests for new train sft/dpo/grpo/pipeline commands."""
+
+    def test_train_sft_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["train", "sft", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+        assert "--model" in result.output
+        assert "--data" in result.output
+
+    def test_train_dpo_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["train", "dpo", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+        assert "base-checkpoint" in result.output
+
+    def test_train_grpo_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["train", "grpo", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+        assert "rollout-provider" in result.output
+
+    def test_train_pipeline_help(self, runner, mock_api):
+        result = runner.invoke(cli, ["train", "pipeline", "--help"], obj={"api": mock_api})
+        assert result.exit_code == 0
+        assert "--config" in result.output
+
+    def test_train_sft_requires_model_and_data(self, runner, mock_api):
+        result = runner.invoke(cli, ["train", "sft"], obj={"api": mock_api})
+        assert result.exit_code != 0
+
+    def test_train_pipeline_dry_run(self, runner, mock_api, tmp_path):
+        from pathlib import Path
+
+        example = Path(__file__).resolve().parents[2] / "examples" / "training_pipeline.yaml"
+        if not example.exists():
+            example = tmp_path / "pipeline.yaml"
+            example.write_text(
+                """
+name: test-pipeline
+checkpoint_bucket: s3://my-bucket/checkpoints
+defaults:
+  provider: auto
+stages:
+  - name: sft
+    type: sft
+    model: meta-llama/Llama-3-8B
+    data: s3://my-bucket/sft-data.jsonl
+    framework: unsloth
+"""
+            )
+        result = runner.invoke(
+            cli,
+            ["train", "pipeline", "--config", str(example), "--dry-run"],
+            obj={"api": mock_api},
+        )
+        assert result.exit_code == 0
+        assert "sft" in result.output
