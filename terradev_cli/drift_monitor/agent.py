@@ -39,6 +39,11 @@ except ImportError:  # pragma: no cover
     service_account = None  # type: ignore
     GoogleRequest = None  # type: ignore
 
+try:
+    import boto3
+except ImportError:  # pragma: no cover
+    boto3 = None  # type: ignore
+
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
@@ -341,33 +346,56 @@ class DriftMonitor:
         except (ValueError, AttributeError, TypeError):
             return None
 
-    def _aws_sigv4_headers(
-        self,
-        method: str,
-        url: str,
-        headers: Dict[str, str],
-        payload: str,
-        creds: Dict[str, Any],
-    ) -> Optional[Dict[str, str]]:
-        """Sign an AWS request with SigV4."""
-        if SigV4Auth is None or AWSRequest is None or AwsCredentials is None:
+    def _aws_presigned_url(
+        self, method: str, url: str, creds: Dict[str, Any]
+    ) -> Optional[str]:
+        """Generate a boto3 SigV4 presigned URL for AWS query APIs."""
+        if boto3 is None:
             return None
         access_key = str(creds.get("aws_access_key_id", ""))
         secret_key = str(creds.get("aws_secret_access_key", ""))
         region = str(creds.get("aws_region", "us-east-1"))
         if not access_key or not secret_key:
             return None
+
         try:
-            aws_creds = AwsCredentials(access_key, secret_key)
-            body = payload if isinstance(payload, (str, bytes)) else json.dumps(payload)
-            req = AWSRequest(
-                method=method,
-                url=url,
-                headers=dict(headers),
-                data=body,
+            parsed = urllib.parse.urlparse(url)
+            query = urllib.parse.parse_qsl(parsed.query)
+
+            action = None
+            params: Dict[str, Any] = {}
+            for key, value in query:
+                if key == "Action":
+                    action = value
+                elif key == "Version":
+                    continue
+                else:
+                    # boto3 expects typed values.
+                    if value.isdigit():
+                        params[key] = int(value)
+                    elif value.lower() == "true":
+                        params[key] = True
+                    elif value.lower() == "false":
+                        params[key] = False
+                    else:
+                        params[key] = value
+
+            if not action:
+                return None
+
+            operation = "".join(
+                ["_" + c.lower() if c.isupper() else c for c in action]
+            ).lstrip("_")
+
+            client = boto3.client(
+                "ec2",
+                region_name=region,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
             )
-            SigV4Auth(aws_creds, "ec2", region).add_auth(req)
-            return dict(req.headers)
+            return client.generate_presigned_url(
+                operation, Params=params, ExpiresIn=60
+            )
         except (ValueError, AttributeError, TypeError):
             return None
 
@@ -514,10 +542,9 @@ class DriftMonitor:
             elif auth_lower == "bearer":
                 headers[auth_header] = f"Bearer {bearer_token}"
             elif auth_lower == "sigv4":
-                body = json.dumps(payload) if payload else ""
-                signed = self._aws_sigv4_headers(method, url, headers, body, creds)
-                if signed:
-                    headers.update(signed)
+                presigned = self._aws_presigned_url(method, url, creds)
+                if presigned:
+                    url = presigned
             elif auth_lower == "rsa":
                 body = json.dumps(payload).encode("utf-8") if payload else b""
                 signed = self._oci_sign(method, url, headers, body, creds)
