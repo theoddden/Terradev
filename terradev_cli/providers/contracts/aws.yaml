@@ -19,8 +19,7 @@ endpoints:
   - name: MaxResults
     default: 5
   expected_response_fields:
-  - requestId
-  - reservationSet
+  - Reservations
   optional_response_fields:
-  - DescribeInstancesResponse
-  - errors
+  - NextToken
+  - ResponseMetadata

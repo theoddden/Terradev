@@ -17,6 +17,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Union, Set
 
 import requests
@@ -27,10 +28,12 @@ try:
     from botocore.auth import SigV4Auth
     from botocore.awsrequest import AWSRequest
     from botocore.credentials import Credentials as AwsCredentials
+    from botocore.exceptions import ClientError
 except ImportError:  # pragma: no cover
     SigV4Auth = None  # type: ignore
     AWSRequest = None  # type: ignore
     AwsCredentials = None  # type: ignore
+    ClientError = None  # type: ignore
 
 try:
     from google.oauth2 import service_account
@@ -255,19 +258,24 @@ class DriftMonitor:
         }
 
         try:
-            url, headers, payload = self._build_request(contract, endpoint, api_key)
-            method = endpoint.get("method", "GET").upper()
-
-            if method == "GET":
-                response = requests.get(url, headers=headers, timeout=self.timeout)
-            elif method == "POST":
-                response = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
-            elif method == "PUT":
-                response = requests.put(url, headers=headers, json=payload, timeout=self.timeout)
-            elif method == "DELETE":
-                response = requests.delete(url, headers=headers, timeout=self.timeout)
+            if contract.get("auth_type", "").lower() == "sigv4":
+                if not isinstance(api_key, dict):
+                    raise ValueError("SigV4 requires a credential dictionary")
+                response = self._aws_boto3_response(contract, endpoint, api_key)
             else:
-                raise ValueError(f"Unsupported HTTP method: {method}")
+                url, headers, payload = self._build_request(contract, endpoint, api_key)
+                method = endpoint.get("method", "GET").upper()
+
+                if method == "GET":
+                    response = requests.get(url, headers=headers, timeout=self.timeout)
+                elif method == "POST":
+                    response = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
+                elif method == "PUT":
+                    response = requests.put(url, headers=headers, json=payload, timeout=self.timeout)
+                elif method == "DELETE":
+                    response = requests.delete(url, headers=headers, timeout=self.timeout)
+                else:
+                    raise ValueError(f"Unsupported HTTP method: {method}")
 
             result["status_code"] = response.status_code
             result["auth_ok"] = response.status_code != 401
@@ -423,6 +431,117 @@ class DriftMonitor:
             )
         except (ValueError, AttributeError, TypeError):
             return None
+
+    def _aws_boto3_response(
+        self, contract: Dict[str, Any], endpoint: Dict[str, Any], creds: Dict[str, Any]
+    ) -> Any:
+        """Call AWS via boto3 and return a requests-like response shim."""
+        if boto3 is None:
+            return SimpleNamespace(
+                status_code=401,
+                ok=False,
+                text="boto3 not installed",
+                json=lambda: None,
+            )
+
+        access_key = str(creds.get("aws_access_key_id", ""))
+        secret_key = str(creds.get("aws_secret_access_key", ""))
+        session_token = str(creds.get("aws_session_token", ""))
+        region = str(creds.get("aws_region", "us-east-1"))
+
+        if not access_key or not secret_key:
+            return SimpleNamespace(
+                status_code=401,
+                ok=False,
+                text="missing AWS credentials",
+                json=lambda: None,
+            )
+
+        # Build EC2 API params from the contract query params.
+        params: Dict[str, Any] = {}
+        action: Optional[str] = None
+        for qp in endpoint.get("query_params", []):
+            if isinstance(qp, dict):
+                name = qp["name"]
+                value = qp.get("default")
+                source = qp.get("from_credential", name)
+                if source in creds:
+                    value = creds[source]
+            else:
+                name = qp
+                value = creds.get(name)
+
+            if value is None:
+                continue
+            value = str(value)
+
+            if name == "Action":
+                action = value
+            elif name == "Version":
+                continue
+            else:
+                if value.isdigit():
+                    params[name] = int(value)
+                elif value.lower() == "true":
+                    params[name] = True
+                elif value.lower() == "false":
+                    params[name] = False
+                else:
+                    params[name] = value
+
+        if not action:
+            return SimpleNamespace(
+                status_code=400,
+                ok=False,
+                text="missing Action query param",
+                json=lambda: None,
+            )
+
+        operation = "".join(
+            ["_" + c.lower() if c.isupper() else c for c in action]
+        ).lstrip("_")
+
+        client_kwargs: Dict[str, Any] = {
+            "region_name": region,
+            "aws_access_key_id": access_key,
+            "aws_secret_access_key": secret_key,
+        }
+        if session_token:
+            client_kwargs["aws_session_token"] = session_token
+
+        try:
+            client = boto3.client("ec2", **client_kwargs)
+            body = getattr(client, operation)(**params)
+            text = json.dumps(body, default=str)
+            return SimpleNamespace(
+                status_code=200,
+                ok=True,
+                text=text,
+                json=lambda: body,
+            )
+        except ClientError as exc:
+            err_body = exc.response
+            status = err_body.get("ResponseMetadata", {}).get("HTTPStatusCode", 401)
+            if status == 400 and err_body.get("Error", {}).get("Code") in (
+                "AuthFailure",
+                "SignatureDoesNotMatch",
+                "InvalidClientTokenId",
+            ):
+                status = 401
+            text = json.dumps(err_body, default=str)
+            return SimpleNamespace(
+                status_code=status,
+                ok=200 <= status < 300,
+                text=text,
+                json=lambda: err_body,
+            )
+        except (ValueError, AttributeError, TypeError):
+            return SimpleNamespace(
+                status_code=401,
+                ok=False,
+                text="AWS request failed",
+                json=lambda: None,
+            )
 
     def _oci_sign(
         self,
