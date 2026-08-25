@@ -15,6 +15,7 @@ endpoints:
   - page
   - page_size
   - count
+  expected_status: 200
 - name: core_flavors
   method: GET
   path: core/flavors
@@ -22,36 +23,11 @@ endpoints:
   expected_response_fields:
   - data
   optional_response_fields: []
+  expected_status: 200
 - name: core_virtual_machines
   method: POST
   path: core/virtual-machines
   enabled: false
   expected_response_fields: []
   optional_response_fields: []
-- name: core_virtual_machines_drift_test
-  method: GET
-  path: core/virtual-machines/drift-test
-  enabled: false
-  expected_response_fields:
-  - data
-  optional_response_fields: []
-- name: core_virtual_machines_drift_test_hibernate
-  method: GET
-  path: core/virtual-machines/drift-test/hibernate
-  enabled: false
-  expected_response_fields:
-  - data
-  optional_response_fields: []
-- name: core_virtual_machines_drift_test_restore
-  method: GET
-  path: core/virtual-machines/drift-test/restore
-  enabled: false
-  expected_response_fields:
-  - data
-  optional_response_fields: []
-- name: core_virtual_machines_drift_test
-  method: DELETE
-  path: core/virtual-machines/drift-test
-  enabled: false
-  expected_response_fields: []
-  optional_response_fields: []
+  expected_status: 201

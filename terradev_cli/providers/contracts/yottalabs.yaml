@@ -4,60 +4,95 @@ auth_header: X-Api-Key
 auth_required: true
 last_verified: '2026-08-24'
 endpoints:
-- name: list_nodes
-  method: GET
-  path: nodes
-  expected_response_fields:
-  - nodes
-- name: gpu_types
+- name: list_gpu_types
   method: GET
   path: gpu-types
   enabled: true
+  expected_status: 200
   expected_response_fields:
+  - gpuType
+  - gpu_type
+  - gpuMemoryInGb
+  - minSingleCardVcpu
+  - minSingleCardRamInGb
+  - regions
+  - available
+  - pricePerHour
+  - price_per_hour
+  optional_response_fields:
   - data
-  optional_response_fields: []
-- name: pods
-  method: POST
-  path: pods
-  enabled: false
-  expected_response_fields: []
-  optional_response_fields: []
-- name: pods_drift_test
-  method: GET
-  path: pods/drift-test
-  enabled: false
-  expected_response_fields:
-  - data
-  optional_response_fields: []
-- name: pods_drift_test_pause
-  method: POST
-  path: pods/drift-test/pause
-  enabled: false
-  expected_response_fields: []
-  optional_response_fields: []
-- name: pods_drift_test_run
-  method: POST
-  path: pods/drift-test/run
-  enabled: false
-  expected_response_fields: []
-  optional_response_fields: []
-- name: pods_drift_test
-  method: DELETE
-  path: pods/drift-test
-  enabled: false
-  expected_response_fields: []
-  optional_response_fields: []
-- name: pods
+- name: list_pods
   method: GET
   path: pods
   enabled: true
+  expected_status: 200
   expected_response_fields:
+  - id
+  - gpuType
+  - gpu_type
+  - status
+  - region
+  - publicIp
+  - gpuCount
+  optional_response_fields:
   - data
-  optional_response_fields: []
-- name: pods_drift_test_logs
-  method: GET
-  path: pods/drift-test/logs
+- name: create_pod
+  method: POST
+  path: pods
   enabled: false
+  expected_status: 201
   expected_response_fields:
+  - id
+  - status
+  - gpuType
+  - region
+  - gpuCount
+  optional_response_fields:
   - data
+- name: get_pod
+  method: GET
+  path: pods/{id}
+  enabled: false
+  expected_status: 200
+  expected_response_fields:
+  - id
+  - gpuType
+  - status
+  - region
+  - publicIp
+  - gpuCount
+  optional_response_fields:
+  - data
+- name: pause_pod
+  method: POST
+  path: pods/{id}/pause
+  enabled: false
+  expected_status: 200
+  expected_response_fields:
+  - gpuType
   optional_response_fields: []
+- name: run_pod
+  method: POST
+  path: pods/{id}/run
+  enabled: false
+  expected_status: 200
+  expected_response_fields:
+  - gpuType
+  optional_response_fields: []
+- name: delete_pod
+  method: DELETE
+  path: pods/{id}
+  enabled: false
+  expected_status: 204
+  expected_response_fields:
+  - gpuType
+  optional_response_fields: []
+- name: get_pod_logs
+  method: GET
+  path: pods/{id}/logs
+  enabled: false
+  expected_status: 200
+  expected_response_fields:
+  - gpuType
+  optional_response_fields:
+  - data

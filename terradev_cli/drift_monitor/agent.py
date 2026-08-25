@@ -142,6 +142,15 @@ class DriftMonitor:
             result["extra_fields"] = []
             result["raw_response_keys"] = []
 
+            expected_status = endpoint.get("expected_status")
+            if expected_status is not None and response.status_code != expected_status:
+                result["drift"] = True
+                result["drift_reasons"].append(
+                    f"expected HTTP {expected_status}, got {response.status_code}"
+                )
+                result["drift_summary"] = "; ".join(result["drift_reasons"])
+                return result
+
             if response.ok:
                 body = response.json()
                 actual_paths = _collect_field_paths(body)

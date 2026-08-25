@@ -10,6 +10,7 @@ endpoints:
   path: droplets
   expected_response_fields:
   - droplets
+  expected_status: 200
 - name: sizes
   method: GET
   path: sizes
@@ -17,31 +18,14 @@ endpoints:
   expected_response_fields:
   - data
   optional_response_fields: []
+  expected_status: 200
 - name: droplets
   method: POST
   path: droplets
   enabled: false
   expected_response_fields: []
   optional_response_fields: []
-- name: droplets_drift_test
-  method: GET
-  path: droplets/drift-test
-  enabled: false
-  expected_response_fields:
-  - data
-  optional_response_fields: []
-- name: droplets_drift_test_actions
-  method: POST
-  path: droplets/drift-test/actions
-  enabled: false
-  expected_response_fields: []
-  optional_response_fields: []
-- name: droplets_drift_test
-  method: DELETE
-  path: droplets/drift-test
-  enabled: false
-  expected_response_fields: []
-  optional_response_fields: []
+  expected_status: 201
 - name: droplets?tag_name=terradev
   method: GET
   path: droplets?tag_name=terradev
@@ -49,3 +33,4 @@ endpoints:
   expected_response_fields:
   - data
   optional_response_fields: []
+  expected_status: 200

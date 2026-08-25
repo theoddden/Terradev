@@ -10,3 +10,5 @@ endpoints:
   method: GET
   path: shapes
   expected_response_fields: []
+  expected_status: 200
+  enabled: false

@@ -10,6 +10,7 @@ endpoints:
   path: servers
   expected_response_fields:
   - servers
+  expected_status: 200
 - name: server_types
   method: GET
   path: server_types
@@ -17,6 +18,7 @@ endpoints:
   expected_response_fields:
   - data
   optional_response_fields: []
+  expected_status: 200
 - name: ssh_keys
   method: GET
   path: ssh_keys
@@ -24,37 +26,14 @@ endpoints:
   expected_response_fields:
   - data
   optional_response_fields: []
+  expected_status: 200
 - name: servers
   method: POST
   path: servers
   enabled: false
   expected_response_fields: []
   optional_response_fields: []
-- name: servers_drift_test
-  method: GET
-  path: servers/drift-test
-  enabled: false
-  expected_response_fields:
-  - data
-  optional_response_fields: []
-- name: servers_drift_test_actions_poweroff
-  method: POST
-  path: servers/drift-test/actions/poweroff
-  enabled: false
-  expected_response_fields: []
-  optional_response_fields: []
-- name: servers_drift_test_actions_poweron
-  method: POST
-  path: servers/drift-test/actions/poweron
-  enabled: false
-  expected_response_fields: []
-  optional_response_fields: []
-- name: servers_drift_test
-  method: DELETE
-  path: servers/drift-test
-  enabled: false
-  expected_response_fields: []
-  optional_response_fields: []
+  expected_status: 201
 - name: servers?label_selector=terradev%3Dtrue
   method: GET
   path: servers?label_selector=terradev%3Dtrue
@@ -62,6 +41,7 @@ endpoints:
   expected_response_fields:
   - data
   optional_response_fields: []
+  expected_status: 200
 - name: locations
   method: GET
   path: locations
@@ -69,3 +49,4 @@ endpoints:
   expected_response_fields:
   - data
   optional_response_fields: []
+  expected_status: 200
