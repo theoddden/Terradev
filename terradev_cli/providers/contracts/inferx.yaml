@@ -15,7 +15,7 @@ endpoints:
     from_credential: model
   - name: messages
   - name: max_tokens
-  model: deepseek-v4-flash
+  model: Qwen3.8-27B-FP8
   messages:
   - role: user
     content: hello

@@ -401,7 +401,7 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
             os.environ.get("TERRADEV_INFERX_API_ENDPOINT")
             or "https://model.inferx.net/endpoints/v1"
         ).strip()
-        extras["model"] = os.environ.get("TERRADEV_INFERX_MODEL") or "deepseek-v4-flash"
+        extras["model"] = os.environ.get("TERRADEV_INFERX_MODEL") or "Qwen3.8-27B-FP8"
 
     if project_id:
         extras["project_id"] = project_id
