@@ -1,7 +1,5 @@
 # Terradev-cli 6.1.7
 
-## An imperative Command Line Interface for AI Workload Orchestration
-
 **Imperative Command Line Interface for AI Workload Orchestration.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
