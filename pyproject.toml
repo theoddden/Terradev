@@ -229,6 +229,7 @@ source = ["terradev_cli"]
 
 [tool.setuptools.package-data]
 terradev_cli = [
+    "README.md",
     "core/semantic_signals/*.yaml",
     "integrations/*.png",
     "kubernetes/*.yaml",
