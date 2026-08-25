@@ -28,6 +28,7 @@ jobs:
 
       - name: Run canary drift checks
         env:
+          TERRADEV_SKIP_ONBOARDING: "1"
           TERRADEV_BASENTEN_KEY: ${{ secrets.TERRADEV_BASENTEN_KEY }}
           TERRADEV_BASENTEN_API_KEY: ${{ secrets.TERRADEV_BASENTEN_API_KEY }}
           TERRADEV_DIGITALOCEAN_KEY: ${{ secrets.TERRADEV_DIGITALOCEAN_KEY }}

@@ -311,15 +311,14 @@ def _load_drift_env_key(provider: str) -> Optional[Union[str, Dict[str, Any]]]:
 def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]:
     """Look for provider extras (project_id, location) and build a credential dict."""
     name = alias.upper().replace("-", "_")
-    project_id = os.environ.get(f"TERRADEV_{name}_PROJECT_ID")
-    location = os.environ.get(f"TERRADEV_{name}_LOCATION")
-    if project_id and location:
-        return {
-            "api_key": api_key,
-            "project_id": project_id,
-            "location": location,
-        }
-    return None
+    project_id = os.environ.get(f"TERRADEV_{name}_PROJECT_ID") or ""
+    location = os.environ.get(f"TERRADEV_{name}_LOCATION") or "Delhi"
+    extras: Dict[str, Any] = {"api_key": api_key}
+    if project_id:
+        extras["project_id"] = project_id
+    if location:
+        extras["location"] = location
+    return extras
 
 
 def _load_drift_env_creds(provider: str) -> Optional[Union[str, Dict[str, Any]]]:
