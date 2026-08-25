@@ -1,4 +1,4 @@
-# Terradev-cli 6.2.0
+# Terradev-cli 6.2.1
 
 ## An imperative Command Line Interface for AI Workload Orchestration
 
@@ -18,11 +18,11 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON v6.2.0**
+**NOTES ON v6.2.1**
 
-- Version bumped to **v6.1.12** for housekeeping and packaging.
-- **17 GPU cloud and inference providers** are available for quoting and provisioning:
-  - `alibaba` — Alibaba Cloud
+- Version bumped to **v6.2.1**.
+- Provider list reprioritized to **17 GPU cloud and inference providers**, selected over others for testing reliability.
+- The following 17 providers are available for quoting and provisioning:
   - `aws` — Amazon Web Services
   - `azure` — Microsoft Azure
   - `baseten` — Baseten
@@ -34,7 +34,6 @@ Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thin
   - `hyperstack` — Hyperstack
   - `inferx` — Inferx
   - `latitude` — Latitude.sh
-  - `oracle` — Oracle Cloud
   - `ovhcloud` — OVHcloud
   - `runpod` — RunPod
   - `siliconflow` — SiliconFlow

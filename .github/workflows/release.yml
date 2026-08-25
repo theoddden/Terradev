@@ -73,16 +73,12 @@ jobs:
 
     - name: Smoke test published package before registry publish
       run: |
-        VERSION=${GITHUB_REF_NAME#v}
         python -m venv smoke_env
         source smoke_env/bin/activate
-        for i in 1 2 3 4 5; do
-          pip install "terradev-cli==$VERSION" && break
-          echo "PyPI not ready, retrying in 15s..."
-          sleep 15
-        done
+        pip install dist/*.whl
         TERRADEV_SKIP_ONBOARDING=1 terradev mcp list-tools >/dev/null
         deactivate
+        rm -rf smoke_env
 
     - name: Download mcp-publisher
       run: |
