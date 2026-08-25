@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "6.1.4"
+version = "6.1.5"
 description = "Cross-cloud GPU infrastructure and training pipeline CLI for SFT, DPO, GRPO, and multi-stage LLM training orchestration."
 readme = "README.md"
 license = {text = "Apache-2.0"}
