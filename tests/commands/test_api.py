@@ -93,12 +93,6 @@ class TestProviderCreds:
     def test_unknown_provider_returns_empty(self, api):
         assert api._provider_creds("unknown") == {}
 
-    def test_oracle_includes_defaults(self, api):
-        api.credentials = {"oracle_api_key": "key"}
-        creds = api._provider_creds("oracle")
-        assert creds["api_key"] == "key"
-        assert creds["region"] == "us-ashburn-1"
-
     def test_aws_nested(self, api):
         api.credentials = {"aws": {"api_key": "AKIA", "secret_key": "wJalr..."}}
         creds = api._provider_creds("aws")
@@ -138,20 +132,6 @@ class TestSaveAndLoadCredentials:
 
 
 class TestQuoteHelpers:
-    @pytest.mark.asyncio
-    async def test_oracle_quotes_require_api_key(self, api):
-        api.credentials = {}
-        quotes = await api.get_oracle_quotes("A100")
-        assert quotes == []
-
-    @pytest.mark.asyncio
-    async def test_oracle_quotes_with_key(self, api):
-        api.credentials = {"oracle": {"api_key": "key"}}
-        quotes = await api.get_oracle_quotes("A100")
-        assert len(quotes) == 1
-        assert quotes[0]["provider"] == "Oracle"
-        assert quotes[0]["price"] == 3.50
-
     @pytest.mark.asyncio
     async def test_get_provider_quotes_handles_exception(self, api):
         from terradev_cli.providers.provider_factory import ProviderFactory

@@ -2,11 +2,21 @@ provider: ovhcloud
 base_url: https://eu.api.ovh.com/v1
 auth_header: X-Ovh-Application
 auth_required: true
-last_verified: '2026-08-24'
+last_verified: '2026-08-25'
 endpoints:
-- name: list_regions
-  method: GET
-  path: cloud/project
-  expected_response_fields: []
-  expected_status: 200
-  enabled: false
+  - name: list_gpu_flavors
+    method: GET
+    path: "cloud/project/{project_id}/flavor"
+    enabled: false
+    expected_status: 200
+    expected_response_fields:
+      - id
+      - name
+      - memory
+      - vcpus
+    optional_response_fields:
+      - disk
+      - type
+      - planCodes
+      - pricingsHourly
+      - gpu

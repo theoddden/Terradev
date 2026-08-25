@@ -275,35 +275,6 @@ class TestProvidersGroup:
 
 
 # ===========================================================================
-# onboarding
-# ===========================================================================
-
-
-class TestOnboardingCommand:
-    """Onboarding command conditional on first-time-user status."""
-
-    def test_already_configured_skips_onboarding(self, runner, mock_api):
-        mock_api.is_first_time_user.return_value = False
-        result = runner.invoke(cli, ["onboarding"], obj={"api": mock_api})
-        assert result.exit_code == 0
-        assert "already" in result.output.lower()
-
-    def test_force_flag_triggers_onboarding(self, runner, mock_api):
-        mock_api.is_first_time_user.return_value = False
-        with patch("terradev_cli.commands.providers.run_interactive_onboarding") as mock_onboard:
-            result = runner.invoke(cli, ["onboarding", "--force"], obj={"api": mock_api})
-        assert result.exit_code == 0
-        mock_onboard.assert_called_once_with(mock_api)
-
-    def test_first_time_user_triggers_onboarding(self, runner, mock_api):
-        mock_api.is_first_time_user.return_value = True
-        with patch("terradev_cli.commands.providers.run_interactive_onboarding") as mock_onboard:
-            result = runner.invoke(cli, ["onboarding"], obj={"api": mock_api})
-        assert result.exit_code == 0
-        mock_onboard.assert_called_once_with(mock_api)
-
-
-# ===========================================================================
 # CLI structure / help / version
 # ===========================================================================
 

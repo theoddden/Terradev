@@ -50,21 +50,6 @@ class ProvidersGroup(click.Group):
         return super().group(*args, **kwargs)
 
 
-@cli.command(cls=ProvidersCommand)
-@click.option(
-    "--force", is_flag=True, help="Force onboarding even if already configured"
-)
-def onboarding(force):
-    """Run the interactive onboarding flow"""
-    api = click.get_current_context().obj["api"]
-    if force or api.is_first_time_user():
-        run_interactive_onboarding(api)
-    else:
-        print("You're already set up! Use --force to re-run onboarding.")
-        print(
-            "Or configure individual providers with: terradev configure --provider <name>"
-        )
-
 
 # Upgrade command removed - tier system eliminated (open source CLI)
 # @cli.command()
@@ -155,12 +140,6 @@ def configure(provider):
                 "key_name": "API Key",
                 "help": "Get from: TensorDock dashboard",
                 "example": "td_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            },
-            "oracle": {
-                "name": "Oracle Cloud",
-                "key_name": "API Key",
-                "help": "OCI uses a config file (tenancy OCID, user OCID, fingerprint, private key file, region). OCI Console → Profile → API Keys → Add API Key to get the snippet.",
-                "example": "ocid1.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             },
             "crusoe": {
                 "name": "Crusoe Cloud",
@@ -307,17 +286,6 @@ def configure(provider):
                     "api_key": api_key.strip(),
                     "api_token": api_token.strip(),
                 }
-            elif provider.lower() == "oracle":
-                # Oracle needs multiple credentials
-                tenancy_ocid = click.prompt("   Enter Oracle Tenancy OCID")
-                compartment_ocid = click.prompt("   Enter Oracle Compartment OCID")
-                region = click.prompt("   Enter Oracle Region", default="us-ashburn-1")
-                existing_creds[provider.lower()] = {
-                    "api_key": api_key.strip(),
-                    "tenancy_ocid": tenancy_ocid.strip(),
-                    "compartment_ocid": compartment_ocid.strip(),
-                    "region": region.strip(),
-                }
             elif provider.lower() == "crusoe":
                 # Crusoe needs multiple credentials
                 access_key = click.prompt("   Enter Crusoe Access Key")
@@ -336,19 +304,6 @@ def configure(provider):
                 existing_creds[provider.lower()] = {
                     "api_key": api_key.strip(),
                     "namespace": namespace.strip(),
-                }
-            elif provider.lower() == "alibaba":
-                # Alibaba Cloud needs Access Key ID and Secret
-                access_key_secret = click.prompt(
-                    "   Enter Alibaba Access Key Secret", hide_input=True
-                )
-                region_id = click.prompt(
-                    "   Enter Alibaba Region ID", default="cn-beijing"
-                )
-                existing_creds[provider.lower()] = {
-                    "access_key_id": api_key.strip(),
-                    "access_key_secret": access_key_secret.strip(),
-                    "region_id": region_id.strip(),
                 }
             elif provider.lower() == "ovhcloud":
                 # OVHcloud needs multiple credentials
@@ -778,9 +733,7 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             ("gcp", api.get_gcp_quotes),
             ("azure", api.get_azure_quotes),
             ("tensordock", api.get_tensordock_quotes),
-            ("oracle", api.get_oracle_quotes),
             ("crusoe", api.get_crusoe_quotes),
-            ("alibaba", api.get_alibaba_quotes),
             ("baseten", api.get_baseten_quotes),
             ("digitalocean", api.get_digitalocean_quotes),
             ("e2enetworks", api.get_e2enetworks_quotes),

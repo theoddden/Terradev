@@ -5,6 +5,8 @@ Simple credential prompt system - no demo mode, just input credentials
 
 import json
 from pathlib import Path
+from typing import Dict
+
 import click
 
 
@@ -28,94 +30,195 @@ def prompt_for_credentials():
     print("Press Enter to skip a provider.")
     print()
 
-    # Provider configurations
-    providers = {
+    # Provider configurations: name, help text, example, and required fields
+    PROVIDER_PROMPTS = {
         "runpod": {
             "name": "RunPod",
-            "key_name": "API Key",
             "help": "Get from: https://runpod.io/console/settings/api-keys",
             "example": "rpa_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Key", "hide_input": True},
+            ],
         },
         "vastai": {
             "name": "Vast.ai",
-            "key_name": "API Key",
             "help": "Get from: https://console.vast.ai/api-keys",
             "example": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Key", "hide_input": True},
+            ],
         },
         "aws": {
             "name": "AWS",
-            "key_name": "Access Key ID",
             "help": "Get from: AWS IAM console",
             "example": "AKIAEXAMPLEKEY123456",
+            "fields": [
+                {"key": "api_key", "label": "Access Key ID", "hide_input": True},
+                {"key": "secret_key", "label": "Secret Access Key", "hide_input": True},
+            ],
         },
         "gcp": {
             "name": "Google Cloud",
-            "key_name": "Service Account JSON",
-            "help": "Get from: GCP Console → IAM & Admin → Service Accounts",
-            "example": "path/to/service-account.json",
+            "help": "Get from: GCP Console → IAM & Admin → Service Accounts. Provide the path to your downloaded service account JSON.",
+            "example": "/path/to/service-account.json",
+            "fields": [
+                {"key": "credentials_file", "label": "Service Account JSON file path", "hide_input": False},
+                {"key": "project_id", "label": "GCP Project ID", "hide_input": False},
+            ],
         },
         "azure": {
             "name": "Azure",
-            "key_name": "Client ID",
             "help": "Azure Portal → Azure AD → App Registrations → New Registration. Create client secret under Certificates & Secrets. Get subscription ID and assign Contributor role.",
             "example": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "fields": [
+                {"key": "subscription_id", "label": "Subscription ID", "hide_input": False},
+                {"key": "tenant_id", "label": "Tenant ID", "hide_input": False},
+                {"key": "client_id", "label": "Client ID", "hide_input": False},
+                {"key": "client_secret", "label": "Client Secret", "hide_input": True},
+            ],
         },
         "tensordock": {
             "name": "TensorDock",
-            "key_name": "API Key",
             "help": "Get from: TensorDock dashboard",
             "example": "td_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        },
-        "oracle": {
-            "name": "Oracle Cloud",
-            "key_name": "API Key",
-            "help": "Uses an OCI config file with tenancy OCID, user OCID, fingerprint, private key file and region. Generate via OCI Console → Profile → API Keys.",
-            "example": "ocid1.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Key", "hide_input": True},
+                {"key": "api_token", "label": "API Token", "hide_input": True},
+            ],
         },
         "crusoe": {
             "name": "Crusoe Cloud",
-            "key_name": "API Key",
             "help": "Get from: Crusoe dashboard",
             "example": "crusoe_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "access_key", "label": "Access Key", "hide_input": False},
+                {"key": "secret_key", "label": "Secret Key", "hide_input": True},
+                {"key": "project_id", "label": "Project ID", "hide_input": False},
+            ],
+        },
+        "huggingface": {
+            "name": "HuggingFace",
+            "help": "Get from: https://huggingface.co/settings/tokens",
+            "example": "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Token", "hide_input": True},
+                {"key": "namespace", "label": "Namespace (username or org)", "hide_input": False},
+            ],
+        },
+        "baseten": {
+            "name": "Baseten",
+            "help": "Get from: Baseten dashboard",
+            "example": "bt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Key", "hide_input": True},
+            ],
+        },
+        "hyperstack": {
+            "name": "Hyperstack",
+            "help": "Get from: Hyperstack dashboard → API Keys",
+            "example": "hs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Key", "hide_input": True},
+                {"key": "environment", "label": "Environment", "hide_input": False, "default": "default-CANADA-1"},
+                {"key": "ssh_key_name", "label": "SSH Key Name", "hide_input": False, "default": ""},
+            ],
+        },
+        "digitalocean": {
+            "name": "DigitalOcean",
+            "help": "Get from: DigitalOcean → API → Tokens",
+            "example": "dop_v1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Token", "hide_input": True},
+                {"key": "region", "label": "Region", "hide_input": False, "default": "tor1"},
+            ],
+        },
+        "e2enetworks": {
+            "name": "E2E Networks",
+            "help": "Get from: https://e2enetworks.com",
+            "example": "e2e_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Key", "hide_input": True},
+                {"key": "project_id", "label": "Project ID (optional)", "hide_input": False, "default": ""},
+            ],
+        },
+        "inferx": {
+            "name": "InferX",
+            "help": "Get from: InferX Console → endpoint Client Setup",
+            "example": "ix_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Key", "hide_input": True},
+                {"key": "api_endpoint", "label": "API Endpoint", "hide_input": False, "default": "https://model.inferx.net/endpoints/v1"},
+                {"key": "model", "label": "Default model", "hide_input": False, "default": "Qwen3.8-27B-FP8"},
+            ],
+        },
+        "latitude": {
+            "name": "Latitude.sh",
+            "help": "Get from: https://latitude.sh/account/api-keys",
+            "example": "lat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Key", "hide_input": True},
+            ],
+        },
+        "ovhcloud": {
+            "name": "OVHcloud",
+            "help": "Visit https://api.ovh.com/createToken, select GET/POST/PUT/DELETE on /cloud/* endpoints. You will receive Application Key, Application Secret and Consumer Key.",
+            "example": "xxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "application_key", "label": "Application Key", "hide_input": True},
+                {"key": "application_secret", "label": "Application Secret", "hide_input": True},
+                {"key": "consumer_key", "label": "Consumer Key", "hide_input": True},
+                {"key": "project_id", "label": "Project ID", "hide_input": False},
+                {"key": "endpoint", "label": "Endpoint", "hide_input": False, "default": "ovh-eu"},
+            ],
+        },
+        "siliconflow": {
+            "name": "SiliconFlow",
+            "help": "Get from: https://cloud.siliconflow.cn/account/ak",
+            "example": "sf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Key", "hide_input": True},
+            ],
+        },
+        "yottalabs": {
+            "name": "Yotta Labs",
+            "help": "Get from: https://yottalabs.ai",
+            "example": "yotta_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Key", "hide_input": True},
+            ],
         },
     }
 
     updated_creds = existing_creds.copy()
 
-    for provider_id, config in providers.items():
+    for provider_id, config in PROVIDER_PROMPTS.items():
         print(f"\n{config['name']}")
         print(f"   Help: {config['help']}")
         print(f"   Example: {config['example']}")
 
         # Check if already configured
-        existing_key = existing_creds.get(provider_id, {}).get("api_key")
-        if existing_key:
-            print(f"   Already configured: {existing_key[:10]}...")
-            if click.confirm(f"   Update {config['name']} credentials?", default=False):
-                pass  # User wants to update
-            else:
-                continue  # Skip this provider
+        existing = existing_creds.get(provider_id, {})
+        if existing and any(str(v).strip() for v in existing.values() if isinstance(v, str)):
+            first_key = next(iter(existing))
+            print(f"   Already configured: {first_key}={existing[first_key][:10]}...")
+            if not click.confirm(f"   Update {config['name']} credentials?", default=False):
+                continue
 
-        # Prompt for API key
-        api_key = click.prompt(
-            f"   Enter {config['key_name']}",
-            default="",
-            hide_input=True,
-            show_default=False,
-        )
+        # Prompt for each required field
+        collected: Dict[str, str] = {}
+        for field in config["fields"]:
+            default = field.get("default", "")
+            show_default = bool(default)
+            value = click.prompt(
+                f"   Enter {field['label']}",
+                default=default,
+                hide_input=field.get("hide_input", False),
+                show_default=show_default,
+            )
+            collected[field["key"]] = value.strip()
 
-        if api_key.strip():
-            if provider_id == "gcp":
-                # GCP needs special handling for service account JSON
-                updated_creds[provider_id] = {
-                    "service_account_key": api_key.strip(),
-                    "project_id": click.prompt(
-                        "   Enter GCP Project ID", default="my-project"
-                    ),
-                }
-            else:
-                updated_creds[provider_id] = {"api_key": api_key.strip()}
-
+        if any(collected.values()):
+            updated_creds[provider_id] = collected
             print(f"   {config['name']} credentials saved")
         else:
             # Remove if user skipped and it existed

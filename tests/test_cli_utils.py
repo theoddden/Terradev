@@ -106,25 +106,6 @@ class TestValidateCredentials:
         creds = {"api_key": "test_key"}
         assert validate_credentials("baseten", creds) is True
 
-    def test_validate_oracle_complete(self):
-        """Validate Oracle with complete credentials"""
-        creds = {
-            "api_key": "test_key",
-            "tenancy_ocid": "test_tenancy",
-            "compartment_ocid": "test_compartment",
-            "region": "us-ashburn-1",
-        }
-        assert validate_credentials("oracle", creds) is True
-
-    def test_validate_oracle_missing_region(self):
-        """Validate Oracle with missing region"""
-        creds = {
-            "api_key": "test_key",
-            "tenancy_ocid": "test_tenancy",
-            "compartment_ocid": "test_compartment",
-        }
-        assert validate_credentials("oracle", creds) is False
-
     def test_validate_crusoe_complete(self):
         """Validate Crusoe with complete credentials"""
         creds = {
@@ -445,25 +426,6 @@ class TestTerradevAPI:
                 creds = api._provider_creds("baseten")
                 assert creds == {"api_key": "test_key"}
 
-    def test_provider_creds_flat_format_oracle(self):
-        """_provider_creds returns flat format Oracle credentials"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("pathlib.Path.home", return_value=Path(tmpdir)):
-                api = TerradevAPI()
-                api.credentials = {
-                    "oracle_api_key": "test_key",
-                    "oracle_tenancy_ocid": "test_tenancy",
-                    "oracle_compartment_ocid": "test_compartment",
-                    "oracle_region": "us-ashburn-1",
-                }
-                creds = api._provider_creds("oracle")
-                assert creds == {
-                    "api_key": "test_key",
-                    "tenancy_ocid": "test_tenancy",
-                    "compartment_ocid": "test_compartment",
-                    "region": "us-ashburn-1",
-                }
-
     def test_provider_creds_flat_format_crusoe(self):
         """_provider_creds returns flat format Crusoe credentials"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -479,24 +441,6 @@ class TestTerradevAPI:
                     "access_key": "test_access",
                     "secret_key": "test_secret",
                     "project_id": "test_project",
-                }
-
-    def test_provider_creds_flat_format_alibaba(self):
-        """_provider_creds returns flat format Alibaba credentials"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("pathlib.Path.home", return_value=Path(tmpdir)):
-                api = TerradevAPI()
-                api.credentials = {
-                    "alibaba_access_key_id": "test_key",
-                    "alibaba_access_key_secret": "test_secret",
-                }
-                creds = api._provider_creds("alibaba")
-                assert creds == {
-                    "access_key_id": "test_key",
-                    "access_key_secret": "test_secret",
-                    "region_id": "cn-beijing",
-                    "security_group_id": "",
-                    "vswitch_id": "",
                 }
 
     def test_provider_creds_flat_format_ovhcloud(self):

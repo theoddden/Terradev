@@ -23,46 +23,12 @@ from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from terradev_cli.providers.alibaba_provider import AlibabaProvider
 from terradev_cli.providers.ovhcloud_provider import OVHcloudProvider
 from terradev_cli.providers.siliconflow_provider import SiliconFlowProvider
 
 
 def run_async(coro):
     return asyncio.get_event_loop().run_until_complete(coro)
-
-
-class TestAlibabaProvider:
-    """Test Alibaba provider - uses signed URL with raw aiohttp"""
-
-    def test_auth_header_format(self):
-        """Alibaba uses signed requests, not standard Bearer auth"""
-        provider = AlibabaProvider(
-            credentials={"access_key_id": "test", "access_key_secret": "test"}
-        )
-        headers = provider._get_auth_headers()
-        # Alibaba doesn't use standard auth headers in _get_auth_headers
-        # It uses signed URLs in _ecs_request
-        assert isinstance(headers, dict)
-
-    @pytest.mark.asyncio
-    async def test_no_credentials_returns_empty_quotes(self):
-        """Alibaba returns empty quotes without credentials"""
-        provider = AlibabaProvider({})
-        result = await provider.get_instance_quotes("A100")
-        assert result == []
-
-    def test_percent_encode_uses_safe_tilde(self):
-        """Alibaba _percent_encode uses safe='~' per RFC 3986"""
-        provider = AlibabaProvider(
-            credentials={"access_key_id": "test", "access_key_secret": "test"}
-        )
-        # Test that ~ is not encoded
-        from urllib.parse import quote
-
-        test_str = "test~value"
-        encoded = provider._percent_encode(test_str)
-        assert "~" in encoded or encoded == quote(test_str, safe="~")
 
 
 class TestOVHcloudProvider:
@@ -86,8 +52,8 @@ class TestOVHcloudProvider:
 
     @pytest.mark.asyncio
     async def test_no_credentials_returns_empty_quotes(self):
-        """Alibaba returns empty quotes without credentials"""
-        provider = AlibabaProvider({})
+        """OVHcloud returns empty quotes without credentials"""
+        provider = OVHcloudProvider({})
         result = await provider.get_instance_quotes("A100")
         assert result == []
 
@@ -138,7 +104,6 @@ class TestProviderOutputSchemaConsistency:
     @pytest.mark.parametrize(
         "provider_class,credentials",
         [
-            (AlibabaProvider, {"access_key_id": "test", "access_key_secret": "test"}),
             (
                 OVHcloudProvider,
                 {

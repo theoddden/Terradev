@@ -2,7 +2,6 @@
 
 from .compute import HANDLERS as _compute_handlers
 from .core import HANDLERS as _core_handlers
-from .gitops import HANDLERS as _gitops_handlers
 from .governance import HANDLERS as _governance_handlers
 from .inference import HANDLERS as _inference_handlers
 from .integrations import HANDLERS as _integrations_handlers
@@ -21,7 +20,6 @@ from .vllm_lora import HANDLERS as _vllm_lora_handlers
 from .agentic import HANDLERS as _agentic_handlers
 HANDLERS.update(_compute_handlers)
 HANDLERS.update(_core_handlers)
-HANDLERS.update(_gitops_handlers)
 HANDLERS.update(_governance_handlers)
 HANDLERS.update(_inference_handlers)
 HANDLERS.update(_integrations_handlers)

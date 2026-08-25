@@ -1,4 +1,4 @@
-# Terradev-cli 6.1.12
+# Terradev-cli 6.2.0
 
 ## An imperative Command Line Interface for AI Workload Orchestration
 
@@ -18,10 +18,10 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON v6.1.12**
+**NOTES ON v6.2.0**
 
 - Version bumped to **v6.1.12** for housekeeping and packaging.
-- **19 GPU cloud and inference providers** are available for quoting and provisioning:
+- **17 GPU cloud and inference providers** are available for quoting and provisioning:
   - `alibaba` — Alibaba Cloud
   - `aws` — Amazon Web Services
   - `azure` — Microsoft Azure
@@ -117,7 +117,7 @@ Added **LoRAX (LoRA eXchange) integration** and **HuggingFace PEFT import** for 
 
 **NOTES ON 5.3.3**
 
-Added **provider registration and profiling system** for intelligent quirk-aware routing across 23 cloud providers, and registration for custom providers from .yaml import:
+Added **provider registration and profiling system** for intelligent quirk-aware routing across 17 cloud providers, and registration for custom providers from .yaml import:
 
 - **ProviderProfile schema** (`providers/types.py`): Encodes provider-specific behaviors including API style (REST/GraphQL/JSON:API), authentication type (Bearer/Basic/HMAC/X-Api-Key), rate limits, spot instance support, egress costs, fallback routing, capacity checks, container image pinning, and spot interruption handling.
 
@@ -150,7 +150,7 @@ We removed the paywall, open-sourced Terradev, and added Rust accelerators for s
 
 With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. You or the agent can issue commands freely... the orchestrator ensures they're safe to execute.
 
-217 tools not including subcommand/flags require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 23 cloud providers, that compounds across every tool call in the chain.
+217 tools not including subcommand/flags require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 17 cloud providers, that compounds across every tool call in the chain.
 
 ## BYOAPI Configuration
 
@@ -192,7 +192,7 @@ terradev --help
 ```
 
 ### Step 2: Configure Your First Cloud Provider
-Terradev supports 23 GPU cloud providers. Start with one, RunPod is the fastest to set up:
+Terradev supports 17 GPU cloud providers. Start with one, RunPod is the fastest to set up:
 
 ```bash
 terradev setup runpod --quick

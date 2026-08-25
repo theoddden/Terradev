@@ -41,7 +41,6 @@ except ImportError:
 def validate_credentials(provider: str, credentials: Dict[str, str]) -> bool:
     """Validate that all required credentials are present for a provider"""
     required_creds = {
-        "alibaba": ["access_key_id", "access_key_secret"],
         "aws": ["api_key", "secret_key"],
         "azure": ["subscription_id", "tenant_id", "client_id", "client_secret"],
         "baseten": ["api_key"],
@@ -53,7 +52,6 @@ def validate_credentials(provider: str, credentials: Dict[str, str]) -> bool:
         "hyperstack": ["api_key"],
         "inferx": ["api_key"],
         "latitude": ["api_key"],
-        "oracle": ["api_key", "tenancy_ocid", "compartment_ocid", "region"],
         "ovhcloud": ["application_key", "application_secret", "consumer_key", "project_id"],
         "runpod": ["api_key"],
         "siliconflow": ["api_key"],
@@ -396,27 +394,10 @@ class TerradevAPI:
             creds["namespace"] = self.credentials.get("huggingface_namespace", "")
         elif provider_name == "baseten":
             creds["api_key"] = self.credentials.get("baseten_api_key", "")
-        elif provider_name == "oracle":
-            creds["api_key"] = self.credentials.get("oracle_api_key", "")
-            creds["tenancy_ocid"] = self.credentials.get("oracle_tenancy_ocid", "")
-            creds["compartment_ocid"] = self.credentials.get(
-                "oracle_compartment_ocid", ""
-            )
-            creds["region"] = self.credentials.get("oracle_region", "us-ashburn-1")
         elif provider_name == "crusoe":
             creds["access_key"] = self.credentials.get("crusoe_access_key", "")
             creds["secret_key"] = self.credentials.get("crusoe_secret_key", "")
             creds["project_id"] = self.credentials.get("crusoe_project_id", "")
-        elif provider_name == "alibaba":
-            creds["access_key_id"] = self.credentials.get("alibaba_access_key_id", "")
-            creds["access_key_secret"] = self.credentials.get(
-                "alibaba_access_key_secret", ""
-            )
-            creds["region_id"] = self.credentials.get("alibaba_region_id", "cn-beijing")
-            creds["security_group_id"] = self.credentials.get(
-                "alibaba_security_group_id", ""
-            )
-            creds["vswitch_id"] = self.credentials.get("alibaba_vswitch_id", "")
         elif provider_name == "ovhcloud":
             creds["application_key"] = self.credentials.get(
                 "ovhcloud_application_key", ""

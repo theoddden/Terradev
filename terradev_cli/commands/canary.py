@@ -271,11 +271,9 @@ _DRIFT_PROVIDER_ALIASES = {
     "tensordock": ["tensordock"],
     "huggingface": ["huggingface", "hf"],
     "baseten": ["baseten", "basenten"],
-    "oracle": ["oracle", "oci"],
     "crusoe": ["crusoe"],
     "hyperstack": ["hyperstack"],
     "digitalocean": ["digitalocean", "digital_ocean"],
-    "alibaba": ["alibaba", "ali"],
     "ovhcloud": ["ovhcloud", "ovh"],
     "siliconflow": ["siliconflow"],
     "inferx": ["inferx"],
@@ -288,7 +286,6 @@ _DRIFT_PROVIDER_ALIASES = {
 _DRIFT_PROVIDER_KEY_ENVS: Dict[str, List[str]] = {
     "aws": ["TERRADEV_AWS_ACCESS_KEY_ID"],
     "gcp": ["TERRADEV_GCP_CREDENTIALS"],
-    "oracle": ["TERRADEV_OCI_PRIVATE_KEY", "TERRADEV_OCI_TENANCY"],
     "inferx": ["TERRADEV_INFERX_API_KEY"],
 }
 
@@ -383,28 +380,22 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
         else:
             extras["gcp_credentials"] = raw
 
-    elif alias == "oracle":
-        extras["oci_tenancy"] = (os.environ.get("TERRADEV_OCI_TENANCY") or "").strip()
-        extras["oci_user"] = (os.environ.get("TERRADEV_OCI_USER") or "").strip()
-        extras["oci_fingerprint"] = (os.environ.get("TERRADEV_OCI_FINGERPRINT") or "").strip()
-        extras["oci_region"] = (
-            os.environ.get("TERRADEV_OCI_REGION") or "us-ashburn-1"
+    elif alias == "azure":
+        # Azure drift expects a bearer token and subscription ID.
+        subscription_id = (
+            os.environ.get("TERRADEV_AZURE_SUBSCRIPTION_ID")
+            or os.environ.get("TERRADEV_AZURE_PROJECT_ID")
+            or ""
         ).strip()
-
-        def _decode_oci_key(raw: str) -> str:
-            raw = (raw or "").strip()
-            if raw.startswith("-----"):
-                return raw
-            try:
-                return base64.b64decode(raw).decode("utf-8").strip()
-            except (ValueError, binascii.Error):
-                return raw
-
-        extras["oci_private_key"] = _decode_oci_key(api_key)
-        # If the primary value was the tenancy, fall back to the dedicated private key secret.
-        fallback_key = os.environ.get("TERRADEV_OCI_PRIVATE_KEY")
-        if fallback_key:
-            extras["oci_private_key"] = _decode_oci_key(fallback_key)
+        project_id = subscription_id
+        location = os.environ.get("TERRADEV_AZURE_LOCATION") or "eastus"
+        extras["subscription_id"] = subscription_id
+        extras["tenant_id"] = (os.environ.get("TERRADEV_AZURE_TENANT_ID") or "").strip()
+        extras["client_id"] = (os.environ.get("TERRADEV_AZURE_CLIENT_ID") or "").strip()
+        extras["client_secret"] = (
+            os.environ.get("TERRADEV_AZURE_CLIENT_SECRET") or ""
+        ).strip()
+        extras["bearer_token"] = api_key.strip()
 
     elif alias == "inferx":
         extras["api_key"] = api_key.strip()

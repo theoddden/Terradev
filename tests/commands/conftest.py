@@ -101,9 +101,7 @@ def _build_mock_api(tmp_config_dir: Path, instances: list) -> MagicMock:
     api.get_gcp_quotes = AsyncMock(return_value=[])
     api.get_azure_quotes = AsyncMock(return_value=[])
     api.get_tensordock_quotes = AsyncMock(return_value=[_SPOT_QUOTE])
-    api.get_oracle_quotes = AsyncMock(return_value=[])
     api.get_crusoe_quotes = AsyncMock(return_value=[])
-    api.get_alibaba_quotes = AsyncMock(return_value=[])
     api.get_baseten_quotes = AsyncMock(return_value=[])
     api.get_digitalocean_quotes = AsyncMock(return_value=[])
     api.get_e2enetworks_quotes = AsyncMock(return_value=[])
@@ -204,7 +202,6 @@ def patch_registry():
             "gcp",
             "azure",
             "tensordock",
-            "oracle",
             "crusoe",
         ]
         MockRegistry.return_value = instance

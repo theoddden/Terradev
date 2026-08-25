@@ -93,7 +93,7 @@ class TestListAllProfiles:
     def test_list_all_profiles_count(self):
         """List contains expected number of providers"""
         profiles = list_all_profiles()
-        assert len(profiles) >= 19
+        assert len(profiles) == 17
 
     def test_list_all_profiles_returns_copy(self):
         """List returns a copy, not the original"""

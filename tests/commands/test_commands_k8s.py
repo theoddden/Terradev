@@ -51,17 +51,6 @@ def _make_terraform_wrapper():
     return tw
 
 
-def _make_gitops_manager():
-    """Return a mock GitOpsManager with async methods."""
-    gm = MagicMock()
-    gm.init_repository = AsyncMock(return_value=True)
-    gm.bootstrap_gitops = AsyncMock(return_value=True)
-    gm.sync_cluster = AsyncMock(return_value=True)
-    gm.validate_configuration = AsyncMock(return_value={"valid": True, "errors": [], "warnings": []})
-    gm.work_dir = "/tmp/gitops"
-    return gm
-
-
 # ===========================================================================
 # k8s group
 # ===========================================================================
@@ -113,46 +102,3 @@ class TestK8sGroup:
         result = runner.invoke(cli, ["k8s", "destroy"], obj={"api": mock_api})
         assert result.exit_code != 0
 
-
-# ===========================================================================
-# gitops group
-# ===========================================================================
-
-
-class TestGitopsGroup:
-    """Tests for the gitops group."""
-
-    def test_group_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["gitops", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-        assert "GitOps" in result.output
-
-    @patch("terradev_cli.core.gitops_manager.GitOpsManager")
-    def test_init_runs(self, MockManager, runner, mock_api):
-        MockManager.return_value = _make_gitops_manager()
-        result = runner.invoke(
-            cli, ["gitops", "init", "--provider", "github", "--cluster", "test-cluster", "--repo", "terradev/infra"], obj={"api": mock_api}
-        )
-        assert result.exit_code == 0
-
-    @patch("terradev_cli.core.gitops_manager.GitOpsManager")
-    def test_bootstrap_runs(self, MockManager, runner, mock_api):
-        MockManager.return_value = _make_gitops_manager()
-        result = runner.invoke(
-            cli, ["gitops", "bootstrap", "--tool", "argocd", "--cluster", "test-cluster"], obj={"api": mock_api}
-        )
-        assert result.exit_code == 0
-
-    @patch("terradev_cli.core.gitops_manager.GitOpsManager")
-    def test_sync_runs(self, MockManager, runner, mock_api):
-        MockManager.return_value = _make_gitops_manager()
-        result = runner.invoke(
-            cli, ["gitops", "sync", "--cluster", "test-cluster", "--environment", "dev"], obj={"api": mock_api}
-        )
-        assert result.exit_code == 0
-
-    @patch("terradev_cli.core.gitops_manager.GitOpsManager")
-    def test_validate_runs(self, MockManager, runner, mock_api):
-        MockManager.return_value = _make_gitops_manager()
-        result = runner.invoke(cli, ["gitops", "validate"], obj={"api": mock_api})
-        assert result.exit_code == 0

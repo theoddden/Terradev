@@ -3,5 +3,14 @@ base_url: https://management.azure.com
 auth_required: true
 auth_type: Bearer
 auth_header: Authorization
-last_verified: '2026-08-24'
-endpoints: []
+last_verified: '2026-08-25'
+endpoints:
+  - name: list_locations
+    method: GET
+    path: "subscriptions/{subscription_id}/locations?api-version=2022-12-01"
+    enabled: true
+    expected_status: 200
+    expected_response_fields:
+      - value
+    optional_response_fields:
+      - nextLink

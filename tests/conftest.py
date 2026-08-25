@@ -148,7 +148,6 @@ def mock_api(tmp_config_dir: Path):
     api.get_gcp_quotes = AsyncMock(return_value=[])
     api.get_azure_quotes = AsyncMock(return_value=[])
     api.get_tensordock_quotes = AsyncMock(return_value=[])
-    api.get_oracle_quotes = AsyncMock(return_value=[])
     api.get_crusoe_quotes = AsyncMock(return_value=[])
 
     api.provision_instance = AsyncMock(return_value={

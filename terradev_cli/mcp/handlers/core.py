@@ -273,38 +273,6 @@ async def _handle_manifests(arguments, cmd_args, tool_name, execute_terradev_com
 HANDLERS['manifests'] = _handle_manifests
 
 
-async def _handle_smart_deploy(arguments, cmd_args, tool_name, execute_terradev_command):
-    cmd_args = [
-        "smart-deploy",
-        "--image",
-        arguments["image"],
-        "--workload",
-        arguments["workload"],
-    ]
-    if arguments.get("gpu_type"):
-        cmd_args.extend(["--gpu-type", arguments["gpu_type"]])
-    if arguments.get("budget"):
-        cmd_args.extend(["--budget", str(arguments["budget"])])
-    if arguments.get("option") is not None:
-        cmd_args.extend(["--option", str(arguments["option"])])
-    result = await execute_terradev_command(cmd_args)
-    output = result["stdout"] if result["success"] else result["stderr"]
-    output_text = "🧠 **Smart Deployment**\n\n"
-    if result["success"]:
-        output_text += output
-        if arguments.get("option") is None:
-            output_text += "\n\n**requires_confirmation:** true\n"
-        output_text += "**suggest_action:** Options ranked by cost/risk. Selection requires confirmation — the deployment graph enforces manifest checksums and drift detection before applying. Execute with `smart_deploy` and `option` parameter."
-    else:
-        output_text += f"⚠️ {output}"
-    return CallToolResult(
-        content=[TextContent(type="text", text=output_text)],
-        isError=not result["success"],
-    )
-
-HANDLERS['smart_deploy'] = _handle_smart_deploy
-
-
 async def _handle_run_workflow(arguments, cmd_args, tool_name, execute_terradev_command):
     if arguments.get("template"):
         cmd_args = ["workflow", "run", "--template", arguments["template"]]

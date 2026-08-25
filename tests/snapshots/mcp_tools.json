@@ -1,5 +1,5 @@
 {
-  "tool_count": 261,
+  "tool_count": 256,
   "tool_names": [
     "active_context",
     "agent_agentic_serving_configure",
@@ -76,10 +76,6 @@
     "egress_cheapest_route",
     "egress_optimize_staging",
     "get_database_connection",
-    "gitops_bootstrap",
-    "gitops_init",
-    "gitops_sync",
-    "gitops_validate",
     "governance_compliance_report",
     "governance_evaluate_opa",
     "governance_move_data",
@@ -212,7 +208,6 @@
     "sglang_inference",
     "sglang_start",
     "sglang_stop",
-    "smart_deploy",
     "stage",
     "status",
     "terraform_apply",

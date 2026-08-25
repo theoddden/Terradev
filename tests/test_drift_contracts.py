@@ -116,7 +116,7 @@ class TestDriftContracts:
                 path = str(ep["path"])
                 # Credential placeholders are resolved at runtime by the drift
                 # agent, so only reject unknown placeholders.
-                allowed_path_placeholders = {"project_id", "aws_region", "oci_region", "zone", "bucket", "object"}
+                allowed_path_placeholders = {"project_id", "subscription_id", "aws_region", "oci_region", "zone", "bucket", "object"}
                 found = set(re.findall(r"\{([a-z_]+)\}", path))
                 unknown = found - allowed_path_placeholders
                 assert not unknown, (

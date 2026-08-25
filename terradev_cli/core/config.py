@@ -23,7 +23,6 @@ class ProviderType(Enum):
     TENSORDOCK = "tensordock"
     HUGGINGFACE = "huggingface"
     BASETEN = "baseten"
-    ORACLE = "oracle"
 
 
 @dataclass
