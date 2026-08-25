@@ -2,18 +2,18 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.theoddden/terradev",
   "title": "Terradev",
-  "description": "GPU provisioning, training, and inference orchestration for AI agents.",
+  "description": "Imperative cross-cloud CLI for AI workloads: provisioning, training, inference, and cost optimization.",
   "repository": {
     "url": "https://github.com/theoddden/Terradev",
     "source": "github"
   },
-  "version": "6.1.5",
+  "version": "6.1.6",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "terradev-cli",
-      "version": "6.1.5",
+      "version": "6.1.6",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
