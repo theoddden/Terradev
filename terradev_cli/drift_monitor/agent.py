@@ -361,6 +361,7 @@ class DriftMonitor:
             return None
         access_key = str(creds.get("aws_access_key_id", ""))
         secret_key = str(creds.get("aws_secret_access_key", ""))
+        session_token = str(creds.get("aws_session_token", ""))
         region = str(creds.get("aws_region", "us-east-1"))
         if not access_key or not secret_key:
             return None
@@ -394,12 +395,14 @@ class DriftMonitor:
                 ["_" + c.lower() if c.isupper() else c for c in action]
             ).lstrip("_")
 
-            client = boto3.client(
-                "ec2",
-                region_name=region,
-                aws_access_key_id=access_key,
-                aws_secret_access_key=secret_key,
-            )
+            client_kwargs: Dict[str, Any] = {
+                "region_name": region,
+                "aws_access_key_id": access_key,
+                "aws_secret_access_key": secret_key,
+            }
+            if session_token:
+                client_kwargs["aws_session_token"] = session_token
+            client = boto3.client("ec2", **client_kwargs)
             return client.generate_presigned_url(
                 operation, Params=params, ExpiresIn=60
             )

@@ -350,42 +350,48 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
             extras["api_key"] = api_key
 
     elif alias == "aws":
-        extras["aws_access_key_id"] = api_key
-        extras["aws_secret_access_key"] = os.environ.get(
-            "TERRADEV_AWS_SECRET_ACCESS_KEY", ""
-        )
-        extras["aws_region"] = os.environ.get("TERRADEV_AWS_REGION") or "us-east-1"
+        extras["aws_access_key_id"] = api_key.strip()
+        extras["aws_secret_access_key"] = (
+            os.environ.get("TERRADEV_AWS_SECRET_ACCESS_KEY", "") or ""
+        ).strip()
+        extras["aws_region"] = (
+            os.environ.get("TERRADEV_AWS_REGION") or "us-east-1"
+        ).strip()
+        extras["aws_session_token"] = (
+            os.environ.get("TERRADEV_AWS_SESSION_TOKEN", "") or ""
+        ).strip()
 
     elif alias == "gcp":
         try:
-            raw = base64.b64decode(api_key).decode("utf-8")
+            raw = base64.b64decode(api_key.strip()).decode("utf-8")
             gcp_creds = json.loads(raw)
             extras["gcp_credentials"] = gcp_creds
             extras["project_id"] = gcp_creds.get("project_id") or ""
-        except (ValueError, json.JSONDecodeError):
+        except (ValueError, json.JSONDecodeError, binascii.Error):
             extras["gcp_credentials"] = api_key
 
     elif alias == "oracle":
-        extras["oci_tenancy"] = os.environ.get("TERRADEV_OCI_TENANCY") or ""
-        extras["oci_user"] = os.environ.get("TERRADEV_OCI_USER") or ""
-        extras["oci_fingerprint"] = os.environ.get("TERRADEV_OCI_FINGERPRINT") or ""
-        extras["oci_region"] = os.environ.get("TERRADEV_OCI_REGION") or "us-ashburn-1"
-        # The primary env value may be the private key (base64) or the tenancy.
-        # If it decodes to a PEM private key, use it; otherwise read the dedicated secret.
-        private_key = api_key
-        if not private_key.startswith("-----BEGIN"):
+        extras["oci_tenancy"] = (os.environ.get("TERRADEV_OCI_TENANCY") or "").strip()
+        extras["oci_user"] = (os.environ.get("TERRADEV_OCI_USER") or "").strip()
+        extras["oci_fingerprint"] = (os.environ.get("TERRADEV_OCI_FINGERPRINT") or "").strip()
+        extras["oci_region"] = (
+            os.environ.get("TERRADEV_OCI_REGION") or "us-ashburn-1"
+        ).strip()
+
+        def _decode_oci_key(raw: str) -> str:
+            raw = (raw or "").strip()
+            if raw.startswith("-----"):
+                return raw
             try:
-                private_key = base64.b64decode(private_key).decode("utf-8")
+                return base64.b64decode(raw).decode("utf-8").strip()
             except (ValueError, binascii.Error):
-                pass
-        extras["oci_private_key"] = private_key
+                return raw
+
+        extras["oci_private_key"] = _decode_oci_key(api_key)
         # If the primary value was the tenancy, fall back to the dedicated private key secret.
         fallback_key = os.environ.get("TERRADEV_OCI_PRIVATE_KEY")
         if fallback_key:
-            try:
-                extras["oci_private_key"] = base64.b64decode(fallback_key).decode("utf-8")
-            except (ValueError, binascii.Error):
-                extras["oci_private_key"] = fallback_key
+            extras["oci_private_key"] = _decode_oci_key(fallback_key)
 
     elif alias == "inferx":
         extras["region"] = os.environ.get("TERRADEV_INFERX_REGION") or "us-west-2"
