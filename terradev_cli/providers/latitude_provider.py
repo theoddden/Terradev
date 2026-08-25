@@ -3,7 +3,7 @@
 Latitude.sh Provider - Bare metal and virtual machine GPU cloud integration
 
 CRITICAL DESIGN NOTES:
-- Dual support: Bare metal servers (/servers) + Virtual machines (/virtual-machines)
+- Dual support: Bare metal servers (/servers) + Virtual machines (/virtual_machines)
 - GPU specialization: H100, A100, RTX PRO 6000 Blackwell support
 - SSH access: Direct SSH for bare metal, container SSH for VMs
 - JSON:API compliance: Full implementation
@@ -182,7 +182,7 @@ class LatitudeProvider(BaseProvider):
         try:
             # Note: VM endpoints need to be discovered - using assumed structure
             vm_data = await self._make_request(
-                "GET", f"{self.API_BASE}/virtual-machines/plans"
+                "GET", f"{self.API_BASE}/plans/virtual_machines"
             )
             vm_plans = vm_data.get("data", [])
 
@@ -332,7 +332,7 @@ class LatitudeProvider(BaseProvider):
             vm_slug = instance_type.replace("latitude-vm-", "")
 
             vm_data = {
-                "type": "virtual-machines",
+                "type": "virtual_machines",
                 "attributes": {
                     "plan": vm_slug,
                     "region": region,
@@ -348,7 +348,7 @@ class LatitudeProvider(BaseProvider):
                 vm_data["attributes"]["user_data"] = kwargs["user_data"]
 
             result = await self._make_request(
-                "POST", f"{self.API_BASE}/virtual-machines", json=vm_data
+                "POST", f"{self.API_BASE}/virtual_machines", json=vm_data
             )
             vm = result.get("data", {})
             attrs = vm.get("attributes", {})
@@ -408,7 +408,7 @@ class LatitudeProvider(BaseProvider):
             # Try virtual machine
             try:
                 data = await self._make_request(
-                    "GET", f"{self.API_BASE}/virtual-machines/{instance_id}"
+                    "GET", f"{self.API_BASE}/virtual_machines/{instance_id}"
                 )
                 vm = data.get("data", {})
                 attrs = vm.get("attributes", {})
@@ -456,7 +456,7 @@ class LatitudeProvider(BaseProvider):
             try:
                 await self._make_request(
                     "POST",
-                    f"{self.API_BASE}/virtual-machines/{instance_id}/actions",
+                    f"{self.API_BASE}/virtual_machines/{instance_id}/actions",
                     json={"type": "power_off"},
                 )
                 return {
@@ -497,7 +497,7 @@ class LatitudeProvider(BaseProvider):
             try:
                 await self._make_request(
                     "POST",
-                    f"{self.API_BASE}/virtual-machines/{instance_id}/actions",
+                    f"{self.API_BASE}/virtual_machines/{instance_id}/actions",
                     json={"type": "power_on"},
                 )
                 return {
@@ -535,7 +535,7 @@ class LatitudeProvider(BaseProvider):
             # Try virtual machine
             try:
                 await self._make_request(
-                    "DELETE", f"{self.API_BASE}/virtual-machines/{instance_id}"
+                    "DELETE", f"{self.API_BASE}/virtual_machines/{instance_id}"
                 )
                 return {
                     "instance_id": instance_id,
@@ -587,7 +587,7 @@ class LatitudeProvider(BaseProvider):
         try:
             # List virtual machines
             vms_data = await self._make_request(
-                "GET", f"{self.API_BASE}/virtual-machines"
+                "GET", f"{self.API_BASE}/virtual_machines"
             )
             vms = vms_data.get("data", [])
 

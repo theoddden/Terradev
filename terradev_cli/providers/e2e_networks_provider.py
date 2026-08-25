@@ -62,8 +62,18 @@ class E2ENetworksProvider(BaseProvider):
         super().__init__(credentials)
         self.name = "e2enetworks"
         self.api_key = credentials.get("api_key", "")
-        # E2E Networks may require a project ID for multi-project accounts
+        # E2E Networks requires project ID and location for every request
         self.project_id = credentials.get("project_id", "")
+        self.location = credentials.get("location", "Delhi")
+
+    def _e2e_query_params(self) -> Dict[str, str]:
+        """Return the query params E2E MyAccount requires for every request."""
+        params: Dict[str, str] = {"apikey": self.api_key}
+        if self.project_id:
+            params["project_id"] = self.project_id
+        if self.location:
+            params["location"] = self.location
+        return params
 
     # ── Authentication ────────────────────────────────────────────────
 
@@ -76,12 +86,12 @@ class E2ENetworksProvider(BaseProvider):
     # ── URL helpers ───────────────────────────────────────────────────
 
     def _nodes_url(self, path: str = "") -> str:
-        """Build a nodes endpoint URL. Project scoping is done via ?project_id= query param."""
+        """Build a nodes endpoint URL. Project scoping is done via query params."""
         return f"{self.API_BASE}/nodes{path}"
 
     def _project_params(self) -> Dict[str, str]:
-        """Return project_id as a query-param dict if configured."""
-        return {"project_id": self.project_id} if self.project_id else {}
+        """Return E2E query params (project_id, apikey, location)."""
+        return self._e2e_query_params()
 
     # ── Capacity / Quotes ─────────────────────────────────────────────
 
@@ -132,10 +142,16 @@ class E2ENetworksProvider(BaseProvider):
     ) -> List[Dict[str, Any]]:
         """Query node plans/types from the API."""
         try:
-            data = await self._make_request("GET", f"{self.API_BASE}/plans/")
+            data = await self._make_request(
+                "GET", f"{self.API_BASE}/images/",
+                params={**self._project_params(), "category": "Distro", "display_category": "Ubuntu",
+                        "os": "Ubuntu", "osversion": "24.04", "billing_type": "hourly"}
+            )
         except Exception:  # noqa: BLE001
-            # Fall back to node-types endpoint
-            data = await self._make_request("GET", f"{self.API_BASE}/node-types/")
+            # Fall back to OS categories
+            data = await self._make_request(
+                "GET", f"{self.API_BASE}/images/os-category/", params=self._project_params()
+            )
 
         plans = data if isinstance(data, list) else data.get("data", data.get("results", []))
         gpu_upper = gpu_type.upper()
@@ -202,7 +218,7 @@ class E2ENetworksProvider(BaseProvider):
         if ssh_key:
             body["ssh_keys"] = [ssh_key]
 
-        data = await self._make_request("POST", self._nodes_url("/"), json=body)
+        data = await self._make_request("POST", self._nodes_url("/"), json=body, params=self._project_params())
         node = data if isinstance(data, dict) else data.get("data", {})
 
         return {
@@ -227,7 +243,7 @@ class E2ENetworksProvider(BaseProvider):
         if not self.api_key:
             raise Exception("E2E Networks API key not configured")
 
-        data = await self._make_request("GET", self._nodes_url(f"/{instance_id}/"))
+        data = await self._make_request("GET", self._nodes_url(f"/{instance_id}/"), params=self._project_params())
         node = data if isinstance(data, dict) else data.get("data", {})
 
         return {
@@ -272,14 +288,14 @@ class E2ENetworksProvider(BaseProvider):
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
         if not self.api_key:
             raise Exception("E2E Networks API key not configured")
-        await self._make_request("DELETE", self._nodes_url(f"/{instance_id}/"))
+        await self._make_request("DELETE", self._nodes_url(f"/{instance_id}/"), params=self._project_params())
         return {"instance_id": instance_id, "action": "terminate", "status": "terminating"}
 
     async def list_instances(self) -> List[Dict[str, Any]]:
         if not self.api_key:
             return []
         try:
-            data = await self._make_request("GET", self._nodes_url("/"))
+            data = await self._make_request("GET", self._nodes_url("/"), params=self._project_params())
             nodes = data if isinstance(data, list) else data.get("data", data.get("results", []))
             return [
                 {
@@ -361,14 +377,20 @@ class E2ENetworksProvider(BaseProvider):
     async def get_plans(self) -> List[Dict[str, Any]]:
         """List all available node plans/configurations."""
         try:
-            data = await self._make_request("GET", f"{self.API_BASE}/plans/")
+            data = await self._make_request(
+                "GET", f"{self.API_BASE}/images/",
+                params={**self._project_params(), "category": "Distro", "display_category": "Ubuntu",
+                        "os": "Ubuntu", "osversion": "24.04", "billing_type": "hourly"}
+            )
         except Exception:  # noqa: BLE001
-            data = await self._make_request("GET", f"{self.API_BASE}/node-types/")
+            data = await self._make_request(
+                "GET", f"{self.API_BASE}/images/os-category/", params=self._project_params()
+            )
         return data if isinstance(data, list) else data.get("data", data.get("results", []))
 
     async def get_images(self) -> List[Dict[str, Any]]:
         """List available OS images for node provisioning."""
-        data = await self._make_request("GET", f"{self.API_BASE}/images/")
+        data = await self._make_request("GET", f"{self.API_BASE}/images/saved-images/", params=self._project_params())
         return data if isinstance(data, list) else data.get("data", data.get("results", []))
 
     async def reboot_instance(self, instance_id: str) -> Dict[str, Any]:

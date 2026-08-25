@@ -22,12 +22,15 @@ endpoints:
   expected_status: 200
 - name: virtual_machines_plans
   method: GET
-  path: virtual-machines/plans
+  path: plans/virtual_machines
   enabled: true
   expected_response_fields:
-  - name
-  optional_response_fields:
   - data
+  - data.attributes
+  optional_response_fields:
+  - data.attributes.name
+  - data.attributes.specs
+  - data.attributes.specs.gpu
   expected_status: 200
 - name: projects
   method: GET
@@ -56,17 +59,19 @@ endpoints:
   expected_status: 201
 - name: virtual_machines
   method: POST
-  path: virtual-machines
+  path: virtual_machines
   enabled: false
   expected_response_fields: []
   optional_response_fields: []
   expected_status: 201
 - name: virtual_machines_get
   method: GET
-  path: virtual-machines
+  path: virtual_machines
   enabled: true
   expected_response_fields:
-  - name
-  optional_response_fields:
   - data
+  optional_response_fields:
+  - data.attributes
+  - data.attributes.name
+  - data.attributes.status
   expected_status: 200

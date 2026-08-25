@@ -60,11 +60,11 @@ class HyperstackProvider(BaseProvider):
     }
 
     # ── Authentication ────────────────────────────────────────────────
-    # Hyperstack uses a custom 'apiKey' header, NOT 'Authorization: Bearer'
+    # Hyperstack uses a custom 'api_key' header, NOT 'Authorization: Bearer'
 
     def _get_auth_headers(self) -> Dict[str, str]:
         if self.api_key:
-            return {"apiKey": self.api_key, "Content-Type": "application/json"}
+            return {"api_key": self.api_key, "Content-Type": "application/json"}
         return {}
 
     # ── BaseProvider implementation ───────────────────────────────────

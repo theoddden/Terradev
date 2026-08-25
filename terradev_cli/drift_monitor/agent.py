@@ -12,7 +12,7 @@ import base64
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Union, Set
 
 import requests
 import yaml
@@ -59,7 +59,7 @@ class DriftMonitor:
     def __init__(
         self,
         contracts_dir: str,
-        credentials: Dict[str, str],
+        credentials: Dict[str, Union[str, Dict[str, Any]]],
         timeout: int = 30,
     ):
         self.contracts_dir = Path(contracts_dir)
@@ -112,7 +112,7 @@ class DriftMonitor:
         self,
         contract: Dict[str, Any],
         endpoint: Dict[str, Any],
-        api_key: str,
+        api_key: Union[str, Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Call a single endpoint and compare its response to the contract."""
         result: Dict[str, Any] = {
@@ -204,7 +204,7 @@ class DriftMonitor:
         self,
         contract: Dict[str, Any],
         endpoint: Dict[str, Any],
-        api_key: str,
+        api_key: Union[str, Dict[str, Any]],
     ) -> tuple:
         """Construct the URL, headers, and payload for a contract endpoint."""
         base_url = contract["base_url"].rstrip("/")
@@ -218,25 +218,52 @@ class DriftMonitor:
         headers: Dict[str, str] = {}
         payload: Dict[str, Any] = {}
 
+        # Normalize credentials: may be a raw key string or a dict with extras.
+        if isinstance(api_key, dict):
+            creds: Dict[str, Any] = api_key
+            key_value: str = str(creds.get("api_key", ""))
+        else:
+            creds = {}
+            key_value = str(api_key)
+
         if not contract.get("auth_required", True):
             return url, headers, payload
 
+        def _add_query_param(name: str, value: Any) -> None:
+            nonlocal url
+            if value is None or value == "":
+                return
+            sep = "&" if "?" in url else "?"
+            url = f"{url}{sep}{name}={value}"
+
         if auth_in == "query":
             param = contract.get("auth_query_param", "api_key")
-            sep = "&" if "?" in url else "?"
-            url = f"{url}{sep}{param}={api_key}"
+            _add_query_param(param, key_value)
         else:
             if auth_type:
                 if auth_type.lower() == "basic":
-                    token = base64.b64encode(f"{api_key}:".encode()).decode()
+                    token = base64.b64encode(f"{key_value}:".encode()).decode()
                     headers[auth_header] = f"Basic {token}"
                 else:
-                    headers[auth_header] = f"{auth_type} {api_key}"
+                    headers[auth_header] = f"{auth_type} {key_value}"
             else:
-                headers[auth_header] = api_key
+                headers[auth_header] = key_value
 
             if endpoint.get("method", "GET").upper() == "POST":
                 headers.setdefault("Content-Type", "application/json")
+
+        # Append any extra query params declared by the endpoint / contract.
+        for qp in endpoint.get("query_params", []):
+            if isinstance(qp, dict):
+                name = qp["name"]
+                source = qp.get("from_credential", name)
+                value = creds.get(source, qp.get("default"))
+            else:
+                name = qp
+                value = creds.get(name)
+            if value is None and name == contract.get("auth_query_param", "api_key"):
+                value = key_value
+            _add_query_param(name, value)
 
         if endpoint.get("smoke_test_query"):
             payload["query"] = endpoint["smoke_test_query"]

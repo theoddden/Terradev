@@ -165,7 +165,7 @@ class TestLatitudeProvider:
         }
 
         def mock_make_request(method, url, **kwargs):
-            if "virtual-machines" in url:
+            if "virtual_machines" in url:
                 return {"data": []}  # No VMs
             else:
                 return mock_servers_response  # Servers

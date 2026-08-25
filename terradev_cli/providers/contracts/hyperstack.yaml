@@ -1,6 +1,6 @@
 provider: hyperstack
 base_url: https://infrahub-api.nexgencloud.com/v1
-auth_header: apiKey
+auth_header: api_key
 auth_required: true
 last_verified: '2026-08-24'
 endpoints:

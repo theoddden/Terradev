@@ -10,7 +10,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import click
 import yaml
@@ -293,7 +293,7 @@ def _drift_provider_aliases(provider: str) -> List[str]:
     return _DRIFT_PROVIDER_ALIASES.get(provider, [provider])
 
 
-def _load_drift_env_key(provider: str) -> Optional[str]:
+def _load_drift_env_key(provider: str) -> Optional[Union[str, Dict[str, Any]]]:
     """Look for a raw API key in the environment."""
     for alias in _drift_provider_aliases(provider):
         name = alias.upper().replace("-", "_")
@@ -304,11 +304,26 @@ def _load_drift_env_key(provider: str) -> Optional[str]:
         ):
             value = os.environ.get(env)
             if value:
-                return value
+                extras = _load_drift_env_extras(alias, value)
+                return extras if extras else value
     return None
 
 
-def _load_drift_env_creds(provider: str) -> Optional[str]:
+def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]:
+    """Look for provider extras (project_id, location) and build a credential dict."""
+    name = alias.upper().replace("-", "_")
+    project_id = os.environ.get(f"TERRADEV_{name}_PROJECT_ID")
+    location = os.environ.get(f"TERRADEV_{name}_LOCATION")
+    if project_id and location:
+        return {
+            "api_key": api_key,
+            "project_id": project_id,
+            "location": location,
+        }
+    return None
+
+
+def _load_drift_env_creds(provider: str) -> Optional[Union[str, Dict[str, Any]]]:
     """Look for a JSON credential object in the environment."""
     for alias in _drift_provider_aliases(provider):
         name = alias.upper().replace("-", "_")
@@ -318,28 +333,28 @@ def _load_drift_env_creds(provider: str) -> Optional[str]:
                 try:
                     data = json.loads(raw)
                     if isinstance(data, dict) and "api_key" in data:
-                        return data["api_key"]
+                        return data
                 except json.JSONDecodeError:
                     pass
     return None
 
 
-def _load_drift_credentials_file(provider: str, data: Dict[str, Any]) -> Optional[str]:
+def _load_drift_credentials_file(provider: str, data: Dict[str, Any]) -> Optional[Union[str, Dict[str, Any]]]:
     """Extract a provider key from ``~/.terradev/credentials.json``."""
     for alias in _drift_provider_aliases(provider):
         for key in (alias, f"{alias}_api_key"):
             if key in data:
                 value = data[key]
                 if isinstance(value, dict) and "api_key" in value:
-                    return value["api_key"]
+                    return value
                 if isinstance(value, str):
                     return value
     return None
 
 
-def _load_drift_credentials(providers: List[str]) -> Dict[str, str]:
+def _load_drift_credentials(providers: List[str]) -> Dict[str, Union[str, Dict[str, Any]]]:
     """Resolve API keys for the requested providers."""
-    creds: Dict[str, str] = {}
+    creds: Dict[str, Union[str, Dict[str, Any]]] = {}
 
     creds_path = Path.home() / ".terradev" / "credentials.json"
     file_data: Dict[str, Any] = {}

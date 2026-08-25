@@ -2,106 +2,95 @@ provider: e2enetworks
 base_url: https://api.e2enetworks.com/myaccount/api/v1
 auth_type: Bearer
 auth_header: Authorization
+auth_query_param: apikey
 auth_required: true
-last_verified: '2026-08-24'
+last_verified: '2026-08-25'
 endpoints:
-- name: list_plans
-  method: GET
-  path: plans/
-  enabled: true
-  expected_status: 200
-  expected_response_fields:
-  - name
-  - plan_name
-  - gpu_type
-  - gpu
-  - price
-  - price_per_hour
-  - region
-  - available
-  - vcpus
-  - cpu
-  - ram
-  - ram_gb
-  - gpu_count
-  - gpu_num
-  optional_response_fields:
-  - data
-  - results
-- name: list_node_types
-  method: GET
-  path: node-types/
-  enabled: true
-  expected_status: 200
-  expected_response_fields:
-  - name
-  - plan_name
-  - gpu_type
-  - gpu
-  - price
-  - price_per_hour
-  - region
-  - available
-  - vcpus
-  - cpu
-  - ram
-  - ram_gb
-  - gpu_count
-  - gpu_num
-  optional_response_fields:
-  - data
-  - results
-- name: list_images
-  method: GET
-  path: images/
-  enabled: true
-  expected_status: 200
-  expected_response_fields:
-  - id
-  - name
-  - slug
-  - distribution
-  - os
-  optional_response_fields:
-  - data
-  - results
 - name: list_nodes
   method: GET
   path: nodes/
   enabled: true
   expected_status: 200
-  expected_response_fields:
-  - id
-  - plan
-  - node_type
-  - status
+  query_params:
+  - apikey
+  - project_id
   - location
-  - region
-  - ip
-  - public_ip
-  - gpu_count
-  optional_response_fields:
+  expected_response_fields:
   - data
-  - results
+  optional_response_fields:
+  - message
+  - code
+  - errors
+- name: list_images
+  method: GET
+  path: images/saved-images/
+  enabled: true
+  expected_status: 200
+  query_params:
+  - apikey
+  - project_id
+  - location
+  expected_response_fields:
+  - data
+  optional_response_fields:
+  - message
+  - code
+  - errors
+- name: list_os_categories
+  method: GET
+  path: images/os-category/
+  enabled: true
+  expected_status: 200
+  query_params:
+  - apikey
+  - project_id
+  - location
+  expected_response_fields:
+  - data
+  optional_response_fields:
+  - message
+  - code
+  - errors
+- name: list_plans
+  method: GET
+  path: images/
+  enabled: false
+  expected_status: 200
+  query_params:
+  - apikey
+  - project_id
+  - location
+  - name: category
+    default: Distro
+  - name: display_category
+    default: Ubuntu
+  - name: os
+    default: Ubuntu
+  - name: osversion
+    default: '24.04'
+  - name: billing_type
+    default: hourly
+  expected_response_fields:
+  - data
+  optional_response_fields:
+  - message
+  - code
+  - errors
 - name: create_node
   method: POST
   path: nodes/
   enabled: false
   expected_status: 201
   expected_response_fields:
-  - id
-  - status
-  - name
-  - plan
-  - location
-  - gpu_count
-  optional_response_fields:
   - data
+  optional_response_fields:
+  - message
+  - code
+  - errors
 - name: delete_node
   method: DELETE
   path: nodes/{id}/
   enabled: false
   expected_status: 204
-  expected_response_fields:
-  - name
+  expected_response_fields: []
   optional_response_fields: []
