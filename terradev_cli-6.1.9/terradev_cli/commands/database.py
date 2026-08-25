@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+"""Universal database / vector store subcommand."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
+from typing import Optional
+
+import click
+
+from . import cli
+from terradev_cli.core.adapters import Capability
+from terradev_cli.core.adapters.orchestrator import UniversalOrchestrator
+from terradev_cli.core.universal_manifest import UniversalManifest, Component
+from terradev_cli.core.output import get_output
+
+
+def _load_or_build_manifest(
+    manifest: Optional[str],
+    adapter: str,
+    name: str,
+    config: str,
+    component_kind: str = "database",
+) -> UniversalManifest:
+    """Load a manifest or build one from CLI options."""
+    if manifest:
+        return UniversalManifest.load(Path(manifest))
+
+    cfg = json.loads(config) if config else {}
+    component = Component(
+        kind=component_kind,
+        name=name,
+        adapter=adapter,
+        config=cfg,
+    )
+    return UniversalManifest(
+        name=f"database-{name}",
+        version="0.0.0",
+        components=[component],
+    )
+
+
+def _run(coro):
+    """Run a single coroutine and return its result."""
+    return asyncio.run(coro)
+
+
+@cli.group("database")
+def database():
+    """Universal database and vector store operations."""
+    pass
+
+
+@database.command("up")
+@click.option("--manifest", "-m", type=click.Path(exists=False), help="Path to universal manifest")
+@click.option("--adapter", "-a", default="sqlite", help="Database adapter name")
+@click.option("--name", "-n", default="db", help="Component name")
+@click.option("--config", "-c", default="{}", help="JSON adapter config")
+def database_up(manifest, adapter, name, config):
+    """Initialize a database or vector store component."""
+    output = get_output()
+    m = _load_or_build_manifest(manifest, adapter, name, config)
+    orchestrator = UniversalOrchestrator(m)
+
+    async def _main():
+        await orchestrator.initialize()
+        return orchestrator.to_result().result
+
+    output.set_result(_run(_main()))
+
+
+@database.command("down")
+@click.option("--manifest", "-m", type=click.Path(exists=False), required=True)
+def database_down(manifest):
+    """Teardown a database stack."""
+    output = get_output()
+    m = UniversalManifest.load(Path(manifest))
+    orchestrator = UniversalOrchestrator(m)
+    _run(orchestrator.teardown())
+    output.success("Database stack torn down")
+
+
+@database.command("crud")
+@click.option("--manifest", "-m", type=click.Path(exists=False), help="Path to universal manifest")
+@click.option("--adapter", "-a", default="sqlite")
+@click.option("--name", "-n", default="db")
+@click.option("--config", "-c", default="{}")
+@click.option("--operation", required=True, type=click.Choice(["insert", "select", "update", "delete"]))
+@click.option("--table", required=True)
+@click.option("--data", default="{}", help="JSON data payload")
+@click.option("--filters", default="{}", help="JSON filter payload")
+def database_crud(manifest, adapter, name, config, operation, table, data, filters):
+    """Run a CRUD operation on a database component."""
+    output = get_output().set_format("json")
+    m = _load_or_build_manifest(manifest, adapter, name, config)
+    orchestrator = UniversalOrchestrator(m)
+
+    async def _main():
+        await orchestrator.initialize()
+        try:
+            return await orchestrator.execute(
+                "database",
+                name,
+                "crud",
+                {
+                    "operation": operation,
+                    "table": table,
+                    "data": json.loads(data),
+                    "filters": json.loads(filters),
+                },
+            )
+        finally:
+            await orchestrator.teardown()
+
+    output.set_result(_run(_main()))
+
+
+@database.command("search")
+@click.option("--manifest", "-m", type=click.Path(exists=False), help="Path to universal manifest")
+@click.option("--adapter", "-a", default="qdrant")
+@click.option("--name", "-n", default="db")
+@click.option("--config", "-c", default="{}")
+@click.option("--table", required=True)
+@click.option("--vector", required=True, help="JSON array of floats")
+@click.option("--top-k", default=10, type=int)
+@click.option("--filters", default="{}")
+def database_search(manifest, adapter, name, config, table, vector, top_k, filters):
+    """Run vector similarity search on a vector store component."""
+    output = get_output().set_format("json")
+    m = _load_or_build_manifest(manifest, adapter, name, config, component_kind="vector_store")
+    orchestrator = UniversalOrchestrator(m)
+
+    async def _main():
+        await orchestrator.initialize()
+        try:
+            return await orchestrator.execute(
+                "vector_store",
+                name,
+                "vector_search",
+                {
+                    "table": table,
+                    "vector": json.loads(vector),
+                    "top_k": top_k,
+                    "filters": json.loads(filters),
+                },
+            )
+        finally:
+            await orchestrator.teardown()
+
+    output.set_result(_run(_main()))
+
+
+@database.command("sql")
+@click.option("--manifest", "-m", type=click.Path(exists=False), help="Path to universal manifest")
+@click.option("--adapter", "-a", default="sqlite")
+@click.option("--name", "-n", default="db")
+@click.option("--config", "-c", default="{}")
+@click.option("--query", required=True, help="Raw SQL query")
+@click.option("--table")
+@click.option("--params", default="{}", help="JSON query parameters")
+def database_sql(manifest, adapter, name, config, query, table, params):
+    """Execute raw SQL against a database adapter that supports SQL."""
+    output = get_output().set_format("json")
+    m = _load_or_build_manifest(manifest, adapter, name, config)
+    orchestrator = UniversalOrchestrator(m)
+
+    async def _main():
+        await orchestrator.initialize()
+        try:
+            instance = orchestrator._instances.get(f"database:{name}")
+            if instance is None:
+                raise RuntimeError(f"Database component {name} not initialized")
+            if not instance.adapter.capabilities.has(Capability.SQL):
+                raise RuntimeError(f"Adapter {adapter} does not support SQL")
+            return await instance.adapter.sql(
+                query=query,
+                table=table,
+                params=json.loads(params),
+            )
+        finally:
+            await orchestrator.teardown()
+
+    output.set_result(_run(_main()))
+
+
+@database.group("qdrant")
+def qdrant():
+    """Qdrant-specific vector operations."""
+    pass
+
+
+def _qdrant_manifest(adapter, name, config):
+    return _load_or_build_manifest(None, adapter, name, config, component_kind="vector_store")
+
+
+def _qdrant_exec(name, operation, args):
+    """Resolve the qdrant component and execute an operation."""
+    m = _qdrant_manifest("qdrant", name, '{}')
+    orchestrator = UniversalOrchestrator(m)
+
+    async def _main():
+        await orchestrator.initialize()
+        try:
+            return await orchestrator.execute("vector_store", name, operation, args)
+        finally:
+            await orchestrator.teardown()
+
+    return _run(_main())
+
+
+@qdrant.command("search")
+@click.option("--name", "-n", default="db")
+@click.option("--config", "-c", default="{}")
+@click.option("--collection", required=True)
+@click.option("--vector", required=True, help="JSON array of floats")
+@click.option("--top-k", default=10, type=int)
+@click.option("--filters", default="{}")
+def qdrant_search(name, config, collection, vector, top_k, filters):
+    """Vector similarity search in a Qdrant collection."""
+    output = get_output().set_format("json")
+    output.set_result(
+        _qdrant_exec(
+            name,
+            "search",
+            {
+                "collection": collection,
+                "vector": json.loads(vector),
+                "top_k": top_k,
+                "filters": json.loads(filters),
+            },
+        )
+    )
+
+
+@qdrant.command("scroll")
+@click.option("--name", "-n", default="db")
+@click.option("--config", "-c", default="{}")
+@click.option("--collection", required=True)
+@click.option("--filters", default="{}")
+@click.option("--limit", default=10, type=int)
+@click.option("--with-vectors", is_flag=True)
+def qdrant_scroll(name, config, collection, filters, limit, with_vectors):
+    """Scroll points in a Qdrant collection."""
+    output = get_output().set_format("json")
+    output.set_result(
+        _qdrant_exec(
+            name,
+            "scroll",
+            {
+                "collection": collection,
+                "filters": json.loads(filters),
+                "limit": limit,
+                "with_vectors": with_vectors,
+            },
+        )
+    )
+
+
+@qdrant.command("upsert")
+@click.option("--name", "-n", default="db")
+@click.option("--config", "-c", default="{}")
+@click.option("--collection", required=True)
+@click.option("--points", required=True, help="JSON list of point objects")
+def qdrant_upsert(name, config, collection, points):
+    """Upsert points into a Qdrant collection."""
+    output = get_output().set_format("json")
+    output.set_result(
+        _qdrant_exec(
+            name,
+            "upsert",
+            {
+                "collection": collection,
+                "points": json.loads(points),
+            },
+        )
+    )
+
+
+@qdrant.command("create-collection")
+@click.option("--name", "-n", default="db")
+@click.option("--config", "-c", default="{}")
+@click.option("--collection", required=True)
+@click.option("--vector-size", required=True, type=int)
+@click.option("--distance", default="Cosine", type=click.Choice(["Cosine", "Euclid", "Dot"]))
+def qdrant_create_collection(name, config, collection, vector_size, distance):
+    """Create a Qdrant collection."""
+    output = get_output().set_format("json")
+    output.set_result(
+        _qdrant_exec(
+            name,
+            "create_collection",
+            {
+                "collection": collection,
+                "vector_size": vector_size,
+                "distance": distance,
+            },
+        )
+    )
+
+
+@qdrant.command("delete-collection")
+@click.option("--name", "-n", default="db")
+@click.option("--config", "-c", default="{}")
+@click.option("--collection", required=True)
+def qdrant_delete_collection(name, config, collection):
+    """Delete a Qdrant collection."""
+    output = get_output().set_format("json")
+    output.set_result(
+        _qdrant_exec(
+            name,
+            "delete_collection",
+            {
+                "collection": collection,
+            },
+        )
+    )

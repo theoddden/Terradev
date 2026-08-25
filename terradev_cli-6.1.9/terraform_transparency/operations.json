@@ -1,0 +1,45 @@
+[
+  {
+    "operation_id": "b37bdd658f51",
+    "mode": "dry_run",
+    "command": [
+      "terraform",
+      "plan",
+      "-detailed-exitcode"
+    ],
+    "working_directory": "terraform_demo",
+    "created_at": "2026-02-09T09:55:19.103941",
+    "started_at": "2026-02-09T09:55:19.103960",
+    "completed_at": "2026-02-09T09:55:19.629611",
+    "status": "failed",
+    "exit_code": 1,
+    "duration_seconds": 0.525651,
+    "resources_affected": null,
+    "cost_impact": null,
+    "rollback_available": false,
+    "pin_enabled": false,
+    "pin_reason": null
+  },
+  {
+    "operation_id": "5d47e8ab3ae9",
+    "mode": "plan",
+    "command": [
+      "terraform",
+      "plan",
+      "-out",
+      "plan-5d47e8ab3ae9.tfplan"
+    ],
+    "working_directory": "terraform_demo",
+    "created_at": "2026-02-09T09:55:19.630966",
+    "started_at": "2026-02-09T09:55:19.631100",
+    "completed_at": "2026-02-09T09:55:19.745953",
+    "status": "failed",
+    "exit_code": 1,
+    "duration_seconds": 0.114853,
+    "resources_affected": null,
+    "cost_impact": null,
+    "rollback_available": false,
+    "pin_enabled": true,
+    "pin_reason": "Critical production deployment"
+  }
+]

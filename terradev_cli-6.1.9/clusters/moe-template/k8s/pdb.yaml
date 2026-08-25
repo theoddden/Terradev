@@ -1,0 +1,14 @@
+# Pod Disruption Budget — ensure at least 1 MoE replica always running
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: moe-pdb
+  namespace: moe-inference
+  labels:
+    app.kubernetes.io/name: moe-inference
+    app.kubernetes.io/managed-by: terradev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: moe-inference

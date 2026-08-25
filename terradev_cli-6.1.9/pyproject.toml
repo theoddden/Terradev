@@ -1,0 +1,268 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "terradev-cli"
+version = "6.1.9"
+description = "Imperative Command Line Interface for AI Workload Orchestration."
+readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Terradev Team", email = "team@terradev.com"}
+]
+maintainers = [
+    {name = "Terradev Team", email = "team@terradev.com"}
+]
+keywords = [
+    "cloud",
+    "provisioning", 
+    "gpu",
+    "multi-cloud",
+    "arbitrage",
+    "aws",
+    "gcp",
+    "azure",
+    "runpod",
+    "vastai",
+    "machine-learning",
+    "cost-optimization",
+    "parallel",
+    "gitops",
+    "argocd",
+    "flux",
+    "kubernetes",
+    "infrastructure-as-code",
+    "langchain",
+    "langgraph",
+    "sglang",
+    "wandb",
+    "mlflow",
+    "analytics",
+    "setup",
+    "conversion",
+    "telemetry",
+    "real-time",
+    "monitoring",
+    "dashboard",
+    "huggingface",
+    "huggingface-spaces",
+    "gradio",
+    "streamlit",
+    "llm",
+    "transformers",
+    "pytorch",
+    "sentence-transformers",
+    "smart-templates",
+    "hardware-optimization",
+    "model-deployment",
+    "inference",
+    "training",
+    "byoapi",
+    "terraform",
+    "kubernetes",
+    "helm",
+    "karpenter",
+    "opa",
+    "ray",
+    "vllm",
+    "ollama",
+    "dvc",
+    "data-version-control",
+    "numa",
+    "disaggregated-inference",
+    "moe",
+    "mixture-of-experts",
+    "qwen",
+    "distserve",
+    "xcd",
+    "mi300x",
+    "h200",
+    "prefill-decode",
+    "cuda-graph",
+    "cuda-graphs",
+    "numa-topology",
+    "gpu-optimization",
+    "passive-optimization",
+    "warm-pool",
+    "endpoint-scoring"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Natural Language :: English"
+]
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.0.0",
+    "aiohttp>=3.10.0",
+    "aiofiles>=0.8.0",
+    "pyyaml>=6.0",
+    "cryptography>=41.0.0",
+    "msgpack>=1.0.0",
+    "requests>=2.31.0",
+    "plotly>=5.0.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "huggingface-hub>=0.24.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "mcp[cli]>=1.0.0,<2.0.0; python_version >= '3.10'",
+]
+
+[project.optional-dependencies]
+aws = ["boto3>=1.34.0"]
+gcp = ["google-cloud-compute>=1.8.0"]
+azure = ["azure-mgmt-compute>=29.0.0", "azure-identity>=1.12.0"]
+lmcache = ["lmcache>=0.1", "redis>=5.0.0"]
+redis = ["redis>=5.0.0"]
+mcp = ["mcp[cli]>=1.0.0,<2.0.0; python_version >= '3.10'"]
+ml = [
+    "torch>=2.0.0",
+    "transformers>=4.0.0",
+    "sentence-transformers>=2.0.0",
+    "gradio>=4.0.0",
+    "streamlit>=1.28.0",
+]
+billing = ["stripe>=10.0.0"]
+all = [
+    "boto3>=1.34.0",
+    "google-cloud-compute>=1.8.0",
+    "azure-mgmt-compute>=29.0.0",
+    "azure-identity>=1.12.0",
+    "langchain>=0.1.0",
+    "langgraph>=0.0.20",
+    "sglang>=0.3.0",
+    "wandb>=0.16.0",
+    "mlflow>=2.8.0",
+    "huggingface-hub>=0.19.0",
+    "lmcache>=0.1",
+    "redis>=5.0.0",
+]
+hf = [
+    "aiohttp>=3.10.0",
+    "aiofiles>=0.8.0",
+    "huggingface-hub>=0.24.0",
+    "gradio>=4.0.0",
+    "streamlit>=1.28.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
+    "black>=22.0.0",
+    "ruff>=0.4.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "build>=0.10.0",
+    "twine>=4.0.0",
+    "maturin>=1.4,<2.0",
+    "hypothesis>=6.0.0",
+]
+enterprise = [
+    "python3-saml>=1.13.0",
+    "authlib>=1.2.0",
+    "pyotp>=2.8.0",
+    "qrcode[pil]>=7.4.0",
+    "redis>=5.0.0",
+    "PyJWT>=2.8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "unit: pure-function / no-I/O tests",
+    "integration: requires mocked external APIs",
+    "slow: full CLI CliRunner or live-service tests",
+    "canary: quick smoke tests for low-coverage modules",
+    "hypothesis: property-based / fuzz tests for low-coverage modules",
+    "deep: deep invariants and state tests for low-coverage modules",
+]
+filterwarnings = [
+    "ignore:.*Boto3 will no longer support Python 3.9.*:Warning",
+    "ignore:.*only supports OpenSSL.*:Warning",
+    "ignore:.*sglang.*:UserWarning",
+    "ignore:.*enable_cleanup_closed.*:DeprecationWarning",
+    "ignore:.*tools returned isError.*:UserWarning",
+    "ignore:.*unclosed database.*:ResourceWarning",
+]
+
+[project.urls]
+Homepage = "https://github.com/theoddden/Terradev"
+Documentation = "https://github.com/theoddden/Terradev/blob/main/README.md"
+Repository = "https://github.com/theoddden/Terradev"
+"Bug Tracker" = "https://github.com/theoddden/Terradev/issues"
+Changelog = "https://github.com/theoddden/Terradev/blob/main/CHANGELOG.md"
+
+[project.scripts]
+terradev = "terradev_cli.cli:cli"
+terradev-cli = "terradev_cli.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["terradev_cli", "terradev_cli.*"]
+
+[tool.coverage.report]
+fail_under = 50
+show_missing = true
+
+[tool.coverage.run]
+source = ["terradev_cli"]
+
+[tool.setuptools.package-data]
+terradev_cli = [
+    "README.md",
+    "core/semantic_signals/*.yaml",
+    "integrations/*.png",
+    "kubernetes/*.yaml",
+    "providers/contracts/*.yaml",
+    "terraform/*.tf",
+    "terraform/modules/**/*.tf",
+    "terraform/modules/**/*.sh",
+    "terraform/modules/**/*.tpl",
+]
+
+[tool.black]
+target-version = ["py310", "py311", "py312"]
+line-length = 120
+skip-string-normalization = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "BLE",  # flake8-blind-except (BLE001 = broad exception catch) - CRITICAL
+    "F401", # unused imports (auto-fixable)
+    "B006", # mutable-argument-defaults (prevents shared mutable defaults)
+    "B017", # assert-raises-exception (catches incorrect assert raises usage)
+]
+ignore = [
+    "E501", # line too long (cosmetic, not critical)
+]
+
+# Per-file ignores - will expand as we add more rules
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["BLE001", "F401"]  # allow broad except and unused imports (for availability testing) in tests
+"terradev_cli/providers/*" = ["F401"]  # allow unused imports (for Rust auth availability testing) in providers
+"terradev_cli/core/*" = ["F401"]  # allow unused imports (for Rust integration availability testing) in core
+"terradev_cli/mcp/*" = ["F401"]  # allow unused imports (for MCP/starlette availability testing) in mcp

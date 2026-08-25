@@ -1,0 +1,15 @@
+[package]
+name = "terradev-tool-registry"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "terradev_tool_registry"
+crate-type = ["rlib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+phf = { version = "0.11", features = ["macros"] }

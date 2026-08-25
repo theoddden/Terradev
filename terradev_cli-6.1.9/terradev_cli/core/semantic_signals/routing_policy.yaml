@@ -1,0 +1,135 @@
+# Terradev Semantic Router — NUMA-Aware Routing Policy
+# Inspired by signal-driven routing concepts from the academic literature.
+#
+# Rules are evaluated top-down by priority (highest first).
+# The first matching rule wins.
+#
+# NUMA policies per rule:
+#   strict  — only route to PIX/PXB endpoints; reject cross-socket
+#   prefer  — weight NUMA locality into scoring (50% NUMA, 30% latency, 20% cost)
+#   none    — ignore topology, use pure latency/cost strategy
+#
+# Condition expressions support:
+#   modality, complexity, domain, language, safety.*, keyword.*
+#   Boolean: AND, OR, NOT   Comparison: ==, !=, >, <, >=, <=, in
+
+name: terradev_production
+description: >
+  Production routing policy with NUMA-aware model placement.
+  Safety-first, then modality routing, then complexity-based tiering.
+
+default_strategy: cost
+default_numa_policy: prefer
+
+signals:
+  safety_pii_scan: true
+  safety_jailbreak_scan: true
+
+rules:
+  # ── Safety (highest priority) ──────────────────────────────────────
+  - name: block_jailbreak
+    when: "safety.flagged and safety.severity >= 0.9"
+    route_to: __blocked__
+    priority: 100
+    tags: [safety]
+
+  - name: pii_to_local_only
+    when: "'pii_detected' in safety.flags"
+    route_to: __local_only__
+    numa_policy: strict          # PII never leaves the NUMA domain
+    priority: 90
+    tags: [privacy, numa_strict]
+
+  # ── Modality routing ───────────────────────────────────────────────
+  - name: vision_request
+    when: "modality == 'vision' or modality == 'multimodal'"
+    route_to: gpt-4o
+    priority: 80
+    tags: [modality, vision]
+
+  - name: diffusion_request
+    when: "modality == 'diffusion'"
+    route_to: dall-e-3
+    priority: 80
+    tags: [modality, diffusion]
+
+  - name: embedding_request
+    when: "modality == 'embedding'"
+    route_to: bge-large-en-v1.5
+    numa_policy: prefer
+    priority: 75
+    tags: [modality, embedding]
+
+  # ── Code routing (NUMA-aware for local vLLM) ──────────────────────
+  - name: code_complex
+    when: "modality == 'code' and complexity > 0.6"
+    route_to: deepseek-coder-33b
+    numa_policy: prefer           # large model — keep NUMA-aligned
+    priority: 70
+    tags: [code, complex, numa_prefer]
+
+  - name: code_simple
+    when: "modality == 'code' and complexity <= 0.6"
+    route_to: deepseek-coder-6.7b
+    numa_policy: prefer
+    priority: 65
+    tags: [code, simple]
+
+  # ── Domain-specific routing ────────────────────────────────────────
+  - name: medical_domain
+    when: "domain == 'medical' and complexity > 0.5"
+    route_to: meditron-70b
+    numa_policy: strict           # medical = regulated, stay on-node
+    priority: 60
+    tags: [domain, medical, numa_strict]
+
+  - name: legal_domain
+    when: "domain == 'legal'"
+    route_to: saul-7b
+    numa_policy: strict
+    priority: 60
+    tags: [domain, legal, numa_strict]
+
+  - name: finance_domain
+    when: "domain == 'finance' and complexity > 0.5"
+    route_to: llama-3-70b
+    numa_policy: prefer
+    priority: 55
+    tags: [domain, finance]
+
+  # ── Complexity-based tiering ───────────────────────────────────────
+  - name: expert_reasoning
+    when: "complexity > 0.7"
+    route_to: llama-3-70b
+    numa_policy: prefer
+    priority: 50
+    tags: [reasoning, complex]
+
+  - name: moderate_general
+    when: "complexity >= 0.3 and complexity <= 0.7"
+    route_to: llama-3-8b
+    numa_policy: prefer
+    priority: 40
+    tags: [general, moderate]
+
+  - name: simple_to_cheapest
+    when: "complexity < 0.3"
+    strategy: cost                # let InferenceRouter pick cheapest healthy endpoint
+    priority: 30
+    tags: [cost_optimize, simple]
+
+  # ── Language routing ───────────────────────────────────────────────
+  - name: non_english
+    when: "language != 'en'"
+    route_to: qwen-72b            # strong multilingual model
+    numa_policy: prefer
+    priority: 25
+    tags: [multilingual]
+
+  # ── Default fallback ───────────────────────────────────────────────
+  - name: default_balanced
+    when: "True"
+    strategy: score               # weighted latency + cost
+    numa_policy: prefer
+    priority: 0
+    tags: [default]

@@ -1,0 +1,31 @@
+provider: tensordock
+base_url: https://dashboard.tensordock.com/api/v2
+auth_required: false
+last_verified: '2026-08-24'
+endpoints:
+- name: list_locations
+  method: GET
+  path: locations
+  expected_response_fields:
+  - data
+  - data.locations
+  optional_response_fields:
+  - locations.id
+  - locations.city
+  - locations.gpus
+  expected_status: 200
+- name: instances
+  method: POST
+  path: instances
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+  expected_status: 201
+- name: instances_get
+  method: GET
+  path: instances
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+  expected_status: 200

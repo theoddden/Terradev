@@ -1,0 +1,91 @@
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: llmd-model
+  namespace: default
+spec:
+  replicas: 2
+  leaderWorkerTemplate:
+    leaderTemplate:
+      metadata:
+        labels:
+          app: llmd-model
+          role: leader
+      spec:
+        containers:
+        - name: vllm-server
+          image: vllm/vllm-openai:latest
+          command:
+            - python3
+            - -m
+            - vllm.entrypoints.openai.api_server
+            - --model=/models/weights
+            - --tensor-parallel-size=1
+            - --gpu-memory-utilization=0.90
+            - --max-model-len=8192
+            - --dtype=auto
+            - --trust-remote-code
+            - --served-model-name=llmd-model
+            - --host=0.0.0.0
+            - --port=8000
+            - --enable-prefix-caching
+            - --enable-chunked-prefill
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+          volumeMounts:
+          - name: model-storage
+            mountPath: /models
+        volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: model-pvc
+    workerTemplate:
+      metadata:
+        labels:
+          app: llmd-model
+          role: worker
+      spec:
+        containers:
+        - name: vllm-worker
+          image: vllm/vllm-openai:latest
+          command:
+            - python3
+            - -m
+            - vllm.entrypoints.openai.api_server
+            - --model=/models/weights
+            - --tensor-parallel-size=1
+            - --data-parallel-size=2
+            - --gpu-memory-utilization=0.90
+            - --max-model-len=8192
+            - --dtype=auto
+            - --trust-remote-code
+            - --served-model-name=llmd-model
+            - --host=0.0.0.0
+            - --port=8000
+            - --enable-prefix-caching
+            - --enable-chunked-prefill
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+          volumeMounts:
+          - name: model-storage
+            mountPath: /models
+        volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: model-pvc
+  leaderSelector:
+    matchLabels:
+      app: llmd-model
+      role: leader
+  workerSelector:
+    matchLabels:
+      app: llmd-model
+      role: worker

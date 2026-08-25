@@ -1,0 +1,62 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.theoddden/terradev",
+  "title": "Terradev",
+  "description": "Imperative Command Line Interface for AI Workload Orchestration.",
+  "repository": {
+    "url": "https://github.com/theoddden/Terradev",
+    "source": "github"
+  },
+  "version": "6.1.9",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "terradev-cli",
+      "version": "6.1.9",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        },
+        {
+          "type": "positional",
+          "value": "serve"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "TERRADEV_API_KEY",
+          "description": "Terradev API key for GPU cloud providers",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "TERRADEV_CREDENTIALS_FILE",
+          "description": "Path to Terradev credentials file",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TERRADEV_PROVIDER",
+          "description": "Default GPU cloud provider",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ],
+  "categories": [
+    "infrastructure",
+    "machine-learning",
+    "cloud-computing",
+    "gpu",
+    "automation"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/theoddden/Terradev#readme"
+}

@@ -1,0 +1,633 @@
+# Kubernetes manifests for Terradev Microservices
+# Deployments, Services, and ConfigMaps for each microservice
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terradev-api-gateway
+  namespace: terradev-system
+  labels:
+    app: terradev-api-gateway
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: terradev-api-gateway
+  template:
+    metadata:
+      labels:
+        app: terradev-api-gateway
+        version: v1
+    spec:
+      containers:
+      - name: api-gateway
+        image: terradev/api-gateway:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: REDIS_PORT
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: terradev-api-gateway
+  namespace: terradev-system
+  labels:
+    app: terradev-api-gateway
+spec:
+  selector:
+    app: terradev-api-gateway
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terradev-provider-service
+  namespace: terradev-system
+  labels:
+    app: terradev-provider-service
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: terradev-provider-service
+  template:
+    metadata:
+      labels:
+        app: terradev-provider-service
+        version: v1
+    spec:
+      containers:
+      - name: provider-service
+        image: terradev/provider-service:latest
+        ports:
+        - containerPort: 8081
+        env:
+        - name: PORT
+          value: "8081"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)"
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_HOST
+        - name: POSTGRES_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_PORT
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: POSTGRES_PASSWORD
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: terradev-provider-service
+  namespace: terradev-system
+  labels:
+    app: terradev-provider-service
+spec:
+  selector:
+    app: terradev-provider-service
+  ports:
+  - port: 80
+    targetPort: 8081
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terradev-risk-analyzer
+  namespace: terradev-system
+  labels:
+    app: terradev-risk-analyzer
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: terradev-risk-analyzer
+  template:
+    metadata:
+      labels:
+        app: terradev-risk-analyzer
+        version: v1
+    spec:
+      containers:
+      - name: risk-analyzer
+        image: terradev/risk-analyzer:latest
+        ports:
+        - containerPort: 8082
+        env:
+        - name: PORT
+          value: "8082"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)"
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: REDIS_PORT
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_HOST
+        - name: POSTGRES_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_PORT
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: POSTGRES_PASSWORD
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            memory: "1Gi"
+            cpu: "800m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8082
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: terradev-risk-analyzer
+  namespace: terradev-system
+  labels:
+    app: terradev-risk-analyzer
+spec:
+  selector:
+    app: terradev-risk-analyzer
+  ports:
+  - port: 80
+    targetPort: 8082
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terradev-latency-analyzer
+  namespace: terradev-system
+  labels:
+    app: terradev-latency-analyzer
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: terradev-latency-analyzer
+  template:
+    metadata:
+      labels:
+        app: terradev-latency-analyzer
+        version: v1
+    spec:
+      containers:
+      - name: latency-analyzer
+        image: terradev/latency-analyzer:latest
+        ports:
+        - containerPort: 8083
+        env:
+        - name: PORT
+          value: "8083"
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: REDIS_PORT
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8083
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: terradev-latency-analyzer
+  namespace: terradev-system
+  labels:
+    app: terradev-latency-analyzer
+spec:
+  selector:
+    app: terradev-latency-analyzer
+  ports:
+  - port: 80
+    targetPort: 8083
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terradev-checkpoint-manager
+  namespace: terradev-system
+  labels:
+    app: terradev-checkpoint-manager
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: terradev-checkpoint-manager
+  template:
+    metadata:
+      labels:
+        app: terradev-checkpoint-manager
+        version: v1
+    spec:
+      containers:
+      - name: checkpoint-manager
+        image: terradev/checkpoint-manager:latest
+        ports:
+        - containerPort: 8084
+        env:
+        - name: PORT
+          value: "8084"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)"
+        - name: S3_BUCKET
+          value: "terradev-dev-storage"
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_HOST
+        - name: POSTGRES_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_PORT
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: POSTGRES_PASSWORD
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8084
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8084
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: terradev-checkpoint-manager
+  namespace: terradev-system
+  labels:
+    app: terradev-checkpoint-manager
+spec:
+  selector:
+    app: terradev-checkpoint-manager
+  ports:
+  - port: 80
+    targetPort: 8084
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terradev-webapp
+  namespace: terradev-system
+  labels:
+    app: terradev-webapp
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: terradev-webapp
+  template:
+    metadata:
+      labels:
+        app: terradev-webapp
+        version: v1
+    spec:
+      containers:
+      - name: webapp
+        image: terradev/webapp:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)"
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: REDIS_PORT
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_HOST
+        - name: POSTGRES_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_PORT
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: POSTGRES_PASSWORD
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: terradev-webapp
+  namespace: terradev-system
+  labels:
+    app: terradev-webapp
+spec:
+  selector:
+    app: terradev-webapp
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: terradev-ingress
+  namespace: terradev-system
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - api.terradev.com
+    - app.terradev.com
+    secretName: terradev-tls
+  rules:
+  - host: api.terradev.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: terradev-api-gateway
+            port:
+              number: 80
+  - host: app.terradev.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: terradev-webapp
+            port:
+              number: 80
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: microservice-config
+  namespace: terradev-system
+data:
+  LOG_LEVEL: "info"
+  ENVIRONMENT: "production"
+  API_GATEWAY_URL: "http://terradev-api-gateway:80"
+  PROVIDER_SERVICE_URL: "http://terradev-provider-service:80"
+  RISK_ANALYZER_URL: "http://terradev-risk-analyzer:80"
+  LATENCY_ANALYZER_URL: "http://terradev-latency-analyzer:80"
+  CHECKPOINT_MANAGER_URL: "http://terradev-checkpoint-manager:80"
+  WEBAPP_URL: "http://terradev-webapp:80"
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway-pdb
+  namespace: terradev-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: terradev-api-gateway
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: provider-service-pdb
+  namespace: terradev-system
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: terradev-provider-service
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: webapp-pdb
+  namespace: terradev-system
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: terradev-webapp

@@ -1,0 +1,13 @@
+provider: alibaba
+base_url: https://ecs.aliyuncs.com
+auth_in: query
+auth_query_param: Signature
+auth_required: true
+last_verified: '2026-08-24'
+endpoints:
+- name: describe_regions
+  method: GET
+  path: ?Action=DescribeRegions&Version=2014-05-26
+  expected_response_fields: []
+  expected_status: 200
+  enabled: false

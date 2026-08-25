@@ -1,0 +1,1 @@
+{"providers": ["aws", "gcp", "azure", "runpod", "lambda", "coreweave"], "gpu_types": ["a100", "h100", "a10g"], "api_keys": {}, "preferred_regions": ["us-west-2", "us-east-1", "europe-west1"], "spot_only": true, "max_price_per_hour": 10.0}

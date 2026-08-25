@@ -1,0 +1,77 @@
+provider: latitude
+base_url: https://api.latitude.sh
+auth_type: Bearer
+auth_header: Authorization
+auth_required: true
+last_verified: '2026-08-24'
+endpoints:
+- name: list_servers
+  method: GET
+  path: servers
+  expected_response_fields:
+  - data
+  expected_status: 200
+- name: plans
+  method: GET
+  path: plans
+  enabled: true
+  expected_response_fields:
+  - name
+  optional_response_fields:
+  - data
+  expected_status: 200
+- name: virtual_machines_plans
+  method: GET
+  path: plans/virtual_machines
+  enabled: true
+  expected_response_fields:
+  - data
+  - data.attributes
+  optional_response_fields:
+  - data.attributes.name
+  - data.attributes.specs
+  - data.attributes.specs.gpu
+  expected_status: 200
+- name: projects
+  method: GET
+  path: projects
+  enabled: true
+  expected_response_fields:
+  - name
+  optional_response_fields:
+  - data
+  expected_status: 200
+- name: regions
+  method: GET
+  path: regions
+  enabled: true
+  expected_response_fields:
+  - name
+  optional_response_fields:
+  - data
+  expected_status: 200
+- name: servers
+  method: POST
+  path: servers
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+  expected_status: 201
+- name: virtual_machines
+  method: POST
+  path: virtual_machines
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+  expected_status: 201
+- name: virtual_machines_get
+  method: GET
+  path: virtual_machines
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields:
+  - data.attributes
+  - data.attributes.name
+  - data.attributes.status
+  expected_status: 200

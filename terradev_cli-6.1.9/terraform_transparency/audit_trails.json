@@ -1,0 +1,430 @@
+{
+  "3caed73ad5bf": {
+    "trail_id": "3caed73ad5bf",
+    "created_at": "2026-02-09T09:55:19.102358",
+    "entries": [
+      {
+        "entry_id": "e96f17b217d1",
+        "timestamp": "2026-02-09T09:55:19.102392",
+        "event_type": "operation_started",
+        "actor": "demo_user",
+        "operation_id": null,
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "operation_type": "terraform_transparency",
+          "trail_started": true
+        },
+        "decision_reasoning": null,
+        "permissions_required": [],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "trail_id": "3caed73ad5bf"
+        }
+      },
+      {
+        "entry_id": "2cca904818e5",
+        "timestamp": "2026-02-09T09:55:19.102689",
+        "event_type": "permission_checked",
+        "actor": "demo_user",
+        "operation_id": null,
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "operation_type": "read_only",
+          "permissions_required": [
+            "read_only"
+          ],
+          "permissions_granted": [
+            "read_only"
+          ],
+          "permissions_denied": [],
+          "check_passed": true
+        },
+        "decision_reasoning": null,
+        "permissions_required": [
+          "read_only"
+        ],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "permission_transparency": "complete",
+          "access_control": "checked"
+        }
+      },
+      {
+        "entry_id": "a6b11a3e0d98",
+        "timestamp": "2026-02-09T09:55:19.102812",
+        "event_type": "permission_checked",
+        "actor": "demo_user",
+        "operation_id": null,
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "operation_type": "dry_run",
+          "permissions_required": [
+            "read_only",
+            "dry_run"
+          ],
+          "permissions_granted": [
+            "read_only",
+            "dry_run"
+          ],
+          "permissions_denied": [],
+          "check_passed": true
+        },
+        "decision_reasoning": null,
+        "permissions_required": [
+          "read_only",
+          "dry_run"
+        ],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "permission_transparency": "complete",
+          "access_control": "checked"
+        }
+      },
+      {
+        "entry_id": "4dfbba434fd4",
+        "timestamp": "2026-02-09T09:55:19.102972",
+        "event_type": "permission_checked",
+        "actor": "demo_user",
+        "operation_id": null,
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "operation_type": "plan",
+          "permissions_required": [
+            "read_only",
+            "plan_only"
+          ],
+          "permissions_granted": [
+            "read_only",
+            "plan_only"
+          ],
+          "permissions_denied": [],
+          "check_passed": true
+        },
+        "decision_reasoning": null,
+        "permissions_required": [
+          "read_only",
+          "plan_only"
+        ],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "permission_transparency": "complete",
+          "access_control": "checked"
+        }
+      },
+      {
+        "entry_id": "1d66b5479041",
+        "timestamp": "2026-02-09T09:55:19.103382",
+        "event_type": "permission_checked",
+        "actor": "demo_user",
+        "operation_id": null,
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "operation_type": "apply",
+          "permissions_required": [
+            "read_only",
+            "plan_only",
+            "apply"
+          ],
+          "permissions_granted": [
+            "read_only",
+            "plan_only",
+            "apply"
+          ],
+          "permissions_denied": [],
+          "check_passed": true
+        },
+        "decision_reasoning": null,
+        "permissions_required": [
+          "read_only",
+          "plan_only",
+          "apply"
+        ],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "permission_transparency": "complete",
+          "access_control": "checked"
+        }
+      },
+      {
+        "entry_id": "d1e517d9e1af",
+        "timestamp": "2026-02-09T09:55:19.103800",
+        "event_type": "permission_checked",
+        "actor": "demo_user",
+        "operation_id": null,
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "operation_type": "destroy",
+          "permissions_required": [
+            "read_only",
+            "destroy"
+          ],
+          "permissions_granted": [
+            "read_only",
+            "destroy"
+          ],
+          "permissions_denied": [],
+          "check_passed": true
+        },
+        "decision_reasoning": null,
+        "permissions_required": [
+          "read_only",
+          "destroy"
+        ],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "permission_transparency": "complete",
+          "access_control": "checked"
+        }
+      },
+      {
+        "entry_id": "ea5c040ce581",
+        "timestamp": "2026-02-09T09:55:19.630716",
+        "event_type": "error_occurred",
+        "actor": "demo_user",
+        "operation_id": "b37bdd658f51",
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "operation_type": "dry_run",
+          "status": "failed",
+          "resources_affected": 0,
+          "cost_impact": 0.0,
+          "duration_seconds": 0.525651,
+          "error_message": null
+        },
+        "decision_reasoning": null,
+        "permissions_required": [
+          "read_only",
+          "dry_run"
+        ],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "operation_transparency": "complete",
+          "cost_transparency": 0.0,
+          "duration_transparency": 0.525651
+        }
+      },
+      {
+        "entry_id": "0e69caec86e7",
+        "timestamp": "2026-02-09T09:55:19.746659",
+        "event_type": "error_occurred",
+        "actor": "demo_user",
+        "operation_id": "5d47e8ab3ae9",
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "operation_type": "plan",
+          "status": "failed",
+          "resources_affected": 0,
+          "cost_impact": 0.0,
+          "duration_seconds": 0.114853,
+          "error_message": null
+        },
+        "decision_reasoning": null,
+        "permissions_required": [
+          "read_only",
+          "plan_only"
+        ],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "operation_transparency": "complete",
+          "cost_transparency": 0.0,
+          "duration_transparency": 0.114853
+        }
+      },
+      {
+        "entry_id": "b76302b05219",
+        "timestamp": "2026-02-09T09:55:19.748020",
+        "event_type": "decision_made",
+        "actor": "demo_user",
+        "operation_id": "decision_123456",
+        "resource_type": "unknown",
+        "resource_id": "unknown",
+        "details": {
+          "decision_type": "instance_selection",
+          "selected_option": {
+            "name": "runpod-a4000",
+            "provider": "runpod",
+            "instance_type": "A4000",
+            "gpu_type": "RTX A4000",
+            "gpu_memory": 16,
+            "cost_per_hour": 0.29,
+            "availability": 0.97,
+            "latency_ms": 35
+          },
+          "alternatives": [
+            {
+              "name": "vastai-a5000",
+              "provider": "vastai",
+              "instance_type": "A5000",
+              "gpu_type": "RTX A5000",
+              "gpu_memory": 24,
+              "cost_per_hour": 0.35,
+              "availability": 0.95,
+              "latency_ms": 45
+            },
+            {
+              "name": "aws-g4dn",
+              "provider": "aws",
+              "instance_type": "g4dn.xlarge",
+              "gpu_type": "T4",
+              "gpu_memory": 16,
+              "cost_per_hour": 0.526,
+              "availability": 0.99,
+              "latency_ms": 25
+            }
+          ],
+          "factors": [
+            {
+              "name": "cost",
+              "value": 0.4486692015209126,
+              "weight": 0.3,
+              "weighted_score": 0.13460076045627378,
+              "reason": "Cost per hour: $0.2900 (lower is better)",
+              "source": "provider_api",
+              "timestamp": "2026-02-09T09:55:19.747059"
+            },
+            {
+              "name": "performance",
+              "value": 1.0,
+              "weight": 0.25,
+              "weighted_score": 0.25,
+              "reason": "GPU memory: 16.0GB (required: 16.0GB)",
+              "source": "instance_specs",
+              "timestamp": "2026-02-09T09:55:19.747059"
+            },
+            {
+              "name": "availability",
+              "value": 0.97,
+              "weight": 0.2,
+              "weighted_score": 0.194,
+              "reason": "Availability: 97.0%",
+              "source": "provider_sla",
+              "timestamp": "2026-02-09T09:55:19.747059"
+            },
+            {
+              "name": "latency",
+              "value": 0.2222222222222222,
+              "weight": 0.15,
+              "weighted_score": 0.03333333333333333,
+              "reason": "Latency: 35.0ms (lower is better)",
+              "source": "provider_metrics",
+              "timestamp": "2026-02-09T09:55:19.747059"
+            }
+          ],
+          "alternatives_count": 2
+        },
+        "decision_reasoning": "Selected runpod-a4000 with score 0.612\nKey factors:\n  \u2022 Cost: $0.2900/hour\n  \u2022 GPU: RTX A4000\n  \u2022 Memory: 16GB\n  \u2022 Availability: 97.0%\nScore advantage: +0.072 over vastai-a5000\n\u26a0\ufe0f  Lower availability - consider backup options",
+        "permissions_required": [
+          "read_only",
+          "dry_run"
+        ],
+        "risk_assessment": {
+          "total_risk_score": 0.2,
+          "high_risk_items": []
+        },
+        "rollback_available": true,
+        "metadata": {
+          "decision_transparency": "complete",
+          "why_this_instance": "Selected runpod-a4000 with score 0.612\nKey factors:\n  \u2022 Cost: $0.2900/hour\n  \u2022 GPU: RTX A4000\n  \u2022 Memory: 16GB\n  \u2022 Availability: 97.0%\nScore advantage: +0.072 over vastai-a5000\n\u26a0\ufe0f  Lower availability - consider backup options",
+          "factors_considered": 4
+        }
+      },
+      {
+        "entry_id": "495ee8595ca2",
+        "timestamp": "2026-02-09T09:55:19.748341",
+        "event_type": "pinned_operation",
+        "actor": "demo_user",
+        "operation_id": "5d47e8ab3ae9",
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "operation_id": "5d47e8ab3ae9",
+          "pin_reason": "Critical production deployment",
+          "pinned_at": "2026-02-09T09:55:19.748310"
+        },
+        "decision_reasoning": null,
+        "permissions_required": [
+          "modify_state"
+        ],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "pin_transparency": "complete",
+          "safety_measure": "enabled"
+        }
+      },
+      {
+        "entry_id": "adda7bbdd879",
+        "timestamp": "2026-02-09T09:55:19.748464",
+        "event_type": "rollback_executed",
+        "actor": "demo_user",
+        "operation_id": "rollback_123456",
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "original_operation_id": "op_123456",
+          "rollback_operation_id": "rollback_123456",
+          "status": "simulated",
+          "resources_affected": 1,
+          "duration_seconds": 60.0
+        },
+        "decision_reasoning": null,
+        "permissions_required": [
+          "modify_state"
+        ],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "rollback_transparency": "complete",
+          "original_operation": "op_123456"
+        }
+      },
+      {
+        "entry_id": "a72b49aaa430",
+        "timestamp": "2026-02-09T09:55:19.748930",
+        "event_type": "operation_completed",
+        "actor": "system",
+        "operation_id": null,
+        "resource_type": null,
+        "resource_id": null,
+        "details": {
+          "trail_completed": true,
+          "final_status": "completed"
+        },
+        "decision_reasoning": null,
+        "permissions_required": [],
+        "risk_assessment": null,
+        "rollback_available": false,
+        "metadata": {
+          "trail_completion": true
+        }
+      }
+    ],
+    "summary": {
+      "actor": "demo_user",
+      "operation_type": "terraform_transparency",
+      "started_at": "2026-02-09T09:55:19.102361",
+      "total_operations": 3,
+      "successful_operations": 1,
+      "failed_operations": 2,
+      "rollback_operations": 1
+    },
+    "compliance_status": "non_compliant",
+    "risk_score": 0.22000000000000003
+  }
+}

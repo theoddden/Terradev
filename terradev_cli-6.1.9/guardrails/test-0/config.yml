@@ -1,0 +1,16 @@
+# NeMo Guardrails config — test-0
+# Colang 2.x syntax
+models:
+  - type: main
+    engine: openai
+    model: gpt-4
+
+rails:
+  input:
+    flows:
+      - check jailbreak
+      - mask sensitive data
+  output:
+    flows:
+      - check topical
+      - mask sensitive data on output

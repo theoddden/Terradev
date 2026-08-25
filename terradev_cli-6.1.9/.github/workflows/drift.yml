@@ -1,0 +1,79 @@
+name: Provider API Drift
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Daily at 06:00 UTC
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Terradev CLI
+        run: pip install ".[aws,gcp]"
+
+      - name: Run canary drift checks
+        env:
+          TERRADEV_SKIP_ONBOARDING: "1"
+          TERRADEV_AWS_ACCESS_KEY_ID: ${{ secrets.TERRADEV_AWS_ACCESS_KEY_ID }}
+          TERRADEV_AWS_SECRET_ACCESS_KEY: ${{ secrets.TERRADEV_AWS_SECRET_ACCESS_KEY }}
+          TERRADEV_AWS_SESSION_TOKEN: ${{ secrets.TERRADEV_AWS_SESSION_TOKEN }}
+          TERRADEV_AWS_REGION: ${{ secrets.TERRADEV_AWS_REGION }}
+          TERRADEV_GCP_CREDENTIALS: ${{ secrets.TERRADEV_GCP_CREDENTIALS }}
+          TERRADEV_OCI_TENANCY: ${{ secrets.TERRADEV_OCI_TENANCY }}
+          TERRADEV_OCI_USER: ${{ secrets.TERRADEV_OCI_USER }}
+          TERRADEV_OCI_FINGERPRINT: ${{ secrets.TERRADEV_OCI_FINGERPRINT }}
+          TERRADEV_OCI_REGION: ${{ secrets.TERRADEV_OCI_REGION }}
+          TERRADEV_OCI_PRIVATE_KEY: ${{ secrets.TERRADEV_OCI_PRIVATE_KEY }}
+          TERRADEV_INFERX_API_KEY: ${{ secrets.TERRADEV_INFERX_API_KEY }}
+          TERRADEV_BASENTEN_KEY: ${{ secrets.TERRADEV_BASENTEN_KEY }}
+          TERRADEV_BASENTEN_API_KEY: ${{ secrets.TERRADEV_BASENTEN_API_KEY }}
+          TERRADEV_BASETEN_KEY: ${{ secrets.TERRADEV_BASETEN_KEY }}
+          TERRADEV_BASETEN_API_KEY: ${{ secrets.TERRADEV_BASETEN_API_KEY }}
+          TERRADEV_DIGITALOCEAN_KEY: ${{ secrets.TERRADEV_DIGITALOCEAN_KEY }}
+          TERRADEV_DIGITALOCEAN_API_KEY: ${{ secrets.TERRADEV_DIGITALOCEAN_API_KEY }}
+          TERRADEV_E2ENETWORKS_KEY: ${{ secrets.TERRADEV_E2ENETWORKS_KEY }}
+          TERRADEV_E2ENETWORKS_API_KEY: ${{ secrets.TERRADEV_E2ENETWORKS_API_KEY }}
+          TERRADEV_E2ENETWORKS_BEARER_TOKEN: ${{ secrets.TERRADEV_E2ENETWORKS_BEARER_TOKEN }}
+          TERRADEV_E2ENETWORKS_AUTH_TOKEN: ${{ secrets.TERRADEV_E2ENETWORKS_AUTH_TOKEN }}
+          TERRADEV_E2ENETWORKS_TOKEN: ${{ secrets.TERRADEV_E2ENETWORKS_TOKEN }}
+          TERRADEV_E2ENETWORKS_PROJECT_ID: ${{ secrets.TERRADEV_E2ENETWORKS_PROJECT_ID }}
+          TERRADEV_E2ENETWORKS_LOCATION: ${{ secrets.TERRADEV_E2ENETWORKS_LOCATION }}
+          TERRADEV_HYPERSTACK_KEY: ${{ secrets.TERRADEV_HYPERSTACK_KEY }}
+          TERRADEV_HYPERSTACK_API_KEY: ${{ secrets.TERRADEV_HYPERSTACK_API_KEY }}
+          TERRADEV_LATITUDE_KEY: ${{ secrets.TERRADEV_LATITUDE_KEY }}
+          TERRADEV_LATITUDE_API_KEY: ${{ secrets.TERRADEV_LATITUDE_API_KEY }}
+          TERRADEV_RUNPOD_KEY: ${{ secrets.TERRADEV_RUNPOD_KEY }}
+          TERRADEV_RUNPOD_API_KEY: ${{ secrets.TERRADEV_RUNPOD_API_KEY }}
+          TERRADEV_SILICONFLOW_KEY: ${{ secrets.TERRADEV_SILICONFLOW_KEY }}
+          TERRADEV_SILICONFLOW_API_KEY: ${{ secrets.TERRADEV_SILICONFLOW_API_KEY }}
+          TERRADEV_VASTAI_KEY: ${{ secrets.TERRADEV_VASTAI_KEY }}
+          TERRADEV_VASTAI_API_KEY: ${{ secrets.TERRADEV_VASTAI_API_KEY }}
+          TERRADEV_YOTTALABS_KEY: ${{ secrets.TERRADEV_YOTTALABS_KEY }}
+          TERRADEV_YOTTALABS_API_KEY: ${{ secrets.TERRADEV_YOTTALABS_API_KEY }}
+        run: terradev canary drift --all --format json --timeout 60 > drift-report.json
+
+      - name: Print drift report
+        if: always()
+        run: python3 -m json.tool drift-report.json || cat drift-report.json
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report
+          path: drift-report.json

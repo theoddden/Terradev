@@ -1,0 +1,50 @@
+name: llama-3-8b-preference-pipeline
+
+checkpoint_bucket: s3://my-bucket/checkpoints
+
+defaults:
+  provider: auto
+  gpu_type: A100
+  node_count: 1
+  gpus_per_node: 1
+  spot: false
+  num_train_epochs: 1
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 4
+  learning_rate: 2.0e-4
+  warmup_ratio: 0.1
+  max_seq_length: 2048
+  lora_rank: 64
+  lora_alpha: 16
+  framework: unsloth
+  output_bucket: s3://my-bucket/checkpoints
+
+stages:
+  - name: sft-llama-3-8b
+    type: sft
+    model: meta-llama/Llama-3-8B
+    data: s3://my-bucket/sft-data.jsonl
+    framework: unsloth
+    checkpoint: s3://my-bucket/checkpoints/sft
+
+  - name: dpo-llama-3-8b
+    type: dpo
+    base_checkpoint: s3://my-bucket/checkpoints/sft
+    data: s3://my-bucket/preference-pairs.jsonl
+    framework: trl
+    algorithm: simpo
+    beta: 0.1
+    checkpoint: s3://my-bucket/checkpoints/dpo
+
+  - name: grpo-llama-3-8b
+    type: grpo
+    base_checkpoint: s3://my-bucket/checkpoints/dpo
+    data: s3://my-bucket/verifiable-prompts.jsonl
+    framework: openrlhf
+    reward_fn: verifiable
+    rollout_provider: vast
+    trainer_provider: coreweave
+    gpu_type: H100
+    gpu_count: 8
+    node_count: 2
+    checkpoint: s3://my-bucket/checkpoints/grpo

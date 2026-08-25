@@ -1,0 +1,17 @@
+[package]
+name = "terradev-resource-pool"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "terradev_resource_pool"
+crate-type = ["rlib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+parking_lot = "0.12"

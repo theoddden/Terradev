@@ -1,0 +1,27 @@
+provider: crusoe
+base_url: https://api.crusoecloud.com/v1alpha5
+auth_required: false
+last_verified: '2026-08-24'
+endpoints:
+- name: list_projects
+  method: GET
+  path: projects
+  expected_response_fields: []
+  expected_status: 200
+  enabled: false
+- name: locations
+  method: GET
+  path: locations
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+  expected_status: 200
+- name: compute_vms_types
+  method: GET
+  path: compute/vms/types
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+  expected_status: 200

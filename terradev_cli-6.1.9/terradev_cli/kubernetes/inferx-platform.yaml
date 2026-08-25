@@ -1,0 +1,619 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: inferx
+  labels:
+    name: inferx
+    platform: inferx-serverless
+---
+# InferX Runtime DaemonSet for GPU nodes
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: inferx-runtime
+  namespace: inferx
+  labels:
+    app: inferx-runtime
+    component: runtime
+spec:
+  selector:
+    matchLabels:
+      app: inferx-runtime
+  template:
+    metadata:
+      labels:
+        app: inferx-runtime
+        component: runtime
+    spec:
+      hostPID: true
+      hostNetwork: true
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: inferx.io/node
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu: "present"
+        inferx.io/enabled: "true"
+      containers:
+        - name: inferx-runtime
+          image: inferx/runtime:v0.1.0
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN", "SYS_RESOURCE"]
+          env:
+            - name: INFERX_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: INFERX_GPU_DEVICES
+              value: "/dev/nvidia0,/dev/nvidia1,/dev/nvidia2,/dev/nvidia3"
+            - name: INFERX_SNAPSHOT_ENABLED
+              value: "true"
+            - name: INFERX_GPU_SLICING
+              value: "true"
+            - name: INFERX_MULTI_TENANT
+              value: "true"
+          volumeMounts:
+            - name: inferx-bin
+              mountPath: /opt/inferx
+              readOnly: true
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+            - name: gpu-devices
+              mountPath: /dev/nvidia0
+            - name: gpu-devices-1
+              mountPath: /dev/nvidia1
+            - name: gpu-devices-2
+              mountPath: /dev/nvidia2
+            - name: gpu-devices-3
+              mountPath: /dev/nvidia3
+            - name: sys-fs
+              mountPath: /sys/fs
+            - name: lib-modules
+              mountPath: /lib/modules
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+              nvidia.com/gpu: "1"
+          livenessProbe:
+            exec:
+              command:
+                - /opt/inferx/bin/health-check
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - /opt/inferx/bin/ready-check
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: inferx-bin
+          hostPath:
+            path: /opt/inferx
+            type: Directory
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+        - name: gpu-devices
+          hostPath:
+            path: /dev/nvidia0
+            type: CharDevice
+        - name: gpu-devices-1
+          hostPath:
+            path: /dev/nvidia1
+            type: CharDevice
+        - name: gpu-devices-2
+          hostPath:
+            path: /dev/nvidia2
+            type: CharDevice
+        - name: gpu-devices-3
+          hostPath:
+            path: /dev/nvidia3
+            type: CharDevice
+        - name: sys-fs
+          hostPath:
+            path: /sys/fs
+            type: Directory
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+            type: Directory
+---
+# InferX Platform Services
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inferx-platform
+  namespace: inferx
+  labels:
+    app: inferx-platform
+    component: platform
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: inferx-platform
+  template:
+    metadata:
+      labels:
+        app: inferx-platform
+        component: platform
+    spec:
+      containers:
+        - name: api-gateway
+          image: inferx/inferx_one:v0.1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 8443
+              name: https
+          env:
+            - name: INFERX_COMPONENT
+              value: "gateway"
+            - name: ETCD_ENDPOINTS
+              value: "etcd:2379"
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: inferx-secrets
+                  key: postgres-url
+            - name: BLOBSTORE_ENDPOINT
+              value: "spdk-blobstore:9000"
+            - name: REDIS_ENDPOINT
+              value: "redis:6379"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: METRICS_ENABLED
+              value: "true"
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+        - name: scheduler
+          image: inferx/inferx_one:v0.1.0
+          imagePullPolicy: Always
+          command: ["inferx-scheduler"]
+          ports:
+            - containerPort: 8081
+              name: scheduler
+          env:
+            - name: INFERX_COMPONENT
+              value: "scheduler"
+            - name: ETCD_ENDPOINTS
+              value: "etcd:2379"
+            - name: BLOBSTORE_ENDPOINT
+              value: "spdk-blobstore:9000"
+            - name: GPU_NODES_COUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.capacity.nvidia.com/gpu
+            - name: MAX_MODELS_PER_GPU
+              value: "30"
+            - name: COLD_START_TIMEOUT
+              value: "5"
+            - name: GPU_UTILIZATION_TARGET
+              value: "90"
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+---
+# SPDK BlobStore for High-Performance Snapshot Storage
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: spdk-blobstore
+  namespace: inferx
+  labels:
+    app: spdk-blobstore
+    component: storage
+spec:
+  serviceName: spdk-blobstore
+  replicas: 3
+  selector:
+    matchLabels:
+      app: spdk-blobstore
+  template:
+    metadata:
+      labels:
+        app: spdk-blobstore
+        component: storage
+    spec:
+      containers:
+        - name: spdk
+          image: inferx/spdk-container:v0.1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9000
+              name: blobstore
+            - containerPort: 9001
+              name: metrics
+          env:
+            - name: SPDK_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: SPDK_STORAGE_PATH
+              value: "/data/spdk"
+            - name: SPDK_RPC_SOCKET
+              value: "/var/run/spdk.sock"
+            - name: SPDK_LOG_LEVEL
+              value: "info"
+          volumeMounts:
+            - name: blob-storage
+              mountPath: /data
+            - name: spdk-socket
+              mountPath: /var/run
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+          securityContext:
+            capabilities:
+              add: ["IPC_LOCK", "SYS_RESOURCE"]
+  volumeClaimTemplates:
+    - metadata:
+        name: blob-storage
+        labels:
+          app: spdk-blobstore
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "inferx-blobstore"
+        resources:
+          requests:
+            storage: 500Gi
+---
+# Redis for Caching
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: inferx
+  labels:
+    app: redis
+    component: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        component: cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: "0.5"
+              memory: "1Gi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+---
+# PostgreSQL for Metadata
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: inferx
+  labels:
+    app: postgres
+    component: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        component: database
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:14-alpine
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              value: "inferx"
+            - name: POSTGRES_USER
+              value: "inferx"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: inferx-secrets
+                  key: postgres-password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+# etcd for Configuration
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: etcd
+  namespace: inferx
+  labels:
+    app: etcd
+    component: config
+spec:
+  serviceName: etcd
+  replicas: 3
+  selector:
+    matchLabels:
+      app: etcd
+  template:
+    metadata:
+      labels:
+        app: etcd
+        component: config
+    spec:
+      containers:
+        - name: etcd
+          image: quay.io/coreos/etcd:v3.5.13
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 2379
+              name: client
+            - containerPort: 2380
+              name: peer
+          env:
+            - name: ETCD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: ETCD_DATA_DIR
+              value: /etcd-data
+            - name: ETCD_LISTEN_CLIENT_URLS
+              value: "http://0.0.0.0:2379"
+            - name: ETCD_LISTEN_PEER_URLS
+              value: "http://0.0.0.0:2380"
+            - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
+              value: "http://$(ETCD_NAME).etcd:2380"
+            - name: ETCD_INITIAL_CLUSTER
+              value: "etcd-0=http://etcd-0.etcd:2380,etcd-1=http://etcd-1.etcd:2380,etcd-2=http://etcd-2.etcd:2380"
+            - name: ETCD_INITIAL_CLUSTER_STATE
+              value: "new"
+            - name: ETCD_INITIAL_CLUSTER_TOKEN
+              value: "inferx-etcd-cluster"
+          volumeMounts:
+            - name: etcd-data
+              mountPath: /etcd-data
+  volumeClaimTemplates:
+    - metadata:
+        name: etcd-data
+        labels:
+          app: etcd
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "inferx-etcd"
+        resources:
+          requests:
+            storage: 100Gi
+---
+# Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: inferx-gateway
+  namespace: inferx
+  labels:
+    app: inferx-platform
+    component: gateway
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 8080
+      name: http
+    - port: 443
+      targetPort: 8443
+      name: https
+  selector:
+    app: inferx-platform
+    component: gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inferx-scheduler
+  namespace: inferx
+  labels:
+    app: inferx-platform
+    component: scheduler
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8081
+      targetPort: 8081
+      name: scheduler
+  selector:
+    app: inferx-platform
+    component: scheduler
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spdk-blobstore
+  namespace: inferx
+  labels:
+    app: spdk-blobstore
+    component: storage
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9000
+      targetPort: 9000
+      name: blobstore
+    - port: 9001
+      targetPort: 9001
+      name: metrics
+  selector:
+    app: spdk-blobstore
+    component: storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: inferx
+  labels:
+    app: redis
+    component: cache
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis
+  selector:
+    app: redis
+    component: cache
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: inferx
+  labels:
+    app: postgres
+    component: database
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  selector:
+    app: postgres
+    component: database
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd
+  namespace: inferx
+  labels:
+    app: etcd
+    component: config
+spec:
+  type: ClusterIP
+  ports:
+    - port: 2379
+      targetPort: 2379
+      name: client
+    - port: 2380
+      targetPort: 2380
+      name: peer
+  selector:
+    app: etcd
+    component: config
+---
+# Persistent Volume Claims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: inferx
+  labels:
+    app: redis
+    component: cache
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: "inferx-cache"
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: inferx
+  labels:
+    app: postgres
+    component: database
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: "inferx-database"
+  resources:
+    requests:
+      storage: 200Gi
+---
+# Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: inferx-secrets
+  namespace: inferx
+type: Opaque
+data:
+  postgres-url: cG9zdGdyZXNxbDppbmZlcng6cGFzc3dvcmRAcG9zdGdyZXM6NTQzMg== # postgres:inferx:password@postgres:5432
+  postgres-password: cGFzc3dvcmQ= # password
+  jwt-secret: c3VwZXItc2VjcmV0LWp3dC1rZXk= # super-secret-jwt-key
+  api-key: c3VwZXItc2VjcmV0LWFwaS1rZXk= # super-secret-api-key

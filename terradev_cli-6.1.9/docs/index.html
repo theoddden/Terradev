@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terradev CLI - Cross-Cloud GPU Orchestration</title>
+    <meta name="description" content="BYOAPI: Cross-cloud GPU provisioning, distributed training, and inference orchestration. 21+ cloud providers, Python MCP server for Claude Code, NUMA topology optimization, MoE templates, disaggregated inference.">
+    <meta name="keywords" content="GPU, cloud computing, cost optimization, multi-cloud, machine learning, distributed training, MCP server, Claude Code, vLLM, MoE, disaggregated inference, NUMA topology, torchrun, deepspeed, AWS, GCP, Azure, RunPod, H100, A100, FlashOptim, Qdrant, RAG, LoRA">
+    <meta name="author" content="Terradev Team">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Terradev CLI - Cross-Cloud GPU Orchestration">
+    <meta property="og:description" content="BYOAPI: 21+ cloud providers, NUMA topology, MoE templates, disaggregated inference, FlashOptim auto-injection, MCP server for Claude Code.">
+    <meta property="og:url" content="https://theoddden.github.io/Terradev/">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Terradev CLI - Cross-Cloud GPU Orchestration">
+    <meta name="twitter:description" content="BYOAPI: 21+ cloud providers, MCP server for Claude, 217 tools.">
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://github.com/theoddden/Terradev">
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        h1 {
+            font-size: 2.8em;
+            margin-bottom: 8px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        h2 {
+            font-size: 1.4em;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+        h3 {
+            font-size: 1.05em;
+            margin-top: 24px;
+            margin-bottom: 10px;
+            color: #63cab7;
+        }
+        .version-badge {
+            display: inline-block;
+            background: rgba(99, 202, 183, 0.2);
+            border: 1px solid rgba(99, 202, 183, 0.5);
+            color: #63cab7;
+            font-size: 0.85em;
+            font-weight: 600;
+            padding: 3px 12px;
+            border-radius: 20px;
+            margin-bottom: 16px;
+        }
+        .subtitle {
+            font-size: 1.15em;
+            margin-bottom: 30px;
+            opacity: 0.85;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 16px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        .feature {
+            background: rgba(255, 255, 255, 0.07);
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            transition: border-color 0.2s;
+        }
+        .feature:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        .feature h3 {
+            margin: 0 0 8px 0;
+            color: #fff;
+            font-size: 0.95em;
+        }
+        .feature p {
+            margin: 0;
+            font-size: 0.82em;
+            opacity: 0.75;
+            line-height: 1.4;
+        }
+        .btn {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.12);
+            color: white;
+            padding: 13px 28px;
+            text-decoration: none;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            font-weight: 600;
+            font-size: 0.9em;
+            margin: 8px 6px;
+            transition: all 0.2s ease;
+        }
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.22);
+            transform: translateY(-2px);
+        }
+        .btn-primary {
+            background: rgba(99, 202, 183, 0.2);
+            border-color: rgba(99, 202, 183, 0.5);
+        }
+        .btn-primary:hover {
+            background: rgba(99, 202, 183, 0.35);
+        }
+        .logo {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 16px;
+            background: rgba(99, 202, 183, 0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            font-weight: bold;
+            border: 1px solid rgba(99, 202, 183, 0.3);
+        }
+        .stat-row {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-num {
+            font-size: 1.6em;
+            font-weight: 800;
+            color: #63cab7;
+        }
+        .stat-label {
+            font-size: 0.75em;
+            opacity: 0.65;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Tabs */
+        .tab-bar {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 24px 0 20px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 24px;
+            border-radius: 24px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
+        }
+        .tab-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .tab-btn.active {
+            background: rgba(99, 202, 183, 0.25);
+            border-color: rgba(99, 202, 183, 0.6);
+            color: #fff;
+        }
+        .tab-content {
+            display: none;
+            text-align: left;
+            max-width: 760px;
+            margin: 0 auto;
+            animation: fadeIn 0.25s ease;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Code blocks */
+        pre {
+            background: rgba(0, 0, 0, 0.35);
+            padding: 16px;
+            border-radius: 12px;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            margin: 12px 0 18px;
+        }
+        code {
+            font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.9em;
+            color: #e8e8e8;
+        }
+        p code, li code {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.72em;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .copy-btn:hover {
+            background: rgba(99, 202, 183, 0.3);
+            border-color: rgba(99, 202, 183, 0.5);
+        }
+        .copy-btn.copied {
+            background: rgba(99, 202, 183, 0.4);
+            border-color: rgba(99, 202, 183, 0.7);
+        }
+
+        .info-box {
+            background: rgba(99, 202, 183, 0.08);
+            border: 1px solid rgba(99, 202, 183, 0.25);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+        .info-box p {
+            margin: 0;
+            opacity: 0.85;
+            font-size: 0.92em;
+        }
+        .links {
+            margin-top: 24px;
+            text-align: center;
+        }
+        .footer {
+            margin-top: 30px;
+            opacity: 0.6;
+            font-size: 0.85em;
+            text-align: center;
+        }
+        .footer a {
+            color: #63cab7;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        ul {
+            padding-left: 20px;
+            opacity: 0.9;
+        }
+        li {
+            margin: 6px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">⚡</div>
+        <h1>Terradev CLI</h1>
+        <div class="version-badge">v5.7.12</div>
+        <div class="subtitle">Cross-Cloud GPU Provisioning · Training · Inference Orchestration</div>
+
+        <div class="stat-row">
+            <div class="stat">
+                <div class="stat-num">21+</div>
+                <div class="stat-label">Cloud Providers</div>
+            </div>
+            <div class="stat">
+                <div class="stat-num">217</div>
+                <div class="stat-label">MCP Tools</div>
+            </div>
+            <div class="stat">
+                <div class="stat-num">90%</div>
+                <div class="stat-label">Max Cost Savings</div>
+            </div>
+            <div class="stat">
+                <div class="stat-num">9x</div>
+                <div class="stat-label">vLLM Throughput</div>
+            </div>
+        </div>
+
+        <div class="tab-bar" role="tablist" aria-label="Terradev CLI tabs">
+            <button class="tab-btn active" role="tab" aria-selected="true" data-tab="overview">Overview</button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="install">Install</button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="mcp">MCP</button>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview" class="tab-content active" role="tabpanel">
+            <div class="features">
+                <div class="feature">
+                    <h3>💰 Price Arbitrage</h3>
+                    <p>21+ providers, real-time spot pricing, up to 90% savings vs on-demand</p>
+                </div>
+                <div class="feature">
+                    <h3>🔬 NUMA Topology</h3>
+                    <p>Auto-aligned GPU/NIC, GPUDirect RDMA, SR-IOV — eliminates 30-50% BW penalty</p>
+                </div>
+                <div class="feature">
+                    <h3>🏋️ Training Pipeline</h3>
+                    <p>torchrun · DeepSpeed · Accelerate · Megatron + FlashOptim auto-injection</p>
+                </div>
+                <div class="feature">
+                    <h3>🧠 MoE Templates</h3>
+                    <p>KV cache offloading, speculative decoding, sleep mode — all auto-applied</p>
+                </div>
+                <div class="feature">
+                    <h3>⚡ Disaggregated Inference</h3>
+                    <p>Prefill/decode separation via NIXL + sticky routing for MoE at scale</p>
+                </div>
+                <div class="feature">
+                    <h3>🤖 MCP Server</h3>
+                    <p>217 tools for Claude Code, stdio transport, one-command install via PyPI or the MCP Registry</p>
+                </div>
+                <div class="feature">
+                    <h3>🗄️ RAG Stack</h3>
+                    <p>Qdrant vector DB, NeMo Guardrails, Arize Phoenix tracing — deploy in one command</p>
+                </div>
+                <div class="feature">
+                    <h3>☸️ K8s GPU Clusters</h3>
+                    <p>Karpenter NodePools, GPU operator, MIG, time-slicing</p>
+                </div>
+            </div>
+
+            <div class="links">
+                <a href="https://github.com/theoddden/Terradev" class="btn btn-primary">📦 GitHub</a>
+                <a href="https://pypi.org/project/terradev-cli/" class="btn">🐍 PyPI</a>
+                <a href="https://registry.modelcontextprotocol.io" class="btn">📡 MCP Registry</a>
+            </div>
+        </div>
+
+        <!-- Install Tab -->
+        <div id="install" class="tab-content" role="tabpanel">
+            <h2>Install Terradev CLI</h2>
+            <p>You can install with <code>pip</code> or run it on-demand with <code>uvx</code>.</p>
+
+            <h3>pip</h3>
+            <pre><code>pip install terradev-cli</code><button class="copy-btn" aria-label="Copy">Copy</button></pre>
+
+            <h3>uvx (no install)</h3>
+            <pre><code>uvx terradev-cli --help</code><button class="copy-btn" aria-label="Copy">Copy</button></pre>
+
+            <div class="info-box">
+                <p><strong>Note:</strong> provider-specific extras are available: <code>pip install "terradev-cli[aws,gcp,azure]"</code>.</p>
+            </div>
+
+            <div class="links">
+                <a href="https://pypi.org/project/terradev-cli/" class="btn">🐍 PyPI</a>
+                <a href="https://github.com/theoddden/Terradev" class="btn btn-primary">📦 GitHub</a>
+            </div>
+        </div>
+
+        <!-- MCP Tab -->
+        <div id="mcp" class="tab-content" role="tabpanel">
+            <h2>Connect the MCP Server</h2>
+            <p>Terradev publishes an <a href="https://modelcontextprotocol.io/" style="color: #63cab7;">MCP</a> server to the <a href="https://registry.modelcontextprotocol.io" style="color: #63cab7;">official MCP Registry</a> as <code>io.github.theoddden/terradev</code>. It exposes 217+ tools for GPU provisioning, training, and inference right inside Claude.</p>
+
+            <h3>1. Claude Code (CLI)</h3>
+            <p>Quickest way to connect inside a project:</p>
+            <pre><code>claude mcp add terradev uvx terradev-cli mcp serve</code><button class="copy-btn" aria-label="Copy">Copy</button></pre>
+
+            <h3>2. Claude Desktop</h3>
+            <p>Add this entry to <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (macOS) or the equivalent on your OS:</p>
+            <pre><code class="language-json">{
+  "mcpServers": {
+    "terradev": {
+      "command": "uvx",
+      "args": ["terradev-cli", "mcp", "serve"],
+      "env": {
+        "TERRADEV_API_KEY": "your-api-key",
+        "TERRADEV_PROVIDER": "aws"
+      }
+    }
+  }
+}</code><button class="copy-btn" aria-label="Copy">Copy</button></pre>
+
+            <h3>3. Via the MCP Registry</h3>
+            <p>View or install the server from the official registry:</p>
+            <pre><code>https://registry.modelcontextprotocol.io</code><button class="copy-btn" aria-label="Copy">Copy</button></pre>
+
+            <h3>4. Local / Manual (pip)</h3>
+            <pre><code>pip install terradev-cli
+terradev mcp serve</code><button class="copy-btn" aria-label="Copy">Copy</button></pre>
+
+            <h3>Optional environment variables</h3>
+            <ul>
+                <li><code>TERRADEV_API_KEY</code> — API key for GPU cloud providers</li>
+                <li><code>TERRADEV_CREDENTIALS_FILE</code> — path to a credentials file</li>
+                <li><code>TERRADEV_PROVIDER</code> — default provider, e.g. <code>aws</code>, <code>gcp</code>, <code>azure</code>, <code>runpod</code></li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>Tip:</strong> For the easiest, no-install setup, use <code>uvx terradev-cli mcp serve</code> with Claude Code or Claude Desktop.</p>
+            </div>
+
+            <div class="links">
+                <a href="https://registry.modelcontextprotocol.io" class="btn btn-primary">📡 MCP Registry</a>
+                <a href="https://pypi.org/project/terradev-cli/" class="btn">🐍 PyPI</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>🔗 <a href="https://github.com/theoddden/Terradev">github.com/theoddden/Terradev</a></p>
+            <p>📄 <a href="https://github.com/theoddden/Terradev?tab=License-1-ov-file">Apache 2.0 License</a></p>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-selected', 'false');
+                });
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                btn.setAttribute('aria-selected', 'true');
+                document.getElementById(btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Copy buttons
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const code = btn.parentElement.querySelector('code');
+                const text = code ? code.textContent : '';
+                if (text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        btn.textContent = 'Copied';
+                        btn.classList.add('copied');
+                        setTimeout(() => {
+                            btn.textContent = 'Copy';
+                            btn.classList.remove('copied');
+                        }, 1500);
+                    }).catch(() => {
+                        // Fallback for browsers that block clipboard
+                        const range = document.createRange();
+                        const selection = window.getSelection();
+                        range.selectNodeContents(code);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        try {
+                            document.execCommand('copy');
+                            btn.textContent = 'Copied';
+                            btn.classList.add('copied');
+                            setTimeout(() => {
+                                btn.textContent = 'Copy';
+                                btn.classList.remove('copied');
+                            }, 1500);
+                        } catch (e) {}
+                        selection.removeAllRanges();
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

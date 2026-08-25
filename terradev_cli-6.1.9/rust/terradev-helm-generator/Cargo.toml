@@ -1,0 +1,16 @@
+[package]
+name = "terradev-helm-generator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "terradev_helm_generator"
+crate-type = ["rlib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tera = { workspace = true }
+serde_yaml = "0.9"

@@ -1,0 +1,14 @@
+# Pod Disruption Budget — ensure at least 1 GLM-5 replica is always running
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: glm5-pdb
+  namespace: glm-5-inference
+  labels:
+    app.kubernetes.io/name: glm-5
+    app.kubernetes.io/managed-by: terradev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: glm-5

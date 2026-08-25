@@ -1,0 +1,20 @@
+[package]
+name = "terradev-dag-executor"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "terradev_dag_executor"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+petgraph = { workspace = true }
+tokio = { workspace = true }
+crossbeam = { workspace = true }
+parking_lot = { workspace = true }
+uuid = { workspace = true }
+num_cpus = { workspace = true }

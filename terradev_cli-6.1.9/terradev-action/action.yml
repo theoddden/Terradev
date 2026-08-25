@@ -1,0 +1,174 @@
+name: "Terradev GPU Provision"
+description: "Provision GPU instances across 10 cloud providers with cost-optimized arbitrage"
+author: "theoddden"
+
+branding:
+  icon: "zap"
+  color: "purple"
+
+inputs:
+  command:
+    description: "Terradev command to run (quote, provision, run, status, manage, optimize)"
+    required: false
+    default: "provision"
+  gpu-type:
+    description: "GPU type (A100, H100, RTX4090, etc.)"
+    required: false
+  count:
+    description: "Number of instances to provision"
+    required: false
+    default: "1"
+  max-price:
+    description: "Maximum price per hour"
+    required: false
+  providers:
+    description: "Comma-separated list of providers (runpod,vastai,aws,gcp,azure,lambda,coreweave,tensordock,oracle)"
+    required: false
+  parallel:
+    description: "Max parallel deploy threads"
+    required: false
+    default: "6"
+  dry-run:
+    description: "Show allocation plan without launching"
+    required: false
+    default: "false"
+  image:
+    description: "Docker image for 'run' command"
+    required: false
+  run-command:
+    description: "Command to execute inside container (for 'run' command)"
+    required: false
+  keep-alive:
+    description: "Keep instance running after command completes (for 'run' command)"
+    required: false
+    default: "false"
+  extra-args:
+    description: "Additional CLI arguments to pass"
+    required: false
+  terradev-version:
+    description: "Version of terradev-cli to install"
+    required: false
+    default: "latest"
+
+outputs:
+  instance-id:
+    description: "Provisioned instance ID(s)"
+    value: ${{ steps.terradev.outputs.instance_id }}
+  provider:
+    description: "Provider used"
+    value: ${{ steps.terradev.outputs.provider }}
+  price:
+    description: "Hourly price"
+    value: ${{ steps.terradev.outputs.price }}
+  output:
+    description: "Full CLI output"
+    value: ${{ steps.terradev.outputs.output }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install terradev-cli
+      shell: bash
+      run: |
+        if [ "${{ inputs.terradev-version }}" = "latest" ]; then
+          pip install terradev-cli
+        else
+          pip install terradev-cli==${{ inputs.terradev-version }}
+        fi
+
+    - name: Configure credentials
+      shell: bash
+      run: |
+        mkdir -p ~/.terradev
+        # Build credentials from environment variables
+        python3 -c "
+        import json, os
+        creds = {}
+        env_map = {
+            'TERRADEV_RUNPOD_KEY': ('runpod', 'api_key'),
+            'TERRADEV_VASTAI_KEY': ('vastai', 'api_key'),
+            'TERRADEV_AWS_ACCESS_KEY': ('aws', 'access_key_id'),
+            'TERRADEV_AWS_SECRET_KEY': ('aws', 'secret_access_key'),
+            'TERRADEV_AWS_REGION': ('aws', 'region'),
+            'TERRADEV_GCP_PROJECT': ('gcp', 'project_id'),
+            'TERRADEV_GCP_CREDENTIALS': ('gcp', 'credentials_json'),
+            'TERRADEV_AZURE_SUBSCRIPTION': ('azure', 'subscription_id'),
+            'TERRADEV_AZURE_TENANT': ('azure', 'tenant_id'),
+            'TERRADEV_AZURE_CLIENT_ID': ('azure', 'client_id'),
+            'TERRADEV_AZURE_CLIENT_SECRET': ('azure', 'client_secret'),
+            'TERRADEV_TENSORDOCK_KEY': ('tensordock', 'api_key'),
+            'TERRADEV_TENSORDOCK_SECRET': ('tensordock', 'api_secret'),
+            'TERRADEV_LAMBDA_KEY': ('lambda', 'api_key'),
+            'TERRADEV_COREWEAVE_KEY': ('coreweave', 'api_key'),
+            'TERRADEV_ORACLE_TENANCY': ('oracle', 'tenancy_ocid'),
+            'TERRADEV_ORACLE_USER': ('oracle', 'user_ocid'),
+            'TERRADEV_ORACLE_KEY': ('oracle', 'api_key'),
+            'TERRADEV_BASETEN_KEY': ('baseten', 'api_key'),
+        }
+        for env_var, (provider, field) in env_map.items():
+            val = os.environ.get(env_var, '')
+            if val:
+                if provider not in creds:
+                    creds[provider] = {}
+                creds[provider][field] = val
+        with open(os.path.expanduser('~/.terradev/credentials.json'), 'w') as f:
+            json.dump(creds, f)
+        print(f'Configured {len(creds)} provider(s): {list(creds.keys())}')
+        "
+
+    - name: Run terradev
+      id: terradev
+      shell: bash
+      run: |
+        CMD="${{ inputs.command }}"
+        ARGS=""
+
+        # Build argument string based on command
+        if [ "$CMD" = "provision" ] || [ "$CMD" = "quote" ]; then
+          [ -n "${{ inputs.gpu-type }}" ] && ARGS="$ARGS -g ${{ inputs.gpu-type }}"
+          [ -n "${{ inputs.count }}" ] && [ "${{ inputs.count }}" != "1" ] && ARGS="$ARGS -n ${{ inputs.count }}"
+          [ -n "${{ inputs.max-price }}" ] && ARGS="$ARGS --max-price ${{ inputs.max-price }}"
+          [ -n "${{ inputs.parallel }}" ] && ARGS="$ARGS --parallel ${{ inputs.parallel }}"
+          [ "${{ inputs.dry-run }}" = "true" ] && ARGS="$ARGS --dry-run"
+        fi
+
+        if [ "$CMD" = "run" ]; then
+          [ -n "${{ inputs.gpu-type }}" ] && ARGS="$ARGS --gpu ${{ inputs.gpu-type }}"
+          [ -n "${{ inputs.image }}" ] && ARGS="$ARGS --image ${{ inputs.image }}"
+          [ -n "${{ inputs.run-command }}" ] && ARGS="$ARGS -c '${{ inputs.run-command }}'"
+          [ "${{ inputs.keep-alive }}" = "true" ] && ARGS="$ARGS --keep-alive"
+          [ -n "${{ inputs.max-price }}" ] && ARGS="$ARGS --max-price ${{ inputs.max-price }}"
+          [ "${{ inputs.dry-run }}" = "true" ] && ARGS="$ARGS --dry-run"
+        fi
+
+        # Add provider filter
+        if [ -n "${{ inputs.providers }}" ]; then
+          IFS=',' read -ra PROVS <<< "${{ inputs.providers }}"
+          for p in "${PROVS[@]}"; do
+            ARGS="$ARGS --providers $p"
+          done
+        fi
+
+        # Add extra args
+        [ -n "${{ inputs.extra-args }}" ] && ARGS="$ARGS ${{ inputs.extra-args }}"
+
+        echo "Running: terradev $CMD $ARGS"
+        OUTPUT=$(terradev $CMD $ARGS 2>&1) || true
+        echo "$OUTPUT"
+
+        # Parse outputs
+        echo "output<<EOF" >> $GITHUB_OUTPUT
+        echo "$OUTPUT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+        # Extract instance ID if present
+        INSTANCE_ID=$(echo "$OUTPUT" | grep -oP '(?<=Instance: )\S+' | head -1 || true)
+        echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+        # Extract provider if present
+        PROVIDER=$(echo "$OUTPUT" | grep -oP '(?<=Provider: )\S+' | head -1 || true)
+        echo "provider=$PROVIDER" >> $GITHUB_OUTPUT
+
+        # Extract price if present
+        PRICE=$(echo "$OUTPUT" | grep -oP '\$[\d.]+/hr' | head -1 || true)
+        echo "price=$PRICE" >> $GITHUB_OUTPUT

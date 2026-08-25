@@ -1,0 +1,404 @@
+# InferX Storage Classes
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: inferx-blobstore
+  labels:
+    platform: inferx
+    component: blobstore
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  iops: "16000"
+  throughput: "1000"
+  fsType: ext4
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Retain
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: inferx-cache
+  labels:
+    platform: inferx
+    component: cache
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  fsType: ext4
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: inferx-database
+  labels:
+    platform: inferx
+    component: database
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: io2
+  iops: "10000"
+  throughput: "500"
+  fsType: ext4
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Retain
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: inferx-etcd
+  labels:
+    platform: inferx
+    component: config
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  fsType: ext4
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Retain
+---
+# GPU Node Pool Configuration
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: inferx-gpu-pool
+  labels:
+    platform: inferx
+    component: gpu-nodes
+spec:
+  template:
+    metadata:
+      labels:
+        inferx.io/gpu-pool: "true"
+        nvidia.com/gpu: "present"
+        inferx.io/enabled: "true"
+    spec:
+      nodeClassRef:
+        name: inferx-gpu-class
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+        - key: inferx.io/node
+          value: "true"
+          effect: NoSchedule
+      startupTaints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+        - key: inferx.io/node
+          value: "true"
+          effect: NoSchedule
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["g", "p"]
+        - key: karpenter.k8s.aws/capacity-type
+      operator: In
+      values: ["spot", "on-demand"]
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: ["p4d", "p3", "g5", "g4dn"]
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    consolidateAfter: 30s
+    budgets:
+      - nodes: "10%"
+---
+apiVersion: karpenter.k8s.aws/v1beta1
+kind: EC2NodeClass
+metadata:
+  name: inferx-gpu-class
+  labels:
+    platform: inferx
+    component: gpu-nodes
+spec:
+  amiSelector:
+    # Use GPU-optimized AMIs
+    - name: karpenter
+      value: "gpu-optimized"
+  instanceTypes:
+    # A100 instances for high-performance inference
+    - p4d.24xlarge  # 8x A100 40GB
+    - p4de.24xlarge # 8x A100 80GB
+    # V100 instances for general inference
+    - p3.16xlarge   # 8x V100 16GB
+    - p3dn.24xlarge # 8x V100 32GB
+    # A10G instances for cost-effective inference
+    - g5.12xlarge   # 4x A10G 24GB
+    - g5.48xlarge   # 8x A10G 24GB
+    # T4 instances for lightweight inference
+    - g4dn.12xlarge # 4x T4 16GB
+    - g4dn.16xlarge # 1x T4 16GB
+  requirements:
+    - key: kubernetes.io/arch
+      operator: In
+      values: ["amd64"]
+    - key: kubernetes.io/os
+      operator: In
+      values: ["linux"]
+    - key: karpenter.k8s.aws/instance-category
+      operator: In
+      values: ["g", "p"]
+    - key: karpenter.k8s.aws/capacity-type
+      operator: In
+      values: ["spot", "on-demand"]
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 500Gi
+        volumeType: gp3
+        iops: 16000
+        throughput: 1000
+        deleteOnTermination: true
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="==MYBOUNDARY=="
+    
+    --==MYBOUNDARY==
+    Content-Type: text/x-shellscript; charset="us-ascii"
+    
+    #!/bin/bash
+    set -ex
+    
+    # Install NVIDIA drivers and container runtime
+    apt-get update
+    apt-get install -y \
+        linux-headers-$(uname -r) \
+        gcc make
+    
+    # Install NVIDIA drivers
+    wget -O /tmp/nvidia-driver.run https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+    dpkg -i /tmp/nvidia-driver.run
+    apt-get update
+    apt-get install -y cuda-toolkit-12-2 cuda-drivers
+    
+    # Install Docker
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    
+    # Configure Docker for NVIDIA
+    distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+    curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
+    curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | tee /etc/apt/sources.list.d/nvidia-docker.list
+    apt-get update && apt-get install -y nvidia-docker2
+    systemctl restart docker
+    
+    # Install InferX runtime
+    mkdir -p /opt/inferx
+    cd /opt/inferx
+    wget -O inferx.tar.gz https://github.com/inferx-net/inferx/releases/download/0.1.0/inferx.tar.gz
+    tar -xzf inferx.tar.gz
+    
+    # Configure Docker daemon for InferX
+    cat > /etc/docker/daemon.json <<EOF
+    {
+      "runtimes": {
+        "inferx": {
+          "path": "/opt/inferx/bin/inferx",
+          "runtimeArgs": []
+        }
+      },
+      "default-runtime": "inferx",
+      "exec-opts": ["native.cgroupdriver=systemd"],
+      "log-driver": "json-file",
+      "log-opts": {
+        "max-size": "100m"
+      },
+      "storage-driver": "overlay2"
+    }
+    EOF
+    
+    systemctl restart docker
+    
+    # Label node for InferX
+    kubectl label node $(hostname) inferx.io/enabled=true nvidia.com/gpu=present --overwrite
+    
+    --==MYBOUNDARY==--
+---
+# Network Policies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: inferx-network-policy
+  namespace: inferx
+  labels:
+    platform: inferx
+    component: security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: inferx
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 8081
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 2379
+        - protocol: TCP
+          port: 2380
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: inferx
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 8081
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 2379
+        - protocol: TCP
+          port: 2380
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS for external APIs
+        - protocol: TCP
+          port: 80   # HTTP for external APIs
+        - protocol: UDP
+          port: 53   # DNS
+        - protocol: TCP
+          port: 53   # DNS
+---
+# Resource Quotas
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: inferx-quota
+  namespace: inferx
+  labels:
+    platform: inferx
+    component: limits
+spec:
+  hard:
+    requests.cpu: "50"
+    requests.memory: "200Gi"
+    limits.cpu: "100"
+    limits.memory: "400Gi"
+    persistentvolumeclaims: "20"
+    services: "20"
+    secrets: "20"
+    configmaps: "20"
+    count/deployments.apps: "20"
+    count/daemonsets.apps: "10"
+    count/statefulsets.apps: "10"
+---
+# Limit Ranges
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: inferx-limits
+  namespace: inferx
+  labels:
+    platform: inferx
+    component: limits
+spec:
+  limits:
+    - default:
+        cpu: "2"
+        memory: "4Gi"
+      defaultRequest:
+        cpu: "1"
+        memory: "2Gi"
+      type: Container
+    - max:
+        cpu: "8"
+        memory: "32Gi"
+      min:
+        cpu: "0.1"
+        memory: "128Mi"
+      type: Container
+    - max:
+        storage: "1Ti"
+      min:
+        storage: "1Gi"
+      type: PersistentVolumeClaim
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inferx-platform-pdb
+  namespace: inferx
+  labels:
+    platform: inferx
+    component: availability
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: inferx-platform
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inferx-blobstore-pdb
+  namespace: inferx
+  labels:
+    platform: inferx
+    component: availability
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: spdk-blobstore
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inferx-etcd-pdb
+  namespace: inferx
+  labels:
+    platform: inferx
+    component: availability
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: etcd

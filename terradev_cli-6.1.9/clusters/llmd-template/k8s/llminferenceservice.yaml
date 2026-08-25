@@ -1,0 +1,45 @@
+apiVersion: inference.kserve.io/v1beta1
+kind: LLMInferenceService
+metadata:
+  name: llmd-model
+  namespace: default
+spec:
+  predictor:
+    model:
+      modelFormat:
+        name: vllm
+      storageUri: pvc://model-pvc
+      resources:
+        limits:
+          nvidia.com/gpu: "1"
+        requests:
+          cpu: "4"
+          memory: "16Gi"
+    args:
+      - --model=/models/weights
+      - --tensor-parallel-size=1
+      - --data-parallel-size=2
+      - --gpu-memory-utilization=0.90
+      - --max-model-len=8192
+      - --dtype=auto
+      - --trust-remote-code
+      - --served-model-name=llmd-model
+      - --host=0.0.0.0
+      - --port=8000
+      - --enable-prefix-caching
+      - --enable-chunked-prefill
+    replicas: 1
+    containerConcurrency: 128
+    timeoutSeconds: 600
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi

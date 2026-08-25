@@ -1,0 +1,35 @@
+# Persistent storage for GLM-5-FP8 model weights (~744GB)
+# Uses high-performance NVMe storage class for fast model loading
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: glm5-model-cache
+  namespace: glm-5-inference
+  labels:
+    app.kubernetes.io/name: glm-5
+    app.kubernetes.io/component: model-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Gi
+  storageClassName: nvme-ssd
+---
+# Shared memory volume for NCCL inter-GPU communication
+# Required for tensor parallelism across 8 GPUs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: glm5-shm
+  namespace: glm-5-inference
+  labels:
+    app.kubernetes.io/name: glm-5
+    app.kubernetes.io/component: shared-memory
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 32Gi
+  storageClassName: tmpfs

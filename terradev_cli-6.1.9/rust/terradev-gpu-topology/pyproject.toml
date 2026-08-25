@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "terradev-gpu-topology"
+version = "0.1.0"
+description = "Rust-backed NUMA-aware GPU topology optimizer for Terradev"
+requires-python = ">=3.9"
+
+[tool.maturin]
+module-name = "terradev_gpu_topology"
+python-packages = []
+features = ["pyo3/extension-module"]

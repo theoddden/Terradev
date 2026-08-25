@@ -1,0 +1,19 @@
+# Persistent storage for MoE model weights
+# Size should be >= model weight size in target precision
+# FP8: ~model_total_params GB (e.g. 744GB for GLM-5)
+# BF16: ~2x model_total_params GB
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: moe-model-cache
+  namespace: moe-inference
+  labels:
+    app.kubernetes.io/name: moe-inference
+    app.kubernetes.io/component: model-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Gi  # Adjust per model: 400Gi for Qwen 3.5, 750Gi for GLM-5 BF16
+  storageClassName: nvme-ssd

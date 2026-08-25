@@ -1,0 +1,1298 @@
+#!/usr/bin/env python3
+"""
+Training Job Orchestrator — Launch, manage, and recover distributed training.
+
+Design: zero external dependencies by default. Builds the right hostfile + env +
+launch command and delegates to native tools (torchrun, deepspeed, accelerate).
+Optional Ray backend behind the same interface when available.
+
+DAG structure:
+    Wave 0: preflight ∥ topology_detect               (independent)
+    Wave 1: build_launch_artifacts                     (depends on topo)
+    Wave 2: launch_training                            (depends on all)
+
+All output is structured JSON for MCP consumption.
+"""
+
+import json
+import logging
+import os
+import shlex
+import shutil
+import subprocess
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+from .dag_executor import DAGExecutor
+from .job_state_manager import JobStateManager, JobStatus
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Local spot-preemption sidecar (runs ON the instance — no SSH needed)
+# ---------------------------------------------------------------------------
+# This script is deployed to each training node and started as a background
+# process alongside the training job.  It polls the cloud metadata endpoint
+# for termination notices and sends SIGUSR1 to the training PID to trigger
+# a checkpoint save.  Works even if external network/SSH dies first.
+_SPOT_SIDECAR_SH = r"""#!/bin/bash
+# Terradev spot-preemption sidecar — auto-deployed, zero config
+TRAIN_PID="$1"
+[ -z "$TRAIN_PID" ] && exit 0
+
+# Provider metadata endpoints for spot/preemption notices
+AWS_META="http://169.254.169.254/latest/meta-data/spot/termination-time"
+GCP_META="http://metadata.google.internal/computeMetadata/v1/instance/preempted"
+AZURE_META="http://169.254.169.254/metadata/scheduledevents?api-version=2020-07-01"
+
+check_preemption() {
+    # AWS — returns termination time (HTTP 200) when preempted, 404 otherwise
+    if curl -sf -m 2 -H "Metadata: true" "$AWS_META" >/dev/null 2>&1; then
+        return 0
+    fi
+    # GCP — returns "TRUE" when preempted
+    resp=$(curl -sf -m 2 -H "Metadata-Flavor: Google" "$GCP_META" 2>/dev/null)
+    [ "$resp" = "TRUE" ] && return 0
+    # Azure — check for Preempt event in scheduled events
+    if curl -sf -m 2 -H "Metadata: true" "$AZURE_META" 2>/dev/null | grep -q '"EventType":"Preempt"'; then
+        return 0
+    fi
+    return 1
+}
+
+while kill -0 "$TRAIN_PID" 2>/dev/null; do
+    if check_preemption; then
+        echo "[terradev-sidecar] Preemption detected — signaling PID $TRAIN_PID to checkpoint"
+        kill -SIGUSR1 "$TRAIN_PID" 2>/dev/null
+        # Also signal the entire process group (covers torchrun child workers)
+        kill -SIGUSR1 -"$TRAIN_PID" 2>/dev/null || true
+        sleep 5
+        exit 0
+    fi
+    sleep 5
+done
+"""
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TrainingConfig:
+    """Declarative training job — can come from YAML, dict, or CLI args."""
+
+    name: str = "training-job"
+    run_id: str = ""  # unique per launch; used for remote work dir
+    framework: str = "torchrun"  # torchrun | deepspeed | accelerate | megatron
+    backend: str = "native"  # native | ray  (native = zero deps, ray = optional)
+    script: str = "train.py"
+    script_args: List[str] = field(default_factory=list)
+    nodes: List[str] = field(default_factory=list)  # empty = localhost
+    gpus_per_node: int = 8
+    ssh_user: str = "root"
+    ssh_key: str = ""
+    hostfile: str = ""  # remote hostfile path for deepspeed
+    # Parallelism
+    tp_size: int = 1
+    pp_size: int = 1
+    dp_size: int = 0  # 0 = auto
+    # Environment
+    env_vars: Dict[str, str] = field(default_factory=dict)
+    nccl_env: Dict[str, str] = field(default_factory=dict)
+    # Data
+    data_path: str = ""
+    # Checkpointing
+    checkpoint_dir: str = ""
+    checkpoint_interval_steps: int = 1000
+    # Training
+    total_steps: int = 0
+    # Monitoring hooks (optional — empty means disabled)
+    log_path: str = ""
+    wandb_project: str = ""  # optional W&B hook
+    # Resume
+    resume_from_checkpoint: str = ""
+    # Elastic
+    max_restarts: int = 3
+    rdzv_port: int = 29400
+    # FlashOptim (auto-applied when beneficial — user never needs to set these)
+    flashoptim: str = "auto"  # auto | on | off
+    flashoptim_optimizer: str = "adamw"  # adamw | adam | sgd | sgdw | lion
+    flashoptim_master_weight_bits: int = 24  # 24 (default) | 32 | 0 (=None)
+    flashoptim_compress_checkpoints: bool = False
+    flashoptim_gradient_release: bool = False
+    # Workload type (for auto-optimization)
+    workload_type: str = "default"  # default | reasoning | chat | batch
+
+    @classmethod
+    def from_yaml(cls, path: str) -> "TrainingConfig":
+        try:
+            import yaml
+        except ImportError:
+            raise ImportError("PyYAML required for YAML config: pip install pyyaml")
+        with open(path) as f:
+            d = yaml.safe_load(f) or {}
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "TrainingConfig":
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {k: getattr(self, k) for k in self.__dataclass_fields__}
+
+
+# ---------------------------------------------------------------------------
+# FlashOptim auto-detection (pure function — no side effects)
+# ---------------------------------------------------------------------------
+
+
+def _flashoptim_auto_config(
+    config: TrainingConfig,
+    topology: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Decide whether FlashOptim should be auto-injected into this training job.
+
+    Returns a dict with:
+      - "enabled": bool
+      - "reason": str  (why it was enabled/disabled — for structured JSON output)
+      - "optimizer_class": str  (e.g. "FlashAdamW")
+      - "env_vars": dict  (env vars to inject)
+      - "pip_install": str  (pip install command, empty if not needed)
+      - "script_args_hint": list  (suggested --optimizer args for the training script)
+
+    Decision rules (conservative — only enable when clearly beneficial):
+      1. OFF if user explicitly set flashoptim="off"
+      2. OFF if framework is "megatron" (Megatron has its own fused optimizer)
+      3. OFF if no NVIDIA GPUs detected in topology
+      4. OFF if all GPUs have <24GB VRAM (too small — overhead not worth it)
+      5. ON  if user explicitly set flashoptim="on"
+      6. ON  if model is being finetuned in bf16/fp16 (detected from script_args)
+      7. ON  if total GPU memory across all GPUs >= 40GB (i.e., serious training)
+      8. OFF otherwise (default conservative — don't inject into tiny test jobs)
+    """
+    result = {
+        "enabled": False,
+        "reason": "",
+        "optimizer_class": "",
+        "env_vars": {},
+        "pip_install": "",
+        "script_args_hint": [],
+    }
+
+    # Rule 1: explicit off
+    if config.flashoptim == "off":
+        result["reason"] = "disabled by user (flashoptim=off)"
+        return result
+
+    # Rule 2: Megatron has its own fused optimizer path
+    if config.framework == "megatron":
+        result["reason"] = "skipped: Megatron uses built-in fused optimizer"
+        return result
+
+    # Gather GPU info from topology
+    nodes = topology.get("nodes", {})
+    all_gpus = []
+    for node_info in nodes.values():
+        all_gpus.extend(node_info.get("gpus", []))
+
+    # Rule 3: no GPUs
+    if not all_gpus:
+        result["reason"] = "skipped: no NVIDIA GPUs detected"
+        return result
+
+    min_vram_mb = min((g.get("memory_mb", 0) for g in all_gpus), default=0)
+    total_vram_mb = sum(g.get("memory_mb", 0) for g in all_gpus)
+
+    # Rule 4: tiny GPUs (< 24GB)
+    if min_vram_mb < 24000 and config.flashoptim != "on":
+        result["reason"] = f"skipped: smallest GPU has {min_vram_mb:.0f}MB VRAM (<24GB)"
+        return result
+
+    # Detect training precision from script args
+    args_str = " ".join(config.script_args).lower()
+    uses_reduced_precision = any(
+        kw in args_str
+        for kw in [
+            "bf16",
+            "bfloat16",
+            "fp16",
+            "float16",
+            "--bf16",
+            "--fp16",
+            "mixed_precision",
+            "--mixed-precision",
+            "half",
+        ]
+    )
+
+    # Detect if user is already specifying an optimizer
+    user_has_optimizer = any(
+        kw in args_str
+        for kw in [
+            "--optimizer",
+            "--optim ",
+            "--optim=",
+        ]
+    )
+
+    # Map config to FlashOptim class name
+    optimizer_map = {
+        "adamw": "FlashAdamW",
+        "adam": "FlashAdam",
+        "sgd": "FlashSGD",
+        "sgdw": "FlashSGDW",
+        "lion": "FlashLion",
+    }
+    flash_class = optimizer_map.get(config.flashoptim_optimizer, "FlashAdamW")
+
+    master_bits = (
+        config.flashoptim_master_weight_bits
+        if config.flashoptim_master_weight_bits != 0
+        else None
+    )
+
+    # Rule 5: explicit on
+    if config.flashoptim == "on":
+        result["enabled"] = True
+        result["reason"] = "enabled by user (flashoptim=on)"
+    # Rule 6: reduced precision training detected
+    elif uses_reduced_precision:
+        result["enabled"] = True
+        result["reason"] = (
+            f"auto-enabled: reduced-precision training detected in script args "
+            f"(~57% optimizer memory savings with {flash_class})"
+        )
+    # Rule 7: large enough job to benefit
+    elif total_vram_mb >= 40000:
+        result["enabled"] = True
+        result["reason"] = (
+            f"auto-enabled: {total_vram_mb / 1000:.0f}GB total GPU memory — "
+            f"FlashOptim saves ~35% peak memory"
+        )
+    else:
+        result["reason"] = "skipped: job too small to benefit meaningfully"
+        return result
+
+    # Build injection payload
+    result["optimizer_class"] = flash_class
+    result["pip_install"] = "pip install -q flashoptim 2>/dev/null || true"
+
+    # Env vars that training scripts can read to auto-configure
+    result["env_vars"] = {
+        "FLASHOPTIM_ENABLED": "1",
+        "FLASHOPTIM_OPTIMIZER": flash_class,
+        "FLASHOPTIM_MASTER_WEIGHT_BITS": str(master_bits) if master_bits else "",
+        "FLASHOPTIM_COMPRESS_CHECKPOINTS": (
+            "1" if config.flashoptim_compress_checkpoints else "0"
+        ),
+        "FLASHOPTIM_GRADIENT_RELEASE": (
+            "1" if config.flashoptim_gradient_release else "0"
+        ),
+    }
+
+    # Hint args that can be passed to training scripts that support --optim
+    if not user_has_optimizer:
+        result["script_args_hint"] = [
+            f"# FlashOptim: replace your optimizer with {flash_class}",
+            f"# from flashoptim import {flash_class}, cast_model",
+        ]
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Reasoning-workload auto-detection (pure function — no side effects)
+# ---------------------------------------------------------------------------
+
+
+def _reasoning_auto_config(
+    config: TrainingConfig,
+    topology: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Detect reasoning-model workloads and apply appropriate optimizations.
+
+    Reasoning models (o3, R1, Claude-thinking, Qwen-QwQ, DeepSeek-R1) have:
+    - 5-50× longer decode phases
+    - Low TPS-per-stream
+    - Massive KV cache growth
+    - Bursty TTFT tolerance
+
+    Returns a dict with:
+      - "enabled": bool
+      - "reason": str
+      - "env_vars": dict (env vars to inject)
+      - "recommendations": list (suggested config changes)
+
+    Decision rules:
+      1. OFF if user explicitly set workload_type != "reasoning"
+      2. ON if user explicitly set workload_type = "reasoning"
+      3. Auto-detect from script args (e.g., "o3", "r1", "thinking", "reasoning")
+      4. ON if detected and GPUs have sufficient VRAM
+    """
+    result = {
+        "enabled": False,
+        "reason": "",
+        "env_vars": {},
+        "recommendations": [],
+    }
+
+    # Rule 1: explicit non-reasoning
+    if config.workload_type in ("default", "chat", "batch"):
+        result["reason"] = (
+            f"workload_type set to {config.workload_type} (not reasoning)"
+        )
+        return result
+
+    # Gather GPU info from topology
+    nodes = topology.get("nodes", {})
+    all_gpus = []
+    for node_info in nodes.values():
+        all_gpus.extend(node_info.get("gpus", []))
+
+    if not all_gpus:
+        result["reason"] = "skipped: no GPUs detected"
+        return result
+
+    min_vram_mb = min((g.get("memory_mb", 0) for g in all_gpus), default=0)
+
+    # Rule 2: explicit reasoning
+    if config.workload_type == "reasoning":
+        result["enabled"] = True
+        result["reason"] = "enabled by user (workload_type=reasoning)"
+    # Rule 3: auto-detect from script args or model name
+    else:
+        args_str = " ".join(config.script_args).lower()
+        reasoning_keywords = [
+            "o3",
+            "r1",
+            "thinking",
+            "reasoning",
+            "deepseek-r1",
+            "qwen-qwq",
+            "claude-thinking",
+            "qwen-thinking",
+            "chain-of-thought",
+            "cot",
+        ]
+        if any(kw in args_str for kw in reasoning_keywords):
+            result["enabled"] = True
+            result["reason"] = "auto-detected reasoning model from script args"
+        else:
+            result["reason"] = "skipped: no reasoning model detected"
+            return result
+
+    # Rule 4: require sufficient VRAM (reasoning needs large KV cache).
+    # This check applies regardless of workload_type — even an explicit
+    # workload_type="reasoning" job cannot run on hardware with <40GB VRAM.
+    if min_vram_mb < 40000:
+        result["enabled"] = False
+        result["reason"] = (
+            f"skipped: smallest GPU has {min_vram_mb / 1000:.0f}GB VRAM "
+            f"(reasoning profile requires >=40GB; use a larger GPU or reduce batch size)"
+        )
+        return result
+
+    # Build optimization payload
+    result["env_vars"] = {
+        # Allocate ≥70% VRAM to KV cache (not default ~35%)
+        "VLLM_KV_CACHE_GPU_MEMORY_FRACTION": "0.70",
+        # Auto-apply KV cache offloading
+        "VLLM_ENABLE_PREFIX_CACHING": "1",
+        # Enable speculative decoding for long generation
+        "VLLM_SPECULATIVE_DECODING": "1",
+        "VLLM_SPECULATIVE_MAX_MODEL_LENGTH": "32768",
+        # Cap max_num_seqs (reasoning is depth-not-breadth)
+        "VLLM_MAX_NUM_SEQS": "32",
+        # Enable chunked prefill for better throughput
+        "VLLM_ENABLE_CHUNKED_PREFILL": "1",
+    }
+
+    result["recommendations"] = [
+        "Reasoning-workload profile active:",
+        "  - KV cache: 70% VRAM allocation (vs 35% default)",
+        "  - Speculative decoding: enabled (2.8× on long generation)",
+        "  - Max sequences: capped at 32 (depth over breadth)",
+        "  - Chunked prefill: enabled for better throughput",
+        "  - Consider prefill:decode ratio of 1:8 (vs 1:4 for chat)",
+    ]
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# SSH helper (shared)
+# ---------------------------------------------------------------------------
+
+
+def _run_on(
+    host: Optional[str],
+    cmd: str,
+    user: str = "root",
+    key: Optional[str] = None,
+    timeout: int = 60,
+) -> Tuple[int, str, str]:
+    # SECURITY: Validate command to prevent shell injection
+    import re
+
+    # Allow alphanumeric, spaces, and basic shell-safe characters.
+    # SECURITY: quotes ('"') are deliberately excluded — they are shell metacharacters
+    # that can be used to escape a quoted context and inject arbitrary commands.
+    # Explicitly exclude shell metacharacters (|, >, &) to prevent command chaining
+    if not re.match(r'^[a-zA-Z0-9_\-./:=@, \n\t]+$', cmd):
+        return -1, "", "Unsafe command characters detected"
+
+    if host and host not in ("localhost", "127.0.0.1"):
+        # Validate host and user
+        if not re.match(r"^[a-zA-Z0-9._-]+$", user):
+            return -1, "", "Invalid username format"
+        if not re.match(r"^[a-zA-Z0-9._-]+$", host):
+            return -1, "", "Invalid hostname format"
+        if key and not re.match(r"^[a-zA-Z0-9._/~-]+$", key):
+            return -1, "", "Invalid key path format"
+
+        ssh = [
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ConnectTimeout=10",
+            "-o",
+            "BatchMode=yes",
+        ]
+        if key:
+            ssh.extend(["-i", key])
+        ssh.extend([f"{user}@{host}", cmd])
+        try:
+            r = subprocess.run(ssh, capture_output=True, text=True, timeout=timeout)
+            return r.returncode, r.stdout.strip(), r.stderr.strip()
+        except Exception as e:  # noqa: BLE001
+            return -1, "", str(e)
+    # SECURITY: validated above; split into argv to avoid shell=True
+    try:
+        r = subprocess.run(
+            shlex.split(cmd), shell=False, capture_output=True, text=True, timeout=timeout
+        )
+        return r.returncode, r.stdout.strip(), r.stderr.strip()
+    except Exception as e:  # noqa: BLE001
+        return -1, "", str(e)
+
+
+# ---------------------------------------------------------------------------
+# Launch command builders (pure functions — no side effects)
+# ---------------------------------------------------------------------------
+
+
+def _build_torchrun_cmd(
+    config: TrainingConfig, n_nodes: int, master_addr: str
+) -> List[str]:
+    parts = [
+        "torchrun",
+        f"--nnodes={n_nodes}",
+        f"--nproc_per_node={config.gpus_per_node}",
+        f"--master_addr={master_addr}",
+        "--master_port=29500",
+    ]
+    if n_nodes > 1:
+        parts.extend(
+            [
+                f"--rdzv_id={config.run_id or 'terradev'}",
+                "--rdzv_backend=c10d",
+                f"--rdzv_endpoint={master_addr}:{config.rdzv_port}",
+                f"--max_restarts={config.max_restarts}",
+            ]
+        )
+    parts.append(config.script)
+    parts.extend(config.script_args)
+    return parts
+
+
+def _build_deepspeed_cmd(
+    config: TrainingConfig, n_nodes: int, master_addr: str, hostfile: str
+) -> List[str]:
+    if n_nodes > 1:
+        parts = [
+            "deepspeed",
+            f"--hostfile={hostfile}",
+            f"--num_gpus={config.gpus_per_node}",
+            f"--num_nodes={n_nodes}",
+            f"--master_addr={master_addr}",
+            "--master_port=29500",
+            f"--ssh_user={config.ssh_user}",
+            "--ssh_port=22",
+            "--launcher=ssh",
+        ]
+    else:
+        parts = [
+            "deepspeed",
+            f"--num_gpus={config.gpus_per_node}",
+        ]
+    parts.append(config.script)
+    parts.extend(config.script_args)
+    return parts
+
+
+def _build_accelerate_cmd(
+    config: TrainingConfig, n_nodes: int, total_gpus: int, master_addr: str
+) -> List[str]:
+    parts = [
+        "accelerate",
+        "launch",
+        f"--num_processes={total_gpus}",
+        f"--num_machines={n_nodes}",
+        f"--machine_rank=0",
+        f"--main_process_ip={master_addr}",
+        "--main_process_port=29500",
+    ]
+    if config.tp_size > 1:
+        parts.extend(
+            ["--use_fsdp", f"--fsdp_sharding_strategy=HYBRID_SHARD_{config.tp_size}"]
+        )
+    parts.append(config.script)
+    parts.extend(config.script_args)
+    return parts
+
+
+def _build_megatron_cmd(
+    config: TrainingConfig, n_nodes: int, master_addr: str
+) -> List[str]:
+    parts = [
+        "torchrun",
+        f"--nnodes={n_nodes}",
+        f"--nproc_per_node={config.gpus_per_node}",
+        f"--master_addr={master_addr}",
+        "--master_port=29500",
+        config.script,
+        f"--tensor-model-parallel-size={config.tp_size}",
+        f"--pipeline-model-parallel-size={config.pp_size}",
+    ]
+    parts.extend(config.script_args)
+    return parts
+
+
+# ---------------------------------------------------------------------------
+# DAG node functions
+# ---------------------------------------------------------------------------
+
+
+def _do_preflight(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Run preflight validation (imports inline so it's optional)."""
+    config = ctx.get("config")
+    if not isinstance(config, TrainingConfig):
+        return {"passed": True, "skipped": True}
+    from .preflight_validator import PreflightValidator
+
+    validator = PreflightValidator(
+        nodes=config.nodes or [None],
+        ssh_user=config.ssh_user,
+        ssh_key=config.ssh_key or None,
+    )
+    return validator.run_quick().summary()
+
+
+def _detect_topology(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Detect GPU count/type on all nodes in parallel."""
+    config = ctx.get("config")
+    if not isinstance(config, TrainingConfig):
+        return {"nodes": {}}
+
+    node_list = config.nodes or [None]
+    if len(node_list) <= 1:
+        # Single node — just run locally, no need for DAG overhead
+        rc, stdout, _ = _run_on(
+            node_list[0],
+            "nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader,nounits",
+            config.ssh_user,
+            config.ssh_key or None,
+        )
+        gpus = []
+        if rc == 0:
+            for line in stdout.splitlines():
+                parts = [p.strip() for p in line.split(",")]
+                if len(parts) >= 3:
+                    gpus.append(
+                        {
+                            "index": int(parts[0]),
+                            "name": parts[1],
+                            "memory_mb": float(parts[2]),
+                        }
+                    )
+        node_key = node_list[0] or "localhost"
+        return {"nodes": {node_key: {"gpus": gpus, "count": len(gpus)}}}
+
+    # Multi-node: DAG-parallel topology detection
+    topo_dag = DAGExecutor(max_workers=len(node_list), name="topo_detect")
+    for i, node in enumerate(node_list):
+
+        def make_fn(h):
+            def fn(_ctx):
+                rc, stdout, _ = _run_on(
+                    h,
+                    "nvidia-smi --query-gpu=index,name,memory.total "
+                    "--format=csv,noheader,nounits",
+                    config.ssh_user,
+                    config.ssh_key or None,
+                )
+                gpus = []
+                if rc == 0:
+                    for line in stdout.splitlines():
+                        parts = [p.strip() for p in line.split(",")]
+                        if len(parts) >= 3:
+                            gpus.append(
+                                {
+                                    "index": int(parts[0]),
+                                    "name": parts[1],
+                                    "memory_mb": float(parts[2]),
+                                }
+                            )
+                return {"node": h or "localhost", "gpus": gpus, "count": len(gpus)}
+
+            return fn
+
+        topo_dag.add_node(f"topo_{i}", make_fn(node))
+
+    result = topo_dag.apply()
+    nodes = {}
+    for val in result.outputs.values():
+        if isinstance(val, dict) and "node" in val:
+            nodes[val["node"]] = val
+    return {"nodes": nodes}
+
+
+def _build_artifacts(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Build hostfile, env, launch command. Pure — no remote calls."""
+    deps = ctx.get("__deps__", {})
+    config = ctx.get("config")
+    if not isinstance(config, TrainingConfig):
+        return {"error": "No config"}
+
+    topology = deps.get("topology_detect", {})
+    n_nodes = max(len(config.nodes), 1)
+    total_gpus = n_nodes * config.gpus_per_node
+    master_addr = config.nodes[0] if config.nodes else "localhost"
+
+    # Stage training script and hostfile into a deterministic remote work dir.
+    # All nodes will use the same absolute path, so launchers can just copy the
+    # files and run the command from there.
+    work_dir = f"/tmp/terradev-train/{config.run_id or 'default'}"
+    os.makedirs(work_dir, exist_ok=True)
+
+    staged_script = os.path.join(work_dir, "train.py")
+    if os.path.isfile(config.script):
+        shutil.copy(config.script, staged_script)
+    else:
+        # The "script" may be a module / already a remote path; write as-is
+        with open(staged_script, "w") as _sf:
+            _sf.write(str(config.script))
+    config.script = staged_script
+
+    # Hostfile (only needed for multi-node deepspeed).
+    # Written here — not deferred to _launch_native — so the file always exists
+    # by the time --hostfile is passed to deepspeed, even if the DAG fails later.
+    hostfile_path = ""
+    hostfile_content = ""
+    if n_nodes > 1:
+        hostfile_path = os.path.join(work_dir, "hostfile")
+        hostfile_content = "\n".join(
+            f"{node} slots={config.gpus_per_node}" for node in config.nodes
+        )
+        with open(hostfile_path, "w") as _hf:
+            _hf.write(hostfile_content)
+        config.hostfile = hostfile_path
+
+    # Build launch command
+    if config.framework == "deepspeed":
+        cmd_parts = _build_deepspeed_cmd(config, n_nodes, master_addr, hostfile_path)
+    elif config.framework == "torchrun":
+        cmd_parts = _build_torchrun_cmd(config, n_nodes, master_addr)
+    elif config.framework == "accelerate":
+        cmd_parts = _build_accelerate_cmd(config, n_nodes, total_gpus, master_addr)
+    elif config.framework == "megatron":
+        cmd_parts = _build_megatron_cmd(config, n_nodes, master_addr)
+    else:
+        return {"error": f"Unknown framework: {config.framework}"}
+
+    # Environment variables
+    env = {}
+    env.update(config.nccl_env)
+    env.update(config.env_vars)
+    env["MASTER_ADDR"] = master_addr
+    env["MASTER_PORT"] = "29500"
+    env["WORLD_SIZE"] = str(total_gpus)
+    # NCCL defaults for multi-node
+    if n_nodes > 1:
+        env.setdefault("NCCL_IB_DISABLE", "0")
+        env.setdefault("NCCL_DEBUG", "WARN")
+
+    # ── FlashOptim auto-injection (silent — like KV offloading for training) ──
+    flashoptim_info = _flashoptim_auto_config(config, topology)
+    if flashoptim_info["enabled"]:
+        env.update(flashoptim_info["env_vars"])
+        logger.info(f"FlashOptim: {flashoptim_info['reason']}")
+    else:
+        logger.debug(f"FlashOptim: {flashoptim_info['reason']}")
+
+    return {
+        "cmd_parts": cmd_parts,
+        "env": env,
+        "hostfile_path": hostfile_path,
+        "hostfile_content": hostfile_content,
+        "total_gpus": total_gpus,
+        "n_nodes": n_nodes,
+        "master_addr": master_addr,
+        "topology": topology,
+        "flashoptim": flashoptim_info,
+    }
+
+
+def _is_local(host: Optional[str]) -> bool:
+    return not host or host in ("localhost", "127.0.0.1", "0.0.0.0")
+
+
+def _push_file_to_node(
+    local_path: str,
+    host: Optional[str],
+    user: str,
+    key: Optional[str],
+    remote_path: str,
+) -> Tuple[int, str, str]:
+    """Copy a local file to a remote (or local) node at the same absolute path."""
+    if _is_local(host):
+        os.makedirs(os.path.dirname(remote_path), exist_ok=True)
+        shutil.copy(local_path, remote_path)
+        return 0, "", ""
+
+    ssh_base = [
+        "ssh",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ConnectTimeout=10",
+        "-o",
+        "BatchMode=yes",
+    ]
+    if key:
+        ssh_base.extend(["-i", key])
+
+    # Make the remote directory
+    r1 = subprocess.run(
+        ssh_base + [f"{user}@{host}", f"mkdir -p {shlex.quote(os.path.dirname(remote_path))}"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if r1.returncode != 0:
+        return r1.returncode, "", r1.stderr
+
+    # Push the file via ssh cat
+    with open(local_path, "rb") as f:
+        r2 = subprocess.run(
+            ssh_base + [f"{user}@{host}", f"cat > {shlex.quote(remote_path)}"],
+            stdin=f,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    return r2.returncode, "", r2.stderr
+
+
+def _build_worker_command(
+    config: TrainingConfig,
+    cmd_parts: List[str],
+    work_dir: str,
+) -> str:
+    """Build a nohup shell command that runs cmd_parts in work_dir and writes an exit code."""
+    env: Dict[str, str] = {}
+    env.update(config.nccl_env)
+    env.update(config.env_vars)
+    env["MASTER_ADDR"] = (config.nodes[0] if config.nodes else "localhost")
+    env["MASTER_PORT"] = "29500"
+    env["WORLD_SIZE"] = str(max(len(config.nodes), 1) * config.gpus_per_node)
+    if len(config.nodes) > 1:
+        env.setdefault("NCCL_IB_DISABLE", "0")
+        env.setdefault("NCCL_DEBUG", "WARN")
+    env.setdefault("PYTHONUNBUFFERED", "1")
+
+    env_exports = " ".join(f"{shlex.quote(k)}={shlex.quote(str(v))}" for k, v in env.items())
+    log_path = os.path.join(work_dir, "train.log")
+    exitcode_path = os.path.join(work_dir, "exitcode.txt")
+
+    inner = (
+        f"source {shlex.quote('~/.bashrc')} 2>/dev/null; "
+        f"{env_exports} "
+        f"cd {shlex.quote(work_dir)}; "
+        + " ".join(shlex.quote(p) for p in cmd_parts)
+        + f"; echo $? > {shlex.quote(exitcode_path)}"
+    )
+
+    return f"nohup bash -lc {shlex.quote(inner)} > {shlex.quote(log_path)} 2>&1 & echo $!"
+
+
+def _start_worker(
+    host: Optional[str],
+    config: TrainingConfig,
+    cmd_parts: List[str],
+    work_dir: str,
+) -> Dict[str, Any]:
+    """Start a training worker on a node and return its remote PID / log info."""
+    outer = _build_worker_command(config, cmd_parts, work_dir)
+    if _is_local(host):
+        r = subprocess.run(
+            ["bash", "-lc", outer],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    else:
+        ssh = [
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ConnectTimeout=10",
+            "-o",
+            "BatchMode=yes",
+        ]
+        if config.ssh_key:
+            ssh.extend(["-i", config.ssh_key])
+        r = subprocess.run(
+            ssh + [f"{config.ssh_user}@{host}", outer],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    if r.returncode != 0:
+        return {"status": "failed", "node": host, "error": (r.stderr or r.stdout).strip()[:500]}
+
+    pid = 0
+    for line in reversed((r.stdout or "").strip().splitlines()):
+        if line.strip().isdigit():
+            pid = int(line.strip())
+            break
+    return {
+        "status": "started",
+        "node": host,
+        "pid": pid,
+        "work_dir": work_dir,
+    }
+
+
+def _local_pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def _remote_pid_alive(host: Optional[str], pid: int, user: str, key: Optional[str]) -> bool:
+    rc, _, _ = _run_on(host, f"kill -0 {pid}", user, key, timeout=10)
+    return rc == 0
+
+
+def _read_exitcode(
+    host: Optional[str],
+    work_dir: str,
+    user: str,
+    key: Optional[str],
+) -> Optional[int]:
+    path = os.path.join(work_dir, "exitcode.txt")
+    if _is_local(host):
+        if not os.path.exists(path):
+            return None
+        with open(path) as f:
+            text = f.read().strip()
+        try:
+            return int(text)
+        except ValueError:
+            return 1
+
+    rc, stdout, _ = _run_on(host, f"cat {path}", user, key, timeout=10)
+    if rc != 0:
+        return None
+    try:
+        return int(stdout.strip())
+    except ValueError:
+        return 1
+
+
+def _kill_worker(host: Optional[str], pid: int, user: str, key: Optional[str]) -> None:
+    _run_on(host, f"kill -9 {pid} 2>/dev/null || true", user, key, timeout=10)
+
+
+def _launch_native(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Launch via subprocess / SSH (zero deps — the default path)."""
+    deps = ctx.get("__deps__", {})
+    artifacts = deps.get("build_artifacts", {})
+    config = ctx.get("config")
+    if not isinstance(config, TrainingConfig) or "error" in artifacts:
+        return {"status": "failed", "error": artifacts.get("error", "No config")}
+
+    cmd_parts = artifacts["cmd_parts"]
+    # SECURITY: Validate cmd_parts to prevent shell injection
+    import re
+
+    for part in cmd_parts:
+        if not re.match(r"^[a-zA-Z0-9_\-./:=@]+$", part):
+            logger.error(f"Unsafe character in command part: {part}")
+            return {"status": "failed", "error": "Unsafe command characters detected"}
+
+    n_nodes = artifacts.get("n_nodes", 1)
+    master_addr = artifacts.get("master_addr", "localhost")
+    work_dir = f"/tmp/terradev-train/{config.run_id or 'default'}"
+    nodes: List[Optional[str]] = list(config.nodes) if config.nodes else [None]
+
+    os.makedirs(work_dir, exist_ok=True)
+
+    # Stage training script to every node
+    remote_script = os.path.join(work_dir, "train.py")
+    for node in nodes:
+        rc, _, err = _push_file_to_node(
+            config.script, node, config.ssh_user, config.ssh_key or None, remote_script
+        )
+        if rc != 0:
+            return {"status": "failed", "error": f"Failed to stage script to {node}: {err}"}
+
+    # Stage deepspeed hostfile if present
+    if config.framework == "deepspeed" and config.hostfile and os.path.isfile(config.hostfile):
+        remote_hostfile = os.path.join(work_dir, "hostfile")
+        for node in nodes:
+            rc, _, err = _push_file_to_node(
+                config.hostfile, node, config.ssh_user, config.ssh_key or None, remote_hostfile
+            )
+            if rc != 0:
+                return {"status": "failed", "error": f"Failed to stage hostfile to {node}: {err}"}
+
+    # Pre-install FlashOptim if auto-enabled (non-blocking, fail-safe)
+    flashoptim_info = artifacts.get("flashoptim", {})
+    if flashoptim_info.get("enabled") and flashoptim_info.get("pip_install"):
+        pip_cmd = flashoptim_info["pip_install"]
+        logger.info(f"FlashOptim pre-install: {pip_cmd}")
+        for node in nodes:
+            _run_on(node, pip_cmd, config.ssh_user, config.ssh_key or None, timeout=120)
+
+    logger.info(f"Launching {config.framework} on {n_nodes} node(s): {' '.join(cmd_parts)}")
+
+    pids: List[Dict[str, Any]] = []
+    launched = True
+    launch_error = ""
+
+    try:
+        if config.framework == "deepspeed":
+            # Deepspeed master SSHs to workers using the hostfile
+            master = nodes[0]
+            res = _start_worker(master, config, cmd_parts, work_dir)
+            if res["status"] == "failed":
+                launched = False
+                launch_error = res.get("error", "master start failed")
+            else:
+                pids.append(res)
+        else:
+            # torchrun / accelerate / megatron: start a worker on each node.
+            # For torchrun the master should open the rendezvous first.
+            for i, node in enumerate(nodes):
+                node_cmd = list(cmd_parts)
+                if config.framework == "accelerate":
+                    node_cmd = [
+                        p.replace("--machine_rank=0", f"--machine_rank={i}") for p in node_cmd
+                    ]
+                res = _start_worker(node, config, node_cmd, work_dir)
+                if res["status"] == "failed":
+                    launched = False
+                    launch_error = res.get("error", f"worker {i} start failed")
+                    break
+                pids.append(res)
+                if i == 0 and len(nodes) > 1 and config.framework == "torchrun":
+                    time.sleep(2)  # Give master a moment to open the c10d rendezvous
+    except Exception as e:  # noqa: BLE001
+        launched = False
+        launch_error = str(e)
+
+    if not launched:
+        for p in pids:
+            _kill_worker(p["node"], p["pid"], config.ssh_user, config.ssh_key or None)
+        return {"status": "failed", "error": launch_error}
+
+    return {
+        "status": "launched",
+        "pids": pids,
+        "command": " ".join(cmd_parts),
+        "total_gpus": artifacts.get("total_gpus", 0),
+        "framework": config.framework,
+        "backend": "native",
+        "master_addr": master_addr,
+        "work_dir": work_dir,
+        "flashoptim": flashoptim_info,
+        "ssh_user": config.ssh_user,
+        "ssh_key": config.ssh_key,
+    }
+
+
+def _launch_ray(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Launch via Ray (optional — only if ray is installed)."""
+    deps = ctx.get("__deps__", {})
+    artifacts = deps.get("build_artifacts", {})
+    config = ctx.get("config")
+    if not isinstance(config, TrainingConfig):
+        return {"status": "failed", "error": "No config"}
+
+    try:
+        from ..ml_services.ray_service import RayService
+
+        ray_svc = RayService()
+        # Submit as Ray job
+        result = ray_svc.submit_job(
+            entrypoint=" ".join(artifacts.get("cmd_parts", [])),
+            runtime_env={"env_vars": artifacts.get("env", {})},
+        )
+        return {
+            "status": "launched",
+            "ray_job_id": result.get("job_id", ""),
+            "backend": "ray",
+            "total_gpus": artifacts.get("total_gpus", 0),
+            "framework": config.framework,
+        }
+    except ImportError:
+        logger.warning("Ray not available, falling back to native launch")
+        return _launch_native(ctx)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Ray launch failed ({e}), falling back to native")
+        return _launch_native(ctx)
+
+
+# ---------------------------------------------------------------------------
+# TrainingOrchestrator
+# ---------------------------------------------------------------------------
+
+
+class TrainingOrchestrator:
+    """
+    High-level training job orchestrator.
+
+    Zero external deps by default — uses torchrun/deepspeed native.
+    Set config.backend = "ray" to use Ray when available (falls back to native).
+
+    Usage:
+        orch = TrainingOrchestrator()
+        result = orch.launch(TrainingConfig(script="train.py", framework="torchrun"))
+        print(json.dumps(result, indent=2))
+    """
+
+    def __init__(self, state_manager: Optional[JobStateManager] = None):
+        self.state_manager = state_manager or JobStateManager()
+        self._jobs: Dict[str, Dict[str, Any]] = {}
+
+    def launch(
+        self, config: TrainingConfig, skip_preflight: bool = False
+    ) -> Dict[str, Any]:
+        """Launch a training job. Returns structured JSON."""
+        job = self.state_manager.create_job(
+            name=config.name,
+            framework=config.framework,
+            config=config.to_dict(),
+            nodes=config.nodes or ["localhost"],
+            total_steps=config.total_steps,
+        )
+        self.state_manager.update_job_status(job.id, JobStatus.PREFLIGHT)
+
+        # Ensure the launch has a unique run id / remote work directory
+        config.run_id = config.run_id or job.id
+
+        # Build DAG
+        dag = DAGExecutor(max_workers=4, name=f"launch_{job.id[:8]}")
+
+        # Wave 0: preflight ∥ topology (independent)
+        if not skip_preflight:
+            dag.add_node("preflight", _do_preflight)
+        dag.add_node("topology_detect", _detect_topology)
+
+        # Wave 1: build artifacts (depends on topology)
+        deps_build = {"topology_detect"}
+        if not skip_preflight:
+            deps_build.add("preflight")
+        dag.add_node("build_artifacts", _build_artifacts, depends_on=deps_build)
+
+        # Wave 2: launch (depends on artifacts)
+        launch_fn = _launch_ray if config.backend == "ray" else _launch_native
+        dag.add_node("launch", launch_fn, depends_on={"build_artifacts"})
+
+        # Execute
+        self.state_manager.update_job_status(job.id, JobStatus.LAUNCHING)
+        result = dag.apply(initial_context={"config": config})
+
+        launch_out = result.outputs.get("launch", {})
+        preflight_out = result.outputs.get("preflight", {})
+
+        if not result.success:
+            self.state_manager.update_job_status(
+                job.id,
+                JobStatus.FAILED,
+                error_message=json.dumps(result.errors, default=str),
+            )
+            return {"job_id": job.id, "status": "failed", "errors": result.errors}
+
+        if preflight_out and not preflight_out.get("passed", True):
+            self.state_manager.update_job_status(
+                job.id, JobStatus.FAILED, error_message="Preflight failed"
+            )
+            return {
+                "job_id": job.id,
+                "status": "preflight_failed",
+                "preflight": preflight_out,
+            }
+
+        self.state_manager.update_job_status(job.id, JobStatus.RUNNING)
+        master_pid = launch_out.get("pids", [{}])[0].get("pid") if launch_out.get("pids") else None
+        self._jobs[job.id] = dict(launch_out)
+
+        return {
+            "job_id": job.id,
+            "status": launch_out.get("status", "unknown"),
+            "pid": master_pid,
+            "pids": launch_out.get("pids", []),
+            "framework": config.framework,
+            "backend": launch_out.get("backend", "native"),
+            "total_gpus": launch_out.get("total_gpus", 0),
+            "nodes": config.nodes or ["localhost"],
+            "master_addr": launch_out.get("master_addr"),
+            "work_dir": launch_out.get("work_dir"),
+            "preflight": preflight_out,
+            "flashoptim": launch_out.get("flashoptim", {}),
+        }
+
+    def resume(
+        self, job_id: str, checkpoint_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Resume from checkpoint. Rebuilds config from job state."""
+        job = self.state_manager.get_job(job_id)
+        if not job:
+            return {"status": "failed", "error": f"Job not found: {job_id}"}
+
+        preempted = job.status == JobStatus.PREEMPTED
+        if preempted:
+            logger.info(
+                f"Resuming preempted job {job_id} "
+                f"(was at step {job.current_step}/{job.total_steps}, "
+                f"reason: {job.error_message})"
+            )
+
+        config = TrainingConfig.from_dict(job.config)
+        config.resume_from_checkpoint = checkpoint_id or "latest"
+
+        if "--resume" not in " ".join(config.script_args):
+            if config.checkpoint_dir:
+                config.script_args.extend(
+                    ["--resume_from_checkpoint", config.checkpoint_dir]
+                )
+
+        result = self.launch(config, skip_preflight=False)
+        if preempted:
+            result["resumed_from_preemption"] = True
+            result["preemption_reason"] = job.error_message
+        return result
+
+    def stop(self, job_id: str) -> Dict[str, Any]:
+        """Stop a running job — kills processes on all nodes in parallel."""
+        job = self.state_manager.get_job(job_id)
+        if not job:
+            return {"status": "failed", "error": f"Job not found: {job_id}"}
+
+        nodes = (
+            job.nodes
+            if hasattr(job, "nodes")
+            else job.config.get("nodes", ["localhost"])
+        )
+        if len(nodes) <= 1:
+            # Single node — no DAG overhead
+            _run_on(
+                nodes[0] if nodes[0] != "localhost" else None,
+                "pkill -f 'torchrun|deepspeed|accelerate' 2>/dev/null",
+                job.config.get("ssh_user", "root"),
+                job.config.get("ssh_key"),
+            )
+        else:
+            dag = DAGExecutor(max_workers=len(nodes), name=f"stop_{job_id[:8]}")
+            for i, node in enumerate(nodes):
+
+                def make_fn(h):
+                    def fn(_ctx):
+                        _run_on(
+                            h if h != "localhost" else None,
+                            "pkill -f 'torchrun|deepspeed|accelerate' 2>/dev/null",
+                            job.config.get("ssh_user", "root"),
+                            job.config.get("ssh_key"),
+                        )
+                        return {"node": h, "stopped": True}
+
+                    return fn
+
+                dag.add_node(f"stop_{i}", make_fn(node))
+            dag.apply()
+
+        self.state_manager.update_job_status(job_id, JobStatus.CANCELLED)
+        return {"job_id": job_id, "status": "stopped"}
+
+    def wait_for_completion(
+        self,
+        job_id: str,
+        timeout_s: int = 0,
+        poll_s: int = 30,
+    ) -> Dict[str, Any]:
+        """Block until a job finishes and return its final status."""
+        runtime = self._jobs.get(job_id, {})
+        pids = runtime.get("pids", [])
+        if not pids:
+            return {"status": "failed", "error": "No launch record for job"}
+
+        master = pids[0]
+        master_node = master.get("node")
+        master_pid = master.get("pid", 0)
+        work_dir = master.get("work_dir", f"/tmp/terradev-train/{job_id}")
+        user = master.get("ssh_user") or runtime.get("ssh_user", "root")
+        key = master.get("ssh_key") or runtime.get("ssh_key") or None
+
+        started = time.time()
+        while True:
+            if _is_local(master_node):
+                alive = _local_pid_alive(master_pid)
+            else:
+                alive = _remote_pid_alive(master_node, master_pid, user, key)
+            if not alive:
+                break
+            if timeout_s and time.time() - started > timeout_s:
+                return {"status": "failed", "error": "Timeout waiting for training"}
+            time.sleep(poll_s)
+
+        # Wait a beat for the exitcode file to be written
+        time.sleep(1)
+        exit_code = _read_exitcode(master_node, work_dir, user, key)
+
+        if exit_code == 0:
+            self.state_manager.update_job_status(job_id, JobStatus.COMPLETED)
+            return {"status": "completed", "exit_code": 0}
+        if exit_code is None:
+            self.state_manager.update_job_status(
+                job_id, JobStatus.FAILED, error_message="Could not read exit code"
+            )
+            return {"status": "failed", "error": "Could not read exit code"}
+
+        self.state_manager.update_job_status(
+            job_id, JobStatus.FAILED, error_message=f"Training exited with code {exit_code}"
+        )
+        return {"status": "failed", "exit_code": exit_code, "error": f"Training exited with code {exit_code}"}
+
+    def status(self, job_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get job status (single job or all running)."""
+        if job_id:
+            job = self.state_manager.get_job(job_id)
+            return job.to_dict() if job else {"error": f"Not found: {job_id}"}
+        return {
+            "running": self.state_manager.running_jobs_summary(),
+            "total_cost": self.state_manager.total_cost(),
+        }

@@ -1,0 +1,55 @@
+# GLM-5 Horizontal Pod Autoscaler
+# Scales based on GPU utilization and request queue depth
+# Each replica requires a full 8× H100 node
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: glm5-hpa
+  namespace: glm-5-inference
+  labels:
+    app.kubernetes.io/name: glm-5
+    app.kubernetes.io/managed-by: terradev
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: glm5-vllm
+  minReplicas: 1
+  maxReplicas: 4  # 4 replicas = 32× H100 GPUs max
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300  # wait 5 min before scaling up
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 600  # add 1 replica per 10 min max
+    scaleDown:
+      stabilizationWindowSeconds: 600  # wait 10 min before scaling down
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 900  # remove 1 replica per 15 min max
+  metrics:
+    # Scale on GPU utilization (via DCGM exporter)
+    - type: Pods
+      pods:
+        metric:
+          name: DCGM_FI_DEV_GPU_UTIL
+        target:
+          type: AverageValue
+          averageValue: "80"
+    # Scale on pending requests in vLLM queue
+    - type: Pods
+      pods:
+        metric:
+          name: vllm_num_requests_waiting
+        target:
+          type: AverageValue
+          averageValue: "10"
+    # Scale on CPU utilization as fallback
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75

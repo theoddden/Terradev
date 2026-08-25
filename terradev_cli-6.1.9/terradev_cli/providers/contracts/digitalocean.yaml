@@ -1,0 +1,43 @@
+provider: digitalocean
+base_url: https://api.digitalocean.com/v2
+auth_type: Bearer
+auth_header: Authorization
+auth_required: true
+last_verified: '2026-08-24'
+endpoints:
+- name: list_droplets
+  method: GET
+  path: droplets
+  expected_response_fields:
+  - droplets
+  expected_status: 200
+  optional_response_fields:
+  - meta
+  - meta.total
+  - links
+- name: sizes
+  method: GET
+  path: sizes
+  enabled: true
+  expected_response_fields:
+  - sizes
+  optional_response_fields:
+  - meta
+  - meta.total
+  - links
+  expected_status: 200
+- name: droplets
+  method: POST
+  path: droplets
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+  expected_status: 201
+- name: droplets?tag_name=terradev
+  method: GET
+  path: droplets?tag_name=terradev
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+  expected_status: 200

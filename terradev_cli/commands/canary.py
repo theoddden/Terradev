@@ -369,8 +369,6 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
             extras["project_id"] = gcp_creds.get("project_id") or ""
         except (ValueError, json.JSONDecodeError, binascii.Error):
             extras["gcp_credentials"] = api_key
-        extras["bucket"] = (os.environ.get("TERRADEV_GCP_BUCKET") or "").strip()
-        extras["object"] = (os.environ.get("TERRADEV_GCP_OBJECT") or "").strip()
 
     elif alias == "oracle":
         extras["oci_tenancy"] = (os.environ.get("TERRADEV_OCI_TENANCY") or "").strip()

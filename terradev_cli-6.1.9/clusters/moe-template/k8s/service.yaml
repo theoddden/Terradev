@@ -1,0 +1,47 @@
+# MoE Inference Service — LoadBalancer with health checks
+apiVersion: v1
+kind: Service
+metadata:
+  name: moe-inference
+  namespace: moe-inference
+  labels:
+    app.kubernetes.io/name: moe-inference
+    app.kubernetes.io/component: inference-api
+    app.kubernetes.io/managed-by: terradev
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: moe-inference
+  ports:
+    - name: inference-api
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 8000
+      protocol: TCP
+  sessionAffinity: None
+  externalTrafficPolicy: Local
+---
+# Headless service for direct pod addressing
+apiVersion: v1
+kind: Service
+metadata:
+  name: moe-internal
+  namespace: moe-inference
+  labels:
+    app.kubernetes.io/name: moe-inference
+    app.kubernetes.io/component: internal
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: moe-inference
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

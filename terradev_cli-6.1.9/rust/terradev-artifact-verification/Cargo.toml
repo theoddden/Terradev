@@ -1,0 +1,16 @@
+[package]
+name = "terradev-artifact-verification"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "terradev_artifact_verification"
+crate-type = ["rlib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+sha2 = "0.10"
+hex = "0.4"

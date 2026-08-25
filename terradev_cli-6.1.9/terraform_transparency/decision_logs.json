@@ -1,0 +1,192 @@
+[
+  {
+    "decision_id": "32357b14d9d6",
+    "decision_type": "instance_selection",
+    "timestamp": "2026-02-09T09:55:19.747059",
+    "context": {
+      "requirements": {
+        "gpu_memory": 16,
+        "gpu_count": 1,
+        "cpu_cores": 8,
+        "memory_gb": 32,
+        "all_instances": [
+          {
+            "name": "vastai-a5000",
+            "provider": "vastai",
+            "instance_type": "A5000",
+            "gpu_type": "RTX A5000",
+            "gpu_memory": 24,
+            "cost_per_hour": 0.35,
+            "availability": 0.95,
+            "latency_ms": 45
+          },
+          {
+            "name": "runpod-a4000",
+            "provider": "runpod",
+            "instance_type": "A4000",
+            "gpu_type": "RTX A4000",
+            "gpu_memory": 16,
+            "cost_per_hour": 0.29,
+            "availability": 0.97,
+            "latency_ms": 35
+          },
+          {
+            "name": "aws-g4dn",
+            "provider": "aws",
+            "instance_type": "g4dn.xlarge",
+            "gpu_type": "T4",
+            "gpu_memory": 16,
+            "cost_per_hour": 0.526,
+            "availability": 0.99,
+            "latency_ms": 25
+          }
+        ]
+      },
+      "available_instances_count": 3,
+      "dry_run_mode": true
+    },
+    "options_considered": [
+      {
+        "name": "runpod-a4000",
+        "provider": "runpod",
+        "instance_type": "A4000",
+        "gpu_type": "RTX A4000",
+        "gpu_memory": 16,
+        "cost_per_hour": 0.29,
+        "availability": 0.97,
+        "latency_ms": 35
+      },
+      {
+        "name": "vastai-a5000",
+        "provider": "vastai",
+        "instance_type": "A5000",
+        "gpu_type": "RTX A5000",
+        "gpu_memory": 24,
+        "cost_per_hour": 0.35,
+        "availability": 0.95,
+        "latency_ms": 45
+      },
+      {
+        "name": "aws-g4dn",
+        "provider": "aws",
+        "instance_type": "g4dn.xlarge",
+        "gpu_type": "T4",
+        "gpu_memory": 16,
+        "cost_per_hour": 0.526,
+        "availability": 0.99,
+        "latency_ms": 25
+      }
+    ],
+    "factors": [
+      {
+        "name": "cost",
+        "value": 0.4486692015209126,
+        "weight": 0.3,
+        "weighted_score": 0.13460076045627378,
+        "reason": "Cost per hour: $0.2900 (lower is better)",
+        "source": "provider_api",
+        "timestamp": "2026-02-09T09:55:19.747059"
+      },
+      {
+        "name": "performance",
+        "value": 1.0,
+        "weight": 0.25,
+        "weighted_score": 0.25,
+        "reason": "GPU memory: 16.0GB (required: 16.0GB)",
+        "source": "instance_specs",
+        "timestamp": "2026-02-09T09:55:19.747059"
+      },
+      {
+        "name": "availability",
+        "value": 0.97,
+        "weight": 0.2,
+        "weighted_score": 0.194,
+        "reason": "Availability: 97.0%",
+        "source": "provider_sla",
+        "timestamp": "2026-02-09T09:55:19.747059"
+      },
+      {
+        "name": "latency",
+        "value": 0.2222222222222222,
+        "weight": 0.15,
+        "weighted_score": 0.03333333333333333,
+        "reason": "Latency: 35.0ms (lower is better)",
+        "source": "provider_metrics",
+        "timestamp": "2026-02-09T09:55:19.747059"
+      }
+    ],
+    "selected_option": {
+      "name": "runpod-a4000",
+      "provider": "runpod",
+      "instance_type": "A4000",
+      "gpu_type": "RTX A4000",
+      "gpu_memory": 16,
+      "cost_per_hour": 0.29,
+      "availability": 0.97,
+      "latency_ms": 35
+    },
+    "reasoning": "Selected runpod-a4000 with score 0.612\nKey factors:\n  \u2022 Cost: $0.2900/hour\n  \u2022 GPU: RTX A4000\n  \u2022 Memory: 16GB\n  \u2022 Availability: 97.0%\nScore advantage: +0.072 over vastai-a5000\n\u26a0\ufe0f  Lower availability - consider backup options",
+    "confidence_score": 0.6,
+    "alternatives": [
+      {
+        "name": "vastai-a5000",
+        "provider": "vastai",
+        "instance_type": "A5000",
+        "gpu_type": "RTX A5000",
+        "gpu_memory": 24,
+        "cost_per_hour": 0.35,
+        "availability": 0.95,
+        "latency_ms": 45
+      },
+      {
+        "name": "aws-g4dn",
+        "provider": "aws",
+        "instance_type": "g4dn.xlarge",
+        "gpu_type": "T4",
+        "gpu_memory": 16,
+        "cost_per_hour": 0.526,
+        "availability": 0.99,
+        "latency_ms": 25
+      }
+    ],
+    "risks": [
+      {
+        "type": "availability",
+        "severity": "medium",
+        "description": "Availability is 97.0% (below 99%)",
+        "mitigation": "Consider backup instances or SLA monitoring"
+      }
+    ],
+    "permissions_required": [
+      "read_only",
+      "dry_run"
+    ],
+    "dry_run_result": {
+      "status": "success",
+      "resources_affected": 1,
+      "cost_impact": 0.29,
+      "estimated_duration": "5 minutes",
+      "changes_required": [
+        "Create instance: runpod-a4000",
+        "Configure GPU: RTX A4000",
+        "Set up networking and storage"
+      ],
+      "validation_passed": true,
+      "warnings": [
+        "This is a dry run - no actual changes will be made"
+      ]
+    },
+    "rollback_plan": {
+      "rollback_available": true,
+      "rollback_steps": [
+        "1. Stop instance if running",
+        "2. Terminate instance",
+        "3. Clean up associated resources",
+        "4. Restore previous state if needed"
+      ],
+      "estimated_rollback_time": "3 minutes",
+      "rollback_cost": 0.0,
+      "data_loss_risk": "low"
+    }
+  }
+]

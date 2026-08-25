@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ml-dev
+    environment: dev
+  name: ml-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-dev
+  template:
+    metadata:
+      labels:
+        app: ml-dev
+        environment: dev
+    spec:
+      containers:
+      - env:
+        - name: ENVIRONMENT
+          value: dev
+        - name: INSTANCE_TYPE
+          value: ml-small
+        image: terradev/ml-worker:latest
+        name: ml-worker
+        resources:
+          limits:
+            cpu: '4'
+            memory: 16Gi
+            nvidia.com/gpu: '1'
+          requests:
+            cpu: '4'
+            memory: 16Gi
+            nvidia.com/gpu: '1'

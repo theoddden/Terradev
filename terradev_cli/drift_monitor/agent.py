@@ -155,7 +155,7 @@ class DriftMonitor:
         # Provider-specific required credential keys.
         required_creds: Dict[str, List[str]] = {
             "aws": ["aws_access_key_id", "aws_secret_access_key"],
-            "gcp": ["gcp_credentials", "bucket", "object"],
+            "gcp": ["gcp_credentials"],
             "oracle": ["oci_tenancy", "oci_user", "oci_fingerprint", "oci_private_key"],
             "inferx": ["api_key"],
         }
