@@ -1,4 +1,4 @@
-# Terradev-cli 6.1.8
+# Terradev-cli 6.1.9
 
 **Imperative Command Line Interface for AI Workload Orchestration.**
 

@@ -7,13 +7,13 @@
     "url": "https://github.com/theoddden/Terradev",
     "source": "github"
   },
-  "version": "6.1.8",
+  "version": "6.1.9",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "terradev-cli",
-      "version": "6.1.8",
+      "version": "6.1.9",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
