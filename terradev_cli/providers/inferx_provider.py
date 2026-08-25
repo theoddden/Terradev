@@ -33,7 +33,9 @@ class InferXProvider(BaseProvider):
     def __init__(self, credentials: Dict[str, str]):
         super().__init__(credentials)
         self.name = "inferx"
-        self.api_endpoint = credentials.get("api_endpoint", "https://model.inferx.net")
+        self.api_endpoint = credentials.get(
+            "api_endpoint", "https://model.inferx.net/endpoints/v1"
+        )
         self.api_key = credentials.get("api_key")
         self.region = credentials.get("region", "us-west-2")
 
