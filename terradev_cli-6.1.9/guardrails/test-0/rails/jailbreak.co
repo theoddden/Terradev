@@ -1,7 +1,0 @@
-# Colang 2.x — Jailbreak detection
-define flow check jailbreak
-  """Detect and block jailbreak attempts."""
-  $is_jailbreak = execute check_jailbreak_attempt
-  if $is_jailbreak
-    bot say "I cannot process that request."
-    stop

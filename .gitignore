@@ -43,6 +43,7 @@ dist/
 build/
 *.egg-info/
 __pycache__/
+terradev_cli-*/
 
 # Test cache
 .pytest_cache/

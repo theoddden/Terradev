@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: lora-serving
-  labels:
-    name: lora-serving
-    app.kubernetes.io/name: lora-serving
