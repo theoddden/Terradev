@@ -98,6 +98,7 @@ class DriftMonitor:
             return result
 
         # If credentials are a dict, ensure all required non-auth query params are present.
+        # E2E Networks is kept in the run even if project_id is not supplied; the API key is enough to attempt.
         if auth_required and isinstance(api_key, dict):
             auth_qp = contract.get("auth_query_param")
             required_qps: set = set()
@@ -115,7 +116,7 @@ class DriftMonitor:
                         continue
                     required_qps.add(name)
             missing = [p for p in required_qps if p not in api_key]
-            if missing:
+            if missing and contract.get("provider") != "e2enetworks":
                 result["status"] = "skipped_no_credentials"
                 return result
 
