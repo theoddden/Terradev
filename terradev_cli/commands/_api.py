@@ -49,7 +49,6 @@ def validate_credentials(provider: str, credentials: Dict[str, str]) -> bool:
         "digitalocean": ["api_key"],
         "e2enetworks": ["api_key"],
         "gcp": ["project_id", "credentials_file"],
-        "hetzner": ["api_token"],
         "huggingface": ["api_key", "namespace"],
         "hyperstack": ["api_key"],
         "inferx": ["api_key"],

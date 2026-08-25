@@ -245,12 +245,6 @@ REGION_CONTINENT: Dict[str, str] = {
     "uk1": "eu",
     "waw": "eu",
     "sgp": "ap",
-    # Hetzner
-    "fsn1": "eu",
-    "nbg1": "eu",
-    "hel1": "eu",
-    "ash": "na",
-    "hil": "na",
     # GPU cloud regions (generic, from smaller providers)
     "us-east": "na",
     "us-west": "na",
