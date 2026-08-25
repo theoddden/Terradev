@@ -24,7 +24,8 @@ endpoints:
 - name: list_images
   method: GET
   path: images/saved-images/
-  enabled: true
+  enabled: false
+  note: Returns 412 Precondition Failed when the project has no saved image templates.
   expected_status: 200
   query_params:
   - apikey
