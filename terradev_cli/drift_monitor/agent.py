@@ -152,11 +152,12 @@ class DriftMonitor:
         if not key_value:
             return None
 
-        bearer_token = str(creds.get("bearer_token", key_value))
         location = str(creds.get("location", "Delhi"))
         base_url = "https://api.e2enetworks.com/myaccount/api/v1"
         url = f"{base_url}/iam/multi-crn/?apikey={key_value}&location={location}"
-        headers = {"Authorization": f"Bearer {bearer_token}"}
+        headers: Dict[str, str] = {}
+        if "bearer_token" in creds:
+            headers["Authorization"] = f"Bearer {creds['bearer_token']}"
 
         try:
             response = requests.get(url, headers=headers, timeout=self.timeout)
