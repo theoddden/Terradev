@@ -1,4 +1,4 @@
-# Terradev CLI v6.1.1
+# Terradev CLI v6.1.4
 
 **Cross-cloud GPU infrastructure and training pipeline CLI for SFT, DPO, GRPO, and multi-stage LLM training orchestration.**
 

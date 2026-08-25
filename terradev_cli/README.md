@@ -1,4 +1,4 @@
-# Terradev CLI v6.1.1
+# Terradev CLI v6.1.4
 
 **Cross-cloud GPU infrastructure and training pipeline CLI for SFT, DPO, GRPO, and multi-stage LLM training orchestration.**
 
@@ -15,6 +15,30 @@ Combines quoting, provisioning, topology optimization, training orchestration, i
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
+
+**NOTES ON v6.1.4**
+
+- Version bumped to **v6.1.4** for housekeeping and packaging.
+- **19 GPU cloud and inference providers** are available for quoting and provisioning:
+  - `alibaba` — Alibaba Cloud
+  - `aws` — Amazon Web Services
+  - `azure` — Microsoft Azure
+  - `baseten` — Baseten
+  - `crusoe` — Crusoe Cloud
+  - `digitalocean` — DigitalOcean
+  - `e2enetworks` — E2E Networks
+  - `gcp` — Google Cloud Platform
+  - `huggingface` — Hugging Face
+  - `hyperstack` — Hyperstack
+  - `inferx` — Inferx
+  - `latitude` — Latitude.sh
+  - `oracle` — Oracle Cloud
+  - `ovhcloud` — OVHcloud
+  - `runpod` — RunPod
+  - `siliconflow` — SiliconFlow
+  - `tensordock` — TensorDock
+  - `vastai` — Vast.ai
+  - `yottalabs` — YottaLabs
 
 **NOTES ON Multi-Stage Training Pipeline (v6.1.1)**
 
