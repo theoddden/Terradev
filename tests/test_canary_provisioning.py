@@ -80,8 +80,6 @@ def _load_creds(provider: str) -> dict:
     flat = {
         "runpod": {"api_key": all_creds.get("runpod_api_key", "")},
         "vastai": {"api_key": all_creds.get("vastai_api_key", "")},
-        "lambda_labs": {"api_key": all_creds.get("lambda_api_key", "")},
-        "coreweave": {"api_key": all_creds.get("coreweave_api_key", "")},
         "tensordock": {
             "api_key": all_creds.get("tensordock_api_key", ""),
             "api_token": all_creds.get("tensordock_api_token", ""),
@@ -126,7 +124,6 @@ def _load_creds(provider: str) -> dict:
             "consumer_key": all_creds.get("ovhcloud_consumer_key", ""),
             "project_id": all_creds.get("ovhcloud_project_id", ""),
         },
-        "fluidstack": {"api_key": all_creds.get("fluidstack_api_key", "")},
         "hetzner": {
             "api_token": all_creds.get("hetzner_api_token", ""),
             "robot_user": all_creds.get("hetzner_robot_user", ""),
@@ -173,14 +170,6 @@ CANARY_PROVIDER_CONFIG = {
     "vastai": {
         "gpu_types": ["RTX4090", "A6000", "A100"],
         "regions": ["us", "eu", "asia"],
-    },
-    "lambda_labs": {
-        "gpu_types": ["A100", "A10G", "RTX4090"],
-        "regions": ["us-east-1", "us-west-1", "us-south-1"],
-    },
-    "coreweave": {
-        "gpu_types": ["A40", "A100"],
-        "regions": ["us-east-1", "us-west-2"],
     },
     "tensordock": {
         "gpu_types": ["RTX4090", "A4000"],
@@ -229,10 +218,6 @@ CANARY_PROVIDER_CONFIG = {
     "ovhcloud": {
         "gpu_types": ["A100", "H100"],
         "regions": ["gra", "sbg"],
-    },
-    "fluidstack": {
-        "gpu_types": ["A100", "H100"],
-        "regions": ["us-east"],
     },
     "hetzner": {
         "gpu_types": ["A100", "H100"],
@@ -731,7 +716,7 @@ async def test_canary_lifecycle(provider):
 async def test_canary_distributed_two_providers():
     """Provision tiny nodes on two providers and verify both are reachable."""
     # Prefer providers with likely cheap spot GPUs
-    candidates = ["runpod", "vastai", "lambda_labs", "tensordock", "coreweave"]
+    candidates = ["runpod", "vastai", "tensordock"]
     configured = [p for p in candidates if any(_load_creds(p).values())]
     if len(configured) < 2:
         pytest.skip("Need credentials for at least two of runpod/vastai for distributed canary")

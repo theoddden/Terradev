@@ -99,7 +99,7 @@ async def test_analyze_egress_cost_zero_egress_alternatives(monitor):
         data_size_gb=100.0,
     )
     providers = {a["provider"] for a in result["alternative_routes"]}
-    assert "lambda_labs" in providers or "runpod" in providers
+    assert "runpod" in providers
 
 
 def test_cost_record_storage(monitor):

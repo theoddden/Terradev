@@ -84,30 +84,6 @@ class DemoModeProvider:
                     "note": "DEMO DATA - NOT REAL PRICING",
                 },
             },
-            "coreweave": {
-                "A100": {
-                    "price": 2.21,
-                    "region": "us-east-04e",
-                    "note": "DEMO DATA - NOT REAL PRICING",
-                },
-                "H100": {
-                    "price": 4.76,
-                    "region": "us-east-04e",
-                    "note": "DEMO DATA - NOT REAL PRICING",
-                },
-            },
-            "lambda_labs": {
-                "A100": {
-                    "price": 1.29,
-                    "region": "us-east-1",
-                    "note": "DEMO DATA - NOT REAL PRICING",
-                },
-                "H100": {
-                    "price": 2.49,
-                    "region": "us-east-1",
-                    "note": "DEMO DATA - NOT REAL PRICING",
-                },
-            },
             "tensordock": {
                 "A100": {
                     "price": 1.50,
@@ -178,8 +154,6 @@ class DemoModeManager:
             "aws": DemoModeProvider("aws"),
             "azure": DemoModeProvider("azure"),
             "gcp": DemoModeProvider("gcp"),
-            "coreweave": DemoModeProvider("coreweave"),
-            "lambda_labs": DemoModeProvider("lambda_labs"),
             "tensordock": DemoModeProvider("tensordock"),
             "oracle": DemoModeProvider("oracle"),
             "crusoe": DemoModeProvider("crusoe"),

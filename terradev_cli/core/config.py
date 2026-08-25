@@ -20,8 +20,6 @@ class ProviderType(Enum):
     AZURE = "azure"
     RUNPOD = "runpod"
     VASTAI = "vastai"
-    LAMBDA_LABS = "lambda_labs"
-    COREWEAVE = "coreweave"
     TENSORDOCK = "tensordock"
     HUGGINGFACE = "huggingface"
     BASETEN = "baseten"
@@ -176,30 +174,6 @@ class TerradevConfig:
                 priority=5,
                 metadata={
                     "instance_types": ["A100-SXM4-40GB", "RTX4090"],
-                    "gpu_types": ["A100", "RTX4090", "RTX3090"],
-                },
-            ),
-            "lambda_labs": ProviderConfig(
-                name="lambda_labs",
-                enabled=True,
-                default_region="us-east-1",
-                api_endpoint="https://api.lambdalabs.com",
-                reliability_score=0.82,
-                priority=6,
-                metadata={
-                    "instance_types": ["gpu_1x_a10", "gpu_8x_a100_40gb"],
-                    "gpu_types": ["A10", "A100", "RTX6000"],
-                },
-            ),
-            "coreweave": ProviderConfig(
-                name="coreweave",
-                enabled=True,
-                default_region="us-east-1",
-                api_endpoint="https://api.coreweave.com",
-                reliability_score=0.88,
-                priority=7,
-                metadata={
-                    "instance_types": ["a100-40gb", "rtx4090"],
                     "gpu_types": ["A100", "RTX4090", "RTX3090"],
                 },
             ),

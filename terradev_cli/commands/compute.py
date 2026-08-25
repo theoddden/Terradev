@@ -443,8 +443,6 @@ def provision(
             "gcp": api.get_gcp_quotes,
             "azure": api.get_azure_quotes,
             "tensordock": api.get_tensordock_quotes,
-            "lambda_labs": api.get_lambda_quotes,
-            "coreweave": api.get_coreweave_quotes,
             "oracle": api.get_oracle_quotes,
             "crusoe": api.get_crusoe_quotes,
         }
@@ -1818,8 +1816,6 @@ def optimize(instance_id, auto_apply):
                         api.get_gcp_quotes(gt),
                         api.get_azure_quotes(gt),
                         api.get_tensordock_quotes(gt),
-                        api.get_lambda_quotes(gt),
-                        api.get_coreweave_quotes(gt),
                     ]
                     results = await asyncio.gather(*tasks, return_exceptions=True)
                     quotes = []
@@ -2341,15 +2337,12 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
             ("gcp", api.get_gcp_quotes),
             ("azure", api.get_azure_quotes),
             ("tensordock", api.get_tensordock_quotes),
-            ("lambda_labs", api.get_lambda_quotes),
-            ("coreweave", api.get_coreweave_quotes),
             ("oracle", api.get_oracle_quotes),
             ("crusoe", api.get_crusoe_quotes),
             ("alibaba", api.get_alibaba_quotes),
             ("baseten", api.get_baseten_quotes),
             ("digitalocean", api.get_digitalocean_quotes),
             ("e2enetworks", api.get_e2enetworks_quotes),
-            ("fluidstack", api.get_fluidstack_quotes),
             ("hetzner", api.get_hetzner_quotes),
             ("huggingface", api.get_huggingface_quotes),
             ("hyperstack", api.get_hyperstack_quotes),

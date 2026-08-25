@@ -1,5 +1,5 @@
 {
-  "tool_count": 263,
+  "tool_count": 261,
   "tool_names": [
     "active_context",
     "agent_agentic_serving_configure",
@@ -184,7 +184,6 @@
     "preflight",
     "preflight_gpu_check",
     "preflight_network_check",
-    "preflight_provision",
     "preflight_report",
     "price_budget_optimize",
     "price_intel",
@@ -198,7 +197,6 @@
     "qdrant_k8s",
     "qdrant_test",
     "query_database",
-    "quote_gpu",
     "ray_disagg_pd_deploy",
     "ray_list_jobs",
     "ray_parallelism_strategy",

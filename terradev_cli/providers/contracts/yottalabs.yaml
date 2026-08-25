@@ -9,3 +9,55 @@ endpoints:
   path: nodes
   expected_response_fields:
   - nodes
+- name: gpu_types
+  method: GET
+  path: gpu-types
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: pods
+  method: POST
+  path: pods
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: pods_drift_test
+  method: GET
+  path: pods/drift-test
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: pods_drift_test_pause
+  method: POST
+  path: pods/drift-test/pause
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: pods_drift_test_run
+  method: POST
+  path: pods/drift-test/run
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: pods_drift_test
+  method: DELETE
+  path: pods/drift-test
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: pods
+  method: GET
+  path: pods
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: pods_drift_test_logs
+  method: GET
+  path: pods/drift-test/logs
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []

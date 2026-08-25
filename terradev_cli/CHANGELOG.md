@@ -109,7 +109,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [5.0.3] - 2026-04-10
 
 ### 🚀 **5 New Cloud Providers**
-- **FluidStack**: auth header `api-key` (not Bearer)
 - **Alibaba Cloud**: HMAC-SHA1 signed URLs, RFC 3986 percent-encoding
 - **OVHcloud**: `X-Ovh-Signature` HMAC, raw aiohttp to avoid header clobbering
 - **Hetzner**: Cloud + Robot API dual support

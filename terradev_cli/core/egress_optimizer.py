@@ -103,12 +103,6 @@ _STATIC_EGRESS_RATES: Dict[str, Dict[str, float]] = {
         "cross_continent": 0.00,
         "internet": 0.00,
     },
-    "fluidstack": {
-        "same_region": 0.00,
-        "same_continent": 0.00,
-        "cross_continent": 0.00,
-        "internet": 0.00,
-    },
     "siliconflow": {
         "same_region": 0.00,
         "same_continent": 0.00,
@@ -116,12 +110,6 @@ _STATIC_EGRESS_RATES: Dict[str, Dict[str, float]] = {
         "internet": 0.00,
     },
     # ── Mid-tier clouds ──────────────────────────────────────────────
-    "coreweave": {
-        "same_region": 0.00,
-        "same_continent": 0.01,
-        "cross_continent": 0.05,
-        "internet": 0.05,
-    },
     "crusoe": {
         "same_region": 0.00,
         "same_continent": 0.00,
@@ -601,14 +589,13 @@ def find_cheapest_multihop(
 
     Returns:
         {
-            "path": ["aws", "runpod", "coreweave"],
             "hops": 2,
             "total_cost": 0.00,
             "direct_cost": 4.50,
             "savings": 4.50,
             "legs": [
                 {"from": "aws", "to": "runpod", "cost": 0.00},
-                {"from": "runpod", "to": "coreweave", "cost": 0.00},
+                {"from": "runpod", "to":, "cost": 0.00},
             ]
         }
     """

@@ -10,3 +10,34 @@ endpoints:
   path: models
   expected_response_fields:
   - models
+- name: models
+  method: POST
+  path: models
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: models_drift_test
+  method: GET
+  path: models/drift-test
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: models_drift_test_deployments_production
+  method: PATCH
+  path: models/drift-test/deployments/production
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: models_drift_test
+  method: DELETE
+  path: models/drift-test
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: models_drift_test_predict
+  method: POST
+  path: models/drift-test/predict
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []

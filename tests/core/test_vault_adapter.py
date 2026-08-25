@@ -20,10 +20,6 @@ def vault(tmp_path, monkeypatch):
 def test_parse_env_name_known_providers():
     assert VaultAdapter.parse_env_name("TERRADEV_RUNPOD_API_KEY") == ("runpod", "api_key")
     assert VaultAdapter.parse_env_name("TERRADEV_AWS_SECRET_KEY") == ("aws", "secret_key")
-    assert VaultAdapter.parse_env_name("TERRADEV_LAMBDA_LABS_API_KEY") == (
-        "lambda_labs",
-        "api_key",
-    )
     assert VaultAdapter.parse_env_name("TERRADEV_GCP_PROJECT_ID") == ("gcp", "project_id")
     assert VaultAdapter.parse_env_name("TERRADEV_FOO_BAR") == ("foo", "bar")
     assert VaultAdapter.parse_env_name("TERRADEV_FOO") == (None, None)

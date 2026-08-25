@@ -276,40 +276,6 @@ class RealGPUPricing:
 
         return quotes
 
-    async def get_coreweave_pricing(
-        self, gpu_type: str, region: str = "us-east-04e"
-    ) -> List[Dict[str, Any]]:
-        """Get real CoreWeave pricing"""
-        pricing_data = {
-            "A100": {"dedicated": 2.21, "shared": 1.10},
-            "H100": {"dedicated": 3.50, "shared": 2.20},
-            "V100": {"dedicated": 1.05, "shared": 0.65},
-            "T4": {"dedicated": 0.45, "shared": 0.25},
-            "RTX4090": {"dedicated": 0.95, "shared": 0.65},
-            "RTX3090": {"dedicated": 0.75, "shared": 0.45},
-        }
-
-        gpu_prices = pricing_data.get(gpu_type, {})
-        quotes = []
-
-        for tier, price in gpu_prices.items():
-            quotes.append(
-                {
-                    "instance_type": f"{gpu_type}-{tier}",
-                    "gpu_type": gpu_type,
-                    "price_per_hour": price,
-                    "region": region,
-                    "available": True,
-                    "provider": "coreweave",
-                    "spot": False,
-                    "gpu_count": 1,
-                    "price_per_gpu": price,
-                    "tier": tier,
-                }
-            )
-
-        return quotes
-
     async def get_all_provider_quotes(self, gpu_type: str) -> List[Dict[str, Any]]:
         """Get quotes from all providers"""
         tasks = [
@@ -318,7 +284,6 @@ class RealGPUPricing:
             self.get_gcp_pricing(gpu_type),
             self.get_runpod_pricing(gpu_type),
             self.get_vastai_pricing(gpu_type),
-            self.get_coreweave_pricing(gpu_type),
         ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)

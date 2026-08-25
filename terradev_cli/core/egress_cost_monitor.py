@@ -37,14 +37,15 @@ class EgressCostMonitor:
     EGRESS_COSTS = {
         # AWS
         "aws": {
-            "us-east-1": {"aws": 0.09, "gcp": 0.12, "azure": 0.09, "lambda_labs": 0.09},
-            "us-west-2": {"aws": 0.09, "gcp": 0.12, "azure": 0.09, "lambda_labs": 0.09},
-            "eu-west-1": {"aws": 0.09, "gcp": 0.12, "azure": 0.09, "lambda_labs": 0.09},
+            "us-east-1": {
+                "aws": 0.09,
+                "gcp": 0.12,
+                "azure": 0.10,
+            },
             "ap-southeast-1": {
                 "aws": 0.14,
                 "gcp": 0.19,
                 "azure": 0.17,
-                "lambda_labs": 0.14,
             },
         },
         # GCP
@@ -53,44 +54,32 @@ class EgressCostMonitor:
                 "aws": 0.12,
                 "gcp": 0.12,
                 "azure": 0.09,
-                "lambda_labs": 0.12,
             },
-            "us-west1": {"aws": 0.12, "gcp": 0.12, "azure": 0.09, "lambda_labs": 0.12},
             "europe-west1": {
                 "aws": 0.12,
                 "gcp": 0.12,
                 "azure": 0.09,
-                "lambda_labs": 0.12,
             },
             "asia-east1": {
                 "aws": 0.19,
                 "gcp": 0.19,
                 "azure": 0.17,
-                "lambda_labs": 0.19,
             },
         },
         # Azure
         "azure": {
-            "eastus": {"aws": 0.09, "gcp": 0.12, "azure": 0.09, "lambda_labs": 0.09},
-            "westus2": {"aws": 0.09, "gcp": 0.12, "azure": 0.09, "lambda_labs": 0.09},
             "westeurope": {
                 "aws": 0.09,
                 "gcp": 0.12,
                 "azure": 0.09,
-                "lambda_labs": 0.09,
             },
             "southeastasia": {
                 "aws": 0.14,
                 "gcp": 0.19,
                 "azure": 0.17,
-                "lambda_labs": 0.14,
             },
         },
         # GPU-first providers (typically zero egress)
-        "lambda_labs": {
-            "us-east-1": {"aws": 0.0, "gcp": 0.0, "azure": 0.0, "lambda_labs": 0.0},
-            "us-west-2": {"aws": 0.0, "gcp": 0.0, "azure": 0.0, "lambda_labs": 0.0},
-        },
         "runpod": {
             "us-east": {"aws": 0.0, "gcp": 0.0, "azure": 0.0, "runpod": 0.0},
         },
@@ -242,7 +231,7 @@ class EgressCostMonitor:
             )
 
         # Check for zero-egress alternatives
-        zero_egress_providers = ["lambda_labs", "runpod"]
+        zero_egress_providers = [ "runpod"]
         if (
             src_provider in zero_egress_providers
             or dst_provider in zero_egress_providers
@@ -287,7 +276,7 @@ class EgressCostMonitor:
         alternatives = []
 
         # Zero-egress provider alternatives
-        zero_egress_providers = ["lambda_labs", "runpod"]
+        zero_egress_providers = [ "runpod"]
 
         for provider in zero_egress_providers:
             if provider != src_provider and provider != dst_provider:
@@ -454,7 +443,7 @@ class EgressCostMonitor:
                     estimated_cost=current_spend,
                     data_size_gb=0,
                     recommendation="Immediately review all data transfers and consider alternatives",
-                    alternative_providers=["lambda_labs", "runpod"],
+                    alternative_providers=[ "runpod"],
                 )
             )
         elif utilization >= 75:
@@ -465,7 +454,7 @@ class EgressCostMonitor:
                     estimated_cost=current_spend,
                     data_size_gb=0,
                     recommendation="Monitor remaining budget carefully and optimize transfers",
-                    alternative_providers=["lambda_labs", "runpod"],
+                    alternative_providers=[ "runpod"],
                 )
             )
         elif utilization >= 50:

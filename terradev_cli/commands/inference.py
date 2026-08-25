@@ -1113,8 +1113,7 @@ def infer():
 @click.option(
     "--provider",
     "-p",
-    type=click.Choice(["runpod", "vastai", "lambda_labs", "baseten", "huggingface", "siliconflow", "inferx"]),
-    help="Provider (runpod|vastai|lambda_labs|baseten|huggingface|siliconflow|inferx)",
+    type=click.Choice(["runpod", "vastai", "baseten", "huggingface", "siliconflow", "inferx"]),
 )
 @click.option("--gpu-type", "-g", help="GPU type preference")
 @click.option("--region", "-r", help="Region preference")
@@ -1126,7 +1125,6 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
     Queries all configured inference providers (GPU-based and inference-only)
     and prints the best quote. To actually deploy, use `terradev infer endpoint`.
 
-    Supported providers: runpod, vastai, lambda_labs, baseten, huggingface,
     siliconflow, inferx.
     """
     print(f"Deploying inference for model: {model}")
@@ -1149,9 +1147,9 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
 
     api = TerradevAPI()
     target_gpu = gpu_type or "A100"
-    inference_providers = ["runpod", "vastai", "lambda_labs", "baseten", "huggingface", "siliconflow", "inferx"]
+    inference_providers = ["runpod", "vastai", "baseten", "huggingface", "siliconflow", "inferx"]
     if provider:
-        inference_providers = [provider.replace("lambda", "lambda_labs")]
+        inference_providers = [provider.replace("lambda")]
 
     async def _fetch_inference_quotes():
         all_q = []
@@ -1290,8 +1288,7 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
 @click.option(
     "--provider",
     "-p",
-    type=click.Choice(["runpod", "vastai", "lambda_labs", "baseten", "huggingface", "siliconflow", "inferx"]),
-    help="Provider (runpod|vastai|lambda_labs|baseten|huggingface|siliconflow|inferx)",
+    type=click.Choice(["runpod", "vastai", "baseten", "huggingface", "siliconflow", "inferx"]),
 )
 @click.option("--gpu-type", "-g", help="GPU type (A100|H100|RTX4090)")
 @click.option("--min-workers", type=int, default=1, help="Minimum workers")
@@ -1314,7 +1311,6 @@ def infer_endpoint(
 
     MODEL_PATH is passed to inference-only providers (huggingface, baseten,
     siliconflow, inferx) as their deployment model. For GPU-VM providers
-    (runpod, vastai, lambda_labs) it is used as the endpoint label.
 
     Use --provider to pin a specific provider or omit it to pick the cheapest
     quote. Use --dry-run to preview the selected provider before provisioning.
@@ -1341,9 +1337,9 @@ def infer_endpoint(
 
     api = TerradevAPI()
     target_gpu = gpu_type or "A100"
-    target_providers = ["runpod", "vastai", "lambda_labs", "baseten", "huggingface", "siliconflow", "inferx"]
+    target_providers = ["runpod", "vastai", "baseten", "huggingface", "siliconflow", "inferx"]
     if provider:
-        target_providers = [provider.replace("lambda", "lambda_labs")]
+        target_providers = [provider.replace("lambda")]
 
     # Get best quote
     async def _get_best_quote():

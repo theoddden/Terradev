@@ -10,3 +10,24 @@ endpoints:
   path: nodes
   expected_response_fields:
   - nodes
+- name: plans
+  method: GET
+  path: plans
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: node_types
+  method: GET
+  path: node-types
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: images
+  method: GET
+  path: images
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields: []

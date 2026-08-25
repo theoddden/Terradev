@@ -40,7 +40,6 @@ from .gpu_catalog import (
 )
 
 # Individual provider classes (lazy-loaded via ProviderFactory, but exported for direct import)
-from .lambda_labs_provider import LambdaLabsProvider
 from .runpod_provider import RunPodProvider
 
 __all__ = [
@@ -64,7 +63,6 @@ __all__ = [
     "ProviderFactory",
     "ProviderRegistry",
     # Individual providers (for direct import)
-    "LambdaLabsProvider",
     "RunPodProvider",
     # GPU catalog functions
     "normalize",

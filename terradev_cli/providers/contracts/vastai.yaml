@@ -15,3 +15,48 @@ endpoints:
   - offers.gpu_name
   - offers.num_gpus
   - offers.dph_total
+- name: bundles
+  method: POST
+  path: bundles
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: asks_drift_test
+  method: PUT
+  path: asks/drift-test
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: instances_drift_test
+  method: GET
+  path: instances/drift-test
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: instances_drift_test
+  method: PUT
+  path: instances/drift-test
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: instances_drift_test
+  method: DELETE
+  path: instances/drift-test
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: instances?owner=me
+  method: GET
+  path: instances?owner=me
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: instances_drift_test?owner=me
+  method: GET
+  path: instances/drift-test?owner=me
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []

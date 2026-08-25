@@ -190,7 +190,6 @@ print("SUCCESS")
     print("   📈 MLA compression ratios: 5-13x KV cache reduction")
     print("   ⚡ Cold start reduction: 30-45 min → under 3 min")
     print("   🔄 Spot interruption handling: 2-min notice → <2-min recovery")
-    print("   🎯 Real-world deployment: Lambda + CoreWeave ready")
 
     # Test coverage
     print("\n🧪 Test Coverage:")

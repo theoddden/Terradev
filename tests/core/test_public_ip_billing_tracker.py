@@ -115,7 +115,7 @@ async def test_detect_idle_ips(tracker):
 async def test_get_billing_alerts(tracker):
     """Billing alerts are generated when idle cost is high."""
     await tracker.track_public_ip(
-        provider="coreweave",
+        provider="aws",
         instance_id="i-3",
         ip_address="3.4.5.6",
         region="us-east-1",

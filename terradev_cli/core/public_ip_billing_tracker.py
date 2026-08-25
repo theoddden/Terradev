@@ -41,13 +41,11 @@ class PublicIPBillingTracker:
         "aws": 0.0045,  # ~$3.24/month
         "gcp": 0.0025,  # ~$1.80/month
         "azure": 0.0036,  # ~$2.59/month
-        "coreweave": 0.005,  # Separate charge, ~$3.60/month
         "digitalocean": 0.005,  # ~$3.60/month
         "vultr": 0.005,  # ~$3.60/month
         "linode": 0.005,  # ~$3.60/month
         "hetzner": 0.0,  # Included in server price
         "runpod": 0.0,  # Included
-        "lambda_labs": 0.0,  # Included
     }
 
     def __init__(self):
@@ -88,9 +86,9 @@ class PublicIPBillingTracker:
             "hourly_cost": hourly_cost,
             "monthly_cost_estimate": hourly_cost * 730,  # 30.42 days * 24 hours
             "billing_separate": provider
-            in ["coreweave", "digitalocean", "vultr", "linode"],
+            in [ "digitalocean", "vultr", "linode"],
             "included_in_instance_cost": provider
-            in ["hetzner", "runpod", "lambda_labs"],
+            in ["hetzner", "runpod"],
             "status": record.status.value,
             "recommendations": self._get_ip_recommendations(record),
         }
@@ -266,7 +264,7 @@ class PublicIPBillingTracker:
         # Provider-specific alerts
         for provider, cost in current_cost_analysis["cost_by_provider"].items():
             if (
-                provider in ["coreweave", "digitalocean", "vultr", "linode"]
+                provider in [ "digitalocean", "vultr", "linode"]
                 and cost > 20.0
             ):
                 alerts.append(
@@ -286,19 +284,9 @@ class PublicIPBillingTracker:
         """Get recommendations for IP management"""
         recommendations = []
 
-        if record.provider in ["coreweave", "digitalocean", "vultr", "linode"]:
-            recommendations.append(
-                "Public IP billed separately - monitor usage carefully"
-            )
-
         if record.provider in ["aws", "gcp", "azure"]:
             recommendations.append(
                 "Consider using Elastic IP reservations for long-term assignments"
-            )
-
-        if record.provider in ["hetzner", "runpod", "lambda_labs"]:
-            recommendations.append(
-                "Public IP included in instance cost - no additional charges"
             )
 
         return recommendations
@@ -356,13 +344,6 @@ class PublicIPBillingTracker:
         if unused_count > 0:
             recommendations.append(f"Clean up {unused_count} unused IPs")
 
-        # Provider-specific recommendations
-        coreweave_count = sum(1 for r in records if r.provider == "coreweave")
-        if coreweave_count > 5:
-            recommendations.append(
-                f"Review {coreweave_count} CoreWeave IPs - billed separately"
-            )
-
         return recommendations
 
     async def get_provider_summary(self, provider: str) -> Dict[str, Any]:
@@ -393,10 +374,6 @@ class PublicIPBillingTracker:
             )
 
         # Determine billing model
-        if provider.lower() in ["hetzner", "runpod", "lambda_labs"]:
-            billing_model = "included_in_instance_cost"
-        elif provider.lower() in ["coreweave", "digitalocean", "vultr", "linode"]:
-            billing_model = "separate_charge"
         else:
             billing_model = "standard_cloud_pricing"
 
@@ -428,15 +405,7 @@ class PublicIPBillingTracker:
 
         recommendations = []
 
-        if provider == "coreweave":
-            recommendations.extend(
-                [
-                    "CoreWeave bills public IPs separately - monitor carefully",
-                    "Consider using internal networking when possible",
-                    "Release unused IPs immediately to avoid charges",
-                ]
-            )
-        elif provider == "aws":
+        if provider == "aws":
             recommendations.extend(
                 [
                     "Use Elastic IP reservations for long-term assignments",

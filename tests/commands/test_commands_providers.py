@@ -139,11 +139,6 @@ class TestConfigureCommand:
         assert result.exit_code == 0
         assert "VASTAI" in result.output
 
-    def test_lambda_echoes_provider_name(self, runner, mock_api):
-        result = runner.invoke(
-            cli, ["configure", "--provider", "lambda_labs"], obj={"api": mock_api}, input="test-key\n"
-        )
-        assert result.exit_code == 0
 
     def test_unknown_provider_accepted_not_crash(self, runner, mock_api):
         """configure rejects unknown provider names gracefully."""
@@ -187,10 +182,6 @@ class TestSetupCommand:
 
     def test_setup_tensordock_exits_zero(self, runner, mock_api):
         result = runner.invoke(cli, ["setup", "tensordock"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    def test_setup_lambda_labs_exits_zero(self, runner, mock_api):
-        result = runner.invoke(cli, ["setup", "lambda_labs"], obj={"api": mock_api})
         assert result.exit_code == 0
 
     def test_setup_crusoe_exits_zero(self, runner, mock_api):

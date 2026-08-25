@@ -10,3 +10,88 @@ endpoints:
   path: servers
   expected_response_fields:
   - data
+- name: plans
+  method: GET
+  path: plans
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: virtual_machines_plans
+  method: GET
+  path: virtual-machines/plans
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: projects
+  method: GET
+  path: projects
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: regions
+  method: GET
+  path: regions
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: servers
+  method: POST
+  path: servers
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: virtual_machines
+  method: POST
+  path: virtual-machines
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: servers_drift_test
+  method: GET
+  path: servers/drift-test
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: virtual_machines_drift_test
+  method: GET
+  path: virtual-machines/drift-test
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: servers_drift_test_actions
+  method: POST
+  path: servers/drift-test/actions
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: virtual_machines_drift_test_actions
+  method: POST
+  path: virtual-machines/drift-test/actions
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: servers_drift_test
+  method: DELETE
+  path: servers/drift-test
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: virtual_machines_drift_test
+  method: DELETE
+  path: virtual-machines/drift-test
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: virtual_machines
+  method: GET
+  path: virtual-machines
+  enabled: true
+  expected_response_fields:
+  - data
+  optional_response_fields: []

@@ -161,35 +161,11 @@ class TestRealGPUPricing:
         quotes = run_async(pricing.get_vastai_pricing("INVALID_GPU"))
         assert quotes == []
 
-    def test_get_coreweave_pricing_a100(self):
-        """Get CoreWeave pricing for A100"""
-        pricing = RealGPUPricing()
-        quotes = run_async(pricing.get_coreweave_pricing("A100"))
-        
-        assert len(quotes) > 0
-        assert all(q["provider"] == "coreweave" for q in quotes)
-        assert all(q["gpu_type"] == "A100" for q in quotes)
-        assert all("tier" in q for q in quotes)
-
-    def test_get_coreweave_pricing_rtx4090(self):
-        """Get CoreWeave pricing for RTX4090"""
-        pricing = RealGPUPricing()
-        quotes = run_async(pricing.get_coreweave_pricing("RTX4090"))
-        
-        assert len(quotes) > 0
-        assert all(q["gpu_type"] == "RTX4090" for q in quotes)
-
-    def test_get_coreweave_pricing_invalid_gpu(self):
-        """Get CoreWeave pricing for invalid GPU returns empty"""
-        pricing = RealGPUPricing()
-        quotes = run_async(pricing.get_coreweave_pricing("INVALID_GPU"))
-        assert quotes == []
-
     def test_get_all_provider_quotes(self):
         """Get quotes from all providers"""
         pricing = RealGPUPricing()
         quotes = run_async(pricing.get_all_provider_quotes("A100"))
-        
+
         assert len(quotes) > 0
         providers = set(q["provider"] for q in quotes)
         assert "aws" in providers
@@ -197,7 +173,6 @@ class TestRealGPUPricing:
         assert "gcp" in providers
         assert "runpod" in providers
         assert "vastai" in providers
-        assert "coreweave" in providers
 
     def test_get_all_provider_quotes_invalid_gpu(self):
         """Get all provider quotes for invalid GPU returns empty"""

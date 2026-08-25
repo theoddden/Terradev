@@ -163,8 +163,6 @@ def format_provider(provider: str) -> str:
         "azure": "🟦",
         "runpod": "🚀",
         "vastai": "🌐",
-        "lambda_labs": "⚡",
-        "coreweave": "🔷",
         "tensordock": "🔶",
     }
 

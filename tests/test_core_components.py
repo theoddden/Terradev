@@ -143,9 +143,8 @@ class TestProviderRegistry:
 
     def test_provider_health_has_name(self, registry):
         """Regression test for observation #10 — provider name must not be empty."""
-        health = registry._get_health("lambda_labs")
-        assert health.provider == "lambda_labs"
-
+        health = registry._get_health("runpod")
+        assert health.provider == "runpod"
     async def test_record_success_resets_failures(self, registry):
         await registry.record_failure("runpod", "err")
         await registry.record_success("runpod", latency_ms=50.0)
@@ -329,7 +328,7 @@ class TestAuthManager:
     def test_list_providers(self, auth_manager):
         providers = auth_manager.list_providers()
         assert "runpod" in providers
-        assert "lambda_labs" in providers
+        assert "runpod" in providers
 
 
 # ── CredentialVault Python fallback ───────────────────────────────────────────
@@ -384,7 +383,7 @@ class TestProviderFactory:
         factory = ProviderFactory()
         providers = factory.get_supported_providers()
         assert "runpod" in providers
-        assert "lambda_labs" in providers
+        assert "runpod" in providers
         assert "aws" in providers
 
     def test_unknown_provider_raises_value_error(self):

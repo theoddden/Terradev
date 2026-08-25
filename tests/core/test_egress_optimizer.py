@@ -92,7 +92,6 @@ def test_optimize_staging_route_recommends_direct_when_no_savings():
         "us-east-1",
         [
             {"provider": "runpod", "region": "us-east-1"},
-            {"provider": "coreweave", "region": "us-east-1"},
         ],
         1000,
     )

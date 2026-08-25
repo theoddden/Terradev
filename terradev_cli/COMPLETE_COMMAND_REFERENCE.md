@@ -780,7 +780,6 @@ Options:
 #### **setup** - Get setup instructions for any cloud provider
 
 ```bash
-terradev setup [OPTIONS] {runpod|vastai|lambda_labs|tensordock|crusoe|bas
 Options:
   -q, --quick  Show quick setup summary
   --help       Show this message and exit.

@@ -192,7 +192,6 @@ class SmartDeploymentRouter:
             "lambda": 0.9,
             "vastai": 0.8,
             "tensordock": 0.8,
-            "coreweave": 0.7,
             "aws": 0.6,
             "gcp": 0.6,
             "azure": 0.5,

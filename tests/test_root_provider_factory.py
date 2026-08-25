@@ -195,8 +195,7 @@ class TestProviderFactory:
         
         expected_providers = [
             "aws", "gcp", "azure", "runpod", "vastai",
-            "lambda_labs", "coreweave", "tensordock",
-            "demo", "latitude"
+            "tensordock", "demo", "latitude",
         ]
         
         for provider in expected_providers:

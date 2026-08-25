@@ -13,10 +13,7 @@ Terradev is a comprehensive ML infrastructure platform spanning **provisioning â
 | **AWS** | Major Cloud | Spot instances, EFA, NCCL, 2-min termination | boto3 + SSM |
 | **Azure** | Major Cloud | GPU VMs, Hardware profiles, Tags | Azure SDK |
 | **GCP** | Major Cloud | A3/A4/A4X GPUs, Capacity reservations, TPU | Google Cloud SDK |
-| **Lambda Labs** | GPU Specialist | Egress advantage, Capacity fallback | REST API |
-| **CoreWeave** | Kubernetes-Native | GPU operator, MIG, Billing checks | API + K8s |
 | **RunPod** | GPU Specialist | GraphQL, Volume attachment, Rate limiting | GraphQL API |
-| **FluidStack** | GPU Specialist | Custom auth (`api-key:`), Fast GPUs | REST API |
 | **Hetzner** | Mixed | Robot API + Cloud, Traffic monitoring | Dual APIs |
 | **Alibaba** | Major Cloud | Compliance alerts, Signed URLs, Cross-border | HMAC-SHA1 |
 | **OVHcloud** | European | X-Ovh-Signature headers, Time delta | Custom auth |

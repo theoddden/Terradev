@@ -1,3 +1,5 @@
+import pytest
+
 """Tests for terradev_cli.core.kv_cache_checkpoint_manager.
 
 These cover the P0 KV cache checkpointing feature end-to-end: create, restore,

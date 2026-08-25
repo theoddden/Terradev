@@ -82,7 +82,6 @@ def auth_manager(tmp_config_dir: Path):
     """
     A real AuthManager instance backed by a temp directory.
 
-    Pre-loaded with fake credentials for runpod and lambda_labs so tests
     that need credentials don't have to configure them manually.
     """
     from terradev_cli.core.auth import AuthManager
@@ -91,7 +90,6 @@ def auth_manager(tmp_config_dir: Path):
     mgr = AuthManager.load(str(auth_file))
     mgr.credentials = {
         "runpod": {"api_key": "test-runpod-key-abc123"},
-        "lambda_labs": {"api_key": "test-lambda-key-xyz789"},
         "aws": {
             "api_key": "AKIAIOSFODNN7EXAMPLE",
             "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -149,9 +147,7 @@ def mock_api(tmp_config_dir: Path):
     api.get_aws_quotes = AsyncMock(return_value=[])
     api.get_gcp_quotes = AsyncMock(return_value=[])
     api.get_azure_quotes = AsyncMock(return_value=[])
-    api.get_lambda_quotes = AsyncMock(return_value=[])
     api.get_tensordock_quotes = AsyncMock(return_value=[])
-    api.get_coreweave_quotes = AsyncMock(return_value=[])
     api.get_oracle_quotes = AsyncMock(return_value=[])
     api.get_crusoe_quotes = AsyncMock(return_value=[])
 
@@ -232,7 +228,7 @@ def registry():
     from terradev_cli.providers.provider_factory import ProviderFactory
 
     mock_factory = MagicMock(spec=ProviderFactory)
-    mock_factory.get_supported_providers.return_value = ["runpod", "lambda_labs", "vastai"]
+    mock_factory.get_supported_providers.return_value = ["runpod", "vastai"]
     return ProviderRegistry(factory=mock_factory)
 
 
@@ -248,8 +244,6 @@ def patch_registry():
             "gcp",
             "azure",
             "tensordock",
-            "lambda_labs",
-            "coreweave",
             "oracle",
             "crusoe",
         ]

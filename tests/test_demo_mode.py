@@ -74,7 +74,7 @@ class TestDemoModeProvider:
         provider = DemoModeProvider("runpod")
         expected_providers = [
             "runpod", "vastai", "aws", "azure", "gcp",
-            "coreweave", "lambda_labs", "tensordock", "oracle", "crusoe"
+            "tensordock", "oracle", "crusoe",
         ]
         for provider_name in expected_providers:
             assert provider_name in provider.demo_data
@@ -86,7 +86,7 @@ class TestDemoModeManager:
     def test_initialization(self):
         """Manager initializes with all providers"""
         manager = DemoModeManager()
-        assert len(manager.providers) == 10
+        assert len(manager.providers) == 8
         assert "runpod" in manager.providers
         assert "aws" in manager.providers
         assert "gcp" in manager.providers

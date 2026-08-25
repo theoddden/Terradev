@@ -3,7 +3,6 @@
 Provider Conformance Tests for New Providers
 
 Tests the 5 new providers added in recent work:
-- FluidStack
 - Alibaba
 - OVHcloud
 - Hetzner
@@ -25,7 +24,6 @@ from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from terradev_cli.providers.fluidstack_provider import FluidStackProvider
 from terradev_cli.providers.alibaba_provider import AlibabaProvider
 from terradev_cli.providers.ovhcloud_provider import OVHcloudProvider
 from terradev_cli.providers.hetzner_provider import HetznerProvider
@@ -34,29 +32,6 @@ from terradev_cli.providers.siliconflow_provider import SiliconFlowProvider
 
 def run_async(coro):
     return asyncio.get_event_loop().run_until_complete(coro)
-
-
-class TestFluidStackProvider:
-    """Test FluidStack provider - uses api-key header (not Bearer)"""
-
-    def test_auth_header_format(self):
-        """FluidStack uses api-key: <key> NOT Authorization: Bearer"""
-        provider = FluidStackProvider(credentials={"api_key": "test-key-123"})
-        headers = provider._get_auth_headers()
-        assert headers == {"api-key": "test-key-123"}
-        assert "Authorization" not in headers
-
-    @pytest.mark.asyncio
-    async def test_no_api_key_returns_empty_quotes(self):
-        """FluidStack returns empty quotes without API key"""
-        provider = FluidStackProvider({})
-        result = await provider.get_instance_quotes("A100")
-        assert result == []
-
-    def test_auth_headers_without_key(self):
-        provider = FluidStackProvider(credentials={})
-        headers = provider._get_auth_headers()
-        assert headers == {}
 
 
 class TestAlibabaProvider:
@@ -188,7 +163,6 @@ class TestProviderOutputSchemaConsistency:
     @pytest.mark.parametrize(
         "provider_class,credentials",
         [
-            (FluidStackProvider, {"api_key": "test"}),
             (AlibabaProvider, {"access_key_id": "test", "access_key_secret": "test"}),
             (
                 OVHcloudProvider,

@@ -57,20 +57,8 @@ def prompt_for_credentials():
         "azure": {
             "name": "Azure",
             "key_name": "Client ID",
-            "help": "Get from: Azure Portal → App registrations",
+            "help": "Azure Portal → Azure AD → App Registrations → New Registration. Create client secret under Certificates & Secrets. Get subscription ID and assign Contributor role.",
             "example": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-        },
-        "lambda_labs": {
-            "name": "Lambda Labs",
-            "key_name": "API Key",
-            "help": "Get from: Lambda Labs dashboard",
-            "example": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        },
-        "coreweave": {
-            "name": "CoreWeave",
-            "key_name": "API Key",
-            "help": "Get from: CoreWeave dashboard",
-            "example": "cw_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         },
         "tensordock": {
             "name": "TensorDock",
@@ -81,7 +69,7 @@ def prompt_for_credentials():
         "oracle": {
             "name": "Oracle Cloud",
             "key_name": "API Key",
-            "help": "Get from: Oracle Cloud Console",
+            "help": "Uses an OCI config file with tenancy OCID, user OCID, fingerprint, private key file and region. Generate via OCI Console → Profile → API Keys.",
             "example": "ocid1.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         },
         "crusoe": {

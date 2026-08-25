@@ -95,7 +95,6 @@ Added **provider registration and profiling system** for intelligent quirk-aware
 
 - **ProviderProfile schema** (`providers/types.py`): Encodes provider-specific behaviors including API style (REST/GraphQL/JSON:API), authentication type (Bearer/Basic/HMAC/X-Api-Key), rate limits, spot instance support, egress costs, fallback routing, capacity checks, container image pinning, and spot interruption handling.
 
-- **Built-in profiles** (`providers/provider_profiles.py`): Pre-configured profiles for all 23 providers (RunPod, Vast.ai, Lambda Labs, AWS, GCP, Azure, Oracle, Crusoe, CoreWeave, DigitalOcean, Yotta Labs, E2E Networks, FluidStack, Alibaba, OVHcloud, Hetzner, SiliconFlow, TensorDock, Baseten, HuggingFace, Hyperstack, InferX, Latitude).
 
 - **Dynamic registration**: Users can register custom provider profiles programmatically or load from YAML/JSON files for internal clusters or proprietary cloud providers.
 
@@ -183,7 +182,6 @@ Paste your API key when prompted. It's stored locally at ~/.terradev/credentials
 
 ```bash
 terradev configure --provider vastai
-terradev configure --provider lambda_labs
 terradev configure --provider aws
 ```
 

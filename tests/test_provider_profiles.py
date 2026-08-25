@@ -50,14 +50,6 @@ class TestGetProfile:
         assert profile.supports_spot is True
         assert profile.rate_limit_per_minute == 100
 
-    def test_get_profile_lambda_labs(self):
-        """Get Lambda Labs profile with fallback routing"""
-        profile = get_profile("lambda_labs")
-        assert profile.name == "lambda_labs"
-        assert profile.has_fallback_routing is True
-        assert "runpod" in profile.fallback_providers
-
-
 class TestDefaultProfile:
     """Test _default_profile function"""
 

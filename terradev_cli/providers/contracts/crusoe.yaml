@@ -10,3 +10,63 @@ endpoints:
   method: GET
   path: projects
   expected_response_fields: []
+- name: compute_vms?project_id=drift_test
+  method: POST
+  path: compute/vms?project_id=drift-test
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: compute_vms_drift_test?project_id=drift_test
+  method: GET
+  path: compute/vms/drift-test?project_id=drift-test
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: compute_vms_drift_test_action?project_id=drift_test
+  method: POST
+  path: compute/vms/drift-test/action?project_id=drift-test
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: compute_vms_drift_test?project_id=drift_test
+  method: DELETE
+  path: compute/vms/drift-test?project_id=drift-test
+  enabled: false
+  expected_response_fields: []
+  optional_response_fields: []
+- name: compute_vms?project_id=drift_test
+  method: GET
+  path: compute/vms?project_id=drift-test
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: locations
+  method: GET
+  path: locations
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: compute_vms_types
+  method: GET
+  path: compute/vms/types
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: organizations_drift_test_billing_costs
+  method: GET
+  path: organizations/drift-test/billing/costs
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []
+- name: organizations_drift_test_reservations
+  method: GET
+  path: organizations/drift-test/reservations
+  enabled: false
+  expected_response_fields:
+  - data
+  optional_response_fields: []

@@ -193,10 +193,6 @@ class AuthManager:
         elif provider == "azure":
             # Azure uses Bearer token
             headers["Authorization"] = f"Bearer {cred['api_key']}"
-        elif provider in ["runpod", "vastai", "lambda_labs", "coreweave", "tensordock"]:
-            # Most GPU cloud providers use API key in header
-            headers["Authorization"] = f"Bearer {cred['api_key']}"
-
         return headers
 
     def rotate_api_key(self, provider: str, new_api_key: str) -> bool:

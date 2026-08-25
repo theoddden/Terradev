@@ -625,7 +625,6 @@ resource "terradev_kubernetes_cluster" "main" {{
             "aws",
             "alibaba",
             "ovhcloud",
-            "fluidstack",
             "hetzner",
             "siliconflow",
             "latitude",
@@ -781,7 +780,6 @@ def generate_terraform_config(
         "aws",
         "alibaba",
         "ovhcloud",
-        "fluidstack",
         "hetzner",
         "siliconflow",
     ]

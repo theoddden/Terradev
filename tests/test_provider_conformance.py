@@ -71,17 +71,14 @@ from terradev_cli.providers.alibaba_provider import AlibabaProvider
 from terradev_cli.providers.aws_provider import AWSProvider
 from terradev_cli.providers.azure_provider import AzureProvider
 from terradev_cli.providers.baseten_provider import BasetenProvider
-from terradev_cli.providers.coreweave_provider import CoreWeaveProvider
 from terradev_cli.providers.crusoe_provider import CrusoeProvider
 from terradev_cli.providers.digitalocean_provider import DigitalOceanProvider
 from terradev_cli.providers.e2e_networks_provider import E2ENetworksProvider
-from terradev_cli.providers.fluidstack_provider import FluidStackProvider
 from terradev_cli.providers.gcp_provider import GCPProvider
 from terradev_cli.providers.hetzner_provider import HetznerProvider
 from terradev_cli.providers.huggingface_provider import HuggingFaceProvider
 from terradev_cli.providers.hyperstack_provider import HyperstackProvider
 from terradev_cli.providers.inferx_provider import InferXProvider
-from terradev_cli.providers.lambda_labs_provider import LambdaLabsProvider
 from terradev_cli.providers.latitude_provider import LatitudeProvider
 from terradev_cli.providers.oracle_provider import OracleProvider
 from terradev_cli.providers.ovhcloud_provider import OVHcloudProvider
@@ -96,17 +93,14 @@ ALL_PROVIDERS = [
     AWSProvider,
     AzureProvider,
     BasetenProvider,
-    CoreWeaveProvider,
     CrusoeProvider,
     DigitalOceanProvider,
     E2ENetworksProvider,
-    FluidStackProvider,
     GCPProvider,
     HetznerProvider,
     HuggingFaceProvider,
     HyperstackProvider,
     InferXProvider,
-    LambdaLabsProvider,
     LatitudeProvider,
     OracleProvider,
     OVHcloudProvider,
@@ -280,8 +274,8 @@ for provider_class in ALL_PROVIDERS:
 async def test_all_providers_registered():
     """Verify all providers are registered and importable"""
     assert (
-        len(ALL_PROVIDERS) >= 22
-    ), f"Expected at least 22 providers, got {len(ALL_PROVIDERS)}"
+        len(ALL_PROVIDERS) >= 20
+    ), f"Expected at least 20 providers, got {len(ALL_PROVIDERS)}"
 
     # Verify each provider has required methods
     mock_creds = {

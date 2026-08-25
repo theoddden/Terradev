@@ -50,7 +50,6 @@ def test_should_optimize_suitable(optimizer):
             "gpu_count": 8,
             "distributed": True,
             "operations": ["allreduce"],
-            "provider": "coreweave",
             "network_topology": "infiniband",
         }
     )

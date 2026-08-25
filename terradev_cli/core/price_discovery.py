@@ -186,14 +186,6 @@ class PriceDiscoveryEngine:
                     "region": "us-east",
                 }
             ],
-            "coreweave": [
-                {
-                    "price_hr": 2.80,
-                    "instance_type": "A100",
-                    "spot": False,
-                    "region": "LGA1",
-                }
-            ],
             "tensordock": [
                 {
                     "price_hr": 1.80,
@@ -450,7 +442,6 @@ class SpotRiskAssessor:
             "azure": 0.25,  # Medium risk
             "vastai": 0.15,  # Low risk
             "lambda": 0.2,  # Low-medium risk
-            "coreweave": 0.1,  # Low risk
             "tensordock": 0.2,  # Low-medium risk
         }
 

@@ -45,17 +45,14 @@ def validate_credentials(provider: str, credentials: Dict[str, str]) -> bool:
         "aws": ["api_key", "secret_key"],
         "azure": ["subscription_id", "tenant_id", "client_id", "client_secret"],
         "baseten": ["api_key"],
-        "coreweave": ["api_key"],
         "crusoe": ["access_key", "secret_key", "project_id"],
         "digitalocean": ["api_key"],
         "e2enetworks": ["api_key"],
-        "fluidstack": ["api_key"],
         "gcp": ["project_id", "credentials_file"],
         "hetzner": ["api_token"],
         "huggingface": ["api_key", "namespace"],
         "hyperstack": ["api_key"],
         "inferx": ["api_key"],
-        "lambda_labs": ["api_key"],
         "latitude": ["api_key"],
         "oracle": ["api_key", "tenancy_ocid", "compartment_ocid", "region"],
         "ovhcloud": ["application_key", "application_secret", "consumer_key", "project_id"],
@@ -392,10 +389,6 @@ class TerradevAPI:
             creds["api_key"] = self.credentials.get("runpod_api_key", "")
         elif provider_name == "vastai":
             creds["api_key"] = self.credentials.get("vastai_api_key", "")
-        elif provider_name == "lambda_labs":
-            creds["api_key"] = self.credentials.get("lambda_api_key", "")
-        elif provider_name == "coreweave":
-            creds["api_key"] = self.credentials.get("coreweave_api_key", "")
         elif provider_name == "tensordock":
             creds["api_key"] = self.credentials.get("tensordock_api_key", "")
             creds["api_token"] = self.credentials.get("tensordock_api_token", "")
@@ -436,9 +429,6 @@ class TerradevAPI:
             creds["project_id"] = self.credentials.get("ovhcloud_project_id", "")
             creds["endpoint"] = self.credentials.get("ovhcloud_endpoint", "ovh-eu")
             creds["ssh_key_id"] = self.credentials.get("ovhcloud_ssh_key_id", "")
-        elif provider_name == "fluidstack":
-            creds["api_key"] = self.credentials.get("fluidstack_api_key", "")
-            creds["ssh_key_name"] = self.credentials.get("fluidstack_ssh_key_name", "")
         elif provider_name == "hetzner":
             creds["api_token"] = self.credentials.get("hetzner_api_token", "")
             creds["robot_user"] = self.credentials.get("hetzner_robot_user", "")
@@ -611,12 +601,6 @@ class TerradevAPI:
     async def get_tensordock_quotes(self, gpu_type: str):
         return await self._get_provider_quotes("tensordock", gpu_type)
 
-    async def get_lambda_quotes(self, gpu_type: str):
-        return await self._get_provider_quotes("lambda_labs", gpu_type)
-
-    async def get_coreweave_quotes(self, gpu_type: str):
-        return await self._get_provider_quotes("coreweave", gpu_type)
-
     async def get_oracle_quotes(self, gpu_type: str):
         """Oracle Cloud  requires API credentials (BYOAPI requirement)"""
         # CRITICAL FIX: Don't return quotes without API credentials
@@ -656,9 +640,6 @@ class TerradevAPI:
 
     async def get_e2enetworks_quotes(self, gpu_type: str):
         return await self._get_provider_quotes("e2enetworks", gpu_type)
-
-    async def get_fluidstack_quotes(self, gpu_type: str):
-        return await self._get_provider_quotes("fluidstack", gpu_type)
 
     async def get_hetzner_quotes(self, gpu_type: str):
         return await self._get_provider_quotes("hetzner", gpu_type)
@@ -831,18 +812,10 @@ def run_interactive_onboarding(api: TerradevAPI):
         "azure": {
             "name": "Azure",
             "key_name": "Client ID",
-            "help": "Get from: Azure Portal → App registrations",
+            "help": "Azure Portal → Azure AD → App Registrations → New Registration. Create client secret. Get subscription ID and assign Contributor role.",
             "example": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
             "env_var": "AZURE_CLIENT_ID",
             "why": "Enterprise integration, ND-series GPUs",
-        },
-        "lambda_labs": {
-            "name": "Lambda Labs",
-            "key_name": "API Key",
-            "help": "Get from: Lambda Labs dashboard → API Keys",
-            "example": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "env_var": "LAMBDA_API_KEY",
-            "why": "Fast provisioning, good for inference",
         },
         "tensordock": {
             "name": "TensorDock",
@@ -855,7 +828,7 @@ def run_interactive_onboarding(api: TerradevAPI):
         "oracle": {
             "name": "Oracle Cloud",
             "key_name": "API Key",
-            "help": "Get from: Oracle Cloud Console → Identity → Users → API Keys",
+            "help": "Uses an OCI config file: tenancy OCID, user OCID, fingerprint, private key file, region. Generate at OCI Console → Profile → API Keys.",
             "example": "ocid1.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             "env_var": "OCI_API_KEY",
             "why": "Reliable infrastructure, competitive pricing",

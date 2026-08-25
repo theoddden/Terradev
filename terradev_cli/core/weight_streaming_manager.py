@@ -420,7 +420,6 @@ class WeightStreamingManager:
             return False
 
     async def _download_from_vast(self, chunk: LayerChunk) -> bool:
-        """Download chunk from VAST Data (CoreWeave integration)"""
         try:
             # VAST Data API integration
             vast_config = self.config.storage_config

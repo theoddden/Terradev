@@ -131,22 +131,6 @@ class RateLimiter:
                 backoff_factor=2.0,
                 timeout=25.0,
             ),
-            "lambda_labs": ProviderRateLimit(
-                requests_per_second=4.0,
-                requests_per_minute=240,
-                burst_limit=12,
-                retry_attempts=3,
-                backoff_factor=1.8,
-                timeout=30.0,
-            ),
-            "coreweave": ProviderRateLimit(
-                requests_per_second=8.0,
-                requests_per_minute=480,
-                burst_limit=20,
-                retry_attempts=3,
-                backoff_factor=1.5,
-                timeout=25.0,
-            ),
             "tensordock": ProviderRateLimit(
                 requests_per_second=2.0,
                 requests_per_minute=120,

@@ -188,8 +188,6 @@ class DataGovernanceManager:
             "azure",
             "runpod",
             "vastai",
-            "lambda_labs",
-            "coreweave",
             "tensordock",
             "huggingface",
             "baseten",

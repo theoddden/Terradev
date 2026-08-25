@@ -18,8 +18,6 @@ class MockTerradevEngine:
             "azure",
             "runpod",
             "vastai",
-            "lambda_labs",
-            "coreweave",
             "tensordock",
         ]
         self.gpu_types = ["A100", "V100", "RTX4090", "H100", "RTX3090"]
@@ -68,8 +66,6 @@ class MockTerradevEngine:
                 "azure": 2.4,
                 "runpod": 2.0,
                 "vastai": 1.8,
-                "lambda_labs": 2.1,
-                "coreweave": 1.9,
                 "tensordock": 1.7,
             },
             "V100": {
@@ -78,8 +74,6 @@ class MockTerradevEngine:
                 "azure": 1.9,
                 "runpod": 1.6,
                 "vastai": 1.4,
-                "lambda_labs": 1.7,
-                "coreweave": 1.5,
                 "tensordock": 1.3,
             },
             "RTX4090": {
@@ -88,8 +82,6 @@ class MockTerradevEngine:
                 "azure": 1.5,
                 "runpod": 1.2,
                 "vastai": 1.0,
-                "lambda_labs": 1.3,
-                "coreweave": 1.1,
                 "tensordock": 0.9,
             },
             "H100": {
@@ -98,8 +90,6 @@ class MockTerradevEngine:
                 "azure": 3.9,
                 "runpod": 3.5,
                 "vastai": 3.2,
-                "lambda_labs": 3.6,
-                "coreweave": 3.3,
                 "tensordock": 3.0,
             },
             "RTX3090": {
@@ -108,8 +98,6 @@ class MockTerradevEngine:
                 "azure": 1.2,
                 "runpod": 1.0,
                 "vastai": 0.8,
-                "lambda_labs": 1.1,
-                "coreweave": 0.9,
                 "tensordock": 0.7,
             },
         }
@@ -151,8 +139,6 @@ class MockTerradevEngine:
             "azure": 0.92,
             "runpod": 0.85,
             "vastai": 0.80,
-            "lambda_labs": 0.82,
-            "coreweave": 0.88,
             "tensordock": 0.78,
         }
         reliability_score = reliability_scores.get(provider, 0.8)
@@ -195,8 +181,6 @@ class MockTerradevEngine:
                 "azure": "🟦",
                 "runpod": "🚀",
                 "vastai": "🌐",
-                "lambda_labs": "⚡",
-                "coreweave": "🔷",
                 "tensordock": "🔶",
             }
 

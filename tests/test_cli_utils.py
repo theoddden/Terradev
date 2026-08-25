@@ -81,16 +81,6 @@ class TestValidateCredentials:
         creds = {"api_key": "test_key"}
         assert validate_credentials("vastai", creds) is True
 
-    def test_validate_lambda_labs_complete(self):
-        """Validate Lambda Labs with complete credentials"""
-        creds = {"api_key": "test_key"}
-        assert validate_credentials("lambda_labs", creds) is True
-
-    def test_validate_coreweave_complete(self):
-        """Validate CoreWeave with complete credentials"""
-        creds = {"api_key": "test_key"}
-        assert validate_credentials("coreweave", creds) is True
-
     def test_validate_tensordock_complete(self):
         """Validate TensorDock with complete credentials"""
         creds = {"api_key": "test_key", "api_token": "test_token"}
@@ -428,24 +418,6 @@ class TestTerradevAPI:
                 creds = api._provider_creds("vastai")
                 assert creds == {"api_key": "test_key"}
 
-    def test_provider_creds_flat_format_lambda_labs(self):
-        """_provider_creds returns flat format Lambda Labs credentials"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("pathlib.Path.home", return_value=Path(tmpdir)):
-                api = TerradevAPI()
-                api.credentials = {"lambda_api_key": "test_key"}
-                creds = api._provider_creds("lambda_labs")
-                assert creds == {"api_key": "test_key"}
-
-    def test_provider_creds_flat_format_coreweave(self):
-        """_provider_creds returns flat format CoreWeave credentials"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("pathlib.Path.home", return_value=Path(tmpdir)):
-                api = TerradevAPI()
-                api.credentials = {"coreweave_api_key": "test_key"}
-                creds = api._provider_creds("coreweave")
-                assert creds == {"api_key": "test_key"}
-
     def test_provider_creds_flat_format_tensordock(self):
         """_provider_creds returns flat format TensorDock credentials"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -547,15 +519,6 @@ class TestTerradevAPI:
                     "endpoint": "ovh-eu",
                     "ssh_key_id": "",
                 }
-
-    def test_provider_creds_flat_format_fluidstack(self):
-        """_provider_creds returns flat format FluidStack credentials"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("pathlib.Path.home", return_value=Path(tmpdir)):
-                api = TerradevAPI()
-                api.credentials = {"fluidstack_api_key": "test_key"}
-                creds = api._provider_creds("fluidstack")
-                assert creds == {"api_key": "test_key", "ssh_key_name": ""}
 
     def test_provider_creds_flat_format_hetzner(self):
         """_provider_creds returns flat format Hetzner credentials"""

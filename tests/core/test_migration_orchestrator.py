@@ -68,12 +68,12 @@ def test_plan_migration_success(manager, orchestrator):
 
     plan = orchestrator.plan_migration(
         source_provider="runpod",
-        target_provider="coreweave",
+        target_provider="aws",
         dry_run=True,
     )
 
     assert plan.source["provider"] == "runpod"
-    assert plan.target["provider"] == "coreweave"
+    assert plan.target["provider"] == "aws"
     assert plan.target["gpu_type"] == "A100"
     assert "data_transfer" in plan.costs
     assert plan.steps
@@ -138,9 +138,9 @@ def test_build_migration_steps_match_workload(orchestrator):
         region="us-east-1",
         provider="runpod",
     )
-    steps = orchestrator._build_migration_steps(workload, "coreweave", "A100")
+    steps = orchestrator._build_migration_steps(workload, "aws", "A100")
     assert any("Transfer" in s for s in steps)
-    assert any("coreweave" in s for s in steps)
+    assert any("aws" in s for s in steps)
 
 
 def test_warnings_for_same_provider(orchestrator):

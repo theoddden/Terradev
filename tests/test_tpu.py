@@ -368,8 +368,6 @@ class TestTPUCli:
         mock_api.get_aws_quotes = AsyncMock(return_value=[])
         mock_api.get_azure_quotes = AsyncMock(return_value=[])
         mock_api.get_tensordock_quotes = AsyncMock(return_value=[])
-        mock_api.get_lambda_quotes = AsyncMock(return_value=[])
-        mock_api.get_coreweave_quotes = AsyncMock(return_value=[])
         mock_api.get_oracle_quotes = AsyncMock(return_value=[])
         mock_api.get_crusoe_quotes = AsyncMock(return_value=[])
 

@@ -216,7 +216,6 @@ class MigrationOrchestrator:
         pricing_data = {
             "runpod": {"A100": 2.0, "H100": 3.0, "A40": 1.0, "L40S": 0.8},
             "crusoe": {"A100": 2.2, "H100": 2.85, "A40": 0.8, "L40S": 1.58},
-            "coreweave": {"A100": 2.5, "H100": 3.2, "A40": 1.2, "L40S": 1.0},
             "aws": {"A100": 3.0, "H100": 4.0, "A40": 1.5, "L40S": 1.2},
         }
         return pricing_data.get(provider.lower(), {}).get(gpu_type, 2.0)
@@ -252,7 +251,6 @@ class MigrationOrchestrator:
         gpu_mapping = {
             "runpod": ["A100", "H100", "A40", "L40S"],
             "crusoe": ["A100", "H100", "A40", "L40S"],
-            "coreweave": ["A100", "H100", "A40", "L40S"],
             "aws": ["A100", "H100", "A40", "L40S"],
         }
 

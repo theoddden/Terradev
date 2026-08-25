@@ -38,13 +38,10 @@ logger = logging.getLogger(__name__)
 _TRAINING_GPU_PROVIDERS = [
     "runpod",
     "vast",
-    "coreweave",
     "lambda",
     "crusoe",
-    "fluidstack",
     "hyperstack",
     "tensordock",
-    "lambda_labs",
     "e2enetworks",
     "alibaba",
     "digitalocean",

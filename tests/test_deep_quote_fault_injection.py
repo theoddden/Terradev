@@ -97,8 +97,6 @@ class TestQuoteFaultInjection:
             "get_gcp_quotes",
             "get_azure_quotes",
             "get_tensordock_quotes",
-            "get_lambda_quotes",
-            "get_coreweave_quotes",
             "get_oracle_quotes",
             "get_crusoe_quotes",
         ]:

@@ -27,8 +27,6 @@ PROVIDER_SCHEMAS: Dict[str, List[str]] = {
     "aws": ["api_key", "secret_key"],
     "gcp": ["project_id", "credentials_file"],
     "azure": ["subscription_id", "tenant_id", "client_id", "client_secret"],
-    "lambda_labs": ["api_key"],
-    "coreweave": ["api_key"],
     "tensordock": ["api_key", "api_token"],
     "huggingface": ["api_key", "namespace"],
     "baseten": ["api_key"],
@@ -46,7 +44,6 @@ KEY_ALIASES: Dict[str, str] = {
     "tenant": "tenant_id",  # Azure
     "client": "client_id",  # Azure
     "secret": "client_secret",  # Azure
-    "lambda_labs_api_key": "api_key",
     "region_name": "region",  # Oracle
 }
 
@@ -237,13 +234,11 @@ class VaultAdapter:
     def parse_env_name(cls, env_name: str) -> Tuple[Optional[str], Optional[str]]:
         """Parse ``TERRADEV_PROVIDER_KEY`` into (provider, key).
 
-        Known multi-word providers (e.g. ``lambda_labs``) are matched first.
         """
         if not env_name.startswith(cls.ENV_PREFIX):
             return None, None
         rest = env_name[len(cls.ENV_PREFIX) :]
 
-        # Sort providers by length descending so ``lambda_labs`` beats ``lambda``.
         for provider in sorted(PROVIDER_SCHEMAS, key=len, reverse=True):
             prov_prefix = provider.upper() + "_"
             if rest.startswith(prov_prefix):

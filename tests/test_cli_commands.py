@@ -76,15 +76,12 @@ def _make_api() -> MagicMock:
     api.get_gcp_quotes = AsyncMock(return_value=[])
     api.get_azure_quotes = AsyncMock(return_value=[])
     api.get_tensordock_quotes = AsyncMock(return_value=_quotes[2:])
-    api.get_lambda_quotes = AsyncMock(return_value=[])
-    api.get_coreweave_quotes = AsyncMock(return_value=[])
     api.get_oracle_quotes = AsyncMock(return_value=[])
     api.get_crusoe_quotes = AsyncMock(return_value=[])
     api.get_alibaba_quotes = AsyncMock(return_value=[])
     api.get_baseten_quotes = AsyncMock(return_value=[])
     api.get_digitalocean_quotes = AsyncMock(return_value=[])
     api.get_e2enetworks_quotes = AsyncMock(return_value=[])
-    api.get_fluidstack_quotes = AsyncMock(return_value=[])
     api.get_hetzner_quotes = AsyncMock(return_value=[])
     api.get_huggingface_quotes = AsyncMock(return_value=[])
     api.get_hyperstack_quotes = AsyncMock(return_value=[])
@@ -402,12 +399,6 @@ class TestConfigureCommand:
         assert result.exit_code == 0
         assert "VASTAI" in result.output
 
-    def test_lambda_echoes_name(self):
-        api = _make_api()
-        result = CliRunner().invoke(
-            cli, ["configure", "--provider", "lambda_labs"], obj={"api": api}, input="test-key\n"
-        )
-        assert result.exit_code == 0
 
     def test_unknown_provider_rejected(self):
         api = _make_api()
