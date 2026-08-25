@@ -152,9 +152,24 @@ class DriftMonitor:
             result["status"] = "skipped_no_credentials"
             return result
 
-        # If credentials are a dict, ensure all required non-auth query params are present.
+        # Provider-specific required credential keys.
+        required_creds: Dict[str, List[str]] = {
+            "aws": ["aws_access_key_id", "aws_secret_access_key"],
+            "gcp": ["gcp_credentials"],
+            "oracle": ["oci_tenancy", "oci_user", "oci_fingerprint", "oci_private_key"],
+            "inferx": ["api_key"],
+        }
+
+        # If credentials are a dict, ensure all required non-auth query params and
+        # provider credentials are present.
         # E2E Networks is kept in the run even if project_id is not supplied; the API key is enough to attempt.
         if auth_required and isinstance(api_key, dict):
+            provider_required = required_creds.get(provider, [])
+            missing_creds = [c for c in provider_required if not api_key.get(c)]
+            if missing_creds:
+                result["status"] = "skipped_no_credentials"
+                return result
+
             auth_qp = contract.get("auth_query_param")
             required_qps: set = set()
             for endpoint in contract.get("endpoints", []):
@@ -496,6 +511,13 @@ class DriftMonitor:
         url = url.replace("{aws_region}", str(creds.get("aws_region", "us-east-1")))
         url = url.replace("{oci_region}", str(creds.get("oci_region", "us-ashburn-1")))
         url = url.replace("{zone}", str(creds.get("zone", "us-central1-a")))
+
+        # Allow arbitrary credential placeholders (e.g. {api_endpoint}).
+        if isinstance(api_key, dict):
+            for key, value in creds.items():
+                placeholder = f"{{{key}}}"
+                if placeholder in url:
+                    url = url.replace(placeholder, str(value))
 
         def _add_query_param(name: str, value: Any) -> None:
             nonlocal url

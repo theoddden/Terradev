@@ -394,7 +394,12 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
             extras["oci_private_key"] = _decode_oci_key(fallback_key)
 
     elif alias == "inferx":
+        extras["api_key"] = api_key.strip()
+        extras["bearer_token"] = api_key.strip()
         extras["region"] = os.environ.get("TERRADEV_INFERX_REGION") or "us-west-2"
+        extras["api_endpoint"] = (
+            os.environ.get("TERRADEV_INFERX_API_ENDPOINT") or "https://api.inferx.com"
+        ).strip()
 
     if project_id:
         extras["project_id"] = project_id

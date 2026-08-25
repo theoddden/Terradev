@@ -1,5 +1,5 @@
 provider: inferx
-base_url: https://api.inferx.net
+base_url: {api_endpoint}
 auth_type: Bearer
 auth_header: Authorization
 auth_required: true
