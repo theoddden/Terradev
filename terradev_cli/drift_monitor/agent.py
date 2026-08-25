@@ -152,10 +152,11 @@ class DriftMonitor:
         if not key_value:
             return None
 
+        bearer_token = str(creds.get("bearer_token", key_value))
         location = str(creds.get("location", "Delhi"))
         base_url = "https://api.e2enetworks.com/myaccount/api/v1"
         url = f"{base_url}/iam/multi-crn/?apikey={key_value}&location={location}"
-        headers = {"Authorization": f"Bearer {key_value}"}
+        headers = {"Authorization": f"Bearer {bearer_token}"}
 
         try:
             response = requests.get(url, headers=headers, timeout=self.timeout)
@@ -283,9 +284,11 @@ class DriftMonitor:
         if isinstance(api_key, dict):
             creds: Dict[str, Any] = api_key
             key_value: str = str(creds.get("api_key", ""))
+            bearer_token: str = str(creds.get("bearer_token", key_value))
         else:
             creds = {}
             key_value = str(api_key)
+            bearer_token = key_value
 
         if not contract.get("auth_required", True):
             return url, headers, payload
@@ -303,12 +306,12 @@ class DriftMonitor:
         else:
             if auth_type:
                 if auth_type.lower() == "basic":
-                    token = base64.b64encode(f"{key_value}:".encode()).decode()
+                    token = base64.b64encode(f"{bearer_token}:".encode()).decode()
                     headers[auth_header] = f"Basic {token}"
                 else:
-                    headers[auth_header] = f"{auth_type} {key_value}"
+                    headers[auth_header] = f"{auth_type} {bearer_token}"
             else:
-                headers[auth_header] = key_value
+                headers[auth_header] = bearer_token
 
             if endpoint.get("method", "GET").upper() == "POST":
                 headers.setdefault("Content-Type", "application/json")

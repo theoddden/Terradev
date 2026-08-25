@@ -314,6 +314,29 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
     project_id = os.environ.get(f"TERRADEV_{name}_PROJECT_ID") or ""
     location = os.environ.get(f"TERRADEV_{name}_LOCATION") or "Delhi"
     extras: Dict[str, Any] = {"api_key": api_key}
+
+    # E2E Networks uses two distinct values: the apikey query param (API key)
+    # and the Authorization: Bearer header (Auth Token / Bearer token).
+    if alias == "e2enetworks":
+        query_api_key = os.environ.get(f"TERRADEV_{name}_API_KEY") or ""
+        bearer_token = (
+            os.environ.get(f"TERRADEV_{name}_BEARER_TOKEN")
+            or os.environ.get(f"TERRADEV_{name}_AUTH_TOKEN")
+            or os.environ.get(f"TERRADEV_{name}_TOKEN")
+            or ""
+        )
+        if query_api_key and bearer_token:
+            extras["api_key"] = query_api_key
+            extras["bearer_token"] = bearer_token
+        elif query_api_key and not bearer_token:
+            # The passed-in api_key is likely the bearer token; the API_KEY is the query key.
+            extras["api_key"] = query_api_key
+            extras["bearer_token"] = api_key
+        elif bearer_token and not query_api_key:
+            # The passed-in api_key is likely the query API key.
+            extras["bearer_token"] = bearer_token
+            extras["api_key"] = api_key
+
     if project_id:
         extras["project_id"] = project_id
     if location:
