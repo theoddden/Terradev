@@ -362,13 +362,26 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
         ).strip()
 
     elif alias == "gcp":
-        try:
-            raw = base64.b64decode(api_key.strip()).decode("utf-8")
-            gcp_creds = json.loads(raw)
+        raw = api_key.strip()
+        gcp_creds = None
+        # Accept a plain JSON credential blob.
+        if raw.startswith("{"):
+            try:
+                gcp_creds = json.loads(raw)
+            except (ValueError, json.JSONDecodeError):
+                gcp_creds = None
+        # Otherwise try base64-encoded JSON.
+        if gcp_creds is None:
+            try:
+                decoded = base64.b64decode(raw).decode("utf-8")
+                gcp_creds = json.loads(decoded)
+            except (ValueError, json.JSONDecodeError, binascii.Error):
+                gcp_creds = None
+        if gcp_creds:
             extras["gcp_credentials"] = gcp_creds
             extras["project_id"] = gcp_creds.get("project_id") or ""
-        except (ValueError, json.JSONDecodeError, binascii.Error):
-            extras["gcp_credentials"] = api_key
+        else:
+            extras["gcp_credentials"] = raw
 
     elif alias == "oracle":
         extras["oci_tenancy"] = (os.environ.get("TERRADEV_OCI_TENANCY") or "").strip()
