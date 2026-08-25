@@ -9,7 +9,12 @@ response shape or auth behavior.
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
+import time
+import urllib.parse
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Set
@@ -17,8 +22,53 @@ from typing import Any, Dict, List, Optional, Union, Set
 import requests
 import yaml
 
+# Optional signing libraries used for provider-specific auth.
+try:
+    from botocore.auth import SigV4Auth
+    from botocore.awsrequest import AWSRequest
+    from botocore.credentials import Credentials as AwsCredentials
+except ImportError:  # pragma: no cover
+    SigV4Auth = None  # type: ignore
+    AWSRequest = None  # type: ignore
+    AwsCredentials = None  # type: ignore
+
+try:
+    from google.oauth2 import service_account
+    from google.auth.transport.requests import Request as GoogleRequest
+except ImportError:  # pragma: no cover
+    service_account = None  # type: ignore
+    GoogleRequest = None  # type: ignore
+
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+
 
 # -- helpers -----------------------------------------------------------------
+
+
+def _xml_to_dict(element) -> Any:
+    """Recursively convert an ElementTree element to a dict or list."""
+    children = list(element)
+    if not children:
+        return element.text or ""
+
+    # If all children share the same tag, treat them as a list.
+    tag_counts: Dict[str, int] = {}
+    for child in children:
+        tag_counts[child.tag] = tag_counts.get(child.tag, 0) + 1
+
+    result: Any = {}
+    for child in children:
+        child_value = _xml_to_dict(child)
+        if tag_counts[child.tag] > 1:
+            if child.tag not in result:
+                result[child.tag] = []
+            if not isinstance(result[child.tag], list):
+                result[child.tag] = [result[child.tag]]
+            result[child.tag].append(child_value)
+        else:
+            result[child.tag] = child_value
+    return result
 
 
 def _collect_field_paths(obj: Any, prefix: str = "") -> Set[str]:
@@ -215,7 +265,18 @@ class DriftMonitor:
                 return result
 
             if response.ok:
-                body = response.json()
+                try:
+                    body = response.json()
+                except json.JSONDecodeError:
+                    try:
+                        root = ET.fromstring(response.text)
+                        body = {root.tag: _xml_to_dict(root)}
+                    except ET.ParseError as exc:
+                        result["drift"] = True
+                        result["error"] = f"invalid JSON/XML: {exc}"
+                        result["drift_reasons"].append("non-JSON/XML response")
+                        result["drift_summary"] = "non-JSON/XML response"
+                        return result
                 actual_paths = _collect_field_paths(body)
                 result["raw_response_keys"] = sorted(actual_paths)
 
@@ -263,6 +324,107 @@ class DriftMonitor:
             result["drift_summary"] = "non-JSON response"
             return result
 
+    def _gcp_access_token(self, creds: Dict[str, Any]) -> Optional[str]:
+        """Get a short-lived GCP access token from a service account JSON."""
+        if service_account is None or GoogleRequest is None:
+            return None
+        gcp_creds = creds.get("gcp_credentials")
+        if not isinstance(gcp_creds, dict):
+            return None
+        try:
+            credentials = service_account.Credentials.from_service_account_info(
+                gcp_creds,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            )
+            credentials.refresh(GoogleRequest())
+            return credentials.token
+        except (ValueError, AttributeError, TypeError):
+            return None
+
+    def _aws_sigv4_headers(
+        self,
+        method: str,
+        url: str,
+        headers: Dict[str, str],
+        payload: str,
+        creds: Dict[str, Any],
+    ) -> Optional[Dict[str, str]]:
+        """Sign an AWS request with SigV4."""
+        if SigV4Auth is None or AWSRequest is None or AwsCredentials is None:
+            return None
+        access_key = str(creds.get("aws_access_key_id", ""))
+        secret_key = str(creds.get("aws_secret_access_key", ""))
+        region = str(creds.get("aws_region", "us-east-1"))
+        if not access_key or not secret_key:
+            return None
+        try:
+            aws_creds = AwsCredentials(access_key, secret_key)
+            body = payload if isinstance(payload, (str, bytes)) else json.dumps(payload)
+            req = AWSRequest(
+                method=method,
+                url=url,
+                headers=dict(headers),
+                data=body,
+            )
+            SigV4Auth(aws_creds, "ec2", region).add_auth(req)
+            return dict(req.headers)
+        except (ValueError, AttributeError, TypeError):
+            return None
+
+    def _oci_sign(
+        self,
+        method: str,
+        url: str,
+        headers: Dict[str, str],
+        payload: bytes,
+        creds: Dict[str, Any],
+    ) -> Optional[Dict[str, str]]:
+        """Sign an Oracle OCI request with RSA-SHA256."""
+        tenancy = str(creds.get("oci_tenancy", ""))
+        user = str(creds.get("oci_user", ""))
+        fingerprint = str(creds.get("oci_fingerprint", ""))
+        private_key = str(creds.get("oci_private_key", ""))
+        if not all([tenancy, user, fingerprint, private_key]):
+            return None
+
+        try:
+            key = serialization.load_pem_private_key(
+                private_key.encode("utf-8"), password=None
+            )
+        except (ValueError, TypeError):
+            return None
+
+        now = datetime.now(timezone.utc)
+        date = now.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.netloc
+        request_target = f"{method.lower()} {parsed.path}"
+        if parsed.query:
+            request_target += f"?{parsed.query}"
+
+        signing_lines = [
+            f"date: {date}",
+            f"(request-target): {request_target}",
+            f"host: {host}",
+        ]
+        signing_string = "\n".join(signing_lines)
+        signature = key.sign(signing_string.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
+        signature_b64 = base64.b64encode(signature).decode("utf-8")
+
+        key_id = f"{tenancy}/{user}/{fingerprint}"
+        auth_header = (
+            'Signature version="1",'
+            f'keyId="{key_id}",'
+            'algorithm="rsa-sha256",'
+            'headers="date (request-target) host",'
+            f'signature="{signature_b64}"'
+        )
+
+        signed = dict(headers)
+        signed["Date"] = date
+        signed["Authorization"] = auth_header
+        return signed
+
     def _build_request(
         self,
         contract: Dict[str, Any],
@@ -291,8 +453,11 @@ class DriftMonitor:
             key_value = str(api_key)
             bearer_token = key_value
 
-        if not contract.get("auth_required", True):
-            return url, headers, payload
+        # Substitute credential placeholders in the URL/base_url.
+        url = url.replace("{project_id}", str(creds.get("project_id", "")))
+        url = url.replace("{aws_region}", str(creds.get("aws_region", "us-east-1")))
+        url = url.replace("{oci_region}", str(creds.get("oci_region", "us-ashburn-1")))
+        url = url.replace("{zone}", str(creds.get("zone", "us-central1-a")))
 
         def _add_query_param(name: str, value: Any) -> None:
             nonlocal url
@@ -301,23 +466,18 @@ class DriftMonitor:
             sep = "&" if "?" in url else "?"
             url = f"{url}{sep}{name}={value}"
 
-        if auth_in == "query":
-            param = contract.get("auth_query_param", "api_key")
-            _add_query_param(param, key_value)
-        else:
-            if auth_type:
-                if auth_type.lower() == "basic":
-                    token = base64.b64encode(f"{bearer_token}:".encode()).decode()
-                    headers[auth_header] = f"Basic {token}"
-                else:
-                    headers[auth_header] = f"{auth_type} {bearer_token}"
-            else:
-                headers[auth_header] = bearer_token
+        method = endpoint.get("method", "GET").upper()
 
-            if endpoint.get("method", "GET").upper() == "POST":
-                headers.setdefault("Content-Type", "application/json")
+        # Build the request payload first; it may be needed for signing POSTs.
+        if endpoint.get("smoke_test_query"):
+            payload["query"] = endpoint["smoke_test_query"]
+        if endpoint.get("smoke_test_variables"):
+            payload["variables"] = endpoint["smoke_test_variables"]
+        for field in endpoint.get("required_fields", []):
+            if field not in ("query", "variables") and field not in payload:
+                payload[field] = endpoint.get(field)
 
-        # Append any extra query params declared by the endpoint / contract.
+        # Append query params (including the auth query param) before signing.
         for qp in endpoint.get("query_params", []):
             if isinstance(qp, dict):
                 name = qp["name"]
@@ -330,13 +490,43 @@ class DriftMonitor:
                 value = key_value
             _add_query_param(name, value)
 
-        if endpoint.get("smoke_test_query"):
-            payload["query"] = endpoint["smoke_test_query"]
-        if endpoint.get("smoke_test_variables"):
-            payload["variables"] = endpoint["smoke_test_variables"]
-        for field in endpoint.get("required_fields", []):
-            if field not in ("query", "variables") and field not in payload:
-                payload[field] = endpoint.get(field)
+        if not contract.get("auth_required", True):
+            return url, headers, payload
+
+        if auth_in == "query":
+            # The auth query param was already added by the loop above.
+            return url, headers, payload
+
+        if method == "POST":
+            headers.setdefault("Content-Type", "application/json")
+
+        if auth_type:
+            auth_lower = auth_type.lower()
+            if auth_lower == "basic":
+                token = base64.b64encode(f"{bearer_token}:".encode()).decode()
+                headers[auth_header] = f"Basic {token}"
+            elif auth_lower == "bearer" and creds.get("gcp_credentials"):
+                gcp_token = self._gcp_access_token(creds)
+                if gcp_token:
+                    headers[auth_header] = f"Bearer {gcp_token}"
+                else:
+                    headers[auth_header] = f"Bearer {bearer_token}"
+            elif auth_lower == "bearer":
+                headers[auth_header] = f"Bearer {bearer_token}"
+            elif auth_lower == "sigv4":
+                body = json.dumps(payload) if payload else ""
+                signed = self._aws_sigv4_headers(method, url, headers, body, creds)
+                if signed:
+                    headers.update(signed)
+            elif auth_lower == "rsa":
+                body = json.dumps(payload).encode("utf-8") if payload else b""
+                signed = self._oci_sign(method, url, headers, body, creds)
+                if signed:
+                    headers.update(signed)
+            else:
+                headers[auth_header] = f"{auth_type} {bearer_token}"
+        else:
+            headers[auth_header] = bearer_token
 
         return url, headers, payload
 

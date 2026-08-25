@@ -3,5 +3,18 @@ base_url: https://compute.googleapis.com/compute/v1
 auth_required: true
 auth_type: Bearer
 auth_header: Authorization
-last_verified: '2026-08-24'
-endpoints: []
+last_verified: '2026-08-25'
+endpoints:
+- name: list_instances
+  method: GET
+  path: projects/{project_id}/aggregated/instances
+  enabled: true
+  expected_status: 200
+  expected_response_fields:
+  - id
+  - items
+  - selfLink
+  optional_response_fields:
+  - kind
+  - nextPageToken
+  - warnings
