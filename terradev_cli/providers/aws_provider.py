@@ -28,6 +28,8 @@ from .base_provider import BaseProvider
 class AWSProvider(BaseProvider):
     """AWS EC2 provider for GPU instances"""
 
+    REQUIRES_AUTH = False  # static on-demand pricing fallback works without keys
+
     def __init__(self, credentials: Dict[str, str]):
         super().__init__(credentials)
         self.name = "aws"
@@ -85,27 +87,25 @@ class AWSProvider(BaseProvider):
         self, gpu_type: str, region: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get EC2 instance quotes for GPU type"""
-        if not self.ec2_client:
+
+        # Map GPU types to EC2 instance types
+        gpu_instance_mapping = {
+            "A100": ["p4d.24xlarge", "p4de.24xlarge"],
+            "V100": ["p3.2xlarge", "p3.8xlarge", "p3.16xlarge"],
+            "T4": ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge"],
+            "H100": ["p5.48xlarge"],
+        }
+
+        instance_types = gpu_instance_mapping.get(gpu_type, [])
+        if not instance_types:
             return []
 
-        # Without resolvable credentials, return no quotes rather than
-        # fabricated hardcoded pricing.
-        if not self._credentials_available():
-            return []
+        # Without a working boto3 client or resolvable credentials, return
+        # static on-demand pricing so quoting still works without keys.
+        if not self.ec2_client or not self._credentials_available():
+            return self._get_static_quotes(gpu_type, instance_types, region)
 
         try:
-            # Map GPU types to EC2 instance types
-            gpu_instance_mapping = {
-                "A100": ["p4d.24xlarge", "p4de.24xlarge"],
-                "V100": ["p3.2xlarge", "p3.8xlarge", "p3.16xlarge"],
-                "T4": ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge"],
-                "H100": ["p5.48xlarge"],
-            }
-
-            instance_types = gpu_instance_mapping.get(gpu_type, [])
-            if not instance_types:
-                return []
-
             quotes = []
 
             # Get spot prices for all instance types
@@ -143,9 +143,7 @@ class AWSProvider(BaseProvider):
 
             # Get on-demand prices as fallback
             if not quotes:
-                on_demand_price = await self._get_on_demand_price(
-                    instance_types[0], region or "us-east-1"
-                )
+                on_demand_price = self._get_on_demand_price(instance_types[0])
                 if on_demand_price:
                     # CRITICAL: Detect P5.4xlarge NCCL+EFA degradation
                     nccl_warning = self._detect_p5_nccl_degradation(instance_types[0])
@@ -171,7 +169,35 @@ class AWSProvider(BaseProvider):
 
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Error getting AWS quotes: {e}")
-            return []
+            return self._get_static_quotes(gpu_type, instance_types, region)
+
+    def _get_static_quotes(
+        self, gpu_type: str, instance_types: List[str], region: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """Return hardcoded on-demand quotes when AWS credentials are not available."""
+        quotes = []
+        for instance_type in instance_types:
+            on_demand_price = self._get_on_demand_price(instance_type)
+            if on_demand_price is None:
+                continue
+            nccl_warning = self._detect_p5_nccl_degradation(instance_type)
+            quote = {
+                "instance_type": instance_type,
+                "gpu_type": gpu_type,
+                "price_per_hour": on_demand_price,
+                "region": region or "us-east-1",
+                "available": True,
+                "provider": "aws",
+                "instance_family": instance_type.split(".")[0],
+                "vcpus": self._get_instance_vcpus(instance_type),
+                "memory_gb": self._get_instance_memory(instance_type),
+                "gpu_count": self._get_gpu_count(instance_type),
+                "spot": False,
+            }
+            if nccl_warning:
+                quote["nccl_warning"] = nccl_warning
+            quotes.append(quote)
+        return quotes
 
     async def _get_spot_prices(
         self, instance_type: str, region: str
@@ -209,8 +235,8 @@ class AWSProvider(BaseProvider):
             logger.debug(f"Error getting spot prices: {e}")
             return []
 
-    async def _get_on_demand_price(
-        self, instance_type: str, region: str
+    def _get_on_demand_price(
+        self, instance_type: str, region: str = ""
     ) -> Optional[float]:
         """Get on-demand price for instance type"""
         # Realistic A100 pricing based on current AWS market rates
