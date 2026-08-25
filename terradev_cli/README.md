@@ -1,6 +1,6 @@
-# Terradev CLI v6.1.4
+# An imperative Command Line Interface for AI Workload Orchestration
 
-**Cross-cloud GPU infrastructure and training pipeline CLI for SFT, DPO, GRPO, and multi-stage LLM training orchestration.**
+**v6.1.5 — Cross-cloud GPU infrastructure and training pipeline CLI for SFT, DPO, GRPO, and multi-stage LLM training orchestration.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
@@ -16,9 +16,9 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON v6.1.4**
+**NOTES ON v6.1.5**
 
-- Version bumped to **v6.1.4** for housekeeping and packaging.
+- Version bumped to **v6.1.5** for housekeeping and packaging.
 - **19 GPU cloud and inference providers** are available for quoting and provisioning:
   - `alibaba` — Alibaba Cloud
   - `aws` — Amazon Web Services
