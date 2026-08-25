@@ -12,7 +12,7 @@ import base64
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Union, Set
+from typing import Any, Dict, List, Optional, Union, Set
 
 import requests
 import yaml
@@ -120,6 +120,16 @@ class DriftMonitor:
                 result["status"] = "skipped_no_credentials"
                 return result
 
+        # For E2E Networks, discover the default project if the user didn't supply one.
+        if (
+            provider == "e2enetworks"
+            and isinstance(api_key, dict)
+            and "project_id" not in api_key
+        ):
+            project_id = self._fetch_e2e_project_id(api_key)
+            if project_id:
+                api_key["project_id"] = project_id
+
         for endpoint in contract.get("endpoints", []):
             if not endpoint.get("enabled", True):
                 continue
@@ -130,6 +140,34 @@ class DriftMonitor:
                 result["status"] = "drift"
 
         return result
+
+    def _fetch_e2e_project_id(self, creds: Dict[str, Any]) -> Optional[str]:
+        """Resolve the last-used E2E Networks project from the CRN endpoint.
+
+        E2E MyAccount requires a project_id query parameter for most compute
+        endpoints. The /iam/multi-crn/ endpoint returns the account's
+        `last_used_project` and only needs the apikey/Authorization credentials.
+        """
+        key_value = str(creds.get("api_key", ""))
+        if not key_value:
+            return None
+
+        location = str(creds.get("location", "Delhi"))
+        base_url = "https://api.e2enetworks.com/myaccount/api/v1"
+        url = f"{base_url}/iam/multi-crn/?apikey={key_value}&location={location}"
+        headers = {"Authorization": f"Bearer {key_value}"}
+
+        try:
+            response = requests.get(url, headers=headers, timeout=self.timeout)
+            if not response.ok:
+                return None
+            body = response.json()
+            project_id = body.get("data", {}).get("last_used_project")
+            if project_id:
+                return str(project_id)
+        except Exception:
+            pass
+        return None
 
     def _check_endpoint(
         self,
