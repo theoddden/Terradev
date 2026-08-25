@@ -429,10 +429,6 @@ class TerradevAPI:
             creds["project_id"] = self.credentials.get("ovhcloud_project_id", "")
             creds["endpoint"] = self.credentials.get("ovhcloud_endpoint", "ovh-eu")
             creds["ssh_key_id"] = self.credentials.get("ovhcloud_ssh_key_id", "")
-        elif provider_name == "hetzner":
-            creds["api_token"] = self.credentials.get("hetzner_api_token", "")
-            creds["robot_user"] = self.credentials.get("hetzner_robot_user", "")
-            creds["robot_password"] = self.credentials.get("hetzner_robot_password", "")
         elif provider_name == "siliconflow":
             creds["api_key"] = self.credentials.get("siliconflow_api_key", "")
             creds["region"] = self.credentials.get("siliconflow_region", "global")
@@ -640,9 +636,6 @@ class TerradevAPI:
 
     async def get_e2enetworks_quotes(self, gpu_type: str):
         return await self._get_provider_quotes("e2enetworks", gpu_type)
-
-    async def get_hetzner_quotes(self, gpu_type: str):
-        return await self._get_provider_quotes("hetzner", gpu_type)
 
     async def get_huggingface_quotes(self, gpu_type: str):
         return await self._get_provider_quotes("huggingface", gpu_type)

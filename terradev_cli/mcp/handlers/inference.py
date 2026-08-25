@@ -61,7 +61,7 @@ async def _handle_inferx_deploy(arguments, cmd_args, tool_name, execute_terradev
                     content=[
                         TextContent(
                             type="text",
-                            text=f"❌ Terraform init failed: {init_result['stderr']}",
+                            text=f"❌ Init failed: {init_result['stderr']}",
                         )
                     ],
                     isError=True,
@@ -73,13 +73,13 @@ async def _handle_inferx_deploy(arguments, cmd_args, tool_name, execute_terradev
 
             if apply_result["success"]:
                 output_text = (
-                    "✅ Inference endpoint deployed via Terraform!\n\n"
+                    "✅ Inference endpoint deployed!\n\n"
                 )
                 output_text += f"**Model:** {model}\n"
                 output_text += f"**GPU Type:** {gpu_type}\n"
                 output_text += f"**Endpoint Name:** {endpoint_name or 'auto-generated'}\n"
                 output_text += (
-                    f"\n**Terraform State:** Persisted at {ws_dir}\n"
+                    f"\n**State:** Persisted at {ws_dir}\n"
                 )
                 output_text += f"**Full Output:**\n{apply_result['stdout']}"
 
@@ -91,7 +91,7 @@ async def _handle_inferx_deploy(arguments, cmd_args, tool_name, execute_terradev
                     content=[
                         TextContent(
                             type="text",
-                            text=f"❌ Terraform apply failed: {apply_result['stderr']}",
+                            text=f"❌ Apply failed: {apply_result['stderr']}",
                         )
                     ],
                     isError=True,
@@ -101,7 +101,7 @@ async def _handle_inferx_deploy(arguments, cmd_args, tool_name, execute_terradev
                 content=[
                     TextContent(
                         type="text",
-                        text=f"❌ Inference Terraform deployment failed: {str(e)}",
+                        text=f"❌ Inference deployment failed: {str(e)}",
                     )
                 ],
                 isError=True,

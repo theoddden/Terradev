@@ -520,19 +520,6 @@ class TestTerradevAPI:
                     "ssh_key_id": "",
                 }
 
-    def test_provider_creds_flat_format_hetzner(self):
-        """_provider_creds returns flat format Hetzner credentials"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("pathlib.Path.home", return_value=Path(tmpdir)):
-                api = TerradevAPI()
-                api.credentials = {"hetzner_api_token": "test_token"}
-                creds = api._provider_creds("hetzner")
-                assert creds == {
-                    "api_token": "test_token",
-                    "robot_user": "",
-                    "robot_password": "",
-                }
-
     def test_provider_creds_flat_format_siliconflow(self):
         """_provider_creds returns flat format SiliconFlow credentials"""
         with tempfile.TemporaryDirectory() as tmpdir:

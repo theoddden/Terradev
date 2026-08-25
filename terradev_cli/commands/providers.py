@@ -186,12 +186,6 @@ def configure(provider):
                 "help": "Get from: https://cloud.siliconflow.cn/account/ak",
                 "example": "sf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             },
-            "hetzner": {
-                "name": "Hetzner",
-                "key_name": "API Token",
-                "help": "Get from: Hetzner Cloud Console → Security → API Tokens",
-                "example": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            },
             "ovhcloud": {
                 "name": "OVHcloud",
                 "key_name": "Application Key",
@@ -372,21 +366,6 @@ def configure(provider):
                     "consumer_key": consumer_key.strip(),
                     "project_id": project_id.strip(),
                     "endpoint": endpoint.strip(),
-                }
-            elif provider.lower() == "hetzner":
-                # Hetzner uses an API token, plus optional Robot credentials
-                robot_user = click.prompt(
-                    "   Enter Hetzner Robot User (optional)", default=""
-                )
-                robot_password = click.prompt(
-                    "   Enter Hetzner Robot Password (optional)",
-                    hide_input=True,
-                    default="",
-                )
-                existing_creds[provider.lower()] = {
-                    "api_token": api_key.strip(),
-                    "robot_user": robot_user.strip(),
-                    "robot_password": robot_password.strip(),
                 }
             elif provider.lower() == "e2enetworks":
                 # E2E Networks optionally supports a project ID
@@ -790,7 +769,6 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             ("baseten", api.get_baseten_quotes),
             ("digitalocean", api.get_digitalocean_quotes),
             ("e2enetworks", api.get_e2enetworks_quotes),
-            ("hetzner", api.get_hetzner_quotes),
             ("huggingface", api.get_huggingface_quotes),
             ("hyperstack", api.get_hyperstack_quotes),
             ("inferx", api.get_inferx_quotes),
@@ -900,7 +878,6 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             "oracle",
             "huggingface",
             "siliconflow",
-            "hetzner",
             "ovhcloud",
             "alibaba",
             "hyperstack",

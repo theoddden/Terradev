@@ -580,27 +580,6 @@ class TestCanaryAzureProvider:
         assert hasattr(result, "healthy")
 
 
-# ---------------------------------------------------------------------------
-# providers/hetzner
-# ---------------------------------------------------------------------------
-
-
-class TestCanaryHetznerProvider:
-    @patch("terradev_cli.providers.base_provider.aiohttp.ClientSession")
-    async def test_check_health(self, MockSession):
-        from terradev_cli.providers.hetzner_provider import HetznerProvider
-
-        prov = HetznerProvider({"api_key": "fake"})
-        result = await prov.check_health()
-        assert hasattr(result, "healthy")
-
-    @pytest.mark.asyncio
-    async def test_traffic_monitor_allowance(self):
-        from terradev_cli.providers.hetzner_provider import HetznerTrafficMonitor
-
-        monitor = HetznerTrafficMonitor()
-        result = await monitor.get_traffic_allowance("server-1")
-        assert isinstance(result, dict)
 
 
 # ---------------------------------------------------------------------------

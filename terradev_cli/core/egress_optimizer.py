@@ -134,12 +134,6 @@ _STATIC_EGRESS_RATES: Dict[str, Dict[str, float]] = {
         "cross_continent": 0.011,
         "internet": 0.011,
     },
-    "hetzner": {
-        "same_region": 0.00,
-        "same_continent": 0.00,
-        "cross_continent": 0.00,
-        "internet": 0.00,  # included bandwidth is generous
-    },
     # ── Inference platforms ───────────────────────────────────────────
     "baseten": {
         "same_region": 0.00,

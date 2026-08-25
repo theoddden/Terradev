@@ -61,7 +61,7 @@ async def _handle_k8s_create(arguments, cmd_args, tool_name, execute_terradev_co
                     content=[
                         TextContent(
                             type="text",
-                            text=f"❌ Terraform init failed: {init_result['stderr']}",
+                            text=f"❌ Init failed: {init_result['stderr']}",
                         )
                     ],
                     isError=True,
@@ -73,7 +73,7 @@ async def _handle_k8s_create(arguments, cmd_args, tool_name, execute_terradev_co
 
             if apply_result["success"]:
                 output_text = (
-                    "✅ Kubernetes cluster created via Terraform!\n\n"
+                    "✅ Kubernetes cluster created!\n\n"
                 )
                 output_text += f"**Cluster Name:** {cluster_name}\n"
                 output_text += f"**GPU Type:** {gpu_type}\n"
@@ -81,7 +81,7 @@ async def _handle_k8s_create(arguments, cmd_args, tool_name, execute_terradev_co
                 output_text += f"**Multi-Cloud:** {multi_cloud}\n"
                 output_text += f"**Spot Instances:** {prefer_spot}\n"
                 output_text += (
-                    f"\n**Terraform State:** Persisted at {ws_dir}\n"
+                    f"\n**State:** Persisted at {ws_dir}\n"
                 )
                 output_text += f"**Full Output:**\n{apply_result['stdout']}"
 
@@ -93,7 +93,7 @@ async def _handle_k8s_create(arguments, cmd_args, tool_name, execute_terradev_co
                     content=[
                         TextContent(
                             type="text",
-                            text=f"❌ Terraform apply failed: {apply_result['stderr']}",
+                            text=f"❌ Apply failed: {apply_result['stderr']}",
                         )
                     ],
                     isError=True,
@@ -103,7 +103,7 @@ async def _handle_k8s_create(arguments, cmd_args, tool_name, execute_terradev_co
                 content=[
                     TextContent(
                         type="text",
-                        text=f"❌ K8s Terraform deployment failed: {str(e)}",
+                        text=f"❌ K8s deployment failed: {str(e)}",
                     )
                 ],
                 isError=True,

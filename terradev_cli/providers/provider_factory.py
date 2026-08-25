@@ -44,7 +44,6 @@ _PROVIDER_LOADERS = {
     "digitalocean": _lazy_import(".digitalocean_provider.DigitalOceanProvider"),
     "alibaba": _lazy_import(".alibaba_provider.AlibabaProvider"),
     "ovhcloud": _lazy_import(".ovhcloud_provider.OVHcloudProvider"),
-    "hetzner": _lazy_import(".hetzner_provider.HetznerProvider"),
     "siliconflow": _lazy_import(".siliconflow_provider.SiliconFlowProvider"),
     "inferx": _lazy_import(".inferx_provider.InferXProvider"),
     "latitude": _lazy_import(".latitude_provider.LatitudeProvider"),

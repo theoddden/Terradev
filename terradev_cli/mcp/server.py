@@ -8,7 +8,7 @@ cross-provider migration, vLLM/SGLang/Ollama inference, DeepEval LLM evaluation,
 NeMo Guardrails output safety, Qdrant vector DB, Ray cluster management, W&B/MLflow/DVC,
 HuggingFace Hub, Datadog monitoring, data governance, cost optimization, FlashOptim training,
 Langfuse LLM observability, vLLM auto-optimization/analysis/benchmarking,
-Enterprise SSO, Latitude.sh provider, and Terraform-powered parallel provisioning across 21+ cloud providers.
+Enterprise SSO, E2E Networks, Yotta Labs, Latitude.sh, and parallel provisioning across 20+ cloud providers.
 """
 
 import argparse

@@ -2343,7 +2343,6 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
             ("baseten", api.get_baseten_quotes),
             ("digitalocean", api.get_digitalocean_quotes),
             ("e2enetworks", api.get_e2enetworks_quotes),
-            ("hetzner", api.get_hetzner_quotes),
             ("huggingface", api.get_huggingface_quotes),
             ("hyperstack", api.get_hyperstack_quotes),
             ("inferx", api.get_inferx_quotes),

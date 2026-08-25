@@ -187,7 +187,7 @@ class TestProviderFactory:
         providers = factory.get_supported_providers()
         
         # Should have at least the major providers
-        assert len(providers) >= 20
+        assert len(providers) >= 19
 
     def test_provider_loaders_registry(self):
         """Provider loaders registry contains expected entries"""

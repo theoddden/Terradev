@@ -621,13 +621,20 @@ resource "terradev_kubernetes_cluster" "main" {{
         providers = [
             "runpod",
             "vastai",
-            "lambda",
             "aws",
+            "gcp",
+            "azure",
+            "tensordock",
+            "oracle",
+            "crusoe",
+            "digitalocean",
+            "hyperstack",
             "alibaba",
             "ovhcloud",
-            "hetzner",
             "siliconflow",
             "latitude",
+            "e2enetworks",
+            "yottalabs"
         ]
         for i, provider in enumerate(providers[:node_count]):
             config += (
@@ -776,12 +783,20 @@ def generate_terraform_config(
     providers = providers or [
         "runpod",
         "vastai",
-        "lambda",
         "aws",
+        "gcp",
+        "azure",
+        "tensordock",
+        "oracle",
+        "crusoe",
+        "digitalocean",
+        "hyperstack",
         "alibaba",
         "ovhcloud",
-        "hetzner",
         "siliconflow",
+        "latitude",
+        "e2enetworks",
+        "yottalabs"
     ]
 
     config = f"""

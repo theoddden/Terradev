@@ -5,7 +5,6 @@ Provider Conformance Tests for New Providers
 Tests the 5 new providers added in recent work:
 - Alibaba
 - OVHcloud
-- Hetzner
 - SiliconFlow
 
 These tests verify:
@@ -26,7 +25,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from terradev_cli.providers.alibaba_provider import AlibabaProvider
 from terradev_cli.providers.ovhcloud_provider import OVHcloudProvider
-from terradev_cli.providers.hetzner_provider import HetznerProvider
 from terradev_cli.providers.siliconflow_provider import SiliconFlowProvider
 
 
@@ -100,29 +98,6 @@ class TestOVHcloudProvider:
         assert headers == {} or "Content-Type" in headers
 
 
-class TestHetznerProvider:
-    """Test Hetzner provider - uses Bearer auth with Content-Type"""
-
-    def test_auth_header_format(self):
-        """Hetzner uses Authorization: Bearer + Content-Type: application/json"""
-        provider = HetznerProvider(credentials={"api_token": "test-token"})
-        headers = provider._get_auth_headers()
-        assert headers["Authorization"] == "Bearer test-token"
-        assert "Content-Type" in headers
-
-    @pytest.mark.asyncio
-    async def test_no_api_key_returns_empty_quotes(self):
-        """Hetzner returns empty quotes without API key"""
-        provider = HetznerProvider({})
-        result = await provider.get_instance_quotes("A100")
-        assert result == []
-
-    def test_auth_headers_without_key(self):
-        provider = HetznerProvider(credentials={})
-        headers = provider._get_auth_headers()
-        # May include Content-Type even without auth
-        assert headers == {} or "Content-Type" in headers
-
 
 class TestSiliconFlowProvider:
     """Test SiliconFlow provider - uses Bearer auth with Content-Type"""
@@ -172,7 +147,6 @@ class TestProviderOutputSchemaConsistency:
                     "consumer_key": "test",
                 },
             ),
-            (HetznerProvider, {"api_token": "test"}),
             (SiliconFlowProvider, {"api_key": "test"}),
         ],
     )

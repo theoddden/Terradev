@@ -275,7 +275,6 @@ _DRIFT_PROVIDER_ALIASES = {
     "digitalocean": ["digitalocean", "digital_ocean"],
     "alibaba": ["alibaba", "ali"],
     "ovhcloud": ["ovhcloud", "ovh"],
-    "hetzner": ["hetzner"],
     "siliconflow": ["siliconflow"],
     "inferx": ["inferx"],
     "latitude": ["latitude"],

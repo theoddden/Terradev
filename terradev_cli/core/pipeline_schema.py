@@ -30,7 +30,6 @@ class Provider(Enum):
     VASTAI = "vastai"
     CRUSOE = "crusoe"
     TENSORDOCK = "tensordock"
-    HETZNER = "hetzner"
     ALIBABA = "alibaba"
     OVHCLOUD = "ovhcloud"
     SILICONFLOW = "siliconflow"

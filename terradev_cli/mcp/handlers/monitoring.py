@@ -240,11 +240,11 @@ async def _handle_datadog_terraform_export(arguments, cmd_args, tool_name, execu
             with open(fpath, "w") as f:
                 f.write(content)
             written.append(fpath)
-        output_text = f"🏗️ **Terraform Module Exported → `{out_dir}/`**\n\n"
+        output_text = f"🏗️ **Module Exported → `{out_dir}/`**\n\n"
         output_text += "**Files:**\n" + "\n".join(
             f"- `{w}`" for w in written
         )
-        output_text += f"\n\n**Next steps:**\n```bash\ncd {out_dir}\nterraform init\nterraform plan\nterraform apply\n```"
+        output_text += f"\n\n**Next steps:**\n```bash\ncd {out_dir}\ninit\nplan\napply\n```"
         return CallToolResult(
             content=[TextContent(type="text", text=output_text)]
         )

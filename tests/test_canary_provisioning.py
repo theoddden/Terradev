@@ -124,11 +124,6 @@ def _load_creds(provider: str) -> dict:
             "consumer_key": all_creds.get("ovhcloud_consumer_key", ""),
             "project_id": all_creds.get("ovhcloud_project_id", ""),
         },
-        "hetzner": {
-            "api_token": all_creds.get("hetzner_api_token", ""),
-            "robot_user": all_creds.get("hetzner_robot_user", ""),
-            "robot_password": all_creds.get("hetzner_robot_password", ""),
-        },
         "siliconflow": {
             "api_key": all_creds.get("siliconflow_api_key", ""),
             "default_model": all_creds.get("siliconflow_default_model", ""),
@@ -218,10 +213,6 @@ CANARY_PROVIDER_CONFIG = {
     "ovhcloud": {
         "gpu_types": ["A100", "H100"],
         "regions": ["gra", "sbg"],
-    },
-    "hetzner": {
-        "gpu_types": ["A100", "H100"],
-        "regions": ["fsn1", "nbg1"],
     },
     "siliconflow": {
         "gpu_types": ["A100", "H100"],

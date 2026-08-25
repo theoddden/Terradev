@@ -44,7 +44,6 @@ class PublicIPBillingTracker:
         "digitalocean": 0.005,  # ~$3.60/month
         "vultr": 0.005,  # ~$3.60/month
         "linode": 0.005,  # ~$3.60/month
-        "hetzner": 0.0,  # Included in server price
         "runpod": 0.0,  # Included
     }
 
@@ -88,7 +87,7 @@ class PublicIPBillingTracker:
             "billing_separate": provider
             in [ "digitalocean", "vultr", "linode"],
             "included_in_instance_cost": provider
-            in ["hetzner", "runpod"],
+            in ["runpod"],
             "status": record.status.value,
             "recommendations": self._get_ip_recommendations(record),
         }

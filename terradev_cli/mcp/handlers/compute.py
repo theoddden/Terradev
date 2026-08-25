@@ -77,7 +77,7 @@ async def _handle_provision_gpu(arguments, cmd_args, tool_name, execute_terradev
     gpu_type = arguments["gpu_type"]
     count = arguments.get("count", 1)
     providers = arguments.get(
-        "providers", ["runpod", "vastai", "lambda", "aws"]
+        "providers", ["runpod", "vastai", "aws", "gcp", "azure", "tensordock", "oracle", "crusoe", "digitalocean", "hyperstack", "alibaba", "ovhcloud", "siliconflow", "latitude", "e2enetworks", "yottalabs"]
     )
     max_price = arguments.get("max_price")
     arguments.get("plan_only", False)
@@ -87,7 +87,7 @@ async def _handle_provision_gpu(arguments, cmd_args, tool_name, execute_terradev
     )
 
     if result["success"]:
-        output_text = "✅ GPU provisioning via Terraform successful!\n\n"
+        output_text = "✅ GPU provisioning successful!\n\n"
         output_text += f"**GPU Type:** {gpu_type}\n"
         output_text += f"**Count:** {count}\n"
         output_text += f"**Providers:** {', '.join(providers)}\n"
@@ -107,7 +107,7 @@ async def _handle_provision_gpu(arguments, cmd_args, tool_name, execute_terradev
                     f"**Provider Costs:** {outputs['provider_costs']}\n"
                 )
 
-        output_text += "\n**Terraform State:** Managed\n"
+        output_text += "\n**State:** Managed\n"
         output_text += f"**Full Output:**\n{result['stdout']}"
 
         return CallToolResult(
@@ -118,7 +118,7 @@ async def _handle_provision_gpu(arguments, cmd_args, tool_name, execute_terradev
             content=[
                 TextContent(
                     type="text",
-                    text=f"❌ Terraform provisioning failed: {result['stderr']}",
+                    text=f"❌ Provisioning failed: {result['stderr']}",
                 )
             ],
             isError=True,
@@ -147,7 +147,7 @@ async def _handle_terraform_plan(arguments, cmd_args, tool_name, execute_terrade
             content=[
                 TextContent(
                     type="text",
-                    text=f"✅ Terraform plan generated:\n\n{result['stdout']}",
+                    text=f"✅ Plan generated:\n\n{result['stdout']}",
                 )
             ]
         )
@@ -156,7 +156,7 @@ async def _handle_terraform_plan(arguments, cmd_args, tool_name, execute_terrade
             content=[
                 TextContent(
                     type="text",
-                    text=f"❌ Terraform plan failed: {result['stderr']}",
+                    text=f"❌ Plan failed: {result['stderr']}",
                 )
             ],
             isError=True,
@@ -194,7 +194,7 @@ async def _handle_terraform_apply(arguments, cmd_args, tool_name, execute_terrad
             content=[
                 TextContent(
                     type="text",
-                    text=f"✅ Terraform apply successful:\n\n{result['stdout']}",
+                    text=f"✅ Apply successful:\n\n{result['stdout']}",
                 )
             ]
         )
@@ -203,7 +203,7 @@ async def _handle_terraform_apply(arguments, cmd_args, tool_name, execute_terrad
             content=[
                 TextContent(
                     type="text",
-                    text=f"❌ Terraform apply failed: {result['stderr']}",
+                    text=f"❌ Apply failed: {result['stderr']}",
                 )
             ],
             isError=True,
@@ -238,7 +238,7 @@ async def _handle_terraform_destroy(arguments, cmd_args, tool_name, execute_terr
             content=[
                 TextContent(
                     type="text",
-                    text=f"✅ Terraform destroy successful:\n\n{result['stdout']}",
+                    text=f"✅ Destroy successful:\n\n{result['stdout']}",
                 )
             ]
         )
@@ -247,7 +247,7 @@ async def _handle_terraform_destroy(arguments, cmd_args, tool_name, execute_terr
             content=[
                 TextContent(
                     type="text",
-                    text=f"❌ Terraform destroy failed: {result['stderr']}",
+                    text=f"❌ Destroy failed: {result['stderr']}",
                 )
             ],
             isError=True,
@@ -261,7 +261,7 @@ async def _handle_terraform_status(arguments, cmd_args, tool_name, execute_terra
     config_dir = arguments["config_dir"]
     show_outputs = arguments.get("show_outputs", True)
 
-    # Fast status query using Terraform state
+    # Fast status query using state
     output_result = await execute_terraform_command(
         ["terraform", "output", "-json"], config_dir
     )
@@ -269,7 +269,7 @@ async def _handle_terraform_status(arguments, cmd_args, tool_name, execute_terra
     if output_result["success"] and show_outputs:
         try:
             outputs = json.loads(output_result["stdout"])
-            output_text = "✅ Terraform Status (from state):\n\n"
+            output_text = "✅ Status (from state):\n\n"
 
             for key, value in outputs.items():
                 if isinstance(value, dict) and "value" in value:
@@ -289,7 +289,7 @@ async def _handle_terraform_status(arguments, cmd_args, tool_name, execute_terra
                 output_text += (
                     f"\n**Resources Managed:** {resource_count}\n"
                 )
-                output_text += "**State File:** Terraform managed\n"
+                output_text += "**State File:** Managed\n"
 
             return CallToolResult(
                 content=[TextContent(type="text", text=output_text)]
@@ -299,7 +299,7 @@ async def _handle_terraform_status(arguments, cmd_args, tool_name, execute_terra
                 content=[
                     TextContent(
                         type="text",
-                        text=f"✅ Terraform Status:\n\n{output_result['stdout']}",
+                        text=f"✅ Status:\n\n{output_result['stdout']}",
                     )
                 ]
             )
@@ -308,7 +308,7 @@ async def _handle_terraform_status(arguments, cmd_args, tool_name, execute_terra
             content=[
                 TextContent(
                     type="text",
-                    text=f"❌ Terraform status query failed: {output_result['stderr']}",
+                    text=f"❌ Status query failed: {output_result['stderr']}",
                 )
             ],
             isError=True,

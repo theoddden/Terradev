@@ -75,7 +75,6 @@ from terradev_cli.providers.crusoe_provider import CrusoeProvider
 from terradev_cli.providers.digitalocean_provider import DigitalOceanProvider
 from terradev_cli.providers.e2e_networks_provider import E2ENetworksProvider
 from terradev_cli.providers.gcp_provider import GCPProvider
-from terradev_cli.providers.hetzner_provider import HetznerProvider
 from terradev_cli.providers.huggingface_provider import HuggingFaceProvider
 from terradev_cli.providers.hyperstack_provider import HyperstackProvider
 from terradev_cli.providers.inferx_provider import InferXProvider
@@ -97,7 +96,6 @@ ALL_PROVIDERS = [
     DigitalOceanProvider,
     E2ENetworksProvider,
     GCPProvider,
-    HetznerProvider,
     HuggingFaceProvider,
     HyperstackProvider,
     InferXProvider,
@@ -274,8 +272,8 @@ for provider_class in ALL_PROVIDERS:
 async def test_all_providers_registered():
     """Verify all providers are registered and importable"""
     assert (
-        len(ALL_PROVIDERS) >= 20
-    ), f"Expected at least 20 providers, got {len(ALL_PROVIDERS)}"
+        len(ALL_PROVIDERS) >= 19
+    ), f"Expected at least 19 providers, got {len(ALL_PROVIDERS)}"
 
     # Verify each provider has required methods
     mock_creds = {
