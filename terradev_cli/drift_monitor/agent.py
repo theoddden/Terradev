@@ -266,6 +266,13 @@ class DriftMonitor:
                 result["drift_reasons"].append(
                     f"expected HTTP {expected_status}, got {response.status_code}"
                 )
+                # Include a short snapshot of the response body to diagnose auth failures.
+                try:
+                    err_text = response.text.strip()[:500]
+                    if err_text:
+                        result["error_body"] = err_text
+                except (ValueError, TypeError, AttributeError):
+                    pass
                 result["drift_summary"] = "; ".join(result["drift_reasons"])
                 return result
 
