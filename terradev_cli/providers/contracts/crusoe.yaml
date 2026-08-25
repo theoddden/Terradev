@@ -12,7 +12,7 @@ endpoints:
 - name: locations
   method: GET
   path: locations
-  enabled: true
+  enabled: false
   expected_response_fields:
   - data
   optional_response_fields: []
@@ -20,7 +20,7 @@ endpoints:
 - name: compute_vms_types
   method: GET
   path: compute/vms/types
-  enabled: true
+  enabled: false
   expected_response_fields:
   - data
   optional_response_fields: []

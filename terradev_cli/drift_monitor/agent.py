@@ -97,6 +97,28 @@ class DriftMonitor:
             result["status"] = "skipped_no_credentials"
             return result
 
+        # If credentials are a dict, ensure all required non-auth query params are present.
+        if auth_required and isinstance(api_key, dict):
+            auth_qp = contract.get("auth_query_param")
+            required_qps: set = set()
+            for endpoint in contract.get("endpoints", []):
+                if not endpoint.get("enabled", True):
+                    continue
+                for qp in endpoint.get("query_params", []):
+                    if isinstance(qp, dict):
+                        if qp.get("default") is not None:
+                            continue
+                        name = qp["name"]
+                    else:
+                        name = qp
+                    if name == auth_qp:
+                        continue
+                    required_qps.add(name)
+            missing = [p for p in required_qps if p not in api_key]
+            if missing:
+                result["status"] = "skipped_no_credentials"
+                return result
+
         for endpoint in contract.get("endpoints", []):
             if not endpoint.get("enabled", True):
                 continue
