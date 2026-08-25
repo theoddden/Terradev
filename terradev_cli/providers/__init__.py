@@ -40,7 +40,9 @@ from .gpu_catalog import (
 )
 
 # Individual provider classes (lazy-loaded via ProviderFactory, but exported for direct import)
+from .e2e_networks_provider import E2ENetworksProvider
 from .runpod_provider import RunPodProvider
+from .yottalabs_provider import YottaLabsProvider
 
 __all__ = [
     # Types
@@ -63,7 +65,9 @@ __all__ = [
     "ProviderFactory",
     "ProviderRegistry",
     # Individual providers (for direct import)
+    "E2ENetworksProvider",
     "RunPodProvider",
+    "YottaLabsProvider",
     # GPU catalog functions
     "normalize",
     "get_canonical_name",

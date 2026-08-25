@@ -339,7 +339,7 @@ jobs:
     - name: Test provider imports
       run: |
         python -c "
-        from terradev_cli.providers import LambdaLabsProvider, RunPodProvider
+        from terradev_cli.providers import E2ENetworksProvider, RunPodProvider, YottaLabsProvider
         from terradev_cli.providers.base_provider import BaseProvider
         from terradev_cli.providers.types import QuoteRequest, ProvisionRequest
         print('✓ All provider imports successful')
@@ -348,9 +348,10 @@ jobs:
     - name: Test provider initialization
       run: |
         python -c "
-        from terradev_cli.providers import LambdaLabsProvider, RunPodProvider
-        lambda_provider = LambdaLabsProvider({})
+        from terradev_cli.providers import E2ENetworksProvider, RunPodProvider, YottaLabsProvider
+        e2e_provider = E2ENetworksProvider({})
         runpod_provider = RunPodProvider({})
+        yotta_provider = YottaLabsProvider({})
         print('✓ Provider initialization successful')
         "
 
