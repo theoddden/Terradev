@@ -5,6 +5,8 @@ Reads canary result telemetry from ~/.terradev/canary-results.jsonl
 and produces a human-readable or JSON summary.
 """
 
+import base64
+import binascii
 import json
 import os
 import sys
@@ -282,6 +284,14 @@ _DRIFT_PROVIDER_ALIASES = {
     "e2enetworks": ["e2enetworks", "e2e"],
 }
 
+# Provider-specific primary env names (full names, not alias-derived).
+_DRIFT_PROVIDER_KEY_ENVS: Dict[str, List[str]] = {
+    "aws": ["TERRADEV_AWS_ACCESS_KEY_ID"],
+    "gcp": ["TERRADEV_GCP_CREDENTIALS"],
+    "oracle": ["TERRADEV_OCI_PRIVATE_KEY", "TERRADEV_OCI_TENANCY"],
+    "inferx": ["TERRADEV_INFERX_API_KEY"],
+}
+
 
 def _default_contracts_dir() -> Path:
     """Return the bundled provider contract directory."""
@@ -294,13 +304,15 @@ def _drift_provider_aliases(provider: str) -> List[str]:
 
 def _load_drift_env_key(provider: str) -> Optional[Union[str, Dict[str, Any]]]:
     """Look for a raw API key in the environment."""
+    specific = _DRIFT_PROVIDER_KEY_ENVS.get(provider, [])
     for alias in _drift_provider_aliases(provider):
         name = alias.upper().replace("-", "_")
-        for env in (
+        envs = list(specific) + [
             f"TERRADEV_{name}_KEY",
             f"TERRADEV_{name}_API_KEY",
             f"CANARY_{name}_KEY",
-        ):
+        ]
+        for env in envs:
             value = os.environ.get(env)
             if value:
                 extras = _load_drift_env_extras(alias, value)
@@ -336,6 +348,47 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
             # The passed-in api_key is likely the query API key.
             extras["bearer_token"] = bearer_token
             extras["api_key"] = api_key
+
+    elif alias == "aws":
+        extras["aws_access_key_id"] = api_key
+        extras["aws_secret_access_key"] = os.environ.get(
+            "TERRADEV_AWS_SECRET_ACCESS_KEY", ""
+        )
+        extras["aws_region"] = os.environ.get("TERRADEV_AWS_REGION") or "us-east-1"
+
+    elif alias == "gcp":
+        try:
+            raw = base64.b64decode(api_key).decode("utf-8")
+            gcp_creds = json.loads(raw)
+            extras["gcp_credentials"] = gcp_creds
+            extras["project_id"] = gcp_creds.get("project_id") or ""
+        except (ValueError, json.JSONDecodeError):
+            extras["gcp_credentials"] = api_key
+
+    elif alias == "oracle":
+        extras["oci_tenancy"] = os.environ.get("TERRADEV_OCI_TENANCY") or ""
+        extras["oci_user"] = os.environ.get("TERRADEV_OCI_USER") or ""
+        extras["oci_fingerprint"] = os.environ.get("TERRADEV_OCI_FINGERPRINT") or ""
+        extras["oci_region"] = os.environ.get("TERRADEV_OCI_REGION") or "us-ashburn-1"
+        # The primary env value may be the private key (base64) or the tenancy.
+        # If it decodes to a PEM private key, use it; otherwise read the dedicated secret.
+        private_key = api_key
+        if not private_key.startswith("-----BEGIN"):
+            try:
+                private_key = base64.b64decode(private_key).decode("utf-8")
+            except (ValueError, binascii.Error):
+                pass
+        extras["oci_private_key"] = private_key
+        # If the primary value was the tenancy, fall back to the dedicated private key secret.
+        fallback_key = os.environ.get("TERRADEV_OCI_PRIVATE_KEY")
+        if fallback_key:
+            try:
+                extras["oci_private_key"] = base64.b64decode(fallback_key).decode("utf-8")
+            except (ValueError, binascii.Error):
+                extras["oci_private_key"] = fallback_key
+
+    elif alias == "inferx":
+        extras["region"] = os.environ.get("TERRADEV_INFERX_REGION") or "us-west-2"
 
     if project_id:
         extras["project_id"] = project_id

@@ -24,11 +24,21 @@ jobs:
           python-version: "3.12"
 
       - name: Install Terradev CLI
-        run: pip install .
+        run: pip install .[aws,gcp]
 
       - name: Run canary drift checks
         env:
           TERRADEV_SKIP_ONBOARDING: "1"
+          TERRADEV_AWS_ACCESS_KEY_ID: ${{ secrets.TERRADEV_AWS_ACCESS_KEY_ID }}
+          TERRADEV_AWS_SECRET_ACCESS_KEY: ${{ secrets.TERRADEV_AWS_SECRET_ACCESS_KEY }}
+          TERRADEV_AWS_REGION: ${{ secrets.TERRADEV_AWS_REGION }}
+          TERRADEV_GCP_CREDENTIALS: ${{ secrets.TERRADEV_GCP_CREDENTIALS }}
+          TERRADEV_OCI_TENANCY: ${{ secrets.TERRADEV_OCI_TENANCY }}
+          TERRADEV_OCI_USER: ${{ secrets.TERRADEV_OCI_USER }}
+          TERRADEV_OCI_FINGERPRINT: ${{ secrets.TERRADEV_OCI_FINGERPRINT }}
+          TERRADEV_OCI_REGION: ${{ secrets.TERRADEV_OCI_REGION }}
+          TERRADEV_OCI_PRIVATE_KEY: ${{ secrets.TERRADEV_OCI_PRIVATE_KEY }}
+          TERRADEV_INFERX_API_KEY: ${{ secrets.TERRADEV_INFERX_API_KEY }}
           TERRADEV_BASENTEN_KEY: ${{ secrets.TERRADEV_BASENTEN_KEY }}
           TERRADEV_BASENTEN_API_KEY: ${{ secrets.TERRADEV_BASENTEN_API_KEY }}
           TERRADEV_BASETEN_KEY: ${{ secrets.TERRADEV_BASETEN_KEY }}
