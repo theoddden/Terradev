@@ -48,6 +48,10 @@ jobs:
           TERRADEV_YOTTALABS_API_KEY: ${{ secrets.TERRADEV_YOTTALABS_API_KEY }}
         run: terradev canary drift --all --format json --timeout 60 > drift-report.json
 
+      - name: Print drift report
+        if: always()
+        run: python3 -m json.tool drift-report.json || cat drift-report.json
+
       - name: Upload drift report
         if: always()
         uses: actions/upload-artifact@v4
