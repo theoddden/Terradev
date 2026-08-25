@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "6.1.6"
-description = "Imperative cross-cloud CLI for AI workloads: provisioning, training, inference, and cost optimization."
+version = "6.1.7"
+description = "Imperative Command Line Interface for AI Workload Orchestration."
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [

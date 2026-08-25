@@ -1,8 +1,8 @@
-# Terradev-cli 6.1.5
+# Terradev-cli 6.1.7
 
 ## An imperative Command Line Interface for AI Workload Orchestration
 
-**Cross-cloud GPU infrastructure and training pipeline CLI for SFT, DPO, GRPO, and multi-stage LLM training orchestration.**
+**Imperative Command Line Interface for AI Workload Orchestration.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
