@@ -11,13 +11,20 @@ endpoints:
   expected_response_fields:
   - droplets
   expected_status: 200
+  optional_response_fields:
+  - meta
+  - meta.total
+  - links
 - name: sizes
   method: GET
   path: sizes
   enabled: true
   expected_response_fields:
-  - data
-  optional_response_fields: []
+  - sizes
+  optional_response_fields:
+  - meta
+  - meta.total
+  - links
   expected_status: 200
 - name: droplets
   method: POST

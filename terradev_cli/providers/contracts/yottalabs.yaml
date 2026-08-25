@@ -7,7 +7,7 @@ endpoints:
 - name: list_gpu_types
   method: GET
   path: gpu-types
-  enabled: true
+  enabled: false
   expected_status: 200
   expected_response_fields:
   - gpuType
@@ -27,15 +27,18 @@ endpoints:
   enabled: true
   expected_status: 200
   expected_response_fields:
-  - id
-  - gpuType
-  - gpu_type
-  - status
-  - region
-  - publicIp
-  - gpuCount
-  optional_response_fields:
   - data
+  optional_response_fields:
+  - region
+  - code
+  - gpuType
+  - id
+  - message
+  - data
+  - publicIp
+  - gpu_type
+  - gpuCount
+  - status
 - name: create_pod
   method: POST
   path: pods

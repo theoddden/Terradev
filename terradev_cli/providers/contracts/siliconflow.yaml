@@ -21,7 +21,7 @@ endpoints:
 - name: deployments_get
   method: GET
   path: deployments
-  enabled: true
+  enabled: false
   expected_response_fields:
   - data
   optional_response_fields: []

@@ -1,5 +1,5 @@
 provider: latitude
-base_url: https://api.latitude.sh/v1
+base_url: https://api.latitude.sh
 auth_type: Bearer
 auth_header: Authorization
 auth_required: true
@@ -16,32 +16,36 @@ endpoints:
   path: plans
   enabled: true
   expected_response_fields:
+  - name
+  optional_response_fields:
   - data
-  optional_response_fields: []
   expected_status: 200
 - name: virtual_machines_plans
   method: GET
   path: virtual-machines/plans
   enabled: true
   expected_response_fields:
+  - name
+  optional_response_fields:
   - data
-  optional_response_fields: []
   expected_status: 200
 - name: projects
   method: GET
   path: projects
   enabled: true
   expected_response_fields:
+  - name
+  optional_response_fields:
   - data
-  optional_response_fields: []
   expected_status: 200
 - name: regions
   method: GET
   path: regions
   enabled: true
   expected_response_fields:
+  - name
+  optional_response_fields:
   - data
-  optional_response_fields: []
   expected_status: 200
 - name: servers
   method: POST
@@ -62,6 +66,7 @@ endpoints:
   path: virtual-machines
   enabled: true
   expected_response_fields:
+  - name
+  optional_response_fields:
   - data
-  optional_response_fields: []
   expected_status: 200

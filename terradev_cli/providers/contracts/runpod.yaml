@@ -15,7 +15,7 @@ endpoints:
   optional_response_fields:
   - errors
   smoke_test_query: query { gpuTypes { id displayName memoryInGb } }
-  expected_status: 201
+  expected_status: 200
 - name: list_pods
   method: POST
   required_fields:
@@ -26,7 +26,7 @@ endpoints:
   optional_response_fields:
   - errors
   smoke_test_query: query { myself { pods { id name } } }
-  expected_status: 201
+  expected_status: 200
 - name: create_pod
   method: POST
   enabled: false
@@ -44,4 +44,4 @@ endpoints:
     \    gpuTypeId: \"NVIDIA RTX A4000\",\n    name: \"drift-canary\"\n  }) {\n  \
     \  id\n  }\n}"
   smoke_test_variables: {}
-  expected_status: 201
+  expected_status: 200
