@@ -1,5 +1,5 @@
 provider: aws
-base_url: https://ec2.{aws_region}.amazonaws.com
+base_url: "https://ec2.{aws_region}.amazonaws.com"
 auth_required: true
 auth_in: header
 auth_type: SigV4
