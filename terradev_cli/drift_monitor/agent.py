@@ -9,10 +9,7 @@ response shape or auth behavior.
 from __future__ import annotations
 
 import base64
-import hashlib
-import hmac
 import json
-import time
 import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -681,7 +678,12 @@ class DriftMonitor:
             return url, headers, payload
 
         if auth_in == "query":
-            # The auth query param was already added by the loop above.
+            # Ensure the auth query param is present even if no other
+            # query_params were declared.
+            auth_param = contract.get("auth_query_param", "api_key")
+            parsed = urllib.parse.urlparse(url)
+            if auth_param not in urllib.parse.parse_qs(parsed.query):
+                _add_query_param(auth_param, key_value)
             return url, headers, payload
 
         if method == "POST":

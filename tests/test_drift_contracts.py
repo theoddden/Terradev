@@ -33,11 +33,25 @@ class TestDriftContracts:
     def test_base_url_is_valid(self, contract_file: Path) -> None:
         data = yaml.safe_load(contract_file.read_text())
         url = data.get("base_url", "")
+
+        # Some contracts use a credential placeholder (e.g. {api_endpoint}) as
+        # the base URL so it can be overridden at runtime. Substitute a dummy
+        # valid URL when validating the scheme/host.
+        placeholder_defaults = {
+            "api_endpoint": "https://model.inferx.net/endpoints/v1",
+            "aws_region": "us-east-1",
+            "oci_region": "us-ashburn-1",
+        }
+        for placeholder, default in placeholder_defaults.items():
+            url = url.replace(f"{{{placeholder}}}", default)
+
         parsed = urlparse(url)
         assert parsed.scheme in {"http", "https"}, (
-            f"{contract_file.name}: base_url must be http(s), got {url!r}"
+            f"{contract_file.name}: base_url must be http(s), got {data['base_url']!r}"
         )
-        assert parsed.netloc, f"{contract_file.name}: base_url has no host: {url!r}"
+        assert parsed.netloc, (
+            f"{contract_file.name}: base_url has no host: {data['base_url']!r}"
+        )
 
     def test_auth_fields_are_consistent(self, contract_file: Path) -> None:
         data = yaml.safe_load(contract_file.read_text())
@@ -100,8 +114,14 @@ class TestDriftContracts:
                     f"{contract_file.name}: enabled endpoint {ep['name']!r} needs a path or smoke_test_query"
                 )
                 path = str(ep["path"])
-                assert "{" not in path, (
-                    f"{contract_file.name}: enabled endpoint {ep['name']!r} path has placeholder {path!r}"
+                # Credential placeholders are resolved at runtime by the drift
+                # agent, so only reject unknown placeholders.
+                allowed_path_placeholders = {"project_id", "aws_region", "oci_region", "zone"}
+                found = set(re.findall(r"\{([a-z_]+)\}", path))
+                unknown = found - allowed_path_placeholders
+                assert not unknown, (
+                    f"{contract_file.name}: enabled endpoint {ep['name']!r} "
+                    f"path has unknown placeholder(s): {unknown}"
                 )
                 assert "drift-test" not in path and "drift_test" not in ep["name"], (
                     f"{contract_file.name}: endpoint {ep['name']!r} looks like a placeholder"

@@ -564,7 +564,8 @@ class TestTerradevAPI:
                 creds = api._provider_creds("inferx")
                 assert creds == {
                     "api_key": "test_key",
-                    "api_endpoint": "https://api.inferx.net",
+                    "api_endpoint": "https://model.inferx.net/endpoints/v1",
+                    "model": "Qwen3.8-27B-FP8",
                     "region": "us-west-2",
                 }
 

@@ -213,7 +213,7 @@ def configure(provider):
             "inferx": {
                 "name": "InferX",
                 "key_name": "API Key",
-                "help": "Get from: InferX dashboard → API Keys",
+                "help": "Get from: InferX Console → endpoint Client Setup",
                 "example": "ix_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             },
             "e2enetworks": {
@@ -375,6 +375,21 @@ def configure(provider):
                 existing_creds[provider.lower()] = {
                     "api_key": api_key.strip(),
                     "project_id": project_id.strip(),
+                }
+            elif provider.lower() == "inferx":
+                # InferX needs the base endpoint and default model from Console
+                api_endpoint = click.prompt(
+                    "   Enter InferX API Base URL",
+                    default="https://model.inferx.net/endpoints/v1",
+                )
+                model = click.prompt(
+                    "   Enter InferX default model",
+                    default="Qwen3.8-27B-FP8",
+                )
+                existing_creds[provider.lower()] = {
+                    "api_key": api_key.strip(),
+                    "api_endpoint": api_endpoint.strip(),
+                    "model": model.strip(),
                 }
             else:
                 existing_creds[provider.lower()] = {"api_key": api_key.strip()}

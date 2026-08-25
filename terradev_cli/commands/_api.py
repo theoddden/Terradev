@@ -446,8 +446,9 @@ class TerradevAPI:
         elif provider_name == "inferx":
             creds["api_key"] = self.credentials.get("inferx_api_key", "")
             creds["api_endpoint"] = self.credentials.get(
-                "inferx_api_endpoint", "https://api.inferx.net"
+                "inferx_api_endpoint", "https://model.inferx.net/endpoints/v1"
             )
+            creds["model"] = self.credentials.get("inferx_model", "Qwen3.8-27B-FP8")
             creds["region"] = self.credentials.get("inferx_region", "us-west-2")
         elif provider_name == "e2enetworks":
             creds["api_key"] = self.credentials.get("e2enetworks_api_key", "")
@@ -694,6 +695,11 @@ def run_interactive_onboarding(api: TerradevAPI):
         elif provider_key == "gcp":
             api.credentials.pop("gcp_project_id", None)
             api.credentials.pop("gcp_credentials_file", None)
+        elif provider_key == "inferx":
+            api.credentials.pop("inferx_api_key", None)
+            api.credentials.pop("inferx_api_endpoint", None)
+            api.credentials.pop("inferx_model", None)
+            api.credentials.pop("inferx_region", None)
         else:
             api.credentials.pop(f"{provider_key}_api_key", None)
 
@@ -740,6 +746,33 @@ def run_interactive_onboarding(api: TerradevAPI):
             else:
                 print("   Skipped AWS")
             return False
+
+        if provider_key == "inferx":
+            print()
+            print("   InferX requires an API key and endpoint details")
+            api_key = click.prompt(
+                "   API Key",
+                default="",
+                hide_input=True,
+                show_default=False,
+            )
+            if not (api_key and api_key.strip()):
+                print("   Skipped InferX")
+                return False
+            api.credentials["inferx_api_key"] = api_key
+            api_endpoint = click.prompt(
+                "   API Base URL",
+                default="https://model.inferx.net/endpoints/v1",
+                show_default=True,
+            )
+            api.credentials["inferx_api_endpoint"] = api_endpoint
+            model = click.prompt(
+                "   Default model",
+                default="Qwen3.8-27B-FP8",
+                show_default=True,
+            )
+            api.credentials["inferx_model"] = model
+            return True
 
         key_value = click.prompt(
             f"   {config['key_name']}",
@@ -832,6 +865,14 @@ def run_interactive_onboarding(api: TerradevAPI):
             "example": "crusoe_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             "env_var": "CRUSOE_ACCESS_KEY",
             "why": "Sustainable computing, unique GPU options",
+        },
+        "inferx": {
+            "name": "InferX",
+            "key_name": "API Key",
+            "help": "Get from: InferX Console → endpoint Client Setup",
+            "example": "ix_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "env_var": "INFERX_API_KEY",
+            "why": "Serverless inference with OpenAI-compatible endpoints",
         },
     }
 
