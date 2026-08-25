@@ -166,7 +166,7 @@ class DriftMonitor:
             project_id = body.get("data", {}).get("last_used_project")
             if project_id:
                 return str(project_id)
-        except Exception:
+        except (requests.RequestException, json.JSONDecodeError, ValueError, AttributeError, TypeError):
             pass
         return None
 
