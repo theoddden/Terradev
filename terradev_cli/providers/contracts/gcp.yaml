@@ -1,20 +1,52 @@
 provider: gcp
-base_url: "https://compute.googleapis.com/compute/v1"
+base_url: "https://storage.googleapis.com"
 auth_required: true
 auth_type: Bearer
 auth_header: Authorization
 last_verified: '2026-08-25'
 endpoints:
-- name: list_instances
+- name: get_object
   method: GET
-  path: "projects/{project_id}/aggregated/instances"
+  path: "storage/v1/b/{bucket}/o/{object}"
   enabled: true
+  query_params:
+  - name: alt
+    default: json
   expected_status: 200
   expected_response_fields:
+  - bucket
+  - name
   - id
-  - items
-  - selfLink
-  optional_response_fields:
   - kind
-  - nextPageToken
-  - warnings
+  - generation
+  - metageneration
+  - storageClass
+  - size
+  - timeCreated
+  - updated
+  - selfLink
+  - contentType
+  optional_response_fields:
+  - acl
+  - cacheControl
+  - componentCount
+  - contentDisposition
+  - contentEncoding
+  - contentLanguage
+  - crc32c
+  - customerEncryption
+  - customTime
+  - etag
+  - eventBasedHold
+  - kmsKeyName
+  - md5Hash
+  - mediaLink
+  - metadata
+  - owner
+  - retention
+  - retentionExpirationTime
+  - temporaryHold
+  - timeDeleted
+  - softDeleteTime
+  - hardDeleteTime
+  - restoreToken

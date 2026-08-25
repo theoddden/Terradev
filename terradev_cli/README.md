@@ -1,4 +1,4 @@
-# Terradev-cli 6.1.7
+# Terradev-cli 6.1.8
 
 ## An imperative Command Line Interface for AI Workload Orchestration
 
@@ -18,9 +18,9 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON v6.1.7**
+**NOTES ON v6.1.8**
 
-- Version bumped to **v6.1.7** for housekeeping and packaging.
+- Version bumped to **v6.1.8** for housekeeping and packaging.
 - **19 GPU cloud and inference providers** are available for quoting and provisioning:
   - `alibaba` — Alibaba Cloud
   - `aws` — Amazon Web Services
