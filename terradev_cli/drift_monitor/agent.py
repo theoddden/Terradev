@@ -653,8 +653,16 @@ class DriftMonitor:
         if endpoint.get("smoke_test_variables"):
             payload["variables"] = endpoint["smoke_test_variables"]
         for field in endpoint.get("required_fields", []):
-            if field not in ("query", "variables") and field not in payload:
-                payload[field] = endpoint.get(field)
+            if isinstance(field, dict):
+                name = field["name"]
+                source = field.get("from_credential", name)
+                value = creds.get(source, endpoint.get(name))
+            else:
+                name = field
+                value = endpoint.get(name)
+            if name not in ("query", "variables") and name not in payload:
+                if value is not None:
+                    payload[name] = value
 
         # Append query params (including the auth query param) before signing.
         for qp in endpoint.get("query_params", []):

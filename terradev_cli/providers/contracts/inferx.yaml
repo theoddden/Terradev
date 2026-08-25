@@ -5,14 +5,25 @@ auth_header: Authorization
 auth_required: true
 last_verified: '2026-08-25'
 endpoints:
-- name: list_models
-  method: GET
-  path: v1/models
+- name: chat_completions
+  method: POST
+  path: chat/completions
   enabled: true
   expected_status: 200
+  required_fields:
+  - name: model
+    from_credential: model
+  - name: messages
+  - name: max_tokens
+  model: deepseek-v4-flash
+  messages:
+  - role: user
+    content: hello
+  max_tokens: 1
   expected_response_fields:
-  - models
-  optional_response_fields:
   - id
-  - name
-  - status
+  - choices
+  optional_response_fields:
+  - object
+  - created
+  - model
