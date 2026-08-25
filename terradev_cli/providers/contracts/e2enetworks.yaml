@@ -1,6 +1,7 @@
 provider: e2enetworks
 base_url: https://api.e2enetworks.com/myaccount/api/v1
-auth_in: query
+auth_type: Bearer
+auth_header: Authorization
 auth_query_param: apikey
 auth_required: true
 last_verified: '2026-08-25'
@@ -11,6 +12,7 @@ endpoints:
   enabled: true
   expected_status: 200
   query_params:
+  - apikey
   - project_id
   - location
   expected_response_fields:
@@ -25,6 +27,7 @@ endpoints:
   enabled: true
   expected_status: 200
   query_params:
+  - apikey
   - project_id
   - location
   expected_response_fields:
@@ -39,6 +42,7 @@ endpoints:
   enabled: true
   expected_status: 200
   query_params:
+  - apikey
   - project_id
   - location
   expected_response_fields:
@@ -53,6 +57,7 @@ endpoints:
   enabled: false
   expected_status: 200
   query_params:
+  - apikey
   - project_id
   - location
   - name: category
