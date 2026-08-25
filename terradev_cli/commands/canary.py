@@ -268,7 +268,7 @@ _DRIFT_PROVIDER_ALIASES = {
     "vastai": ["vastai", "vast"],
     "tensordock": ["tensordock"],
     "huggingface": ["huggingface", "hf"],
-    "baseten": ["baseten"],
+    "baseten": ["baseten", "basenten"],
     "oracle": ["oracle", "oci"],
     "crusoe": ["crusoe"],
     "hyperstack": ["hyperstack"],

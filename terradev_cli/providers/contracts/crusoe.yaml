@@ -1,9 +1,6 @@
 provider: crusoe
 base_url: https://api.crusoecloud.com/v1alpha5
-auth_required: true
-auth_in: header
-auth_type: HMAC
-auth_header: Authorization
+auth_required: false
 last_verified: '2026-08-24'
 endpoints:
 - name: list_projects
@@ -15,7 +12,7 @@ endpoints:
 - name: locations
   method: GET
   path: locations
-  enabled: false
+  enabled: true
   expected_response_fields:
   - data
   optional_response_fields: []
@@ -23,7 +20,7 @@ endpoints:
 - name: compute_vms_types
   method: GET
   path: compute/vms/types
-  enabled: false
+  enabled: true
   expected_response_fields:
   - data
   optional_response_fields: []
