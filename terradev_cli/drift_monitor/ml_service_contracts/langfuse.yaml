@@ -1,8 +1,6 @@
 provider: langfuse
 base_url: "http://localhost:3000"
-auth_required: true
-auth_header: "Authorization"
-auth_type: "Basic"
+auth_required: false
 last_verified: '2026-08-25'
 endpoints:
 - name: public_health

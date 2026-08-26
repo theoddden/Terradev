@@ -23,6 +23,7 @@ jobs:
           - weaviate
           - ray
           - letta
+          - langfuse
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
@@ -78,6 +79,28 @@ jobs:
                 -e OPENAI_API_KEY=dummy letta/letta:latest
               for i in $(seq 1 60); do
                 curl -fs http://localhost:8283/v1/health/ > /dev/null && break
+                sleep 1
+              done
+              ;;
+            langfuse)
+              docker run -d --rm --name postgres -p 5432:5432 \
+                -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres \
+                -e POSTGRES_DB=langfuse postgres:15
+              for i in $(seq 1 60); do
+                docker exec postgres pg_isready -U postgres > /dev/null 2>&1 && break
+                sleep 1
+              done
+              docker run -d --rm --name langfuse -p 3000:3000 \
+                -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/langfuse \
+                -e NEXTAUTH_URL=http://localhost:3000 \
+                -e NEXTAUTH_SECRET=secret \
+                -e SALT=salt \
+                -e ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000 \
+                -e TELEMETRY_ENABLED=false \
+                -e LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=false \
+                langfuse/langfuse:latest
+              for i in $(seq 1 60); do
+                curl -fs http://localhost:3000/api/public/health > /dev/null && break
                 sleep 1
               done
               ;;
