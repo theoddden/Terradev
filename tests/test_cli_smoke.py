@@ -16,6 +16,8 @@ Covers:
 import os
 import sys
 import json
+
+import click
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -205,6 +207,45 @@ class TestProvision:
         assert "--max-price" in result.output
         assert "--dry-run" in result.output
         assert "--parallel" in result.output
+
+
+# ── All commands ─────────────────────────────────────────────────────────────
+
+
+class TestAllCommandHelp:
+    """Smoke test: every registered command and subcommand can print --help."""
+
+    @pytest.fixture
+    def isolated_runner(self, monkeypatch):
+        monkeypatch.setenv("TERRADEV_SKIP_ONBOARDING", "1")
+        monkeypatch.setattr(
+            "terradev_cli.commands._api.TerradevAPI.is_first_time_user", lambda self: False
+        )
+        monkeypatch.setattr(
+            "terradev_cli.commands._api.run_interactive_onboarding", lambda *a, **k: None
+        )
+        return CliRunner()
+
+    def _all_command_paths():
+        def walk(group, prefix):
+            for name, cmd in group.commands.items():
+                path = prefix + [name]
+                if isinstance(cmd, click.Group):
+                    yield path + ["--help"]
+                    yield from walk(cmd, path)
+                else:
+                    yield path + ["--help"]
+
+        return list(walk(cli, []))
+
+    @pytest.mark.parametrize(
+        "args",
+        _all_command_paths(),
+        ids=lambda a: "/".join(a),
+    )
+    def test_command_help(self, isolated_runner, args):
+        result = isolated_runner.invoke(cli, args)
+        assert result.exit_code == 0, f"--help failed for '{' '.join(args)}': {result.output}"
 
 
 if __name__ == "__main__":
