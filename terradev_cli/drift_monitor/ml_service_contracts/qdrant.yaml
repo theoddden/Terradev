@@ -1,0 +1,27 @@
+provider: qdrant
+base_url: "http://localhost:6333"
+auth_required: false
+last_verified: '2026-08-25'
+endpoints:
+- name: readyz
+  method: GET
+  path: "readyz"
+  enabled: true
+  expected_status: 200
+  content_type: text/plain
+  expected_text: "ok"
+- name: livez
+  method: GET
+  path: "livez"
+  enabled: true
+  expected_status: 200
+  content_type: text/plain
+  expected_text: "ok"
+- name: collections
+  method: GET
+  path: "collections"
+  enabled: true
+  expected_status: 200
+  expected_response_fields:
+  - result
+  - collections

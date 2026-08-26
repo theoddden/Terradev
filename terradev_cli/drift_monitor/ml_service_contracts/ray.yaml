@@ -1,0 +1,23 @@
+provider: ray
+base_url: "http://localhost:8265"
+auth_required: false
+last_verified: '2026-08-25'
+endpoints:
+- name: cluster_status
+  method: GET
+  path: "api/cluster_status"
+  enabled: true
+  expected_status: 200
+  expected_response_fields:
+  - result
+  - data
+  - clusterStatus
+- name: nodes
+  method: GET
+  path: "api/nodes"
+  enabled: true
+  expected_status: 200
+  expected_response_fields:
+  - data
+  - raylet
+  - actors

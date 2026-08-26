@@ -256,3 +256,11 @@ endpoints:
         assert data["healthy"] == 1
         assert data["skipped"] == 0
         assert data["providers"][0]["status"] == "healthy"
+
+
+
+class TestCanaryMlDrift:
+    def test_canary_ml_drift_help(self, runner):
+        result = runner.invoke(cli, ["canary", "ml-drift", "--help"])
+        assert result.exit_code == 0
+        assert "ml-drift" in result.output

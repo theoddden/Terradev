@@ -116,10 +116,12 @@ class DriftMonitor:
         contracts_dir: str,
         credentials: Dict[str, Union[str, Dict[str, Any]]],
         timeout: int = 30,
+        base_url_overrides: Optional[Dict[str, str]] = None,
     ):
         self.contracts_dir = Path(contracts_dir)
         self.credentials = credentials
         self.timeout = timeout
+        self.base_url_overrides = base_url_overrides or {}
         self.results: List[Dict[str, Any]] = []
 
     def run_all(self) -> List[Dict[str, Any]]:
@@ -138,6 +140,11 @@ class DriftMonitor:
             contract = yaml.safe_load(f)
 
         provider = contract.get("provider") or contract_path.stem
+        override = self.base_url_overrides.get(provider)
+        if override:
+            contract["base_url"] = override
+        if self.base_url_overrides.get("*"):
+            contract["base_url"] = self.base_url_overrides["*"]
         result: Dict[str, Any] = {
             "provider": provider,
             "checked_at": datetime.now(timezone.utc).isoformat(),
@@ -297,6 +304,21 @@ class DriftMonitor:
                 return result
 
             if response.ok:
+                # Handle explicit plain-text contracts (e.g. health/readiness probes).
+                content_type = endpoint.get("content_type") or contract.get("content_type")
+                if content_type and content_type.lower() == "text/plain":
+                    actual = response.text.strip()
+                    expected_text = endpoint.get("expected_text", "")
+                    result["raw_response_keys"] = [actual]
+                    if actual != expected_text:
+                        result["drift"] = True
+                        result["drift_reasons"].append(
+                            f"expected text {expected_text!r}, got {actual!r}"
+                        )
+                    if result["drift"]:
+                        result["drift_summary"] = "; ".join(result["drift_reasons"])
+                    return result
+
                 try:
                     body = response.json()
                 except json.JSONDecodeError:

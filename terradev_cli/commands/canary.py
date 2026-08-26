@@ -619,3 +619,111 @@ def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format, drift_ti
     _render_drift_human(summary)
     if summary["drifted"]:
         ctx.exit(1)
+
+
+def _default_ml_contracts_dir() -> Path:
+    """Return the bundled ML service contract directory."""
+    return Path(__file__).resolve().parent.parent / "drift_monitor" / "ml_service_contracts"
+
+
+@canary.command("ml-drift")
+@click.option(
+    "--all",
+    "ml_all",
+    is_flag=True,
+    help="Check all ML service contracts.",
+)
+@click.option(
+    "--provider",
+    "-p",
+    default=None,
+    help="Check a specific ML service contract (matches filename or provider field).",
+)
+@click.option(
+    "--format",
+    "drift_format",
+    type=click.Choice(["human", "json", "jsonl"]),
+    default=None,
+    help="Output format for the drift report.",
+)
+@click.option(
+    "--timeout",
+    "drift_timeout",
+    type=int,
+    default=30,
+    help="HTTP timeout in seconds for each drift endpoint call.",
+)
+@click.option(
+    "--base-url",
+    "base_url",
+    default=None,
+    help="Override the base URL for all selected ML service contracts.",
+)
+@click.pass_context
+def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url):
+    """Run drift checks for self-hosted ML/inference services."""
+    if not ml_all and not provider:
+        get_output(ctx).error("Specify --all or --provider <name>")
+        ctx.exit(2)
+        return
+
+    contracts_path = _default_ml_contracts_dir()
+    if not contracts_path.exists():
+        get_output(ctx).error(f"Contracts directory not found: {contracts_path}")
+        ctx.exit(2)
+        return
+
+    contract_files = sorted(contracts_path.glob("*.yaml"))
+    if provider:
+        provider_lower = provider.lower()
+        matching_files = []
+        for p in contract_files:
+            with open(p, "r", encoding="utf-8") as f:
+                contract = yaml.safe_load(f) or {}
+            contract_provider = (contract.get("provider") or p.stem).lower()
+            if (
+                p.stem.lower() == provider_lower
+                or provider_lower in p.stem.lower()
+                or contract_provider == provider_lower
+                or provider_lower in contract_provider
+            ):
+                matching_files.append(p)
+        contract_files = matching_files
+
+    if not contract_files:
+        get_output(ctx).error(f"No matching ML service contracts in {contracts_path}")
+        ctx.exit(2)
+        return
+
+    overrides = {"*": base_url} if base_url else {}
+    monitor = DriftMonitor(
+        str(contracts_path),
+        {},
+        timeout=drift_timeout,
+        base_url_overrides=overrides,
+    )
+    monitor.run_all()
+    summary = monitor.summary()
+
+    out = get_output(ctx)
+    if drift_format:
+        out.set_format(drift_format)
+
+    if out.format == "json":
+        out._closed = True  # noqa: SLF001
+        sys.stdout.write(json.dumps(summary, indent=2, default=str) + "\n")
+        if summary["drifted"]:
+            ctx.exit(1)
+        return
+
+    if out.format == "jsonl":
+        out._closed = True  # noqa: SLF001
+        for r in summary["providers"]:
+            sys.stdout.write(json.dumps(r, default=str) + "\n")
+        if summary["drifted"]:
+            ctx.exit(1)
+        return
+
+    _render_drift_human(summary)
+    if summary["drifted"]:
+        ctx.exit(1)

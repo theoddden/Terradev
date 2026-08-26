@@ -1,0 +1,25 @@
+provider: ollama
+base_url: "http://localhost:11434"
+auth_required: false
+last_verified: '2026-08-25'
+endpoints:
+- name: list_models
+  method: GET
+  path: "api/tags"
+  enabled: true
+  expected_status: 200
+  expected_response_fields:
+  - models
+  - name
+  - model
+  optional_response_fields:
+  - modified_at
+  - size
+  - details
+- name: version
+  method: GET
+  path: "api/version"
+  enabled: true
+  expected_status: 200
+  expected_response_fields:
+  - version

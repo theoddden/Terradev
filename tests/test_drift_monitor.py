@@ -211,3 +211,70 @@ def test_unauthenticated_public_endpoint_does_not_inject_auth(monitor):
     with mock.patch("requests.get", return_value=_FakeResponse(200, {"items": []})) as m:
         monitor._check_endpoint(contract, contract["endpoints"][0], "")
     assert m.call_args.kwargs["headers"] == {}
+
+
+
+@pytest.mark.unit
+def test_drift_text_plain_endpoint(monitor):
+    contract = {
+        "provider": "demo",
+        "base_url": "https://demo.example.com",
+        "auth_required": False,
+        "endpoints": [
+            {
+                "name": "health",
+                "method": "GET",
+                "path": "health",
+                "expected_status": 200,
+                "content_type": "text/plain",
+                "expected_text": "ok",
+            }
+        ],
+    }
+    with mock.patch("requests.get", return_value=_FakeResponse(200, {}, text="ok")):
+        result = monitor._check_endpoint(contract, contract["endpoints"][0], "")
+    assert result["drift"] is False
+    assert result["raw_response_keys"] == ["ok"]
+
+
+@pytest.mark.unit
+def test_drift_text_plain_mismatch_reported(monitor):
+    contract = {
+        "provider": "demo",
+        "base_url": "https://demo.example.com",
+        "auth_required": False,
+        "endpoints": [
+            {
+                "name": "health",
+                "method": "GET",
+                "path": "health",
+                "expected_status": 200,
+                "content_type": "text/plain",
+                "expected_text": "ok",
+            }
+        ],
+    }
+    with mock.patch("requests.get", return_value=_FakeResponse(200, {}, text="fail")):
+        result = monitor._check_endpoint(contract, contract["endpoints"][0], "")
+    assert result["drift"] is True
+    assert "expected text" in result["drift_summary"]
+
+
+@pytest.mark.unit
+def test_drift_base_url_override(tmp_path):
+    contract_file = tmp_path / "demo.yaml"
+    contract_file.write_text("""
+provider: demo
+base_url: https://old.example.com
+auth_required: false
+endpoints:
+- name: health
+  method: GET
+  path: health
+  expected_status: 200
+  expected_response_fields: [status]
+""")
+    monitor = DriftMonitor(str(tmp_path), credentials={}, base_url_overrides={"demo": "https://new.example.com"})
+    with mock.patch("requests.get", return_value=_FakeResponse(200, {"status": "ok"})):
+        result = monitor.check_provider(contract_file)
+    assert result["endpoints"][0].get("drift") is False
