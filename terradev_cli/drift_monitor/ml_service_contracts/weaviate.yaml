@@ -1,8 +1,6 @@
 provider: weaviate
 base_url: "http://localhost:8080"
-auth_required: true
-auth_header: "Authorization"
-auth_type: "Bearer"
+auth_required: false
 last_verified: '2026-08-25'
 endpoints:
 - name: ready
