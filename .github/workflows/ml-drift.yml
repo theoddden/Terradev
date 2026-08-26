@@ -1,0 +1,48 @@
+name: ML Service Drift
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Daily at 06:30 UTC
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  ml-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Terradev CLI
+        run: pip install "."
+
+      - name: Run ML service drift checks
+        env:
+          TERRADEV_SKIP_ONBOARDING: "1"
+          TERRADEV_WANDB_API_KEY: ${{ secrets.TERRADEV_WANDB_API_KEY }}
+          TERRADEV_LANGFUSE_PUBLIC_KEY: ${{ secrets.TERRADEV_LANGFUSE_PUBLIC_KEY }}
+          TERRADEV_LANGFUSE_SECRET_KEY: ${{ secrets.TERRADEV_LANGFUSE_SECRET_KEY }}
+          TERRADEV_LETTA_API_KEY: ${{ secrets.TERRADEV_LETTA_API_KEY }}
+          TERRADEV_WEAVIATE_API_KEY: ${{ secrets.TERRADEV_WEAVIATE_API_KEY }}
+        run: terradev canary ml-drift --all --format json --timeout 60 > ml-drift-report.json
+
+      - name: Print drift report
+        if: always()
+        run: python3 -m json.tool ml-drift-report.json || cat ml-drift-report.json
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-drift-report
+          path: ml-drift-report.json
