@@ -34,8 +34,8 @@ class TestMlServiceContracts:
             f"{contract_file.name}: provider field {data['provider']!r} "
             f"does not match filename {contract_file.stem!r}"
         )
-        assert data.get("auth_required") is False, (
-            f"{contract_file.name}: ML service contracts should not require auth"
+        assert isinstance(data.get("auth_required", True), bool), (
+            f"{contract_file.name}: auth_required must be a boolean"
         )
 
     def test_base_url_is_valid(self, contract_file: Path) -> None:

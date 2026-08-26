@@ -714,7 +714,10 @@ class DriftMonitor:
         if auth_type:
             auth_lower = auth_type.lower()
             if auth_lower == "basic":
-                token = base64.b64encode(f"{bearer_token}:".encode()).decode()
+                if ":" in bearer_token:
+                    token = base64.b64encode(bearer_token.encode()).decode()
+                else:
+                    token = base64.b64encode(f"{bearer_token}:".encode()).decode()
                 headers[auth_header] = f"Basic {token}"
             elif auth_lower == "bearer" and creds.get("gcp_credentials"):
                 gcp_token = self._gcp_access_token(creds)

@@ -1,3 +1,4 @@
+import base64
 """Unit + contract tests for the API drift monitor.
 
 These mock the ``requests`` library so they run offline while still proving that:
@@ -278,3 +279,56 @@ endpoints:
     with mock.patch("requests.get", return_value=_FakeResponse(200, {"status": "ok"})):
         result = monitor.check_provider(contract_file)
     assert result["endpoints"][0].get("drift") is False
+
+
+
+@pytest.mark.unit
+def test_drift_basic_auth_encodes_username_password(monitor):
+    contract = {
+        "provider": "langfuse",
+        "base_url": "http://localhost:3000",
+        "auth_required": True,
+        "auth_type": "Basic",
+        "auth_header": "Authorization",
+        "endpoints": [
+            {
+                "name": "health",
+                "method": "GET",
+                "path": "api/public/health",
+                "expected_status": 200,
+                "expected_response_fields": ["status"],
+            }
+        ],
+    }
+    creds = {"bearer_token": "pk-lf-abc:sk-lf-xyz"}
+    with mock.patch("requests.get", return_value=_FakeResponse(200, {"status": "ok"})) as m:
+        monitor._check_endpoint(contract, contract["endpoints"][0], creds)
+    args, kwargs = m.call_args
+    token = base64.b64encode(b"pk-lf-abc:sk-lf-xyz").decode()
+    assert kwargs["headers"]["Authorization"] == f"Basic {token}"
+
+
+@pytest.mark.unit
+def test_drift_basic_auth_falls_back_to_token_with_colon(monitor):
+    contract = {
+        "provider": "wandb",
+        "base_url": "http://localhost:8080",
+        "auth_required": True,
+        "auth_type": "Basic",
+        "auth_header": "Authorization",
+        "endpoints": [
+            {
+                "name": "health",
+                "method": "GET",
+                "path": "v1/health",
+                "expected_status": 200,
+                "expected_response_fields": ["status"],
+            }
+        ],
+    }
+    creds = {"api_key": "wandb-key"}
+    with mock.patch("requests.get", return_value=_FakeResponse(200, {"status": "ok"})) as m:
+        monitor._check_endpoint(contract, contract["endpoints"][0], creds)
+    args, kwargs = m.call_args
+    token = base64.b64encode(b"wandb-key:").decode()
+    assert kwargs["headers"]["Authorization"] == f"Basic {token}"

@@ -287,6 +287,10 @@ _DRIFT_PROVIDER_KEY_ENVS: Dict[str, List[str]] = {
     "aws": ["TERRADEV_AWS_ACCESS_KEY_ID"],
     "gcp": ["TERRADEV_GCP_CREDENTIALS"],
     "inferx": ["TERRADEV_INFERX_API_KEY"],
+    "wandb": ["TERRADEV_WANDB_API_KEY"],
+    "langfuse": ["TERRADEV_LANGFUSE_PUBLIC_KEY"],
+    "letta": ["TERRADEV_LETTA_API_KEY"],
+    "weaviate": ["TERRADEV_WEAVIATE_API_KEY"],
 }
 
 
@@ -406,6 +410,26 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
             or "https://model.inferx.net/endpoints/v1"
         ).strip()
         extras["model"] = os.environ.get("TERRADEV_INFERX_MODEL") or "Qwen3.8-27B-FP8"
+
+    elif alias == "langfuse":
+        public_key = api_key.strip()
+        secret_key = (os.environ.get(f"TERRADEV_{name}_SECRET_KEY") or "").strip()
+        if public_key and secret_key:
+            extras["bearer_token"] = f"{public_key}:{secret_key}"
+        extras["public_key"] = public_key
+        extras["secret_key"] = secret_key
+        extras["api_key"] = public_key
+
+    elif alias == "wandb":
+        extras["api_key"] = api_key.strip()
+
+    elif alias == "letta":
+        extras["api_key"] = api_key.strip()
+        extras["bearer_token"] = api_key.strip()
+
+    elif alias == "weaviate":
+        extras["api_key"] = api_key.strip()
+        extras["bearer_token"] = api_key.strip()
 
     if project_id:
         extras["project_id"] = project_id
@@ -659,8 +683,15 @@ def _default_ml_contracts_dir() -> Path:
     default=None,
     help="Override the base URL for all selected ML service contracts.",
 )
+@click.option(
+    "--no-credentials",
+    "no_credentials",
+    is_flag=True,
+    default=False,
+    help="Run drift checks without loading any credentials (only public/no-auth endpoints).",
+)
 @click.pass_context
-def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url):
+def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url, no_credentials):
     """Run drift checks for self-hosted ML/inference services."""
     if not ml_all and not provider:
         get_output(ctx).error("Specify --all or --provider <name>")
@@ -695,10 +726,17 @@ def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url
         ctx.exit(2)
         return
 
+    providers = []
+    for p in contract_files:
+        with open(p, "r", encoding="utf-8") as f:
+            contract = yaml.safe_load(f) or {}
+        providers.append(contract.get("provider") or p.stem)
+
+    credentials = {} if no_credentials else _load_drift_credentials(providers)
     overrides = {"*": base_url} if base_url else {}
     monitor = DriftMonitor(
         str(contracts_path),
-        {},
+        credentials,
         timeout=drift_timeout,
         base_url_overrides=overrides,
     )

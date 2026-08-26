@@ -1,0 +1,14 @@
+provider: letta
+base_url: "http://localhost:8283"
+auth_required: true
+auth_header: "Authorization"
+auth_type: "Bearer"
+last_verified: '2026-08-25'
+endpoints:
+- name: health
+  method: GET
+  path: "v1/health/"
+  enabled: true
+  expected_status: 200
+  expected_response_fields:
+  - status

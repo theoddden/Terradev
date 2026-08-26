@@ -1,0 +1,14 @@
+provider: wandb
+base_url: "http://localhost:8080"
+auth_required: true
+auth_header: "X-WandB-Api-Key"
+auth_type: ""
+last_verified: '2026-08-25'
+endpoints:
+- name: v1_health
+  method: GET
+  path: "v1/health"
+  enabled: true
+  expected_status: 200
+  expected_response_fields:
+  - status

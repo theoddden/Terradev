@@ -1,0 +1,21 @@
+provider: langfuse
+base_url: "http://localhost:3000"
+auth_required: true
+auth_header: "Authorization"
+auth_type: "Basic"
+last_verified: '2026-08-25'
+endpoints:
+- name: public_health
+  method: GET
+  path: "api/public/health"
+  enabled: true
+  expected_status: 200
+  expected_response_fields:
+  - status
+- name: public_ready
+  method: GET
+  path: "api/public/ready"
+  enabled: true
+  expected_status: 200
+  expected_response_fields:
+  - status
