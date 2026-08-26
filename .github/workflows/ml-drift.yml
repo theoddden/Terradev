@@ -13,20 +13,7 @@ on:
 jobs:
   ml-drift:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        service:
-          - qdrant
-          - ollama
-          - weaviate
-          - ray
-          - letta
-          - langfuse
-          - wandb
-          - vllm
-          - sglang
+    timeout-minutes: 120
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
@@ -39,103 +26,129 @@ jobs:
       - name: Install Terradev CLI
         run: pip install "."
 
-      - name: Start and test ${{ matrix.service }}
+      - name: Start and test ML services
         env:
           TERRADEV_SKIP_ONBOARDING: "1"
         run: |
-          set -e
-          case "${{ matrix.service }}" in
-            qdrant)
-              docker run -d --rm --name qdrant -p 6333:6333 qdrant/qdrant:latest
-              for i in $(seq 1 30); do
-                curl -fs http://localhost:6333/readyz > /dev/null && break
-                sleep 1
-              done
-              ;;
-            ollama)
-              docker run -d --rm --name ollama -p 11434:11434 ollama/ollama:latest
-              for i in $(seq 1 60); do
-                curl -fs http://localhost:11434/api/tags > /dev/null && break
-                sleep 1
-              done
-              ;;
-            weaviate)
-              docker run -d --rm --name weaviate -p 8080:8080 \
-                -e AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true \
-                -e AUTHORIZATION_ENABLED=false \
-                cr.weaviate.io/semitechnologies/weaviate:latest
-              for i in $(seq 1 60); do
-                curl -fs http://localhost:8080/v1/.well-known/live > /dev/null && break
-                sleep 1
-              done
-              ;;
-            ray)
-              docker run -d --rm --name ray -p 8265:8265 rayproject/ray:2.38.0 \
-                ray start --head --dashboard-host 0.0.0.0 --dashboard-port 8265 --block
-              for i in $(seq 1 60); do
-                curl -fs http://localhost:8265/api/cluster_status > /dev/null && break
-                sleep 1
-              done
-              ;;
-            letta)
-              docker run -d --rm --name letta -p 8283:8283 \
-                -e OPENAI_API_KEY=dummy letta/letta:latest
-              for i in $(seq 1 60); do
-                curl -fs http://localhost:8283/v1/health/ > /dev/null && break
-                sleep 1
-              done
-              ;;
-            langfuse)
-              docker run -d --rm --name postgres -p 5432:5432 \
-                -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres \
-                -e POSTGRES_DB=langfuse postgres:15
-              for i in $(seq 1 60); do
-                docker exec postgres pg_isready -U postgres > /dev/null 2>&1 && break
-                sleep 1
-              done
-              docker run -d --rm --name langfuse -p 3000:3000 \
-                -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/langfuse \
-                -e NEXTAUTH_URL=http://localhost:3000 \
-                -e NEXTAUTH_SECRET=secret \
-                -e SALT=salt \
-                -e ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000 \
-                -e TELEMETRY_ENABLED=false \
-                -e LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=false \
-                langfuse/langfuse:latest
-              for i in $(seq 1 60); do
-                curl -fs http://localhost:3000/api/public/health > /dev/null && break
-                sleep 1
-              done
-              ;;
-            wandb)
-              if [ -z "${{ secrets.WANDB_LICENSE }}" ]; then
-                echo "WANDB_LICENSE secret not set; skipping W&B local (requires license and 4GB+ RAM)"
-                exit 0
-              fi
-              docker run -d --rm --name wandb -p 8080:8080 \
-                -e LICENSE=${{ secrets.WANDB_LICENSE }} \
-                -e HOST=http://localhost:8080 \
-                wandb/local
-              for i in $(seq 1 90); do
-                curl -fs http://localhost:8080/healthz > /dev/null && break
-                sleep 2
-              done
-              ;;
-            vllm|sglang)
-              echo "${{ matrix.service }} requires a GPU runner and is not supported on GitHub-hosted CPU runners"
-              exit 0
-              ;;
-          esac
-          terradev canary ml-drift --provider ${{ matrix.service }} \
-            --format json --timeout 60 > ml-drift-report-${{ matrix.service }}.json
+          set -a
+          failed=0
+
+          run_drift() {
+            local service=$1
+            terradev canary ml-drift --provider "$service" \
+              --format jsonl --timeout 60 >> ml-drift-report.jsonl || failed=1
+          }
+
+          stop_and_remove() {
+            local name=$1
+            docker stop "$name" >/dev/null 2>&1 || true
+          }
+
+          # Qdrant
+          docker run -d --rm --name qdrant -p 6333:6333 qdrant/qdrant:latest
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:6333/readyz > /dev/null && break
+            sleep 1
+          done
+          run_drift qdrant
+          stop_and_remove qdrant
+
+          # Ollama
+          docker run -d --rm --name ollama -p 11434:11434 ollama/ollama:latest
+          for i in $(seq 1 60); do
+            curl -fs http://localhost:11434/api/tags > /dev/null && break
+            sleep 1
+          done
+          run_drift ollama
+          stop_and_remove ollama
+
+          # Weaviate
+          docker run -d --rm --name weaviate -p 8080:8080 \
+            -e AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true \
+            -e AUTHORIZATION_ENABLED=false \
+            cr.weaviate.io/semitechnologies/weaviate:latest
+          for i in $(seq 1 60); do
+            curl -fs http://localhost:8080/v1/.well-known/live > /dev/null && break
+            sleep 1
+          done
+          run_drift weaviate
+          stop_and_remove weaviate
+
+          # Ray
+          docker run -d --rm --name ray -p 8265:8265 rayproject/ray:2.38.0 \
+            ray start --head --dashboard-host 0.0.0.0 --dashboard-port 8265 --block
+          for i in $(seq 1 60); do
+            curl -fs http://localhost:8265/api/cluster_status > /dev/null && break
+            sleep 1
+          done
+          run_drift ray
+          stop_and_remove ray
+
+          # Letta
+          docker run -d --rm --name letta -p 8283:8283 \
+            -e OPENAI_API_KEY=dummy letta/letta:latest
+          for i in $(seq 1 60); do
+            curl -fs http://localhost:8283/v1/health/ > /dev/null && break
+            sleep 1
+          done
+          run_drift letta
+          stop_and_remove letta
+
+          # Langfuse (requires Postgres)
+          docker run -d --rm --name postgres -p 5432:5432 \
+            -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres \
+            -e POSTGRES_DB=langfuse postgres:15
+          for i in $(seq 1 60); do
+            docker exec postgres pg_isready -U postgres > /dev/null 2>&1 && break
+            sleep 1
+          done
+          docker run -d --rm --name langfuse -p 3000:3000 \
+            -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/langfuse \
+            -e NEXTAUTH_URL=http://localhost:3000 \
+            -e NEXTAUTH_SECRET=secret \
+            -e SALT=salt \
+            -e ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000 \
+            -e TELEMETRY_ENABLED=false \
+            -e LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=false \
+            langfuse/langfuse:latest
+          for i in $(seq 1 60); do
+            curl -fs http://localhost:3000/api/public/health > /dev/null && break
+            sleep 1
+          done
+          run_drift langfuse
+          stop_and_remove langfuse
+          stop_and_remove postgres
+
+          # W&B local requires a license and ~4GB RAM
+          if [ -n "${{ secrets.WANDB_LICENSE }}" ]; then
+            docker run -d --rm --name wandb -p 8080:8080 \
+              -e LICENSE=${{ secrets.WANDB_LICENSE }} \
+              -e HOST=http://localhost:8080 \
+              wandb/local
+            for i in $(seq 1 90); do
+              curl -fs http://localhost:8080/healthz > /dev/null && break
+              sleep 2
+            done
+            run_drift wandb
+            stop_and_remove wandb
+          else
+            echo "WANDB_LICENSE secret not set; skipping W&B local (requires license and 4GB+ RAM)"
+          fi
+
+          # vLLM and SGLang require a GPU; GitHub-hosted runners do not have one.
+          echo "vLLM and SGLang require a GPU runner; skipping on CPU-only runner"
+
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Print drift report
         if: always()
-        run: python3 -m json.tool ml-drift-report-${{ matrix.service }}.json || cat ml-drift-report-${{ matrix.service }}.json
+        run: cat ml-drift-report.jsonl | python3 -m json.tool --json-lines 2>/dev/null || cat ml-drift-report.jsonl
 
       - name: Upload drift report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ml-drift-report-${{ matrix.service }}
-          path: ml-drift-report-${{ matrix.service }}.json
+          name: ml-drift-report
+          path: ml-drift-report.jsonl
