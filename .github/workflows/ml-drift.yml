@@ -98,7 +98,7 @@ jobs:
           run_drift letta
           stop_and_remove letta
 
-          # Langfuse (Postgres on a Docker network so langfuse can resolve postgres by name)
+          # Langfuse v2 (Postgres-only; v3/v4 require ClickHouse and Redis)
           docker network create ml-drift-net >/dev/null 2>&1 || true
           docker run -d --rm --name postgres --network ml-drift-net \
             -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres \
@@ -109,14 +109,15 @@ jobs:
           done
           docker run -d --rm --name langfuse --network ml-drift-net -p 3000:3000 \
             -e DATABASE_URL=postgresql://postgres:postgres@postgres:5432/langfuse \
+            -e DIRECT_URL=postgresql://postgres:postgres@postgres:5432/langfuse \
             -e NEXTAUTH_URL=http://localhost:3000 \
             -e NEXTAUTH_SECRET=secret \
             -e SALT=salt \
             -e ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000 \
             -e TELEMETRY_ENABLED=false \
-            -e LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=false \
-            langfuse/langfuse:latest
-          for i in $(seq 1 120); do
+            -e DO_NOT_TRACK=true \
+            langfuse/langfuse:2
+          for i in $(seq 1 180); do
             curl -fs http://localhost:3000/api/public/health > /dev/null && break
             sleep 1
           done
