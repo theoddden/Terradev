@@ -14,6 +14,15 @@ jobs:
   ml-drift:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - qdrant
+          - ollama
+          - weaviate
+          - ray
+          - letta
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
@@ -26,59 +35,63 @@ jobs:
       - name: Install Terradev CLI
         run: pip install "."
 
-      - name: Start Qdrant
-        run: |
-          docker run -d --rm --name qdrant -p 6333:6333 qdrant/qdrant:latest
-          for i in $(seq 1 30); do
-            curl -fs http://localhost:6333/readyz > /dev/null && break
-            sleep 1
-          done
-
-      - name: Start Ollama
-        run: |
-          docker run -d --rm --name ollama -p 11434:11434 ollama/ollama:latest
-          for i in $(seq 1 60); do
-            curl -fs http://localhost:11434/api/tags > /dev/null && break
-            sleep 1
-          done
-
-      - name: Start Weaviate
-        run: |
-          docker run -d --rm --name weaviate -p 8080:8080             -e AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true             -e AUTHORIZATION_ENABLED=false             cr.weaviate.io/semitechnologies/weaviate:latest
-          for i in $(seq 1 60); do
-            curl -fs http://localhost:8080/v1/.well-known/live > /dev/null && break
-            sleep 1
-          done
-
-      - name: Start Ray
-        run: |
-          docker run -d --rm --name ray -p 8265:8265 rayproject/ray:2.38.0 \
-            ray start --head --dashboard-host 0.0.0.0 --dashboard-port 8265 --block
-          for i in $(seq 1 60); do
-            curl -fs http://localhost:8265/api/cluster_status > /dev/null && break
-            sleep 1
-          done
-
-      - name: Run ML service drift checks
-        # This is an informational report. A GitHub-hosted runner has no local
-        # ML services, so connections will be refused unless you run services in
-        # the runner or point the contracts at a remote cluster.
+      - name: Start and test ${{ matrix.service }}
         env:
           TERRADEV_SKIP_ONBOARDING: "1"
-          TERRADEV_WANDB_API_KEY: ${{ secrets.TERRADEV_WANDB_API_KEY }}
-          TERRADEV_LANGFUSE_PUBLIC_KEY: ${{ secrets.TERRADEV_LANGFUSE_PUBLIC_KEY }}
-          TERRADEV_LANGFUSE_SECRET_KEY: ${{ secrets.TERRADEV_LANGFUSE_SECRET_KEY }}
-          TERRADEV_LETTA_API_KEY: ${{ secrets.TERRADEV_LETTA_API_KEY }}
-          TERRADEV_WEAVIATE_API_KEY: ${{ secrets.TERRADEV_WEAVIATE_API_KEY }}
-        run: terradev canary ml-drift --all --format json --timeout 60 > ml-drift-report.json || true
+        run: |
+          set -e
+          case "${{ matrix.service }}" in
+            qdrant)
+              docker run -d --rm --name qdrant -p 6333:6333 qdrant/qdrant:latest
+              for i in $(seq 1 30); do
+                curl -fs http://localhost:6333/readyz > /dev/null && break
+                sleep 1
+              done
+              ;;
+            ollama)
+              docker run -d --rm --name ollama -p 11434:11434 ollama/ollama:latest
+              for i in $(seq 1 60); do
+                curl -fs http://localhost:11434/api/tags > /dev/null && break
+                sleep 1
+              done
+              ;;
+            weaviate)
+              docker run -d --rm --name weaviate -p 8080:8080 \
+                -e AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true \
+                -e AUTHORIZATION_ENABLED=false \
+                cr.weaviate.io/semitechnologies/weaviate:latest
+              for i in $(seq 1 60); do
+                curl -fs http://localhost:8080/v1/.well-known/live > /dev/null && break
+                sleep 1
+              done
+              ;;
+            ray)
+              docker run -d --rm --name ray -p 8265:8265 rayproject/ray:2.38.0 \
+                ray start --head --dashboard-host 0.0.0.0 --dashboard-port 8265 --block
+              for i in $(seq 1 60); do
+                curl -fs http://localhost:8265/api/cluster_status > /dev/null && break
+                sleep 1
+              done
+              ;;
+            letta)
+              docker run -d --rm --name letta -p 8283:8283 \
+                -e OPENAI_API_KEY=dummy letta/letta:latest
+              for i in $(seq 1 60); do
+                curl -fs http://localhost:8283/v1/health/ > /dev/null && break
+                sleep 1
+              done
+              ;;
+          esac
+          terradev canary ml-drift --provider ${{ matrix.service }} \
+            --format json --timeout 60 > ml-drift-report-${{ matrix.service }}.json
 
       - name: Print drift report
         if: always()
-        run: python3 -m json.tool ml-drift-report.json || cat ml-drift-report.json
+        run: python3 -m json.tool ml-drift-report-${{ matrix.service }}.json || cat ml-drift-report-${{ matrix.service }}.json
 
       - name: Upload drift report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ml-drift-report
-          path: ml-drift-report.json
+          name: ml-drift-report-${{ matrix.service }}
+          path: ml-drift-report-${{ matrix.service }}.json

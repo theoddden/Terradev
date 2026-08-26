@@ -1,8 +1,6 @@
 provider: letta
 base_url: "http://localhost:8283"
-auth_required: true
-auth_header: "Authorization"
-auth_type: "Bearer"
+auth_required: false
 last_verified: '2026-08-25'
 endpoints:
 - name: health
