@@ -13,7 +13,7 @@ on:
 jobs:
   ml-drift:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -24,6 +24,9 @@ jobs:
           - ray
           - letta
           - langfuse
+          - wandb
+          - vllm
+          - sglang
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
@@ -103,6 +106,24 @@ jobs:
                 curl -fs http://localhost:3000/api/public/health > /dev/null && break
                 sleep 1
               done
+              ;;
+            wandb)
+              if [ -z "${{ secrets.WANDB_LICENSE }}" ]; then
+                echo "WANDB_LICENSE secret not set; skipping W&B local (requires license and 4GB+ RAM)"
+                exit 0
+              fi
+              docker run -d --rm --name wandb -p 8080:8080 \
+                -e LICENSE=${{ secrets.WANDB_LICENSE }} \
+                -e HOST=http://localhost:8080 \
+                wandb/local
+              for i in $(seq 1 90); do
+                curl -fs http://localhost:8080/healthz > /dev/null && break
+                sleep 2
+              done
+              ;;
+            vllm|sglang)
+              echo "${{ matrix.service }} requires a GPU runner and is not supported on GitHub-hosted CPU runners"
+              exit 0
               ;;
           esac
           terradev canary ml-drift --provider ${{ matrix.service }} \
