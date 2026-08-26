@@ -261,7 +261,7 @@ class TestDriftErrorBranches:
         bad = tmp_contracts / "bad.yaml"
         bad.write_text("{unclosed")
         monitor = DriftMonitor(str(tmp_contracts), credentials={})
-        with pytest.raises(Exception):
+        with pytest.raises(yaml.YAMLError):
             monitor.check_provider(bad)
 
     def test_contract_missing_base_url_raises(self, tmp_contracts):
