@@ -27,6 +27,9 @@ jobs:
         run: pip install "."
 
       - name: Run ML service drift checks
+        # This is an informational report. A GitHub-hosted runner has no local
+        # ML services, so connections will be refused unless you run services in
+        # the runner or point the contracts at a remote cluster.
         env:
           TERRADEV_SKIP_ONBOARDING: "1"
           TERRADEV_WANDB_API_KEY: ${{ secrets.TERRADEV_WANDB_API_KEY }}
@@ -34,7 +37,7 @@ jobs:
           TERRADEV_LANGFUSE_SECRET_KEY: ${{ secrets.TERRADEV_LANGFUSE_SECRET_KEY }}
           TERRADEV_LETTA_API_KEY: ${{ secrets.TERRADEV_LETTA_API_KEY }}
           TERRADEV_WEAVIATE_API_KEY: ${{ secrets.TERRADEV_WEAVIATE_API_KEY }}
-        run: terradev canary ml-drift --all --format json --timeout 60 > ml-drift-report.json
+        run: terradev canary ml-drift --all --format json --timeout 60 > ml-drift-report.json || true
 
       - name: Print drift report
         if: always()
