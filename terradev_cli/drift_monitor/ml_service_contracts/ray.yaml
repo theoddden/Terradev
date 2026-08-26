@@ -14,10 +14,11 @@ endpoints:
   - clusterStatus
 - name: nodes
   method: GET
-  path: "api/nodes"
+  path: "api/v0/nodes"
   enabled: true
   expected_status: 200
   expected_response_fields:
+  - result
   - data
   optional_response_fields:
   - raylet

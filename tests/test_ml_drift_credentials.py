@@ -9,12 +9,6 @@ from terradev_cli.commands.canary import _load_drift_credentials
 class TestMlDriftCredentials:
     """Verify TERRADEV_* tokens for new ML services are loaded correctly."""
 
-    def test_wandb_api_key_loaded(self, monkeypatch):
-        monkeypatch.setenv("TERRADEV_WANDB_API_KEY", "wandb-key")
-        creds = _load_drift_credentials(["wandb"])
-        assert "wandb" in creds
-        assert creds["wandb"]["api_key"] == "wandb-key"
-
     def test_langfuse_public_and_secret_keys_loaded(self, monkeypatch):
         monkeypatch.setenv("TERRADEV_LANGFUSE_PUBLIC_KEY", "pk-lf-abc")
         monkeypatch.setenv("TERRADEV_LANGFUSE_SECRET_KEY", "sk-lf-xyz")
@@ -39,6 +33,6 @@ class TestMlDriftCredentials:
         assert creds["weaviate"]["bearer_token"] == "weaviate-key"
 
     def test_missing_tokens_return_empty(self, monkeypatch):
-        monkeypatch.delenv("TERRADEV_WANDB_API_KEY", raising=False)
-        creds = _load_drift_credentials(["wandb"])
-        assert "wandb" not in creds
+        monkeypatch.delenv("TERRADEV_WEAVIATE_API_KEY", raising=False)
+        creds = _load_drift_credentials(["weaviate"])
+        assert "weaviate" not in creds

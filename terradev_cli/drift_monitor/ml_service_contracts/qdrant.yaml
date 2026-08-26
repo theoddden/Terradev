@@ -9,14 +9,14 @@ endpoints:
   enabled: true
   expected_status: 200
   content_type: text/plain
-  expected_text: "ok"
+  expected_text: "all shards are ready"
 - name: livez
   method: GET
   path: "livez"
   enabled: true
   expected_status: 200
   content_type: text/plain
-  expected_text: "ok"
+  expected_text: "healthz check passed"
 - name: collections
   method: GET
   path: "collections"

@@ -287,7 +287,6 @@ _DRIFT_PROVIDER_KEY_ENVS: Dict[str, List[str]] = {
     "aws": ["TERRADEV_AWS_ACCESS_KEY_ID"],
     "gcp": ["TERRADEV_GCP_CREDENTIALS"],
     "inferx": ["TERRADEV_INFERX_API_KEY"],
-    "wandb": ["TERRADEV_WANDB_API_KEY"],
     "langfuse": ["TERRADEV_LANGFUSE_PUBLIC_KEY"],
     "letta": ["TERRADEV_LETTA_API_KEY"],
     "weaviate": ["TERRADEV_WEAVIATE_API_KEY"],
@@ -419,9 +418,6 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
         extras["public_key"] = public_key
         extras["secret_key"] = secret_key
         extras["api_key"] = public_key
-
-    elif alias == "wandb":
-        extras["api_key"] = api_key.strip()
 
     elif alias == "letta":
         extras["api_key"] = api_key.strip()
@@ -618,7 +614,9 @@ def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format, drift_ti
         providers.append(contract.get("provider") or p.stem)
     credentials = {} if no_credentials else _load_drift_credentials(providers)
     monitor = DriftMonitor(str(contracts_path), credentials, timeout=drift_timeout)
-    monitor.run_all()
+    monitor.results = []
+    for p in contract_files:
+        monitor.results.append(monitor.check_provider(p))
     summary = monitor.summary()
 
     out = get_output(ctx)
@@ -740,7 +738,9 @@ def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url
         timeout=drift_timeout,
         base_url_overrides=overrides,
     )
-    monitor.run_all()
+    monitor.results = []
+    for p in contract_files:
+        monitor.results.append(monitor.check_provider(p))
     summary = monitor.summary()
 
     out = get_output(ctx)

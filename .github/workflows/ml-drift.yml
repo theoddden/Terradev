@@ -62,13 +62,13 @@ jobs:
           run_drift ollama
           stop_and_remove ollama
 
-          # Weaviate
+          # Weaviate (wait until it reports itself ready, not just live)
           docker run -d --rm --name weaviate -p 8080:8080 \
             -e AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true \
             -e AUTHORIZATION_ENABLED=false \
             cr.weaviate.io/semitechnologies/weaviate:latest
-          for i in $(seq 1 60); do
-            curl -fs http://localhost:8080/v1/.well-known/live > /dev/null && break
+          for i in $(seq 1 120); do
+            curl -fs http://localhost:8080/v1/.well-known/ready > /dev/null && break
             sleep 1
           done
           run_drift weaviate
@@ -87,23 +87,28 @@ jobs:
           # Letta
           docker run -d --rm --name letta -p 8283:8283 \
             -e OPENAI_API_KEY=dummy letta/letta:latest
-          for i in $(seq 1 60); do
+          for i in $(seq 1 120); do
             curl -fs http://localhost:8283/v1/health/ > /dev/null && break
             sleep 1
           done
+          if ! curl -fs http://localhost:8283/v1/health/ > /dev/null 2>&1; then
+            echo "Letta failed to become ready; last logs:"
+            docker logs letta
+          fi
           run_drift letta
           stop_and_remove letta
 
-          # Langfuse (requires Postgres)
-          docker run -d --rm --name postgres -p 5432:5432 \
+          # Langfuse (Postgres on a Docker network so langfuse can resolve postgres by name)
+          docker network create ml-drift-net >/dev/null 2>&1 || true
+          docker run -d --rm --name postgres --network ml-drift-net \
             -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres \
             -e POSTGRES_DB=langfuse postgres:15
           for i in $(seq 1 60); do
             docker exec postgres pg_isready -U postgres > /dev/null 2>&1 && break
             sleep 1
           done
-          docker run -d --rm --name langfuse -p 3000:3000 \
-            -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/langfuse \
+          docker run -d --rm --name langfuse --network ml-drift-net -p 3000:3000 \
+            -e DATABASE_URL=postgresql://postgres:postgres@postgres:5432/langfuse \
             -e NEXTAUTH_URL=http://localhost:3000 \
             -e NEXTAUTH_SECRET=secret \
             -e SALT=salt \
@@ -111,32 +116,19 @@ jobs:
             -e TELEMETRY_ENABLED=false \
             -e LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=false \
             langfuse/langfuse:latest
-          for i in $(seq 1 60); do
+          for i in $(seq 1 120); do
             curl -fs http://localhost:3000/api/public/health > /dev/null && break
             sleep 1
           done
+          if ! curl -fs http://localhost:3000/api/public/health > /dev/null 2>&1; then
+            echo "Langfuse failed to become ready; last logs:"
+            docker logs langfuse
+            docker logs postgres
+          fi
           run_drift langfuse
           stop_and_remove langfuse
           stop_and_remove postgres
-
-          # W&B local requires a license and ~4GB RAM
-          if [ -n "${{ secrets.WANDB_LICENSE }}" ]; then
-            docker run -d --rm --name wandb -p 8080:8080 \
-              -e LICENSE=${{ secrets.WANDB_LICENSE }} \
-              -e HOST=http://localhost:8080 \
-              wandb/local
-            for i in $(seq 1 90); do
-              curl -fs http://localhost:8080/healthz > /dev/null && break
-              sleep 2
-            done
-            run_drift wandb
-            stop_and_remove wandb
-          else
-            echo "WANDB_LICENSE secret not set; skipping W&B local (requires license and 4GB+ RAM)"
-          fi
-
-          # vLLM and SGLang require a GPU; GitHub-hosted runners do not have one.
-          echo "vLLM and SGLang require a GPU runner; skipping on CPU-only runner"
+          docker network rm ml-drift-net >/dev/null 2>&1 || true
 
           if [ "$failed" -ne 0 ]; then
             exit 1
