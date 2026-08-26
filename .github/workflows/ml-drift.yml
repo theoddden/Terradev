@@ -26,6 +26,14 @@ jobs:
       - name: Install Terradev CLI
         run: pip install "."
 
+      - name: Start Qdrant
+        run: |
+          docker run -d --rm --name qdrant -p 6333:6333 qdrant/qdrant:latest
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:6333/readyz > /dev/null && break
+            sleep 1
+          done
+
       - name: Run ML service drift checks
         # This is an informational report. A GitHub-hosted runner has no local
         # ML services, so connections will be refused unless you run services in
