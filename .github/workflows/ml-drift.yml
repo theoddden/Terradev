@@ -34,6 +34,14 @@ jobs:
             sleep 1
           done
 
+      - name: Start Ollama
+        run: |
+          docker run -d --rm --name ollama -p 11434:11434 ollama/ollama:latest
+          for i in $(seq 1 60); do
+            curl -fs http://localhost:11434/api/tags > /dev/null && break
+            sleep 1
+          done
+
       - name: Run ML service drift checks
         # This is an informational report. A GitHub-hosted runner has no local
         # ML services, so connections will be refused unless you run services in

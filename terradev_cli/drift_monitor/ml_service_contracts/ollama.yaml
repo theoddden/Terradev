@@ -10,9 +10,9 @@ endpoints:
   expected_status: 200
   expected_response_fields:
   - models
+  optional_response_fields:
   - name
   - model
-  optional_response_fields:
   - modified_at
   - size
   - details
