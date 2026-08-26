@@ -19,5 +19,7 @@ endpoints:
   expected_status: 200
   expected_response_fields:
   - data
+  optional_response_fields:
   - raylet
   - actors
+  - clients

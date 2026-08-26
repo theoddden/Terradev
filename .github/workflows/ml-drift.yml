@@ -50,6 +50,15 @@ jobs:
             sleep 1
           done
 
+      - name: Start Ray
+        run: |
+          docker run -d --rm --name ray -p 8265:8265 rayproject/ray:2.38.0 \
+            ray start --head --dashboard-host 0.0.0.0 --dashboard-port 8265 --block
+          for i in $(seq 1 60); do
+            curl -fs http://localhost:8265/api/cluster_status > /dev/null && break
+            sleep 1
+          done
+
       - name: Run ML service drift checks
         # This is an informational report. A GitHub-hosted runner has no local
         # ML services, so connections will be refused unless you run services in
