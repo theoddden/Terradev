@@ -231,6 +231,7 @@ source = ["terradev_cli"]
 terradev_cli = [
     "README.md",
     "core/semantic_signals/*.yaml",
+    "drift_monitor/ml_service_contracts/*.yaml",
     "integrations/*.png",
     "kubernetes/*.yaml",
     "providers/contracts/*.yaml",
