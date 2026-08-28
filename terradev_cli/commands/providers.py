@@ -171,12 +171,6 @@ def configure(provider):
                 "help": "Visit https://api.ovh.com/createToken, select GET/POST/PUT/DELETE on /cloud/* endpoints. You will receive Application Key, Application Secret and Consumer Key.",
                 "example": "xxxxxxxxxxxxxxxx",
             },
-            "alibaba": {
-                "name": "Alibaba Cloud",
-                "key_name": "Access Key ID",
-                "help": "Alibaba Cloud Console → top-right avatar → AccessKey Management → Create AccessKey. Pair of Access Key ID and Access Key Secret.",
-                "example": "LTAIxxxxxxxxxxxxxxxxxx",
-            },
             "hyperstack": {
                 "name": "Hyperstack",
                 "key_name": "API Key",
@@ -212,6 +206,12 @@ def configure(provider):
                 "key_name": "API Key",
                 "help": "Get from: https://yottalabs.ai",
                 "example": "yotta_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            },
+            "gcore": {
+                "name": "Gcore",
+                "key_name": "API Token",
+                "help": "Get from: Gcore Customer Portal → Profile → API Tokens",
+                "example": "12345_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             },
         }
 
@@ -744,6 +744,7 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             ("ovhcloud", api.get_ovhcloud_quotes),
             ("siliconflow", api.get_siliconflow_quotes),
             ("yottalabs", api.get_yottalabs_quotes),
+            ("gcore", api.get_gcore_quotes),
         ]
         for pname, fn in provider_list:
             if not providers or pname in providers:
@@ -843,17 +844,16 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             "tensordock",
             "crusoe",
             "baseten",
-            "oracle",
             "huggingface",
             "siliconflow",
             "ovhcloud",
-            "alibaba",
             "hyperstack",
             "digitalocean",
             "inferx",
             "e2enetworks",
             "latitude",
             "yottalabs",
+            "gcore",
         ]
     ),
 )

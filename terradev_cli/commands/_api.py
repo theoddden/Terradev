@@ -438,6 +438,11 @@ class TerradevAPI:
             creds["api_key"] = self.credentials.get("latitude_api_key", "")
         elif provider_name == "yottalabs":
             creds["api_key"] = self.credentials.get("yottalabs_api_key", "")
+        elif provider_name == "gcore":
+            creds["api_key"] = self.credentials.get("gcore_api_key", "")
+            creds["project_id"] = self.credentials.get("gcore_project_id", "")
+            creds["region_id"] = self.credentials.get("gcore_region_id", "")
+            creds["region"] = self.credentials.get("gcore_region", "")
         # ML Services
         elif provider_name == "kserve":
             creds["namespace"] = self.credentials.get("kserve_namespace", "default")
@@ -638,6 +643,9 @@ class TerradevAPI:
 
     async def get_yottalabs_quotes(self, gpu_type: str):
         return await self._get_provider_quotes("yottalabs", gpu_type)
+
+    async def get_gcore_quotes(self, gpu_type: str):
+        return await self._get_provider_quotes("gcore", gpu_type)
 
 
 def run_interactive_onboarding(api: TerradevAPI):

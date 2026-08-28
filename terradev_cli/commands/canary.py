@@ -280,6 +280,7 @@ _DRIFT_PROVIDER_ALIASES = {
     "latitude": ["latitude"],
     "yottalabs": ["yottalabs", "yotta"],
     "e2enetworks": ["e2enetworks", "e2e"],
+    "gcore": ["gcore"],
 }
 
 # Provider-specific primary env names (full names, not alias-derived).
@@ -426,6 +427,20 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
     elif alias == "weaviate":
         extras["api_key"] = api_key.strip()
         extras["bearer_token"] = api_key.strip()
+
+    elif alias == "gcore":
+        extras["api_key"] = api_key.strip()
+        # Project and region are optional; Gcore can discover them via API.
+        # Add TERRADEV_GCORE_PROJECT_ID / TERRADEV_GCORE_REGION_ID to skip discovery.
+        extras["project_id"] = (
+            os.environ.get(f"TERRADEV_{name}_PROJECT_ID") or project_id or ""
+        ).strip()
+        extras["region_id"] = (
+            os.environ.get(f"TERRADEV_{name}_REGION_ID") or ""
+        ).strip()
+        extras["region"] = (
+            os.environ.get(f"TERRADEV_{name}_REGION") or ""
+        ).strip()
 
     if project_id:
         extras["project_id"] = project_id

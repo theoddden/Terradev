@@ -77,7 +77,7 @@ async def _handle_provision_gpu(arguments, cmd_args, tool_name, execute_terradev
     gpu_type = arguments["gpu_type"]
     count = arguments.get("count", 1)
     providers = arguments.get(
-        "providers", ["runpod", "vastai", "aws", "gcp", "azure", "tensordock", "crusoe", "digitalocean", "hyperstack", "ovhcloud", "siliconflow", "latitude", "e2enetworks", "yottalabs"]
+        "providers", ["runpod", "vastai", "aws", "gcp", "azure", "tensordock", "crusoe", "digitalocean", "hyperstack", "ovhcloud", "siliconflow", "latitude", "e2enetworks", "yottalabs", "gcore"]
     )
     max_price = arguments.get("max_price")
     arguments.get("plan_only", False)

@@ -187,6 +187,16 @@ def prompt_for_credentials():
                 {"key": "api_key", "label": "API Key", "hide_input": True},
             ],
         },
+        "gcore": {
+            "name": "Gcore",
+            "help": "Get from: Gcore Customer Portal → Profile → API Tokens",
+            "example": "12345_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "fields": [
+                {"key": "api_key", "label": "API Token", "hide_input": True},
+                {"key": "project_id", "label": "Project ID (optional)", "hide_input": False, "default": ""},
+                {"key": "region_id", "label": "Region ID (optional)", "hide_input": False, "default": ""},
+            ],
+        },
     }
 
     updated_creds = existing_creds.copy()
