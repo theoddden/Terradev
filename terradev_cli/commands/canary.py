@@ -318,6 +318,18 @@ def _load_drift_env_key(provider: str) -> Optional[Union[str, Dict[str, Any]]]:
             if value:
                 extras = _load_drift_env_extras(alias, value)
                 return extras if extras else value
+
+    # Azure can also be configured via a service principal without a dedicated
+    # bearer token / key. If the four service-principal values are present,
+    # build the credential dict directly from them.
+    if provider == "azure":
+        subscription_id = (os.environ.get("TERRADEV_AZURE_SUBSCRIPTION_ID") or "").strip()
+        tenant_id = (os.environ.get("TERRADEV_AZURE_TENANT_ID") or "").strip()
+        client_id = (os.environ.get("TERRADEV_AZURE_CLIENT_ID") or "").strip()
+        client_secret = (os.environ.get("TERRADEV_AZURE_CLIENT_SECRET") or "").strip()
+        if subscription_id and tenant_id and client_id and client_secret:
+            return _load_drift_env_extras("azure", "")
+
     return None
 
 
@@ -385,7 +397,7 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
             extras["gcp_credentials"] = raw
 
     elif alias == "azure":
-        # Azure drift expects a bearer token and subscription ID.
+        # Azure drift can use either a bearer token or a service principal.
         subscription_id = (
             os.environ.get("TERRADEV_AZURE_SUBSCRIPTION_ID")
             or os.environ.get("TERRADEV_AZURE_PROJECT_ID")
@@ -396,10 +408,18 @@ def _load_drift_env_extras(alias: str, api_key: str) -> Optional[Dict[str, Any]]
         extras["subscription_id"] = subscription_id
         extras["tenant_id"] = (os.environ.get("TERRADEV_AZURE_TENANT_ID") or "").strip()
         extras["client_id"] = (os.environ.get("TERRADEV_AZURE_CLIENT_ID") or "").strip()
-        extras["client_secret"] = (
+        client_secret = (
             os.environ.get("TERRADEV_AZURE_CLIENT_SECRET") or ""
         ).strip()
-        extras["bearer_token"] = api_key.strip()
+        extras["client_secret"] = client_secret
+        # Prefer a dedicated bearer token; fall back to the legacy key only when
+        # it is not just the client secret being reused as the key placeholder.
+        bearer_token = (
+            os.environ.get("TERRADEV_AZURE_BEARER_TOKEN")
+            or ("" if api_key == client_secret else api_key)
+            or ""
+        ).strip()
+        extras["bearer_token"] = bearer_token
 
     elif alias == "inferx":
         extras["api_key"] = api_key.strip()
