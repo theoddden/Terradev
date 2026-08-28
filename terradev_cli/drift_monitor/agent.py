@@ -395,6 +395,28 @@ class DriftMonitor:
         except (ValueError, AttributeError, TypeError):
             return None
 
+    def _azure_access_token(self, creds: Dict[str, Any]) -> Optional[str]:
+        """Get a short-lived Azure AD access token from a service principal."""
+        tenant_id = creds.get("tenant_id")
+        client_id = creds.get("client_id")
+        client_secret = creds.get("client_secret")
+        if not tenant_id or not client_id or not client_secret:
+            return None
+        token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+        data = {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": "https://management.azure.com/.default",
+        }
+        try:
+            response = requests.post(token_url, data=data, timeout=self.timeout)
+            if not response.ok:
+                return None
+            return response.json().get("access_token")
+        except (requests.RequestException, json.JSONDecodeError, ValueError, TypeError, AttributeError):
+            return None
+
     def _aws_presigned_url(
         self, method: str, url: str, creds: Dict[str, Any]
     ) -> Optional[str]:
@@ -719,14 +741,15 @@ class DriftMonitor:
                 else:
                     token = base64.b64encode(f"{bearer_token}:".encode()).decode()
                 headers[auth_header] = f"Basic {token}"
-            elif auth_lower == "bearer" and creds.get("gcp_credentials"):
-                gcp_token = self._gcp_access_token(creds)
-                if gcp_token:
-                    headers[auth_header] = f"Bearer {gcp_token}"
-                else:
-                    headers[auth_header] = f"Bearer {bearer_token}"
             elif auth_lower == "bearer":
-                headers[auth_header] = f"Bearer {bearer_token}"
+                token = None
+                if creds.get("gcp_credentials"):
+                    token = self._gcp_access_token(creds)
+                if not token and creds.get("tenant_id") and creds.get("client_id") and creds.get("client_secret"):
+                    token = self._azure_access_token(creds)
+                if not token:
+                    token = bearer_token
+                headers[auth_header] = f"Bearer {token}"
             elif auth_lower == "sigv4":
                 presigned = self._aws_presigned_url(method, url, creds)
                 if presigned:
