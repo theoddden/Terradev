@@ -165,12 +165,6 @@ def configure(provider):
                 "help": "Get from: https://cloud.siliconflow.cn/account/ak",
                 "example": "sf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             },
-            "ovhcloud": {
-                "name": "OVHcloud",
-                "key_name": "Application Key",
-                "help": "Visit https://api.ovh.com/createToken, select GET/POST/PUT/DELETE on /cloud/* endpoints. You will receive Application Key, Application Secret and Consumer Key.",
-                "example": "xxxxxxxxxxxxxxxx",
-            },
             "hyperstack": {
                 "name": "Hyperstack",
                 "key_name": "API Key",
@@ -304,23 +298,6 @@ def configure(provider):
                 existing_creds[provider.lower()] = {
                     "api_key": api_key.strip(),
                     "namespace": namespace.strip(),
-                }
-            elif provider.lower() == "ovhcloud":
-                # OVHcloud needs multiple credentials
-                application_secret = click.prompt(
-                    "   Enter OVHcloud Application Secret", hide_input=True
-                )
-                consumer_key = click.prompt("   Enter OVHcloud Consumer Key")
-                project_id = click.prompt("   Enter OVHcloud Project ID")
-                endpoint = click.prompt(
-                    "   Enter OVHcloud Endpoint", default="ovh-eu"
-                )
-                existing_creds[provider.lower()] = {
-                    "application_key": api_key.strip(),
-                    "application_secret": application_secret.strip(),
-                    "consumer_key": consumer_key.strip(),
-                    "project_id": project_id.strip(),
-                    "endpoint": endpoint.strip(),
                 }
             elif provider.lower() == "e2enetworks":
                 # E2E Networks optionally supports a project ID
@@ -741,7 +718,6 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             ("hyperstack", api.get_hyperstack_quotes),
             ("inferx", api.get_inferx_quotes),
             ("latitude", api.get_latitude_quotes),
-            ("ovhcloud", api.get_ovhcloud_quotes),
             ("siliconflow", api.get_siliconflow_quotes),
             ("yottalabs", api.get_yottalabs_quotes),
             ("gcore", api.get_gcore_quotes),
@@ -846,7 +822,6 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             "baseten",
             "huggingface",
             "siliconflow",
-            "ovhcloud",
             "hyperstack",
             "digitalocean",
             "inferx",

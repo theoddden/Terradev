@@ -118,12 +118,6 @@ def _load_creds(provider: str) -> dict:
             "access_key_secret": all_creds.get("alibaba_access_key_secret", ""),
             "region_id": all_creds.get("alibaba_region_id", ""),
         },
-        "ovhcloud": {
-            "application_key": all_creds.get("ovhcloud_application_key", ""),
-            "application_secret": all_creds.get("ovhcloud_application_secret", ""),
-            "consumer_key": all_creds.get("ovhcloud_consumer_key", ""),
-            "project_id": all_creds.get("ovhcloud_project_id", ""),
-        },
         "siliconflow": {
             "api_key": all_creds.get("siliconflow_api_key", ""),
             "default_model": all_creds.get("siliconflow_default_model", ""),
@@ -209,10 +203,6 @@ CANARY_PROVIDER_CONFIG = {
     "alibaba": {
         "gpu_types": ["A100", "H100"],
         "regions": ["cn-beijing", "cn-shanghai"],
-    },
-    "ovhcloud": {
-        "gpu_types": ["A100", "H100"],
-        "regions": ["gra", "sbg"],
     },
     "siliconflow": {
         "gpu_types": ["A100", "H100"],

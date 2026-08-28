@@ -2347,7 +2347,6 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
             ("hyperstack", api.get_hyperstack_quotes),
             ("inferx", api.get_inferx_quotes),
             ("latitude", api.get_latitude_quotes),
-            ("ovhcloud", api.get_ovhcloud_quotes),
             ("siliconflow", api.get_siliconflow_quotes),
             ("yottalabs", api.get_yottalabs_quotes),
         ]

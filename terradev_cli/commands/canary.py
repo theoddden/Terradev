@@ -274,7 +274,6 @@ _DRIFT_PROVIDER_ALIASES = {
     "crusoe": ["crusoe"],
     "hyperstack": ["hyperstack"],
     "digitalocean": ["digitalocean", "digital_ocean"],
-    "ovhcloud": ["ovhcloud", "ovh"],
     "siliconflow": ["siliconflow"],
     "inferx": ["inferx"],
     "latitude": ["latitude"],

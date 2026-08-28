@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.2.3] - 2026-08-28
+
+### 🚀 Provider consolidation — remove OVHcloud
+
+- Version bumped to **6.2.3**.
+- Removed **OVHcloud** from the active provider set and deleted the provider implementation, drift contract, and MCP/tooling references.
+- Consolidated all CLI provider lists, provider factory, credential prompts, and MCP schemas to the **17 active GPU cloud and inference providers**.
+
+### Full active provider list (17)
+
+- `aws` — Amazon Web Services
+- `azure` — Microsoft Azure
+- `baseten` — Baseten
+- `crusoe` — Crusoe Cloud
+- `digitalocean` — DigitalOcean
+- `e2enetworks` — E2E Networks
+- `gcore` — Gcore
+- `gcp` — Google Cloud Platform
+- `huggingface` — Hugging Face
+- `hyperstack` — Hyperstack
+- `inferx` — InferX
+- `latitude` — Latitude.sh
+- `runpod` — RunPod
+- `siliconflow` — SiliconFlow
+- `tensordock` — TensorDock
+- `vastai` — Vast.ai
+- `yottalabs` — YottaLabs
+
+
 ## [6.2.2] - 2026-08-28
 
 ### 🚀 Provider consolidation and Gcore integration

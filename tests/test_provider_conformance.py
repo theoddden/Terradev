@@ -80,7 +80,6 @@ from terradev_cli.providers.hyperstack_provider import HyperstackProvider
 from terradev_cli.providers.inferx_provider import InferXProvider
 from terradev_cli.providers.latitude_provider import LatitudeProvider
 from terradev_cli.providers.oracle_provider import OracleProvider
-from terradev_cli.providers.ovhcloud_provider import OVHcloudProvider
 from terradev_cli.providers.runpod_provider import RunPodProvider
 from terradev_cli.providers.siliconflow_provider import SiliconFlowProvider
 from terradev_cli.providers.tensordock_provider import TensorDockProvider
@@ -101,7 +100,6 @@ ALL_PROVIDERS = [
     InferXProvider,
     LatitudeProvider,
     OracleProvider,
-    OVHcloudProvider,
     RunPodProvider,
     SiliconFlowProvider,
     TensorDockProvider,
@@ -272,8 +270,8 @@ for provider_class in ALL_PROVIDERS:
 async def test_all_providers_registered():
     """Verify all providers are registered and importable"""
     assert (
-        len(ALL_PROVIDERS) >= 19
-    ), f"Expected at least 19 providers, got {len(ALL_PROVIDERS)}"
+        len(ALL_PROVIDERS) >= 18
+    ), f"Expected at least 18 providers, got {len(ALL_PROVIDERS)}"
 
     # Verify each provider has required methods
     mock_creds = {

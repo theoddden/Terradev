@@ -443,27 +443,6 @@ class TestTerradevAPI:
                     "project_id": "test_project",
                 }
 
-    def test_provider_creds_flat_format_ovhcloud(self):
-        """_provider_creds returns flat format OVHcloud credentials"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("pathlib.Path.home", return_value=Path(tmpdir)):
-                api = TerradevAPI()
-                api.credentials = {
-                    "ovhcloud_application_key": "test_app_key",
-                    "ovhcloud_application_secret": "test_app_secret",
-                    "ovhcloud_consumer_key": "test_consumer",
-                    "ovhcloud_project_id": "test_project",
-                }
-                creds = api._provider_creds("ovhcloud")
-                assert creds == {
-                    "application_key": "test_app_key",
-                    "application_secret": "test_app_secret",
-                    "consumer_key": "test_consumer",
-                    "project_id": "test_project",
-                    "endpoint": "ovh-eu",
-                    "ssh_key_id": "",
-                }
-
     def test_provider_creds_flat_format_siliconflow(self):
         """_provider_creds returns flat format SiliconFlow credentials"""
         with tempfile.TemporaryDirectory() as tmpdir:

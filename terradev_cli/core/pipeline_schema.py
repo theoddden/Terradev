@@ -31,7 +31,6 @@ class Provider(Enum):
     CRUSOE = "crusoe"
     TENSORDOCK = "tensordock"
     ALIBABA = "alibaba"
-    OVHCLOUD = "ovhcloud"
     SILICONFLOW = "siliconflow"
 
 

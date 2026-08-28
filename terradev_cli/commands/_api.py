@@ -52,7 +52,6 @@ def validate_credentials(provider: str, credentials: Dict[str, str]) -> bool:
         "hyperstack": ["api_key"],
         "inferx": ["api_key"],
         "latitude": ["api_key"],
-        "ovhcloud": ["application_key", "application_secret", "consumer_key", "project_id"],
         "runpod": ["api_key"],
         "siliconflow": ["api_key"],
         "tensordock": ["api_key", "api_token"],
@@ -398,17 +397,6 @@ class TerradevAPI:
             creds["access_key"] = self.credentials.get("crusoe_access_key", "")
             creds["secret_key"] = self.credentials.get("crusoe_secret_key", "")
             creds["project_id"] = self.credentials.get("crusoe_project_id", "")
-        elif provider_name == "ovhcloud":
-            creds["application_key"] = self.credentials.get(
-                "ovhcloud_application_key", ""
-            )
-            creds["application_secret"] = self.credentials.get(
-                "ovhcloud_application_secret", ""
-            )
-            creds["consumer_key"] = self.credentials.get("ovhcloud_consumer_key", "")
-            creds["project_id"] = self.credentials.get("ovhcloud_project_id", "")
-            creds["endpoint"] = self.credentials.get("ovhcloud_endpoint", "ovh-eu")
-            creds["ssh_key_id"] = self.credentials.get("ovhcloud_ssh_key_id", "")
         elif provider_name == "siliconflow":
             creds["api_key"] = self.credentials.get("siliconflow_api_key", "")
             creds["region"] = self.credentials.get("siliconflow_region", "global")
@@ -634,9 +622,6 @@ class TerradevAPI:
 
     async def get_latitude_quotes(self, gpu_type: str):
         return await self._get_provider_quotes("latitude", gpu_type)
-
-    async def get_ovhcloud_quotes(self, gpu_type: str):
-        return await self._get_provider_quotes("ovhcloud", gpu_type)
 
     async def get_siliconflow_quotes(self, gpu_type: str):
         return await self._get_provider_quotes("siliconflow", gpu_type)
@@ -886,14 +871,6 @@ def run_interactive_onboarding(api: TerradevAPI):
             "example": "e2e_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             "env_var": "E2ENETWORKS_API_KEY",
             "why": "Indian cloud with GPU VMs",
-        },
-        "ovhcloud": {
-            "name": "OVHcloud",
-            "key_name": "Application Key",
-            "help": "Visit https://api.ovh.com/createToken, select GET/POST/PUT/DELETE on /cloud/* endpoints",
-            "example": "xxxxxxxxxxxxxxxx",
-            "env_var": "OVH_APPLICATION_KEY",
-            "why": "European cloud with GPU instances",
         },
         "siliconflow": {
             "name": "SiliconFlow",

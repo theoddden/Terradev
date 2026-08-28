@@ -128,12 +128,6 @@ _STATIC_EGRESS_RATES: Dict[str, Dict[str, float]] = {
         "cross_continent": 0.01,
         "internet": 0.01,
     },
-    "ovhcloud": {
-        "same_region": 0.00,
-        "same_continent": 0.01,
-        "cross_continent": 0.011,
-        "internet": 0.011,
-    },
     # ── Inference platforms ───────────────────────────────────────────
     "baseten": {
         "same_region": 0.00,
@@ -237,14 +231,6 @@ REGION_CONTINENT: Dict[str, str] = {
     "cn-hongkong": "ap",
     "us-west-1-alibaba": "na",
     "eu-central-1-alibaba": "eu",
-    # OVHcloud
-    "gra": "eu",
-    "sbg": "eu",
-    "bhs": "na",
-    "de1": "eu",
-    "uk1": "eu",
-    "waw": "eu",
-    "sgp": "ap",
     # GPU cloud regions (generic, from smaller providers)
     "us-east": "na",
     "us-west": "na",

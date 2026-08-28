@@ -41,7 +41,6 @@ _PROVIDER_LOADERS = {
     "crusoe": _lazy_import(".crusoe_provider.CrusoeProvider"),
     "hyperstack": _lazy_import(".hyperstack_provider.HyperstackProvider"),
     "digitalocean": _lazy_import(".digitalocean_provider.DigitalOceanProvider"),
-    "ovhcloud": _lazy_import(".ovhcloud_provider.OVHcloudProvider"),
     "siliconflow": _lazy_import(".siliconflow_provider.SiliconFlowProvider"),
     "inferx": _lazy_import(".inferx_provider.InferXProvider"),
     "latitude": _lazy_import(".latitude_provider.LatitudeProvider"),

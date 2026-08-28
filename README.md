@@ -1,6 +1,6 @@
-# Terradev-cli 6.2.2
+# Terradev-cli 6.2.3
 
-**Imperative Command Line Interface for AI Workload Orchestration across 18 GPU cloud providers.**
+**Imperative Command Line Interface for AI Workload Orchestration across 17 GPU cloud providers.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
@@ -17,10 +17,10 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON v6.2.2**
+**NOTES ON v6.2.3**
 
-- Version bumped to **v6.2.2**.
-- Provider list consolidated to **18 active GPU cloud and inference providers**:
+- Version bumped to **v6.2.3**.
+- Provider list consolidated to **17 active GPU cloud and inference providers**:
   - `aws` — Amazon Web Services
   - `azure` — Microsoft Azure
   - `baseten` — Baseten
@@ -33,15 +33,15 @@ Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thin
   - `hyperstack` — Hyperstack
   - `inferx` — InferX
   - `latitude` — Latitude.sh
-  - `ovhcloud` — OVHcloud
   - `runpod` — RunPod
   - `siliconflow` — SiliconFlow
   - `tensordock` — TensorDock
   - `vastai` — Vast.ai
   - `yottalabs` — YottaLabs
 - Added Gcore (`gcore`) as a new VM provider with full lifecycle support, API token auth, and drift monitoring.
+- Removed OVHcloud from the active provider list.
 - Removed Jio Cloud and Oracle Cloud from the active provider list; removed Alibaba Cloud references from the CLI UI.
-- Onboarding, `configure`, `setup`, `quote`, `credential_prompt`, and MCP tool schemas now all reflect the 18-provider set.
+- Onboarding, `configure`, `setup`, `quote`, `credential_prompt`, and MCP tool schemas now all reflect the 17-provider set.
 
 **NOTES ON Multi-Stage Training Pipeline (v6.1.1)**
 
@@ -178,7 +178,7 @@ Added **provider registration and profiling system** for intelligent quirk-aware
 
 - **ProviderProfile schema** (`providers/types.py`): Encodes provider-specific behaviors including API style (REST/GraphQL/JSON:API), authentication type (Bearer/Basic/HMAC/X-Api-Key), rate limits, spot instance support, egress costs, fallback routing, capacity checks, container image pinning, and spot interruption handling.
 
-- **Built-in profiles** (`providers/provider_profiles.py`): Pre-configured profiles for all 23 providers (RunPod, Vast.ai, Lambda Labs, AWS, GCP, Azure, Oracle, Crusoe, CoreWeave, DigitalOcean, Yotta Labs, E2E Networks, FluidStack, Alibaba, OVHcloud, Hetzner, SiliconFlow, TensorDock, Baseten, HuggingFace, Hyperstack, InferX, Latitude).
+- **Built-in profiles** (`providers/provider_profiles.py`): Pre-configured profiles for all 23 providers (RunPod, Vast.ai, Lambda Labs, AWS, GCP, Azure, Oracle, Crusoe, CoreWeave, DigitalOcean, Yotta Labs, E2E Networks, FluidStack, Alibaba, Hetzner, SiliconFlow, TensorDock, Baseten, HuggingFace, Hyperstack, InferX, Latitude).
 
 - **Dynamic registration**: Users can register custom provider profiles programmatically or load from YAML/JSON files for internal clusters or proprietary cloud providers.
 

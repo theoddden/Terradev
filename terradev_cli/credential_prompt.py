@@ -159,18 +159,6 @@ def prompt_for_credentials():
                 {"key": "api_key", "label": "API Key", "hide_input": True},
             ],
         },
-        "ovhcloud": {
-            "name": "OVHcloud",
-            "help": "Visit https://api.ovh.com/createToken, select GET/POST/PUT/DELETE on /cloud/* endpoints. You will receive Application Key, Application Secret and Consumer Key.",
-            "example": "xxxxxxxxxxxxxxxx",
-            "fields": [
-                {"key": "application_key", "label": "Application Key", "hide_input": True},
-                {"key": "application_secret", "label": "Application Secret", "hide_input": True},
-                {"key": "consumer_key", "label": "Consumer Key", "hide_input": True},
-                {"key": "project_id", "label": "Project ID", "hide_input": False},
-                {"key": "endpoint", "label": "Endpoint", "hide_input": False, "default": "ovh-eu"},
-            ],
-        },
         "siliconflow": {
             "name": "SiliconFlow",
             "help": "Get from: https://cloud.siliconflow.cn/account/ak",

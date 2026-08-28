@@ -16,7 +16,6 @@ Terradev is a comprehensive ML infrastructure platform spanning **provisioning â
 | **RunPod** | GPU Specialist | GraphQL, Volume attachment, Rate limiting | GraphQL API |
 | **Hetzner** | Mixed | Robot API + Cloud, Traffic monitoring | Dual APIs |
 | **Alibaba** | Major Cloud | Compliance alerts, Signed URLs, Cross-border | HMAC-SHA1 |
-| **OVHcloud** | European | X-Ovh-Signature headers, Time delta | Custom auth |
 | **Crusoe** | Climate-Friendly | Carbon tracking, Sustainable GPUs | REST API |
 | **Oracle** | Enterprise | OCI integration, Tenancy management | OCI SDK |
 | **DigitalOcean** | Developer-Friendly | Simple API, Managed GPUs | REST API |

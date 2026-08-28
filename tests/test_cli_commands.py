@@ -86,7 +86,6 @@ def _make_api() -> MagicMock:
     api.get_hyperstack_quotes = AsyncMock(return_value=[])
     api.get_inferx_quotes = AsyncMock(return_value=[])
     api.get_latitude_quotes = AsyncMock(return_value=[])
-    api.get_ovhcloud_quotes = AsyncMock(return_value=[])
     api.get_siliconflow_quotes = AsyncMock(return_value=[])
     api.get_yottalabs_quotes = AsyncMock(return_value=[])
 
