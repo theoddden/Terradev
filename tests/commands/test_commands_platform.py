@@ -113,49 +113,6 @@ class TestLocal:
         result = runner.invoke(cli, ["local", "scan", "--help"], obj={"api": mock_api})
         assert result.exit_code == 0
 
-class TestObserve:
-    def test_group_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["observe", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-        assert "observe" in result.output
-
-    def test_gateway_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["observe", "gateway", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    def test_gateway_requires_args(self, runner, mock_api):
-        result = runner.invoke(cli, ["observe", "gateway"], obj={"api": mock_api})
-        assert result.exit_code != 0
-
-    def test_status_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["observe", "status", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    def test_status_requires_args(self, runner, mock_api):
-        result = runner.invoke(cli, ["observe", "status"], obj={"api": mock_api})
-        assert result.exit_code != 0
-
-class TestSchedule:
-    def test_group_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["schedule", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-        assert "schedule" in result.output
-
-    def test_job_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["schedule", "job", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    def test_job_requires_args(self, runner, mock_api):
-        result = runner.invoke(cli, ["schedule", "job"], obj={"api": mock_api})
-        assert result.exit_code != 0
-
-    def test_list_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["schedule", "list", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    def test_windows_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["schedule", "windows", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
 
 class TestSso:
     def test_group_help(self, runner, mock_api):

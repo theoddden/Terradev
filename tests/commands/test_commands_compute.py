@@ -456,22 +456,6 @@ class TestAnalyticsCommand:
         assert result.exit_code == 0
 
 
-# ===========================================================================
-# integrations
-# ===========================================================================
-
-
-class TestIntegrationsCommand:
-    """Integrations command shows observability status."""
-
-    def test_exits_zero(self, runner, mock_api):
-        result = runner.invoke(cli, ["integrations"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    def test_shows_integrations_header(self, runner, mock_api):
-        result = runner.invoke(cli, ["integrations"], obj={"api": mock_api})
-        assert "Integrations" in result.output or "integration" in result.output.lower()
-
 
 # ===========================================================================
 # stage

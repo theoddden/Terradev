@@ -102,13 +102,6 @@ class TestPlatformHelp:
         "agent list",
         "agent teardown",
         "gateway",
-        "observe",
-        "observe gateway",
-        "observe status",
-        "schedule",
-        "schedule job",
-        "schedule list",
-        "schedule windows",
     ])
     def test_help(self, runner, mock_api, path):
         with patch("terradev_cli.commands.platform.TerradevAPI", return_value=mock_api):

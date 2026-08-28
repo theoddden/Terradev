@@ -91,27 +91,6 @@ def _make_warm_pool():
     return wp
 
 
-def _make_cost_scaler():
-    """Return a mock CostScaler with async methods."""
-    cs = MagicMock()
-    cs.start = AsyncMock(return_value=True)
-    cs.stop = AsyncMock(return_value=True)
-    cs.get_status = MagicMock(
-        return_value={
-            "current_hourly_cost_usd": 2.5,
-            "budget_utilization_percent": 16.7,
-            "memory_cost_usd": 1.0,
-            "cold_start_penalty_usd": 0.1,
-            "total_cost_usd": 2.6,
-            "cost_savings_usd": 0.5,
-            "current_memory_usage_gb": 10.0,
-            "active_models": 1,
-            "strategy": "balance_cost_latency",
-            "is_peak_hour": False,
-            "predicted_cost_1h": 2.5,
-            "predicted_cost_2h": 2.5,
-        }
-    )
     cs.get_cost_optimization_recommendations = MagicMock(return_value=[])
     cs.get_model_cost_details = MagicMock(
         return_value={
@@ -357,37 +336,3 @@ class TestWarmPoolGroup:
         assert result.exit_code != 0
 
 
-# ===========================================================================
-# cost-scaler group
-# ===========================================================================
-
-
-class TestCostScalerGroup:
-    """Tests for the cost-scaler group."""
-
-    def test_group_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["cost-scaler", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-        assert "Cost-aware" in result.output
-
-    @patch("terradev_cli.commands.inference.asyncio.sleep")
-    @patch("terradev_cli.core.cost_scaler.CostScaler")
-    def test_start_runs(self, MockScaler, MockSleep, runner, mock_api):
-        MockSleep.side_effect = KeyboardInterrupt
-        MockScaler.return_value = _make_cost_scaler()
-        result = runner.invoke(cli, ["cost-scaler", "start"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    @patch("terradev_cli.core.cost_scaler.CostScaler")
-    def test_status_runs(self, MockScaler, runner, mock_api):
-        MockScaler.return_value = _make_cost_scaler()
-        result = runner.invoke(cli, ["cost-scaler", "status"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    @patch("terradev_cli.core.cost_scaler.CostScaler")
-    def test_model_details_runs(self, MockScaler, runner, mock_api):
-        MockScaler.return_value = _make_cost_scaler()
-        result = runner.invoke(
-            cli, ["cost-scaler", "model-details", "m1"], obj={"api": mock_api}
-        )
-        assert result.exit_code == 0

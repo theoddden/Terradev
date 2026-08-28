@@ -58,8 +58,6 @@ TERRADEV_COMMAND_MAP = {
     "orchestrator_infer": ["orchestrator", "infer"],
     "warm_pool_start": ["warm-pool", "start"],
     "warm_pool_status": ["warm-pool", "status"],
-    "cost_scaler_start": ["cost-scaler", "start"],
-    "cost_scaler_status": ["cost-scaler", "status"],
     "inferx_configure": ["inferx", "configure"],
     "inferx_delete": ["inferx", "delete"],
     "inferx_usage": ["inferx", "usage"],

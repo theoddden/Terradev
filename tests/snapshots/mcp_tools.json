@@ -1,5 +1,5 @@
 {
-  "tool_count": 256,
+  "tool_count": 254,
   "tool_names": [
     "active_context",
     "agent_agentic_serving_configure",
@@ -43,8 +43,6 @@
     "cost_analyze",
     "cost_budget_optimize",
     "cost_optimize_recommend",
-    "cost_scaler_start",
-    "cost_scaler_status",
     "cost_simulate",
     "create_postgresql_connection",
     "create_sqlite_connection",
