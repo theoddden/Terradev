@@ -1,8 +1,8 @@
-# Terradev-cli 6.2.1
+# Terradev-cli 6.2.2
 
 ## An imperative Command Line Interface for AI Workload Orchestration
 
-**Imperative Command Line Interface for AI Workload Orchestration.**
+**Imperative Command Line Interface for AI Workload Orchestration across 18 GPU cloud providers.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
@@ -18,21 +18,21 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON v6.2.1**
+**NOTES ON v6.2.2**
 
-- Version bumped to **v6.2.1**.
-- Provider list reprioritized to **17 GPU cloud and inference providers**, selected over others for testing reliability.
-- The following 17 providers are available for quoting and provisioning:
+- Version bumped to **v6.2.2**.
+- Provider list consolidated to **18 active GPU cloud and inference providers**:
   - `aws` — Amazon Web Services
   - `azure` — Microsoft Azure
   - `baseten` — Baseten
   - `crusoe` — Crusoe Cloud
   - `digitalocean` — DigitalOcean
   - `e2enetworks` — E2E Networks
+  - `gcore` — Gcore
   - `gcp` — Google Cloud Platform
   - `huggingface` — Hugging Face
   - `hyperstack` — Hyperstack
-  - `inferx` — Inferx
+  - `inferx` — InferX
   - `latitude` — Latitude.sh
   - `ovhcloud` — OVHcloud
   - `runpod` — RunPod
@@ -40,6 +40,9 @@ Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thin
   - `tensordock` — TensorDock
   - `vastai` — Vast.ai
   - `yottalabs` — YottaLabs
+- Added Gcore (`gcore`) as a new VM provider with full lifecycle support, API token auth, and drift monitoring.
+- Removed Jio Cloud and Oracle Cloud from the active provider list; removed Alibaba Cloud references from the CLI UI.
+- Onboarding, `configure`, `setup`, `quote`, `credential_prompt`, and MCP tool schemas now all reflect the 18-provider set.
 
 **NOTES ON Multi-Stage Training Pipeline (v6.1.1)**
 
@@ -191,7 +194,7 @@ terradev --help
 ```
 
 ### Step 2: Configure Your First Cloud Provider
-Terradev supports 17 GPU cloud providers. Start with one, RunPod is the fastest to set up:
+Terradev supports 18 GPU cloud providers. Start with one, RunPod is the fastest to set up:
 
 ```bash
 terradev setup runpod --quick
@@ -421,7 +424,7 @@ Terradev handles the foundation automatically so the rest of the stack works the
 # Set up cloud provider credentials
 terradev configure
 
-# Real-time GPU pricing across 21+ clouds
+# Real-time GPU pricing across 18 clouds
 terradev quote -g H100 
 
 # Provision with auto topology optimization

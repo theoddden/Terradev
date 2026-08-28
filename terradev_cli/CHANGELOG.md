@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.2.2] - 2026-08-28
+
+### 🚀 Provider consolidation and Gcore integration
+
+- Version bumped to **6.2.2**.
+- Added **Gcore** (`gcore`) as a new GPU cloud provider with full VM lifecycle support, API token authentication, project/region discovery, and drift monitoring.
+- Removed **Jio Cloud** and **Oracle Cloud** from the active provider set; removed **Alibaba Cloud** references from the CLI UI.
+- Consolidated all CLI provider lists (onboarding, `configure`, `setup`, `quote`, `credential_prompt`) to the 18 active providers.
+- Updated MCP schemas and handlers to include `gcore` in provider enums and defaults.
+- Full active provider list (18):
+  - `aws` — Amazon Web Services
+  - `azure` — Microsoft Azure
+  - `baseten` — Baseten
+  - `crusoe` — Crusoe Cloud
+  - `digitalocean` — DigitalOcean
+  - `e2enetworks` — E2E Networks
+  - `gcore` — Gcore
+  - `gcp` — Google Cloud Platform
+  - `huggingface` — Hugging Face
+  - `hyperstack` — Hyperstack
+  - `inferx` — InferX
+  - `latitude` — Latitude.sh
+  - `ovhcloud` — OVHcloud
+  - `runpod` — RunPod
+  - `siliconflow` — SiliconFlow
+  - `tensordock` — TensorDock
+  - `vastai` — Vast.ai
+  - `yottalabs` — YottaLabs
+
+
 ### 🚀 Multi-stage LLM training pipeline (`terradev train`)
 - Added `terradev train sft`, `terradev train dpo`, `terradev train grpo`, and `terradev train pipeline` commands.
 - Added `terradev_cli/core/training_stages.py` with declarative `StageConfig` / `PipelineConfig` and command builders for `unsloth`, `trl`, `openrlhf`, `axolotl`, `llama-factory`, and `ms-swift`.
@@ -325,6 +355,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [Unreleased]
+
+## [6.2.2] - 2026-08-28
+
+### 🚀 Provider consolidation and Gcore integration
+
+- Version bumped to **6.2.2**.
+- Added **Gcore** (`gcore`) as a new GPU cloud provider with full VM lifecycle support, API token authentication, project/region discovery, and drift monitoring.
+- Removed **Jio Cloud** and **Oracle Cloud** from the active provider set; removed **Alibaba Cloud** references from the CLI UI.
+- Consolidated all CLI provider lists (onboarding, `configure`, `setup`, `quote`, `credential_prompt`) to the 18 active providers.
+- Updated MCP schemas and handlers to include `gcore` in provider enums and defaults.
+- Full active provider list (18):
+  - `aws` — Amazon Web Services
+  - `azure` — Microsoft Azure
+  - `baseten` — Baseten
+  - `crusoe` — Crusoe Cloud
+  - `digitalocean` — DigitalOcean
+  - `e2enetworks` — E2E Networks
+  - `gcore` — Gcore
+  - `gcp` — Google Cloud Platform
+  - `huggingface` — Hugging Face
+  - `hyperstack` — Hyperstack
+  - `inferx` — InferX
+  - `latitude` — Latitude.sh
+  - `ovhcloud` — OVHcloud
+  - `runpod` — RunPod
+  - `siliconflow` — SiliconFlow
+  - `tensordock` — TensorDock
+  - `vastai` — Vast.ai
+  - `yottalabs` — YottaLabs
+
 
 ### 🚀 **Upcoming Features**
 - Additional provider integrations
