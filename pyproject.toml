@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "6.2.3"
+version = "6.2.4"
 description = "Imperative Command Line Interface for AI Workload Orchestration across 17 GPU cloud providers."
 readme = "README.md"
 license = {text = "Apache-2.0"}

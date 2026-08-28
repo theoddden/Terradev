@@ -1,4 +1,4 @@
-# Terradev-cli 6.2.3
+# Terradev-cli 6.2.4
 
 ## An imperative Command Line Interface for AI Workload Orchestration
 
@@ -18,9 +18,9 @@ Continued focus on lower cost, faster provisioning, and topology-aware execution
 
 Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thing Terradev is not agnostic about is correctness: it enforces topology, idempotency, and sequencing.
 
-**NOTES ON v6.2.3**
+**NOTES ON v6.2.4**
 
-- Version bumped to **v6.2.3**.
+- Version bumped to **v6.2.4**.
 - Provider list consolidated to **17 active GPU cloud and inference providers**:
   - `aws` — Amazon Web Services
   - `azure` — Microsoft Azure
@@ -194,7 +194,7 @@ terradev --help
 ```
 
 ### Step 2: Configure Your First Cloud Provider
-Terradev supports 18 GPU cloud providers. Start with one, RunPod is the fastest to set up:
+Terradev supports 17 GPU cloud providers. Start with one, RunPod is the fastest to set up:
 
 ```bash
 terradev setup runpod --quick
