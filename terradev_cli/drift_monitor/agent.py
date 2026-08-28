@@ -44,6 +44,11 @@ try:
 except ImportError:  # pragma: no cover
     boto3 = None  # type: ignore
 
+try:
+    from azure.identity import ClientSecretCredential
+except ImportError:  # pragma: no cover
+    ClientSecretCredential = None  # type: ignore
+
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
@@ -396,12 +401,32 @@ class DriftMonitor:
             return None
 
     def _azure_access_token(self, creds: Dict[str, Any]) -> Optional[str]:
-        """Get a short-lived Azure AD access token from a service principal."""
+        """Get a short-lived Azure AD access token from a service principal.
+
+        Prefer the official azure-identity SDK when it is installed; it handles
+        national clouds, token caching, and request signing. Fall back to a
+        manual OAuth2 client-credentials request otherwise.
+        """
         tenant_id = creds.get("tenant_id")
         client_id = creds.get("client_id")
         client_secret = creds.get("client_secret")
         if not tenant_id or not client_id or not client_secret:
             return None
+
+        if ClientSecretCredential is not None:
+            try:
+                credential = ClientSecretCredential(
+                    tenant_id=tenant_id,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                )
+                token = credential.get_token("https://management.azure.com/.default")
+                return token.token
+            except Exception as exc:
+                raise requests.RequestException(
+                    f"Azure Identity token acquisition failed: {exc}"
+                ) from exc
+
         token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
         data = {
             "grant_type": "client_credentials",
@@ -411,11 +436,29 @@ class DriftMonitor:
         }
         try:
             response = requests.post(token_url, data=data, timeout=self.timeout)
-            if not response.ok:
-                return None
-            return response.json().get("access_token")
-        except (requests.RequestException, json.JSONDecodeError, ValueError, TypeError, AttributeError):
-            return None
+        except requests.RequestException as exc:
+            raise requests.RequestException(
+                f"Azure AD token request failed for tenant {tenant_id}: {exc}"
+            ) from exc
+
+        if not response.ok:
+            raise requests.RequestException(
+                f"Azure AD token request returned {response.status_code}: {response.text}"
+            )
+
+        try:
+            payload = response.json()
+        except (json.JSONDecodeError, ValueError, TypeError) as exc:
+            raise requests.RequestException(
+                f"Azure AD token response was not valid JSON: {exc}"
+            ) from exc
+
+        token = payload.get("access_token")
+        if not token:
+            raise requests.RequestException(
+                f"Azure AD token response did not contain access_token: {payload}"
+            )
+        return token
 
     def _aws_presigned_url(
         self, method: str, url: str, creds: Dict[str, Any]

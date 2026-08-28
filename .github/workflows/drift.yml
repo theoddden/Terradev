@@ -24,7 +24,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Terradev CLI
-        run: pip install ".[aws,gcp]"
+        run: pip install ".[aws,gcp,azure]"
 
       - name: Run canary drift checks
         env:

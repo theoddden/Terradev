@@ -195,6 +195,43 @@ class TestDriftAuthInjection:
         assert payload["variables"] == {"x": 1}
         assert headers.get("Content-Type") == "application/json"
 
+    def test_azure_service_principal_token_exchange(self, monitor):
+        from terradev_cli.drift_monitor.agent import ClientSecretCredential
+
+        contract = _make_contract(auth_type="bearer")
+        endpoint = contract["endpoints"][0]
+        creds = {
+            "tenant_id": "tenant-uuid",
+            "client_id": "client-uuid",
+            "client_secret": "client-secret",
+        }
+
+        if ClientSecretCredential is not None:
+            from collections import namedtuple
+
+            AccessToken = namedtuple("AccessToken", ["token", "expires_on"])
+            with patch("terradev_cli.drift_monitor.agent.ClientSecretCredential") as mock_cred:
+                mock_cred.return_value.get_token.return_value = AccessToken(
+                    token="azure-jwt-token", expires_on=9999999999
+                )
+                _, headers, _ = monitor._build_request(contract, endpoint, creds)
+            assert headers["Authorization"] == "Bearer azure-jwt-token"
+            mock_cred.assert_called_once_with(
+                tenant_id="tenant-uuid",
+                client_id="client-uuid",
+                client_secret="client-secret",
+            )
+        else:
+            with patch("terradev_cli.drift_monitor.agent.requests.post") as mock_post:
+                mock_response = MagicMock()
+                mock_response.ok = True
+                mock_response.json.return_value = {"access_token": "azure-jwt-token"}
+                mock_post.return_value = mock_response
+                url, headers, _ = monitor._build_request(contract, endpoint, creds)
+            assert mock_post.called
+            assert "tenant-uuid" in mock_post.call_args[0][0]
+            assert headers["Authorization"] == "Bearer azure-jwt-token"
+
     @settings(max_examples=20, suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
     @given(
         key=st.text(alphabet=st.characters(whitelist_categories=("L", "N")), min_size=1, max_size=32),
