@@ -303,6 +303,15 @@ class DriftMonitor:
                     err_text = response.text.strip()[:500]
                     if err_text:
                         result["error_body"] = err_text
+                        # Surface the body inline so the human and JSON summaries
+                        # show the exact permission or auth error.
+                        if response.status_code in (401, 403):
+                            try:
+                                err_payload = response.json()
+                                err_detail = err_payload.get("error", {}).get("message") or err_payload.get("message") or err_text
+                            except (json.JSONDecodeError, ValueError, AttributeError, TypeError):
+                                err_detail = err_text
+                            result["drift_reasons"].append(str(err_detail)[:300])
                 except (ValueError, TypeError, AttributeError):
                     pass
                 result["drift_summary"] = "; ".join(result["drift_reasons"])
