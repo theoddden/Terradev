@@ -771,7 +771,7 @@ def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url
         for p in contract_files:
             monitor.results.append(monitor.check_provider(p))
         summary = monitor.summary()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         get_output(ctx.find_root()).error(f"ML drift check failed: {exc}")
         ctx.exit(1)
 
