@@ -1,5 +1,5 @@
 {
-  "tool_count": 254,
+  "tool_count": 252,
   "tool_names": [
     "active_context",
     "agent_agentic_serving_configure",
@@ -41,7 +41,6 @@
     "checkpoint_save",
     "configure_provider",
     "cost_analyze",
-    "cost_budget_optimize",
     "cost_optimize_recommend",
     "cost_simulate",
     "create_postgresql_connection",
@@ -179,7 +178,6 @@
     "preflight_gpu_check",
     "preflight_network_check",
     "preflight_report",
-    "price_budget_optimize",
     "price_intel",
     "price_spot_risk",
     "price_trends",

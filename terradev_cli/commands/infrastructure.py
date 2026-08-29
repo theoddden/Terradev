@@ -2,69 +2,12 @@
 """Infrastructure intelligence commands for the Terradev CLI."""
 
 import logging
-import sys
 
 import click
 from . import cli
 
 logger = logging.getLogger(__name__)
 
-@cli.command()
-@click.option("--gpu-type", required=True, help="GPU type")
-@click.option("--budget", type=click.FloatRange(0.0, 10000.0), required=True, help="Budget constraint ($/hr)")
-@click.option("--gpu-count", type=click.IntRange(1, 1000), default=1, help="Number of GPUs")
-@click.option("--hours", type=click.FloatRange(0.0, 100000.0), default=1.0, help="Estimated runtime in hours")
-@click.option("--region", help="Preferred region")
-@click.option("--workload", default="training", help="Workload type")
-def budget_optimize(gpu_type, budget, gpu_count, hours, region, workload):
-    """Find optimal deployment under budget constraints"""
-    import asyncio
-
-    async def _budget_optimize():
-        from terradev_cli.core.price_discovery import BudgetOptimizationEngine
-
-        optimizer = BudgetOptimizationEngine()
-
-        requirements = {
-            "gpu_type": gpu_type,
-            "gpu_count": gpu_count,
-            "estimated_hours": hours,
-            "workload_type": workload,
-            "region": region,
-        }
-
-        click.echo(f"COST: Finding options under ${budget:.2f}/hr budget for {gpu_type}...")
-
-        options = await optimizer.optimize_for_budget(requirements, budget)
-
-        if not options:
-            click.echo(f"ERROR: No options found under ${budget:.2f}/hr budget", err=True)
-            raise SystemExit(1)
-
-        click.echo("\n Budget-Optimized Options:")
-        click.echo("=" * 80)
-        click.echo(
-            f"{'Provider':<12} {'Instance':<20} {'Cost':<10} {'Risk':<8} {'Budget Used':<12} {'Confidence':<12}"
-        )
-        click.echo("-" * 80)
-
-        for option in options:
-            click.echo(
-                f"{option['provider']:<12} {option['instance_type']:<20} ${option['price']:<9.2f} {option['risk_score']:<7.1%} {option['budget_utilization']:<11.1%} {option['confidence']:<12.1%}"
-            )
-            click.echo(
-                f"   Predicted total: ${option['predicted_cost']:.2f} (risk-adjusted: ${option['risk_adjusted_cost']:.2f})"
-            )
-            click.echo(
-                f"   Capacity: {option['capacity']} | Spot: {'Yes' if option['spot'] else 'No'}"
-            )
-            click.echo()
-
-    try:
-        asyncio.run(asyncio.wait_for(_budget_optimize(), timeout=120))
-    except asyncio.TimeoutError:
-        click.echo("ERROR: Budget optimization timed out")
-        raise SystemExit(1)
 @cli.command()
 @click.option(
     "--workload",

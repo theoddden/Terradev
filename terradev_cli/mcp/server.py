@@ -490,10 +490,6 @@ async def handle_read_resource(request: ReadResourceRequest) -> ReadResourceResu
         )
         if monitor["success"] and monitor["stdout"].strip():
             alerts.append({"type": "straggler", "data": monitor["stdout"]})
-        # Check cost budget
-        cost = await execute_terradev_command(["cost-scaler-status", "-f", "json"])
-        if cost["success"] and "exceed" in cost["stdout"].lower():
-            alerts.append({"type": "budget_warning", "data": cost["stdout"]})
         # Check drift
         drift = await execute_terradev_command(
             ["manifests", "--check-drift", "-f", "json"]

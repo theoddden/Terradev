@@ -1,5 +1,5 @@
 """Tests for infrastructure commands."""
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -13,15 +13,6 @@ class TestAvailability:
     def test_help(self, runner, mock_api):
         result = runner.invoke(cli, ["availability", "--help"], obj={"api": mock_api})
         assert result.exit_code == 0
-
-class TestBudgetOptimize:
-    def test_help(self, runner, mock_api):
-        result = runner.invoke(cli, ["budget-optimize", "--help"], obj={"api": mock_api})
-        assert result.exit_code == 0
-
-    def test_requires_args(self, runner, mock_api):
-        result = runner.invoke(cli, ["budget-optimize"], obj={"api": mock_api})
-        assert result.exit_code != 0
 
 class TestHelmGenerate:
     def test_help(self, runner, mock_api):
@@ -45,16 +36,6 @@ class TestFunctionalInfrastructure:
         from types import SimpleNamespace
         return SimpleNamespace(provider=provider, price=price, instance_type=instance_type, capacity=capacity, confidence=confidence)
 
-    @patch("terradev_cli.core.price_discovery.BudgetOptimizationEngine")
-    def test_budget_optimize_runs(self, MockEngine, runner, mock_api):
-        engine = MockEngine.return_value
-        engine.optimize_for_budget = AsyncMock(return_value=[{
-            "provider": "RunPod", "instance_type": "a100", "price": 2.0,
-            "risk_score": 0.1, "budget_utilization": 0.4, "confidence": 0.95,
-            "predicted_cost": 2.0, "risk_adjusted_cost": 2.1, "capacity": "high", "spot": False,
-        }])
-        result = runner.invoke(cli, ["budget-optimize", "--gpu-type", "A100", "--budget", "5"], obj={"api": mock_api})
-        assert result.exit_code == 0
 
     def test_helm_generate_dry_run(self, runner, mock_api):
         result = runner.invoke(cli, ["helm-generate", "--image", "nginx", "--dry-run"], obj={"api": mock_api})

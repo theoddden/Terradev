@@ -166,10 +166,8 @@ TERRADEV_COMMAND_MAP = {
     "cost_analyze": ["cost", "analyze"],
     "cost_optimize_recommend": ["cost", "recommend"],
     "cost_simulate": ["cost", "simulate"],
-    "cost_budget_optimize": ["cost", "budget-optimize"],
     # v5.0.0: Price Intelligence Extended — handled by custom elif blocks
     "price_trends": ["price", "trends"],
-    "price_budget_optimize": ["price", "budget-optimize"],
     "price_spot_risk": ["price", "spot-risk"],
     # v5.0.0: Training Extended — handled by custom elif blocks
     "training_config_generate": ["train", "config-generate"],

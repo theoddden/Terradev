@@ -162,41 +162,6 @@ async def _handle_cost_simulate(arguments, cmd_args, tool_name, execute_terradev
 HANDLERS['cost_simulate'] = _handle_cost_simulate
 
 
-async def _handle_cost_budget_optimize(arguments, cmd_args, tool_name, execute_terradev_command):
-    try:
-        from terradev_cli.core.cost_optimizer import CostOptimizer
-
-        cost_optimizer = CostOptimizer()
-        result = await cost_optimizer.budget_optimize(
-            budget=arguments["budget"],
-            gpu_type=arguments.get("gpu_type"),
-            gpu_count=arguments.get("gpu_count", 1),
-            hours=arguments.get("hours", 1.0),
-            allow_spot=arguments.get("allow_spot", True),
-        )
-        output_text = (
-            f"💰 **Budget Optimization — ${arguments['budget']}**\n\n"
-        )
-        output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-        return CallToolResult(
-            content=[TextContent(type="text", text=output_text)]
-        )
-    except ImportError:
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text="❌ Terradev CLI not found.")
-            ],
-            isError=True,
-        )
-    except Exception as e:  # noqa: BLE001
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"❌ {e}")], isError=True
-        )
-    return cmd_args
-
-HANDLERS['cost_budget_optimize'] = _handle_cost_budget_optimize
-
-
 async def _handle_price_trends(arguments, cmd_args, tool_name, execute_terradev_command):
     try:
         from terradev_cli.core.price_intelligence import PriceIntelligence
@@ -226,38 +191,6 @@ async def _handle_price_trends(arguments, cmd_args, tool_name, execute_terradev_
     return cmd_args
 
 HANDLERS['price_trends'] = _handle_price_trends
-
-
-async def _handle_price_budget_optimize(arguments, cmd_args, tool_name, execute_terradev_command):
-    try:
-        from terradev_cli.core.price_intelligence import PriceIntelligence
-
-        intel = PriceIntelligence()
-        result = await intel.budget_optimize(
-            budget=arguments["budget"],
-            gpu_type=arguments["gpu_type"],
-            gpu_count=arguments.get("gpu_count", 1),
-            hours=arguments.get("hours", 1.0),
-        )
-        output_text = "💰 **Price Budget Optimization**\n\n"
-        output_text += f"```json\n{json.dumps(result, indent=2, default=str)[:4000]}\n```"
-        return CallToolResult(
-            content=[TextContent(type="text", text=output_text)]
-        )
-    except ImportError:
-        return CallToolResult(
-            content=[
-                TextContent(type="text", text="❌ Terradev CLI not found.")
-            ],
-            isError=True,
-        )
-    except Exception as e:  # noqa: BLE001
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"❌ {e}")], isError=True
-        )
-    return cmd_args
-
-HANDLERS['price_budget_optimize'] = _handle_price_budget_optimize
 
 
 async def _handle_price_spot_risk(arguments, cmd_args, tool_name, execute_terradev_command):

@@ -38,7 +38,7 @@ def fake_agentic_serving():
 class TestAgenticServing:
     def _patch_agentic(self, fake):
         config, instructions = fake
-        return patch("terradev_cli.commands.mlops.TerradevAPI", return_value=agentic_api), patch(
+        return patch("terradev_cli.commands.mlops._get_api", return_value=agentic_api), patch(
             "terradev_cli.ml_services.agentic_serving.create_agentic_serving_from_credentials",
             return_value=(config, instructions),
         ), patch(
@@ -58,7 +58,7 @@ class TestAgenticServing:
 
     def test_show_config_text(self, runner, agentic_api, fake_agentic_serving):
         config, instructions = fake_agentic_serving
-        with patch("terradev_cli.commands.mlops.TerradevAPI", return_value=agentic_api), patch(
+        with patch("terradev_cli.commands.mlops._get_api", return_value=agentic_api), patch(
             "terradev_cli.ml_services.agentic_serving.create_agentic_serving_from_credentials",
             return_value=(config, instructions),
         ), patch("terradev_cli.ml_services.agentic_serving.generate_vllm_args", return_value=["--model", config.model]), patch(
@@ -70,7 +70,7 @@ class TestAgenticServing:
 
     def test_show_config_json(self, runner, agentic_api, fake_agentic_serving):
         config, instructions = fake_agentic_serving
-        with patch("terradev_cli.commands.mlops.TerradevAPI", return_value=agentic_api), patch(
+        with patch("terradev_cli.commands.mlops._get_api", return_value=agentic_api), patch(
             "terradev_cli.ml_services.agentic_serving.create_agentic_serving_from_credentials",
             return_value=(config, instructions),
         ), patch("terradev_cli.ml_services.agentic_serving.generate_vllm_args", return_value=["--model", config.model]), patch(
@@ -82,7 +82,7 @@ class TestAgenticServing:
 
     def test_launch_args(self, runner, agentic_api, fake_agentic_serving):
         config, instructions = fake_agentic_serving
-        with patch("terradev_cli.commands.mlops.TerradevAPI", return_value=agentic_api), patch(
+        with patch("terradev_cli.commands.mlops._get_api", return_value=agentic_api), patch(
             "terradev_cli.ml_services.agentic_serving.create_agentic_serving_from_credentials",
             return_value=(config, instructions),
         ), patch("terradev_cli.ml_services.agentic_serving.generate_vllm_args", return_value=["--model", config.model]):
@@ -92,7 +92,7 @@ class TestAgenticServing:
 
     def test_lmcache_env(self, runner, agentic_api, fake_agentic_serving):
         config, instructions = fake_agentic_serving
-        with patch("terradev_cli.commands.mlops.TerradevAPI", return_value=agentic_api), patch(
+        with patch("terradev_cli.commands.mlops._get_api", return_value=agentic_api), patch(
             "terradev_cli.ml_services.agentic_serving.create_agentic_serving_from_credentials",
             return_value=(config, instructions),
         ), patch("terradev_cli.ml_services.agentic_serving.generate_lmcache_env", return_value={"LMCACHE_LOCAL_CPU": "1"}):
@@ -102,7 +102,7 @@ class TestAgenticServing:
 
     def test_k8s_manifest(self, runner, agentic_api, fake_agentic_serving):
         config, instructions = fake_agentic_serving
-        with patch("terradev_cli.commands.mlops.TerradevAPI", return_value=agentic_api), patch(
+        with patch("terradev_cli.commands.mlops._get_api", return_value=agentic_api), patch(
             "terradev_cli.ml_services.agentic_serving.create_agentic_serving_from_credentials",
             return_value=(config, instructions),
         ), patch("terradev_cli.ml_services.agentic_serving.generate_k8s_deployment", return_value="apiVersion: v1"):
@@ -112,7 +112,7 @@ class TestAgenticServing:
 
     def test_helm_values(self, runner, agentic_api, fake_agentic_serving):
         config, instructions = fake_agentic_serving
-        with patch("terradev_cli.commands.mlops.TerradevAPI", return_value=agentic_api), patch(
+        with patch("terradev_cli.commands.mlops._get_api", return_value=agentic_api), patch(
             "terradev_cli.ml_services.agentic_serving.create_agentic_serving_from_credentials",
             return_value=(config, instructions),
         ), patch(
@@ -127,7 +127,7 @@ class TestAgenticServing:
 class TestModelRouter:
     def test_model_router_configure(self, runner, mock_api):
         mock_api._provider_creds.return_value = {}
-        with patch("terradev_cli.commands.mlops.TerradevAPI", return_value=mock_api):
+        with patch("terradev_cli.commands.mlops._get_api", return_value=mock_api):
             result = runner.invoke(
                 cli,
                 [
@@ -152,7 +152,7 @@ class TestModelRouter:
 
     def test_model_router_configure_missing_prompts(self, runner, mock_api):
         # interactive prompts are not provided; click prompts and aborts
-        with patch("terradev_cli.commands.mlops.TerradevAPI", return_value=mock_api):
+        with patch("terradev_cli.commands.mlops._get_api", return_value=mock_api):
             result = runner.invoke(cli, ["model-router", "configure"], input="\n\n\n\n\n")
         assert result.exit_code != 0
 
@@ -210,6 +210,6 @@ class TestMLOpsHelp:
         "lineage complete",
     ])
     def test_help(self, runner, mock_api, path):
-        with patch("terradev_cli.commands.mlops.TerradevAPI", return_value=mock_api):
+        with patch("terradev_cli.commands.mlops._get_api", return_value=mock_api):
             result = runner.invoke(cli, path.split() + ["--help"])
         assert result.exit_code == 0, f"help failed for {path}: {result.output}"

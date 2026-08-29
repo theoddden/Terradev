@@ -20,7 +20,7 @@ def _make_artifact():
 
 
 class TestLineageFunctional:
-    @patch("terradev_cli.commands.mlops.TerradevAPI")
+    @patch("terradev_cli.commands.mlops._get_api")
     @patch("terradev_cli.core.event_system.lineage_service")
     def test_lineage_register(self, mock_service, MockAPI, runner):
         from terradev_cli.core.event_system import ArtifactType, Environment
@@ -177,7 +177,7 @@ class TestEvalFunctional:
 
 
 class TestModelRouterFunctional:
-    @patch("terradev_cli.commands.mlops.TerradevAPI")
+    @patch("terradev_cli.commands.mlops._get_api")
     @patch("terradev_cli.ml_services.model_router.create_router_from_credentials")
     def test_model_router_test(self, mock_create, MockAPI, runner):
         router = MagicMock()
@@ -188,14 +188,19 @@ class TestModelRouterFunctional:
         )
         mock_create.return_value = router
         mock_api = MagicMock()
-        mock_api._provider_creds.return_value = {}
+        mock_api._provider_creds.return_value = {
+            "strong_url": "http://s",
+            "strong_model": "m",
+            "weak_url": "http://w",
+            "weak_model": "w",
+        }
         MockAPI.return_value = mock_api
 
         result = runner.invoke(cli, ["model-router", "test", "--format", "json"])
         assert result.exit_code == 0
         assert "decode" in result.output
 
-    @patch("terradev_cli.commands.mlops.TerradevAPI")
+    @patch("terradev_cli.commands.mlops._get_api")
     @patch("terradev_cli.ml_services.model_router.create_router_from_credentials")
     def test_model_router_stats(self, mock_create, MockAPI, runner):
         router = MagicMock()
@@ -207,7 +212,12 @@ class TestModelRouterFunctional:
         }
         mock_create.return_value = router
         mock_api = MagicMock()
-        mock_api._provider_creds.return_value = {}
+        mock_api._provider_creds.return_value = {
+            "strong_url": "http://s",
+            "strong_model": "m",
+            "weak_url": "http://w",
+            "weak_model": "w",
+        }
         MockAPI.return_value = mock_api
 
         result = runner.invoke(cli, ["model-router", "stats"])

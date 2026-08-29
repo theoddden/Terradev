@@ -484,51 +484,6 @@ Options:
 
 
 
-#### **budget-optimize** - Find optimal deployment under budget constraints
-
-```bash
-terradev budget-optimize [OPTIONS]
-Options:
-  --gpu-type TEXT      GPU type  [required]
-  --budget FLOAT       Budget constraint ($/hr)  [required]
-  --gpu-count INTEGER  Number of GPUs
-  --hours FLOAT        Estimated runtime in hours
-  --region TEXT        Preferred region
-  --workload TEXT      Workload type
-  --help               Show this message and exit.
-```
-
-
-
-#### **cost-scaler-start** - Start the cost-aware scaling manager
-```bash
-terradev cost-scaler-start [OPTIONS]
-
-Options:
-  --config-file TEXT            Configuration file
-  --budget FLOAT                Budget limit
-  --scale-down-threshold FLOAT Scale down threshold
-  --scale-up-threshold FLOAT    Scale up threshold
-```
-
-#### **cost-scaler-status** - Get cost scaler status and recommendations
-```bash
-terradev cost-scaler-status [OPTIONS]
-
-Options:
-  --detailed                    Show detailed recommendations
-  --format [table|json]         Output format [default: table]
-```
-
-#### **cost-scaler-model-details** - Get cost details for a specific model
-```bash
-terradev cost-scaler-model-details [OPTIONS] MODEL_NAME
-
-Options:
-  --region TEXT                 Region
-  --gpu-type TEXT               GPU type
-  --include-spot                Include spot pricing
-```
 
 ---
 

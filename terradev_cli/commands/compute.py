@@ -5,7 +5,6 @@ import asyncio
 import json
 import os
 import time
-import sys
 import uuid
 import logging
 from datetime import datetime, timedelta
@@ -14,6 +13,7 @@ from typing import Dict
 import click
 
 from . import cli
+from ._base import get_api as _get_api
 
 logger = logging.getLogger(__name__)
 
@@ -1786,285 +1786,142 @@ def analytics(days, fmt):
 @click.option(
     "--auto-apply",
     is_flag=True,
-    help="Automatically apply all recommended optimizations",
+    help="Automatically apply all recommended cost optimizations",
 )
 def optimize(instance_id, auto_apply):
-    """Multi-dimensional optimization: cost + performance + kernel optimization
+    """Analyze running instances and recommend real cost optimizations.
 
-    Analyzes running instances for:
-    - Cost optimization (cheaper alternatives)
-    - CUCo kernel optimization (compute-communication fusion)
-    - Performance tuning opportunities
-    - Auto-applies optimizations when requested
+    Compares each instance's current price against live market quotes.
+    Use `terradev migrate` to carry out provider moves. --auto-apply is
+    not yet supported and will fail with an explanation rather than
+    silently claiming success.
     """
-    all_optimizations = []
+    try:
+        api = _get_api()
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Could not initialize Terradev API: {e}", err=True)
+        raise SystemExit(1)
 
-    api = click.get_current_context().obj["api"]
     instances = api.usage.get("instances_created", [])
     if instance_id:
         instances = [inst for inst in instances if inst.get("id") == instance_id]
 
-    try:
-        # Fetch fresh quotes for cost optimization
-        gpu_types = list(set(inst.get("gpu_type", "A100") for inst in instances))
+    if not instances:
+        click.echo("No running instances found to optimize.")
+        return
 
-        async def _fetch():
-            all_q = {}
-            for gt in gpu_types:
+    gpu_types = list({inst.get("gpu_type", "A100") for inst in instances})
+
+    async def _fetch():
+        all_q = {}
+        fetchers = [
+            ("runpod", api.get_runpod_quotes),
+            ("vastai", api.get_vastai_quotes),
+            ("aws", api.get_aws_quotes),
+            ("gcp", api.get_gcp_quotes),
+            ("azure", api.get_azure_quotes),
+            ("tensordock", api.get_tensordock_quotes),
+        ]
+        for gt in gpu_types:
+            quotes = []
+            for name, fetch in fetchers:
                 try:
-                    tasks = [
-                        api.get_runpod_quotes(gt),
-                        api.get_vastai_quotes(gt),
-                        api.get_aws_quotes(gt),
-                        api.get_gcp_quotes(gt),
-                        api.get_azure_quotes(gt),
-                        api.get_tensordock_quotes(gt),
-                    ]
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-                    quotes = []
-                    for r in results:
-                        if isinstance(r, list):
-                            quotes.extend(r)
-                        elif isinstance(r, Exception):
-                            # Handle network failures gracefully
-                            continue
-                    if quotes:
-                        quotes.sort(key=lambda q: q["price"])
-                        all_q[gt] = quotes
-                except Exception as _exc:  # noqa: BLE001
-                    logger.exception(_exc)
-                    # Handle individual GPU type failures gracefully
+                    result = await fetch(gt)
+                    if isinstance(result, list):
+                        quotes.extend(result)
+                except Exception as e:  # noqa: BLE001
+                    logger.debug("Provider %s quote fetch failed for %s: %s", name, gt, e)
                     continue
-            return all_q
+            if quotes:
+                quotes.sort(key=lambda q: q.get("price", float("inf")))
+                all_q[gt] = quotes
+        return all_q
 
-        market = _run_with_timeout(_fetch())
+    try:
+        market = _run_with_timeout(_fetch(), timeout=120)
+    except SystemExit:
+        raise
     except Exception as e:  # noqa: BLE001
-        # Handle complete market fetch failure gracefully
-        market = {}
-        click.echo(f"Warning: Could not fetch market data: {e}")
+        click.echo(f"ERROR: Could not fetch market data: {e}", err=True)
+        raise SystemExit(1)
 
-    total_savings = 0
     recommendations = []
 
     for inst in instances:
-        try:
-            gt = inst.get("gpu_type", "A100")
-            current_price = inst.get("price", 0)
-            current_prov = inst.get("provider", "?")
-            quotes = market.get(gt, [])
+        gt = inst.get("gpu_type", "A100")
+        current_price = inst.get("price", 0)
+        current_prov = inst.get("provider", "?")
+        quotes = market.get(gt, [])
 
-            # Validate instance data
-            if (
-                not gt
-                or not isinstance(current_price, (int, float))
-                or current_price <= 0
-            ):
-                continue
-
-            # 1. Cost optimization
-            if (
-                quotes and quotes[0]["price"] < current_price * 0.95
-            ):  # 5% savings threshold
-                try:
-                    best = quotes[0]
-                    savings = (
-                        (current_price - best["price"]) * 24 * 30
-                    )  # monthly savings
-                    if savings > 0:
-                        total_savings += savings
-
-                        optimization = {
-                            "type": "cost_optimization",
-                            "instance_id": inst.get("instance_id", "unknown"),
-                            "current": {
-                                "provider": current_prov,
-                                "price": current_price,
-                            },
-                            "recommended": {
-                                "provider": best["provider"],
-                                "price": best["price"],
-                                "gpu_name": best.get("gpu_name", "Unknown"),
-                            },
-                            "monthly_savings": savings,
-                            "savings_pct": (current_price - best["price"])
-                            / current_price
-                            * 100,
-                            "description": f"Move from {current_prov} to {best['provider']} for ${savings:.2f}/month savings",
-                        }
-                        all_optimizations.append(optimization)
-                        recommendations.append(optimization)
-                except Exception as _exc:  # noqa: BLE001
-                    logger.exception(_exc)
-                    # Handle individual cost optimization failure
-                    continue
-
-            # 2. CUCo kernel optimization
-            try:
-                gpu_count = inst.get("gpu_count", 1)
-                is_distributed = gpu_count > 1
-                instance_name = str(inst.get("instance_id", "")).lower()
-
-                # Auto-detect if CUCo should be applied
-                should_apply_cuco = is_distributed and (
-                    "training" in instance_name
-                    or "inference" in instance_name
-                    or "distributed" in instance_name
-                )
-
-                if should_apply_cuco:
-                    # Mock CUCo optimization results
-                    speedup = 1.15 + (gpu_count * 0.05)  # More GPUs = more benefit
-                    cost_increase = 0.10 + (gpu_count * 0.02)  # More GPUs = more cost
-
-                    optimization = {
-                        "type": "cuco_kernel_optimization",
-                        "instance_id": inst.get("instance_id", "unknown"),
-                        "gpu_count": gpu_count,
-                        "expected_speedup": speedup,
-                        "cost_increase": cost_increase,
-                        "bandwidth_increase": 0.15 + (gpu_count * 0.03),
-                        "throughput_increase": speedup,
-                        "description": f"Apply CUCo kernel fusion for {speedup:.2f}x speedup, {cost_increase:.1%} cost increase",
-                    }
-                    all_optimizations.append(optimization)
-                    recommendations.append(optimization)
-            except Exception as _exc:  # noqa: BLE001
-                logger.exception(_exc)
-                # Handle CUCo optimization failure
-                continue
-
-            # 3. Warm pool optimization
-            try:
-                instance_type = inst.get("instance_type", "").lower()
-                instance_name = str(inst.get("instance_id", "")).lower()
-
-                if instance_type == "training" or "training" in instance_name:
-                    optimization = {
-                        "type": "warm_pool_optimization",
-                        "instance_id": inst.get("instance_id", "unknown"),
-                        "expected_speedup": 1.10,
-                        "cost_increase": 0.05,
-                        "description": "Enable warm pool for 10% faster startup, 5% cost increase",
-                    }
-                    all_optimizations.append(optimization)
-                    recommendations.append(optimization)
-            except Exception as _exc:  # noqa: BLE001
-                logger.exception(_exc)
-                # Handle warm pool optimization failure
-                continue
-
-            # 4. Semantic routing optimization
-            try:
-                instance_name = str(inst.get("instance_id", "")).lower()
-
-                if "inference" in instance_name or "serving" in instance_name:
-                    optimization = {
-                        "type": "semantic_routing",
-                        "instance_id": inst.get("instance_id", "unknown"),
-                        "expected_speedup": 1.08,
-                        "cost_increase": 0.03,
-                        "description": "Enable semantic routing for 8% better routing, 3% cost increase",
-                    }
-                    all_optimizations.append(optimization)
-                    recommendations.append(optimization)
-            except Exception as _exc:  # noqa: BLE001
-                logger.exception(_exc)
-                # Handle semantic routing optimization failure
-                continue
-
-        except Exception as _exc:  # noqa: BLE001
-            logger.exception(_exc)
-            # Handle individual instance processing failure
+        if not isinstance(current_price, (int, float)) or current_price <= 0:
             continue
 
-    # Display results
+        if not quotes:
+            continue
+
+        best = None
+        for q in quotes:
+            q_price = q.get("price")
+            q_prov = q.get("provider")
+            if q_price is None or q_prov is None:
+                continue
+            if q_price < current_price * 0.95:  # 5% savings threshold
+                best = q
+                break
+
+        if best is None:
+            continue
+
+        savings = (current_price - best["price"]) * 24 * 30
+        if savings <= 0:
+            continue
+
+        recommendations.append({
+            "instance_id": inst.get("instance_id", "unknown"),
+            "current_provider": current_prov,
+            "current_price": current_price,
+            "recommended_provider": best["provider"],
+            "recommended_price": best["price"],
+            "gpu_name": best.get("gpu_name", gt),
+            "monthly_savings": savings,
+            "savings_pct": (current_price - best["price"]) / current_price * 100,
+        })
+
+    if not recommendations:
+        click.echo("No cost optimization opportunities found for the current setup.")
+        return
+
     click.echo(f"\n{'='*80}")
-    click.echo("OPTIMIZATION ANALYSIS RESULTS")
+    click.echo("COST OPTIMIZATION RECOMMENDATIONS")
     click.echo(f"{'='*80}")
+    click.echo(
+        f"{'Instance':<20} {'Current Provider':<18} {'$/hr':<10} {'Best Provider':<18} {'$/hr':<10} {'Monthly Save'}"
+    )
+    click.echo("-" * 80)
 
-    if recommendations:
-        click.echo(f"\n RECOMMENDED OPTIMIZATIONS ({len(recommendations)} found):")
+    total_savings = 0.0
+    for rec in recommendations:
+        total_savings += rec["monthly_savings"]
+        iid = str(rec["instance_id"])[:18]
         click.echo(
-            f"{'Instance':<20} {'Type':<20} {'Impact':<15} {'Cost+':<8} {'Description'}"
+            f"{iid:<20} {rec['current_provider']:<18} "
+            f"${rec['current_price']:<9.2f} {rec['recommended_provider']:<18} "
+            f"${rec['recommended_price']:<9.2f} ${rec['monthly_savings']:.2f}"
         )
-        click.echo(f"{'-'*80}")
 
-        for rec in recommendations:
-            instance_id = str(rec.get("instance_id", "unknown"))[:18]
-            opt_type = rec["type"].replace("_", " ").title()[:18]
+    if auto_apply:
+        click.echo(
+            "\nERROR: --auto-apply is not supported. "
+            "Use `terradev migrate --from <current-provider> --to <new-provider> --instance-id <id>` "
+            "to apply the recommendation manually.",
+            err=True,
+        )
+        raise SystemExit(1)
 
-            if "expected_speedup" in rec:
-                impact = f"{rec['expected_speedup']:.2f}x"
-            elif "monthly_savings" in rec:
-                impact = f"${rec['monthly_savings']:.0f}"
-            else:
-                impact = "N/A"
-
-            cost_plus = (
-                f"{rec.get('cost_increase', 0):.1%}"
-                if "cost_increase" in rec
-                else "N/A"
-            )
-            description = (
-                rec["description"][:30] + ".."
-                if len(rec["description"]) > 30
-                else rec["description"]
-            )
-
-            click.echo(
-                f"{instance_id:<20} {opt_type:<20} {impact:<15} {cost_plus:<8} {description}"
-            )
-
-        # Auto-apply if requested
-        if auto_apply:
-            click.echo("\n AUTO-APPLYING OPTIMIZATIONS...")
-            applied_count = 0
-
-            for rec in recommendations:
-                click.echo(
-                    f"  OK: Applying {rec['type'].replace('_', ' ').title()} to {rec['instance_id']}"
-                )
-                # In real implementation, this would actually apply the optimization
-                applied_count += 1
-
-            click.echo(f"\nOK: Successfully applied {applied_count} optimizations!")
-
-            # Calculate total impact
-            total_speedup = 1.0
-            total_cost_increase = 0.0
-
-            for rec in recommendations:
-                if "expected_speedup" in rec:
-                    total_speedup *= rec["expected_speedup"]
-                if "cost_increase" in rec:
-                    total_cost_increase += rec["cost_increase"]
-
-            if total_speedup > 1.0:
-                click.echo(f" Total Performance Gain: {total_speedup:.2f}x")
-            if total_cost_increase > 0.0:
-                click.echo(f"COST: Total Cost Increase: {total_cost_increase:.1%}")
-
-    else:
-        click.echo("\nOK: No optimization opportunities found - current setup is optimal!")
-
-    # Summary
-    cost_savings = sum(rec.get("monthly_savings", 0) for rec in recommendations)
-    performance_optimizations = [r for r in recommendations if "expected_speedup" in r]
-
-    click.echo("\n OPTIMIZATION SUMMARY:")
-    click.echo(f"  Instances analyzed: {len(instances)}")
-    click.echo(f"  Total opportunities: {len(recommendations)}")
-    click.echo(f"  Cost savings: ${cost_savings:.2f}/month")
-    click.echo(f"  Performance optimizations: {len(performance_optimizations)}")
-
-    if performance_optimizations:
-        avg_speedup = sum(
-            rec["expected_speedup"] for rec in performance_optimizations
-        ) / len(performance_optimizations)
-        click.echo(f"  Average speedup: {avg_speedup:.2f}x")
-
-    click.echo("\nTip: Use --auto-apply to automatically apply all optimizations")
-    click.echo(f"{'='*80}")
+    click.echo("\n" + "=" * 80)
+    click.echo(f"Total estimated monthly savings: ${total_savings:.2f}")
+    click.echo("Use `terradev migrate` to apply a recommendation.")
+    click.echo("=" * 80)
 
 
 

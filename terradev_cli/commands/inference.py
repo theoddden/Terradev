@@ -22,6 +22,28 @@ def orchestrator():
     pass
 
 
+_orchestrator: Optional[Any] = None
+
+
+def _get_orchestrator_singleton(gpu_id=0, memory_gb=80.0, policy="hybrid"):
+    """Return a single in-process orchestrator instance."""
+    global _orchestrator
+    if _orchestrator is None:
+        from terradev_cli.core.model_orchestrator import ModelOrchestrator, ScalingPolicy
+
+        policy_map = {
+            "billing_optimized": ScalingPolicy.BILLING_OPTIMIZED,
+            "latency_optimized": ScalingPolicy.LATENCY_OPTIMIZED,
+            "hybrid": ScalingPolicy.HYBRID,
+        }
+        _orchestrator = ModelOrchestrator(
+            gpu_id=gpu_id,
+            total_memory_gb=memory_gb,
+            scaling_policy=policy_map[policy],
+        )
+    return _orchestrator
+
+
 @orchestrator.command("start")
 @click.option("--gpu-id", default=0, help="GPU ID to use for orchestration")
 @click.option("--memory-gb", default=80.0, help="Total GPU memory in GB")
@@ -32,18 +54,8 @@ def orchestrator():
     help="Scaling policy",
 )
 def orchestrator_start(gpu_id, memory_gb, policy):
-    """Start the model orchestrator for multi-model inference"""
-    from terradev_cli.core.model_orchestrator import ModelOrchestrator, ScalingPolicy
-
-    policy_map = {
-        "billing_optimized": ScalingPolicy.BILLING_OPTIMIZED,
-        "latency_optimized": ScalingPolicy.LATENCY_OPTIMIZED,
-        "hybrid": ScalingPolicy.HYBRID,
-    }
-
-    orchestrator = ModelOrchestrator(
-        gpu_id=gpu_id, total_memory_gb=memory_gb, scaling_policy=policy_map[policy]
-    )
+    """Start the model orchestrator for multi-model inference (foreground)."""
+    orchestrator = _get_orchestrator_singleton(gpu_id, memory_gb, policy)
 
     async def run_orchestrator():
         await orchestrator.start()
@@ -63,11 +75,20 @@ def orchestrator_start(gpu_id, memory_gb, policy):
                     f"{status['used_memory_gb']:.1f}GB used "
                     f"({status['memory_utilization_percent']:.1f}%)"
                 )
-        except KeyboardInterrupt:
+        except asyncio.CancelledError:
+            pass
+        finally:
             click.echo("\nStopping orchestrator...")
             await orchestrator.stop()
 
-    _run_with_timeout(run_orchestrator())
+    try:
+        asyncio.run(run_orchestrator())
+    except KeyboardInterrupt:
+        click.echo("\nStopping orchestrator...")
+        try:
+            asyncio.run(orchestrator.stop())
+        except Exception:  # noqa: BLE001
+            pass
 
 
 @orchestrator.command("register")
@@ -86,96 +107,133 @@ def orchestrator_start(gpu_id, memory_gb, policy):
 )
 @click.option("--tags", help="Comma-separated tags for model categorization")
 def orchestrator_register(model_id, model_path, framework, priority, tags):
-    """Register a model with the orchestrator"""
+    """Register a model with the orchestrator."""
     from terradev_cli.core.model_orchestrator import ModelOrchestrator
 
-    orchestrator = ModelOrchestrator()
     tag_set = set(tags.split(",")) if tags else None
 
-    _run_with_timeout(orchestrator.register_model(
-        model_id=model_id,
-        model_path=model_path,
-        framework=framework,
-        priority=priority,
-        tags=tag_set,
-    ))
+    async def _register(orch):
+        await orch.start()
+        try:
+            instance = await orch.register_model(
+                model_id=model_id,
+                model_path=model_path,
+                framework=framework,
+                priority=priority,
+                tags=tag_set,
+            )
+            return instance
+        finally:
+            await orch.stop()
 
-    click.echo(f"Model registered: {model_id}")
-    click.echo(f"  Path: {model_path}")
-    click.echo(f"  Framework: {framework}")
-    click.echo(f"  Priority: {priority}")
-    click.echo(f"  Tags: {', '.join(tag_set) if tag_set else 'None'}")
+    try:
+        orch = _get_orchestrator_singleton() if _orchestrator is not None else ModelOrchestrator()
+        instance = _run_with_timeout(_register(orch), timeout=60, operation="Register model")
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Failed to register model: {e}", err=True)
+        raise SystemExit(1)
+
+    click.echo(f"Model registered: {instance.model_id}")
+    click.echo(f"  Path: {instance.model_path}")
+    click.echo(f"  Framework: {instance.framework}")
+    click.echo(f"  Priority: {instance.priority}")
+    click.echo(f"  Tags: {', '.join(instance.tags) if instance.tags else 'None'}")
 
 
 @orchestrator.command("load")
 @click.argument("model-id")
 @click.option("--force", is_flag=True, help="Force loading even if memory is full")
 def orchestrator_load(model_id, force):
-    """Load a model into GPU memory"""
+    """Load a model into GPU memory."""
     from terradev_cli.core.model_orchestrator import ModelOrchestrator
 
-    orchestrator = ModelOrchestrator()
+    async def _load(orch):
+        await orch.start()
+        try:
+            success = await orch.load_model(model_id, force=force)
+            if not success:
+                return None
+            return orch.get_model_details(model_id)
+        finally:
+            await orch.stop()
 
-    async def load_model():
-        success = await orchestrator.load_model(model_id, force=force)
-        if success:
-            details = orchestrator.get_model_details(model_id)
-            click.echo(f"Model {model_id} loaded successfully!")
-            click.echo(f"  State: {details['state']}")
-            click.echo(f"  Memory: {details['metrics']['memory_gb']:.1f}GB")
-            click.echo(f"  Load time: {details['metrics']['load_time_s']:.1f}s")
-            click.echo(f"  Warmup time: {details['metrics']['warmup_time_s']:.1f}s")
-        else:
-            click.echo(f"Failed to load model {model_id}", err=True)
+    try:
+        orch = _get_orchestrator_singleton() if _orchestrator is not None else ModelOrchestrator()
+        details = _run_with_timeout(_load(orch), timeout=300, operation="Load model")
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Failed to load model: {e}", err=True)
+        raise SystemExit(1)
 
-    _run_with_timeout(load_model())
+    if details is None:
+        click.echo(f"ERROR: Failed to load model {model_id}", err=True)
+        raise SystemExit(1)
+
+    click.echo(f"Model {model_id} loaded successfully!")
+    click.echo(f"  State: {details['state']}")
+    click.echo(f"  Memory: {details['metrics']['memory_gb']:.1f}GB")
+    click.echo(f"  Load time: {details['metrics']['load_time_s']:.1f}s")
+    click.echo(f"  Warmup time: {details['metrics']['warmup_time_s']:.1f}s")
 
 
 @orchestrator.command("evict")
 @click.argument("model-id")
 def orchestrator_evict(model_id):
-    """Evict a model from GPU memory"""
+    """Evict a model from GPU memory."""
     from terradev_cli.core.model_orchestrator import ModelOrchestrator
 
-    orchestrator = ModelOrchestrator()
+    async def _evict(orch):
+        await orch.start()
+        try:
+            return await orch.evict_model(model_id)
+        finally:
+            await orch.stop()
 
-    async def evict_model():
-        success = await orchestrator.evict_model(model_id)
-        if success:
-            click.echo(f"Model {model_id} evicted successfully")
-        else:
-            click.echo(f"Failed to evict model {model_id}", err=True)
+    try:
+        orch = _get_orchestrator_singleton() if _orchestrator is not None else ModelOrchestrator()
+        success = _run_with_timeout(_evict(orch), timeout=60, operation="Evict model")
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Failed to evict model: {e}", err=True)
+        raise SystemExit(1)
 
-    _run_with_timeout(evict_model())
+    if not success:
+        click.echo(f"ERROR: Failed to evict model {model_id}", err=True)
+        raise SystemExit(1)
+    click.echo(f"Model {model_id} evicted successfully")
 
 
 @orchestrator.command("status")
 @click.option("--model-id", help="Get details for specific model")
 def orchestrator_status(model_id):
-    """Get orchestrator and model status"""
+    """Get orchestrator and model status."""
     from terradev_cli.core.model_orchestrator import ModelOrchestrator
 
-    orchestrator = ModelOrchestrator()
+    try:
+        orch = _get_orchestrator_singleton() if _orchestrator is not None else ModelOrchestrator()
+        if not orch._running:
+            _run_with_timeout(orch.start(), timeout=30, operation="Start orchestrator")
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Failed to start orchestrator: {e}", err=True)
+        raise SystemExit(1)
 
     if model_id:
-        details = orchestrator.get_model_details(model_id)
-        if details:
-            click.echo(f"Model Details: {model_id}")
-            click.echo(f"  Framework: {details['framework']}")
-            click.echo(f"  State: {details['state']}")
-            click.echo(f"  Priority: {details['priority']}")
-            click.echo(f"  Tags: {', '.join(details['tags'])}")
-            click.echo(f"  Memory: {details['metrics']['memory_gb']:.1f}GB")
-            click.echo(f"  Load time: {details['metrics']['load_time_s']:.1f}s")
-            click.echo(f"  Warmup time: {details['metrics']['warmup_time_s']:.1f}s")
-            click.echo(f"  Requests/hour: {details['metrics']['requests_per_hour']:.1f}")
-            click.echo(f"  Avg latency: {details['metrics']['avg_latency_ms']:.1f}ms")
-            click.echo(f"  Error rate: {details['metrics']['error_rate']:.2f}")
-            click.echo(f"  Last accessed: {details['last_accessed']}")
-        else:
-            click.echo(f"Model {model_id} not found")
+        details = orch.get_model_details(model_id)
+        if details is None:
+            click.echo(f"ERROR: Model {model_id} not found", err=True)
+            raise SystemExit(1)
+        click.echo(f"Model Details: {model_id}")
+        click.echo(f"  Framework: {details['framework']}")
+        click.echo(f"  State: {details['state']}")
+        click.echo(f"  Priority: {details['priority']}")
+        click.echo(f"  Tags: {', '.join(details['tags'])}")
+        click.echo(f"  Memory: {details['metrics']['memory_gb']:.1f}GB")
+        click.echo(f"  Load time: {details['metrics']['load_time_s']:.1f}s")
+        click.echo(f"  Warmup time: {details['metrics']['warmup_time_s']:.1f}s")
+        click.echo(f"  Requests/hour: {details['metrics']['requests_per_hour']:.1f}")
+        click.echo(f"  Avg latency: {details['metrics']['avg_latency_ms']:.1f}ms")
+        click.echo(f"  Error rate: {details['metrics']['error_rate']:.2f}")
+        click.echo(f"  Last accessed: {details['last_accessed']}")
     else:
-        status = orchestrator.get_status()
+        status = orch.get_status()
         click.echo("Orchestrator Status:")
         click.echo(f"  GPU: {status['gpu_id']}")
         click.echo(f"  Total memory: {status['total_memory_gb']:.1f}GB")
@@ -196,22 +254,28 @@ def orchestrator_status(model_id):
 @orchestrator.command("infer")
 @click.argument("model-id")
 def orchestrator_infer(model_id):
-    """Test inference with a model"""
+    """Test inference with a model."""
     from terradev_cli.core.model_orchestrator import ModelOrchestrator
 
-    orchestrator = ModelOrchestrator()
+    async def _infer(orch):
+        await orch.start()
+        try:
+            return await orch.handle_request(model_id)
+        finally:
+            await orch.stop()
 
-    async def test_inference():
-        success, latency_ms = await orchestrator.handle_request(model_id)
-        if success:
-            click.echo(f"Inference successful for {model_id}")
-            click.echo(f"  Latency: {latency_ms:.1f}ms")
-        else:
-            click.echo(f"Inference failed for {model_id}")
+    try:
+        orch = _get_orchestrator_singleton() if _orchestrator is not None else ModelOrchestrator()
+        success, latency_ms = _run_with_timeout(_infer(orch), timeout=120, operation="Inference")
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Failed to run inference: {e}", err=True)
+        raise SystemExit(1)
 
-    _run_with_timeout(test_inference())
-
-
+    if not success:
+        click.echo(f"ERROR: Inference failed for {model_id}", err=True)
+        raise SystemExit(1)
+    click.echo(f"Inference successful for {model_id}")
+    click.echo(f"  Latency: {latency_ms:.1f}ms")
 @cli.group(name="warm-pool", cls=InferenceGroup)
 def warm_pool():
     """Warm pool manager for intelligent pre-warming"""

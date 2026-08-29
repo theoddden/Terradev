@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Training / LoRA commands for the Terradev CLI."""
 
-import asyncio
 import json
 from pathlib import Path
 
@@ -15,13 +14,8 @@ from terradev_cli.core.training_stages import (
 )
 
 
-def _run_with_timeout(coro, timeout=300):
-    """Run an async coroutine with a timeout to prevent hangs."""
-    try:
-        return _run_with_timeout(asyncio.wait_for(coro, timeout=timeout))
-    except asyncio.TimeoutError:
-        click.echo(f"ERROR: Training operation timed out after {timeout}s", err=True)
-        raise SystemExit(1)
+from ._base import run_with_timeout as _run_with_timeout
+
 
 @cli.group()
 def train():
@@ -1313,7 +1307,7 @@ def retrain():
 @click.option(
     "--eval-threshold",
     default=0.85,
-    type=click.FloatRange(0.0, 10000.0),
+    type=click.FloatRange(0.0, 1.0),
     help="Minimum eval score to deploy (0.0-1.0)",
 )
 @click.option(
@@ -1338,8 +1332,8 @@ def retrain():
     "--vllm-endpoint", "-e", default="", help="vLLM endpoint for eval and deploy"
 )
 @click.option("--vllm-api-key", default=None, help="vLLM API key")
-@click.option("--baseline", default=0.90, type=click.FloatRange(0.0, 10000.0), help="Baseline quality score")
-@click.option("--threshold", default=0.85, type=click.FloatRange(0.0, 10000.0), help="Drift trigger threshold")
+@click.option("--baseline", default=0.90, type=click.FloatRange(0.0, 1.0), help="Baseline quality score")
+@click.option("--threshold", default=0.85, type=click.FloatRange(0.0, 1.0), help="Drift trigger threshold")
 @click.option(
     "--min-samples", default=50, type=click.IntRange(1, 1000000), help="Min samples before triggering"
 )
@@ -1399,7 +1393,13 @@ def retrain_drift(
     click.echo(f"  Cycle ID: {config.cycle_id}")
     click.echo(f"{'='*60}\n")
 
-    result = asyncio.get_event_loop().run_until_complete(svc.run_full_cycle())
+    try:
+        result = _run_with_timeout(
+            svc.run_full_cycle(), timeout=300, operation="Retrain drift cycle"
+        )
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Retrain cycle failed: {e}", err=True)
+        raise SystemExit(1)
 
     if fmt == "json":
         click.echo(json.dumps(result, indent=2, default=str))
@@ -1471,8 +1471,8 @@ def retrain_drift(
 @click.option("--model", "-m", required=True, help="Model identifier")
 @click.option("--phoenix-endpoint", default="http://localhost:6006")
 @click.option("--phoenix-project", default="default")
-@click.option("--baseline", default=0.90, type=float)
-@click.option("--threshold", default=0.85, type=float)
+@click.option("--baseline", default=0.90, type=click.FloatRange(0.0, 1.0))
+@click.option("--threshold", default=0.85, type=click.FloatRange(0.0, 1.0))
 @click.option("--min-samples", default=50, type=int)
 @click.option(
     "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
@@ -1500,7 +1500,13 @@ def retrain_detect(
         min_samples=min_samples,
     )
     svc = DriftRetrainService(config)
-    result = asyncio.get_event_loop().run_until_complete(svc.detect_drift())
+    try:
+        result = _run_with_timeout(
+            svc.detect_drift(), timeout=120, operation="Drift detection"
+        )
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Drift detection failed: {e}", err=True)
+        raise SystemExit(1)
 
     if fmt == "json":
         click.echo(json.dumps(result, indent=2))
@@ -1557,7 +1563,13 @@ def retrain_deploy(cycle_id, vllm_endpoint, vllm_api_key, fmt):
         auto_swap=True,
     )
     svc = DriftRetrainService(config)
-    result = asyncio.get_event_loop().run_until_complete(svc.deploy_adapter())
+    try:
+        result = _run_with_timeout(
+            svc.deploy_adapter(), timeout=120, operation="Deploy adapter"
+        )
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Deploy adapter failed: {e}", err=True)
+        raise SystemExit(1)
 
     if fmt == "json":
         click.echo(json.dumps(result, indent=2))
@@ -1569,8 +1581,10 @@ def retrain_deploy(cycle_id, vllm_endpoint, vllm_api_key, fmt):
             click.echo(f"  Path:     {result.get('adapter_path')}\n")
         else:
             click.echo(
-                f"\n  \u274c Deploy failed: {result.get('error', result.get('reason', '?'))}\n"
+                f"\n  \u274c Deploy failed: {result.get('error', result.get('reason', '?'))}\n",
+                err=True,
             )
+            raise SystemExit(1)
 @retrain.command("history")
 @click.option("--limit", "-n", default=20, type=click.IntRange(1, 1000000), help="Number of cycles to show")
 @click.option(

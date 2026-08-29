@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 from . import cli
-from terradev_cli.commands._api import TerradevAPI
+from terradev_cli.commands._base import get_api as _get_api
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def agentic_serving_configure(
     disaggregation,
 ):
     """Configure agentic inference serving settings."""
-    api = TerradevAPI()
+    api = _get_api()
     api._save_provider_creds(
         "agentic_serving",
         {
@@ -88,7 +88,7 @@ def agentic_serving_show_config(fmt):
         generate_lmcache_config,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     config, _ = create_agentic_serving_from_credentials(
         api._provider_creds("agentic_serving")
     )
@@ -145,7 +145,7 @@ def agentic_serving_launch_args():
         generate_sglang_args,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     config, _ = create_agentic_serving_from_credentials(
         api._provider_creds("agentic_serving")
     )
@@ -170,7 +170,7 @@ def agentic_serving_lmcache_env():
         generate_lmcache_env,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     config, _ = create_agentic_serving_from_credentials(
         api._provider_creds("agentic_serving")
     )
@@ -191,7 +191,7 @@ def agentic_serving_k8s(namespace):
         generate_k8s_deployment,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     config, _ = create_agentic_serving_from_credentials(
         api._provider_creds("agentic_serving")
     )
@@ -207,7 +207,7 @@ def agentic_serving_helm_values(fmt):
         generate_helm_values,
     )
 
-    api = TerradevAPI()
+    api = _get_api()
     config, _ = create_agentic_serving_from_credentials(
         api._provider_creds("agentic_serving")
     )
@@ -262,7 +262,7 @@ def model_router_configure(
     cost_threshold,
 ):
     """Configure model routing endpoints and strategy."""
-    api = TerradevAPI()
+    api = _get_api()
     api._save_provider_creds(
         "model_router",
         {
@@ -290,10 +290,19 @@ def model_router_test(prompt, fmt):
     """Test model routing with a sample prompt."""
     from terradev_cli.ml_services.model_router import create_router_from_credentials
 
-    api = TerradevAPI()
-    router = create_router_from_credentials(api._provider_creds("model_router"))
-    messages = [{"role": "user", "content": prompt}]
-    endpoint, step_type, reason = router.route(messages)
+    api = _get_api()
+    creds = api._provider_creds("model_router")
+    if not creds:
+        click.echo("ERROR: model-router not configured. Run `terradev model-router configure` first.", err=True)
+        raise SystemExit(1)
+
+    try:
+        router = create_router_from_credentials(creds)
+        messages = [{"role": "user", "content": prompt}]
+        endpoint, step_type, reason = router.route(messages)
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Model routing failed: {e}", err=True)
+        raise SystemExit(1)
 
     if fmt == "json":
         click.echo(
@@ -322,7 +331,11 @@ def model_router_classify(text):
     from terradev_cli.ml_services.model_router import StepClassifier
 
     messages = [{"role": "user", "content": text}]
-    step_type = StepClassifier.classify(messages)
+    try:
+        step_type = StepClassifier.classify(messages)
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Could not classify message: {e}", err=True)
+        raise SystemExit(1)
     click.echo(f"  Step type: {step_type.value}")
 @model_router.command("stats")
 @click.option(
@@ -332,9 +345,18 @@ def model_router_stats(fmt):
     """Show routing statistics (in-memory, current session)."""
     from terradev_cli.ml_services.model_router import create_router_from_credentials
 
-    api = TerradevAPI()
-    router = create_router_from_credentials(api._provider_creds("model_router"))
-    stats = router.get_routing_stats()
+    api = _get_api()
+    creds = api._provider_creds("model_router")
+    if not creds:
+        click.echo("ERROR: model-router not configured. Run `terradev model-router configure` first.", err=True)
+        raise SystemExit(1)
+
+    try:
+        router = create_router_from_credentials(creds)
+        stats = router.get_routing_stats()
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Could not load routing stats: {e}", err=True)
+        raise SystemExit(1)
 
     if fmt == "json":
         click.echo(json.dumps(stats, indent=2))
@@ -360,7 +382,12 @@ def model_router_llmd_config(fmt):
     """Generate llm-d KV-cache-aware routing config."""
     from terradev_cli.ml_services.model_router import generate_llmd_routing_config, RouterConfig
 
-    config = generate_llmd_routing_config(RouterConfig())
+    try:
+        config = generate_llmd_routing_config(RouterConfig())
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"ERROR: Could not generate LLM-d routing config: {e}", err=True)
+        raise SystemExit(1)
+
     if fmt == "json":
         click.echo(json.dumps(config, indent=2))
     else:
