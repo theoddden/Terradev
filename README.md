@@ -1,4 +1,4 @@
-# Terradev-cli 6.2.6
+# Terradev-cli 6.2.7
 
 **Imperative Command Line Interface for AI Workload Orchestration across 17 GPU cloud providers.**
 
