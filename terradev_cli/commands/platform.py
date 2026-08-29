@@ -88,7 +88,7 @@ def sso_configure(
         if provider == "auth0":
             if not domain:
                 click.echo('ERROR: Domain required for Auth0', err=True)
-                raise SystemExit(1)
+                return
             config = api.enterprise_auth.get_sso_provider_config(provider)
             config.update(
                 {
@@ -143,7 +143,7 @@ def sso_configure(
             click.echo('ERROR: Entity ID and SSO URL required for SAML providers', err=True)
         else:
             click.echo(f'ERROR: {provider} not supported with the provided credentials', err=True)
-        raise SystemExit(1)
+        return
 
     try:
         api.enterprise_auth.enable_sso_provider(provider, config)
@@ -167,7 +167,7 @@ def sso_test(provider):
         config = api.enterprise_auth.get_sso_provider_config(provider)
         if not config or not config.get("enabled"):
             click.echo(f'ERROR: Provider {provider} not configured', err=True)
-            raise SystemExit(1)
+            return
 
         click.echo(f'Testing {provider}...')
         if api.enterprise_auth.test_sso_provider(provider):
@@ -345,7 +345,7 @@ def local_scan(host, user, key, detailed, register, name):
             click.echo(
                 f"No GPUs found on {target} or nvidia-smi not available.", err=True
             )
-            raise SystemExit(1)
+            return
         for line in raw.splitlines():
             parts = [p.strip() for p in line.split(",")]
             if len(parts) < 11:

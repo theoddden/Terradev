@@ -784,9 +784,11 @@ def provision(
             return await asyncio.gather(*tasks, return_exceptions=True)
 
         preflight_reports = _run_with_timeout(_preflight_all())
+        all_preflight_passed = True
         for report in preflight_reports:
             if isinstance(report, Exception):
                 click.echo(f"   [!] Preflight failed: {report}")
+                all_preflight_passed = False
                 continue
             icon = "OK" if report.passed else "ERROR"
             click.echo(f"   [{icon}] {report.provider}: {report.gpu_type} in {report.region}")
@@ -799,8 +801,12 @@ def provision(
                     click.echo(f"            {line}")
             if not report.passed:
                 click.echo(f"\n   Tip: Fix the failed checks, then re-run with --dry-run")
-                raise SystemExit(1)
-        click.echo("\nPreflight passed. Remove --dry-run to launch instances.")
+                all_preflight_passed = False
+                continue
+        if all_preflight_passed:
+            click.echo("\nPreflight passed. Remove --dry-run to launch instances.")
+        else:
+            click.echo("\nPreflight completed with warnings. Remove --dry-run to launch instances.")
         return
 
     # ── Step 3: Deploy across clouds in parallel via real provider APIs ──
@@ -1290,7 +1296,7 @@ def manage(instance_id, action):
         click.echo("   terradev status --live              # Get live status from providers")
         click.echo("\nTip: If you recently provisioned:")
         click.echo("   terradev status --format json       # Get full instance details")
-        raise SystemExit(1)
+        return
     pname = instance["provider"].lower().replace(" ", "_")
     click.echo(f"{action.upper()}  {instance_id}")
     click.echo(
@@ -1669,7 +1675,7 @@ def execute(instance_id, cmd, async_exec):
         click.echo("   terradev status --live              # Get live status from providers")
         click.echo("\nTip: If you recently provisioned:")
         click.echo("   terradev status --format json       # Get full instance details")
-        raise SystemExit(1)
+        return
     pname = instance["provider"].lower().replace(" ", "_")
     click.echo(f"Executing on {instance_id} ({instance['provider']}):")
     click.echo(f"   $ {cmd}")

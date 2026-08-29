@@ -182,7 +182,7 @@ def canary_report(output, file, provider, gpu):
     if not records:
         click.echo("No canary records found.")
         click.echo(f"Run canary tests first or point to a results file with --file.")
-        raise SystemExit(1)
+        return
 
     click.echo(f"Total runs:     {summary['total']}")
     click.echo(f"Passed:         {summary['passed']}")
@@ -251,7 +251,7 @@ def canary_tail(file, limit):
     recent = records[-limit:]
     if not recent:
         click.echo("No canary records found.")
-        raise SystemExit(1)
+        return
     for rec in recent:
         click.echo(json.dumps(rec, indent=2, default=str))
 
@@ -659,6 +659,7 @@ def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format, drift_ti
         click.echo(json.dumps(summary, indent=2, default=str))
         if summary["drifted"]:
             ctx.exit(1)
+        return
 
     if out.format == "jsonl":
         out._closed = True  # noqa: SLF001
@@ -666,6 +667,7 @@ def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format, drift_ti
             click.echo(json.dumps(r, default=str))
         if summary["drifted"]:
             ctx.exit(1)
+        return
 
     _render_drift_human(summary)
     if summary["drifted"]:
@@ -782,6 +784,7 @@ def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url
         click.echo(json.dumps(summary, indent=2, default=str))
         if summary["drifted"]:
             ctx.exit(1)
+        return
 
     if out.format == "jsonl":
         out._closed = True  # noqa: SLF001
@@ -789,6 +792,7 @@ def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url
             click.echo(json.dumps(r, default=str))
         if summary["drifted"]:
             ctx.exit(1)
+        return
 
     _render_drift_human(summary)
     if summary["drifted"]:

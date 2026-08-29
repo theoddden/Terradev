@@ -17,6 +17,15 @@ from . import cli
 from terradev_cli.commands._api import TerradevAPI
 
 
+def _run_with_timeout(coro, timeout=300):
+    """Run an async coroutine with a timeout to prevent hangs."""
+    try:
+        return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
+    except asyncio.TimeoutError:
+        click.echo(f"ERROR: ML operation timed out after {timeout}s", err=True)
+        raise SystemExit(1)
+
+
 def _safe_json(raw: str, option: str):
     try:
         return json.loads(raw)
@@ -122,6 +131,7 @@ def wandb_test():
             click.echo(f"ERROR: W&B connection failed: {result['error']}", err=True)
     except ImportError:
         click.echo("ERROR: Enhanced W&B service not available.", err=True)
+        raise SystemExit(1)
 @wandb.command("list-projects")
 def wandb_list_projects():
     """List all W&B projects."""

@@ -17,6 +17,16 @@ from . import cli
 from terradev_cli.commands._api import TerradevAPI
 
 
+
+
+def _run_with_timeout(coro, timeout=300):
+    """Run an async coroutine with a timeout to prevent hangs."""
+    try:
+        return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
+    except asyncio.TimeoutError:
+        click.echo(f"ERROR: Operation timed out after {timeout}s", err=True)
+        raise SystemExit(1)
+
 class InferenceCommand(click.Command):
     """Click command that catches runtime failures and returns non-zero on errors."""
 

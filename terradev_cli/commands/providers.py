@@ -1291,7 +1291,7 @@ def remove_profile(name, force):
         click.echo(f"✓ Removed provider profile: {name}")
     else:
         click.echo(f"Profile '{name}' not found (may be a built-in profile)", err=True)
-        raise SystemExit(1)
+        return
 
 
 @providers.command()
