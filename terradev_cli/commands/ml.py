@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """ML integrations commands for the Terradev CLI."""
 
-import asyncio
 import json
 import os  # noqa: F401
 import subprocess
@@ -14,16 +13,7 @@ from typing import Any, Dict, Optional
 
 import click
 from . import cli
-from terradev_cli.commands._api import TerradevAPI
-
-
-def _run_with_timeout(coro, timeout=300):
-    """Run an async coroutine with a timeout to prevent hangs."""
-    try:
-        return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
-    except asyncio.TimeoutError:
-        click.echo(f"ERROR: ML operation timed out after {timeout}s", err=True)
-        raise SystemExit(1)
+from ._base import TerradevGroup as MLGroup, get_api as _get_api, run_with_timeout as _run_with_timeout
 
 
 def _safe_json(raw: str, option: str):
@@ -33,51 +23,12 @@ def _safe_json(raw: str, option: str):
         click.echo(f"ERROR: Invalid JSON in {option}: {exc}", err=True)
         raise SystemExit(1) from exc
 
-def _get_api():
-    """Resolve the TerradevAPI instance from the Click context or create a real one."""
-    ctx = click.get_current_context()
-    if ctx and ctx.obj and ctx.obj.get("api"):
-        return ctx.obj["api"]
-    return TerradevAPI()
-
 def _parse_vllm_endpoint(endpoint: str):
     """Parse 'http://host:port' into (host, port)."""
     from urllib.parse import urlparse
 
     p = urlparse(endpoint if "://" in endpoint else f"http://{endpoint}")
     return p.hostname or "127.0.0.1", p.port or 8000
-
-
-class MLCommand(click.Command):
-    """Click command that catches runtime failures and returns non-zero on errors."""
-
-    def invoke(self, ctx):
-        try:
-            rv = super().invoke(ctx)
-        except (click.ClickException, SystemExit):
-            raise
-        except Exception as exc:  # noqa: BLE001
-            click.echo(f"ERROR: {exc}", err=True)
-            raise click.exceptions.Exit(1) from exc
-
-        output = ctx.obj.get("terradev_output") if ctx.obj else None
-        if output is not None and (rv is None or rv == 0):
-            messages = getattr(output, "_messages", [])
-            if any(m.level == "error" for m in messages):
-                raise click.exceptions.Exit(1)
-        return rv
-
-
-class MLGroup(click.Group):
-    """Click group that uses MLCommand for leaf subcommands and MLGroup for nested groups."""
-
-    def command(self, *args, **kwargs):
-        kwargs.setdefault("cls", MLCommand)
-        return super().command(*args, **kwargs)
-
-    def group(self, *args, **kwargs):
-        kwargs.setdefault("cls", MLGroup)
-        return super().group(*args, **kwargs)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1186,7 +1137,6 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
         # Generate and apply Helm values
         terradev vllm auto-optimize -e http://localhost:8000 -m codellama/CodeLlama-34b-hf -o helm
     """
-    import asyncio
 
     async def run_optimization():
         from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
@@ -1332,7 +1282,6 @@ def vllm_analyze(endpoint, duration):
         terradev vllm analyze -e http://10.0.0.1:8000 -d 120
     """
     from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
-    import asyncio
 
     async def run_analysis():
         try:
@@ -1466,7 +1415,6 @@ def vllm_import_adapter(adapter_id, local_name, hf_token, no_register):
         terradev ml vllm import-adapter organization/adapter-name
         terradev ml vllm import-adapter organization/adapter-name -n customer-a
     """
-    import asyncio
     from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
 
     async def run_import():
@@ -1512,7 +1460,6 @@ def vllm_import_model(model_id, cache_dir, hf_token):
         terradev ml vllm import-model meta-llama/Llama-2-7b-hf
         terradev ml vllm import-model mistralai/Mistral-7B-v0.1 --hf-token $HF_TOKEN
     """
-    import asyncio
     from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
 
     async def run_import():
@@ -1546,7 +1493,6 @@ def lora():
 @click.option("--api-key", help="vLLM API key")
 def vllm_lora_list(endpoint, api_key):
     """List LoRA adapters currently loaded on a vLLM server."""
-    import asyncio
     from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
 
     host, port = _parse_vllm_endpoint(endpoint)
@@ -1588,7 +1534,6 @@ def vllm_lora_load(endpoint, name, path, api_key, register, base_model, rank):
         terradev ml vllm lora load -e http://localhost:8000 -n customer-a --path /adapters/customer-a
         terradev ml vllm lora load -e http://localhost:8000 -n customer-a --path /adapters/customer-a --register --base-model meta-llama/Llama-2-7b-hf
     """
-    import asyncio
     from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService, LoRAModule
 
     host, port = _parse_vllm_endpoint(endpoint)
@@ -1632,7 +1577,6 @@ def vllm_lora_load(endpoint, name, path, api_key, register, base_model, rank):
 @click.option("--api-key", help="vLLM API key")
 def vllm_lora_unload(endpoint, name, api_key):
     """Hot-unload a LoRA adapter from a running vLLM server."""
-    import asyncio
     from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
 
     host, port = _parse_vllm_endpoint(endpoint)
@@ -1661,7 +1605,6 @@ def vllm_lora_link(endpoint, name, api_key):
     Examples:
         terradev ml vllm lora link -e http://localhost:8000 -n customer-a
     """
-    import asyncio
     from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
 
     host, port = _parse_vllm_endpoint(endpoint)
@@ -1684,7 +1627,6 @@ def vllm_lora_link(endpoint, name, api_key):
 @click.option("--replicas", required=True, help="Comma-separated host:port list")
 def vllm_lora_sync(name, replicas):
     """Synchronize an adapter from the registry across multiple vLLM replicas."""
-    import asyncio
     from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
 
     replica_list = []

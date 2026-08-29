@@ -3,9 +3,7 @@
 
 import asyncio
 import json
-import sys
 from pathlib import Path
-from typing import List, Optional
 
 import click
 from . import cli
@@ -548,7 +546,6 @@ def lora_register_cmd(name, path, base_model, rank, tenant, metadata):
         terradev lora register -n customer-a --path /adapters/customer-a -b meta-llama/Llama-2-7b-hf
         terradev lora register -n customer-b --path /adapters/customer-b -b meta-llama/Llama-2-7b-hf --tenant t-123
     """
-    import json
     from terradev_cli.ml_services.lora_registry import get_lora_registry
 
     registry = get_lora_registry()
@@ -627,7 +624,6 @@ def lora_sync_cmd(deployment, name, replicas):
     Examples:
         terradev lora sync -d prod -n customer-a --replicas 10.0.0.1:8000,10.0.0.2:8000
     """
-    import asyncio
     from terradev_cli.ml_services.lora_registry import get_lora_registry
     from terradev_cli.core.lora_consistency import LoRAConsistencyManager
 
@@ -792,7 +788,6 @@ def lora_rollback_cmd(name, to_version, replicas):
         terradev lora rollback -n customer-a
         terradev lora rollback -n customer-a -v abc123... --replicas 10.0.0.1:8000,10.0.0.2:8000
     """
-    import asyncio
     from terradev_cli.ml_services.lora_registry import get_lora_registry
     from terradev_cli.core.lora_versioning import LoRAVersioningManager
     from terradev_cli.core.lora_consistency import LoRAConsistencyManager
@@ -838,7 +833,6 @@ def lora_drift_check_cmd(name, version, threshold, source):
         terradev lora drift-check -n customer-a
         terradev lora drift-check -n customer-a -t 0.15
     """
-    import asyncio
     from terradev_cli.ml_services.lora_registry import get_lora_registry
     from terradev_cli.core.lora_versioning import LoRAVersioningManager
 
@@ -881,7 +875,6 @@ def lora_cost_report_cmd(days, adapter, tenant):
         terradev lora cost-report -a customer-a
         terradev lora cost-report -t tenant-123
     """
-    import asyncio
     from terradev_cli.core.lora_cost_attribution import CostAttributionService, CostConfig
 
     config = CostConfig()
@@ -989,7 +982,6 @@ def lorax_test_cmd(host, port):
         terradev lora lorax test
         terradev lora lorax test --host 10.0.0.1 --port 8080
     """
-    import asyncio
     from terradev_cli.ml_services.lorax_service import get_lorax_service
 
     svc = get_lorax_service(host=host, port=port)
@@ -1017,7 +1009,6 @@ def lorax_list_adapters_cmd(host, port):
     Examples:
         terradev lora lorax list-adapters
     """
-    import asyncio
     from terradev_cli.ml_services.lorax_service import get_lorax_service
 
     svc = get_lorax_service(host=host, port=port)
@@ -1049,7 +1040,6 @@ def lorax_load_adapter_cmd(adapter_id, adapter_name, host, port):
         terradev lora lorax load-adapter -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
         terradev lora lorax load-adapter -a /path/to/local/adapter --adapter-name my-adapter
     """
-    import asyncio
     from terradev_cli.ml_services.lorax_service import get_lorax_service
 
     svc = get_lorax_service(host=host, port=port)
@@ -1077,7 +1067,6 @@ def lorax_unload_adapter_cmd(adapter_id, host, port):
     Examples:
         terradev lora lorax unload-adapter -a vineetsharma/qlora-adapter-Mistral-7B-Instruct-v0.1-gsm8k
     """
-    import asyncio
     from terradev_cli.ml_services.lorax_service import get_lorax_service
 
     svc = get_lorax_service(host=host, port=port)
@@ -1104,7 +1093,6 @@ def lorax_sync_registry_cmd(host, port, adapter):
         terradev lora lorax sync-registry
         terradev lora lorax sync-registry -a customer-a
     """
-    import asyncio
     from terradev_cli.ml_services.lorax_service import get_lorax_service
     from terradev_cli.ml_services.lora_registry import get_lorax_registry
 
@@ -1149,7 +1137,6 @@ def lorax_generate_cmd(prompt, adapter_id, max_tokens, temperature, host, port):
         terradev lora lorax generate -p "Hello, world!"
         terradev lora lorax generate -p "What is 2+2?" -a my-adapter
     """
-    import asyncio
     from terradev_cli.ml_services.lorax_service import get_lorax_service
 
     svc = get_lorax_service(host=host, port=port)

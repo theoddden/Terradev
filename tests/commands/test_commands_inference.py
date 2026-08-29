@@ -175,14 +175,11 @@ class TestInferGroup:
         result = runner.invoke(cli, ["infer", "deploy"], obj={"api": mock_api})
         assert result.exit_code != 0
 
-    @patch("terradev_cli.commands.inference.TerradevAPI")
-    def test_endpoint_dry_run(self, MockAPI, runner, mock_api):
-        api = MagicMock()
-        api._get_provider_quotes = AsyncMock(
+    def test_endpoint_dry_run(self, runner, mock_api):
+        mock_api._get_provider_quotes = AsyncMock(
             return_value=[{"price": 1.0, "gpu_type": "A100-80GB"}]
         )
-        api._provider_creds = MagicMock(return_value={"api_key": "test"})
-        MockAPI.return_value = api
+        mock_api._provider_creds = MagicMock(return_value={"api_key": "test"})
 
         result = runner.invoke(
             cli,

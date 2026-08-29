@@ -11,45 +11,18 @@ import click
 from . import cli
 from ._api import (
     validate_credentials,
-    run_interactive_onboarding,
     _telemetry,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class ProvidersCommand(click.Command):
-    """Click command that catches runtime failures and returns non-zero on errors."""
-
-    def invoke(self, ctx):
-        try:
-            rv = super().invoke(ctx)
-        except (click.ClickException, SystemExit):
-            raise
-        except Exception as exc:  # noqa: BLE001
-            click.echo(f"ERROR: {exc}", err=True)
-            raise click.exceptions.Exit(1) from exc
-
-        output = ctx.obj.get("terradev_output") if ctx.obj else None
-        if output is not None and (rv is None or rv == 0):
-            messages = getattr(output, "_messages", [])
-            if any(m.level == "error" for m in messages):
-                raise click.exceptions.Exit(1)
-        return rv
-
-
-class ProvidersGroup(click.Group):
-    """Click group that uses ProvidersCommand for leaf subcommands and ProvidersGroup for nested groups."""
-
-    def command(self, *args, **kwargs):
-        kwargs.setdefault("cls", ProvidersCommand)
-        return super().command(*args, **kwargs)
-
-    def group(self, *args, **kwargs):
-        kwargs.setdefault("cls", ProvidersGroup)
-        return super().group(*args, **kwargs)
-
-
+from ._base import (
+    TerradevCommand as ProvidersCommand,
+    TerradevGroup as ProvidersGroup,
+    get_api as _get_api,
+    run_with_timeout as _run_with_timeout,
+)
 
 # Upgrade command removed - tier system eliminated (open source CLI)
 # @cli.command()
@@ -657,7 +630,7 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             },
         )
 
-    api = click.get_current_context().obj["api"]
+    api = _get_api()
 
     # ── Load local pool if --include-local is set ──
     local_quotes = []
@@ -701,15 +674,18 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
     # ── Fetch quotes from all providers in parallel ──
     click.echo(f"Querying providers for {gpu_type} pricing...")
 
+    semaphore = asyncio.Semaphore(parallel)
+
     async def _fetch_one(pname, fn):
-        try:
-            return await asyncio.wait_for(fn(gpu_type), timeout=30)
-        except asyncio.TimeoutError:
-            click.echo(f"WARNING: {pname} quote timed out")
-            return []
-        except Exception as exc:  # noqa: BLE001
-            click.echo(f"WARNING: {pname} quote failed: {exc}")
-            return []
+        async with semaphore:
+            try:
+                return await asyncio.wait_for(fn(gpu_type), timeout=30)
+            except asyncio.TimeoutError:
+                click.echo(f"WARNING: {pname} quote timed out", err=True)
+                return []
+            except Exception as exc:  # noqa: BLE001
+                click.echo(f"WARNING: {pname} quote failed: {exc}", err=True)
+                return []
 
     async def _fetch_all():
         tasks = []
@@ -741,14 +717,11 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             if isinstance(r, list):
                 out.extend(r)
             elif isinstance(r, Exception):
-                click.echo(f"WARNING: Provider quote task failed: {r}")
+                click.echo(f"WARNING: Provider quote task failed: {r}", err=True)
         return out
 
     try:
-        all_quotes = asyncio.run(asyncio.wait_for(_fetch_all(), timeout=120))
-    except asyncio.TimeoutError:
-        click.echo("ERROR: Quote request timed out after 120s. Try a smaller provider list or check your network.", err=True)
-        raise SystemExit(1)
+        all_quotes = _run_with_timeout(_fetch_all(), timeout=120, operation="Quote")
     except Exception as exc:  # noqa: BLE001
         click.echo(f"ERROR: Quote request failed: {exc}", err=True)
         raise SystemExit(1)

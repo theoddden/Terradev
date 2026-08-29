@@ -5,58 +5,15 @@ import asyncio
 import json
 import os
 import subprocess
-import sys
 import time
-import uuid
 from datetime import datetime
 from pathlib import Path  # noqa: F401
 from typing import Any, Dict, List, Optional
 
 import click
 from . import cli
-from terradev_cli.commands._api import TerradevAPI
+from ._base import TerradevCommand as InferenceCommand, TerradevGroup as InferenceGroup, get_api as _get_api, run_with_timeout as _run_with_timeout
 
-
-
-
-def _run_with_timeout(coro, timeout=300):
-    """Run an async coroutine with a timeout to prevent hangs."""
-    try:
-        return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
-    except asyncio.TimeoutError:
-        click.echo(f"ERROR: Operation timed out after {timeout}s", err=True)
-        raise SystemExit(1)
-
-class InferenceCommand(click.Command):
-    """Click command that catches runtime failures and returns non-zero on errors."""
-
-    def invoke(self, ctx):
-        try:
-            rv = super().invoke(ctx)
-        except (click.ClickException, SystemExit):
-            raise
-        except Exception as exc:  # noqa: BLE001
-            click.echo(f"ERROR: {exc}", err=True)
-            raise click.exceptions.Exit(1) from exc
-
-        output = ctx.obj.get("terradev_output") if ctx.obj else None
-        if output is not None and (rv is None or rv == 0):
-            messages = getattr(output, "_messages", [])
-            if any(m.level == "error" for m in messages):
-                raise click.exceptions.Exit(1)
-        return rv
-
-
-class InferenceGroup(click.Group):
-    """Click group that uses InferenceCommand for leaf subcommands and InferenceGroup for nested groups."""
-
-    def command(self, *args, **kwargs):
-        kwargs.setdefault("cls", InferenceCommand)
-        return super().command(*args, **kwargs)
-
-    def group(self, *args, **kwargs):
-        kwargs.setdefault("cls", InferenceGroup)
-        return super().group(*args, **kwargs)
 
 
 @cli.group(cls=InferenceGroup)
@@ -852,7 +809,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
         if fmt != "json":
             click.echo(f"  Resolving IPs for {len(unresolved)} instance(s)...")
 
-        api = TerradevAPI()
+        api = _get_api()
 
         async def _resolve_ips():
             from terradev_cli.providers.provider_factory import ProviderFactory
@@ -1035,7 +992,7 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
     # Get real quotes from providers
     click.echo("Getting inference quotes from terradev_cli.providers...")
 
-    api = TerradevAPI()
+    api = _get_api()
     target_gpu = gpu_type or "A100"
     inference_providers = ["runpod", "vastai", "baseten", "huggingface", "siliconflow", "inferx"]
     if provider:
@@ -1225,7 +1182,7 @@ def infer_endpoint(
     # Real deployment via provider API
     click.echo("\nAnalyzing model requirements...")
 
-    api = TerradevAPI()
+    api = _get_api()
     target_gpu = gpu_type or "A100"
     target_providers = ["runpod", "vastai", "baseten", "huggingface", "siliconflow", "inferx"]
     if provider:
@@ -1454,7 +1411,6 @@ def infer_failover(dry_run):
 
     Open source feature - available to all users.
     """
-    TerradevAPI()
     # Tier check removed - inference available to all users (open source)
     # tier_features = api.tier.get('features', [])
     # if 'all' not in tier_features and 'inference' not in tier_features:
@@ -1542,7 +1498,6 @@ def infer_route(model, strategy, measure):
     Integrates with WebPageTest TTFB probes for real-world latency data.
     Set WPT_API_KEY env var to enable WebPageTest integration.
     """
-    TerradevAPI()
     # Tier check removed - inference available to all users (open source)
     # tier_features = api.tier.get('features', [])
     # if 'all' not in tier_features and 'inference' not in tier_features:
