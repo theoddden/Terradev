@@ -175,12 +175,12 @@ class TerradevAPI:
             self.credentials = self._vault.load_env_credentials(auth.credentials, known_only=True)
         except Exception as e:  # noqa: BLE001
             import sys
-            print(
+            click.echo(
                 f"Warning: Failed to load credentials via AuthManager ({e}). "
                 f"Your credentials file may be corrupted.",
                 file=sys.stderr,
             )
-            print(
+            click.echo(
                 "   Run `terradev configure` to re-enter your keys.",
                 file=sys.stderr,
             )
@@ -220,13 +220,13 @@ class TerradevAPI:
         try:
             auth.save(str(self.credentials_file))
             import sys
-            print(
+            click.echo(
                 "[terradev] Credentials migrated to encrypted storage.",
                 file=sys.stderr,
             )
         except Exception as e:  # noqa: BLE001
             import sys
-            print(f"Warning: credential migration failed ({e})", file=sys.stderr)
+            click.echo(f"Warning: credential migration failed ({e})", err=True)
 
     def save_credentials(self):
         """Save cloud provider credentials via AuthManager (Fernet-encrypted)."""
@@ -241,7 +241,7 @@ class TerradevAPI:
             self._auth_manager.credentials = self.credentials
             self._auth_manager.save(str(self.credentials_file))
         except Exception as e:  # noqa: BLE001
-            print(f"ERROR: Failed to save credentials: {e}", file=sys.stderr)
+            click.echo(f"ERROR: Failed to save credentials: {e}", err=True)
 
     def _save_provider_creds(self, provider_name: str, creds: Dict[str, str]) -> None:
         """Store/update credentials for a specific provider."""
@@ -680,9 +680,9 @@ def run_interactive_onboarding(api: TerradevAPI):
     def _collect_provider(provider_key: str, config: dict) -> bool:
         """Collect credentials for a provider. Returns True if something was entered."""
         if provider_key == "gcp":
-            print()
-            print("   Enter path to your service account JSON file:")
-            print(f"   Example: {config['example']}")
+            click.echo()
+            click.echo("   Enter path to your service account JSON file:")
+            click.echo(f"   Example: {config['example']}")
             file_path = click.prompt(
                 f"   {config['key_name']}", default="", show_default=False
             )
@@ -693,12 +693,12 @@ def run_interactive_onboarding(api: TerradevAPI):
                     )
                     api.credentials["gcp_credentials_file"] = file_path
                     return True
-                print(f"   File not found: {file_path}")
+                click.echo(f"   File not found: {file_path}")
             return False
 
         if provider_key == "aws":
-            print()
-            print("   AWS requires both Access Key ID and Secret Access Key")
+            click.echo()
+            click.echo("   AWS requires both Access Key ID and Secret Access Key")
             access_key = click.prompt(
                 "   Access Key ID",
                 default="",
@@ -716,14 +716,14 @@ def run_interactive_onboarding(api: TerradevAPI):
                     api.credentials["aws_access_key_id"] = access_key
                     api.credentials["aws_secret_access_key"] = secret_key
                     return True
-                print("   Skipped AWS (missing secret)")
+                click.echo("   Skipped AWS (missing secret)")
             else:
-                print("   Skipped AWS")
+                click.echo("   Skipped AWS")
             return False
 
         if provider_key == "inferx":
-            print()
-            print("   InferX requires an API key and endpoint details")
+            click.echo()
+            click.echo("   InferX requires an API key and endpoint details")
             api_key = click.prompt(
                 "   API Key",
                 default="",
@@ -731,7 +731,7 @@ def run_interactive_onboarding(api: TerradevAPI):
                 show_default=False,
             )
             if not (api_key and api_key.strip()):
-                print("   Skipped InferX")
+                click.echo("   Skipped InferX")
                 return False
             api.credentials["inferx_api_key"] = api_key
             api_endpoint = click.prompt(
@@ -764,16 +764,16 @@ def run_interactive_onboarding(api: TerradevAPI):
             return True
         return False
 
-    print()
-    print("=" * 70)
-    print("WELCOME TO TERRADEV CLI".center(70))
-    print("=" * 70)
-    print()
-    print("Your Cross-Cloud GPU Optimization Platform")
-    print("Save 30-60% on GPU compute costs across multiple cloud providers")
-    print("Real-time pricing + automated provisioning")
-    print()
-    print("=" * 70)
+    click.echo()
+    click.echo("=" * 70)
+    click.echo("WELCOME TO TERRADEV CLI".center(70))
+    click.echo("=" * 70)
+    click.echo()
+    click.echo("Your Cross-Cloud GPU Optimization Platform")
+    click.echo("Save 30-60% on GPU compute costs across multiple cloud providers")
+    click.echo("Real-time pricing + automated provisioning")
+    click.echo()
+    click.echo("=" * 70)
 
     provider_configs = {
         "runpod": {
@@ -916,19 +916,19 @@ def run_interactive_onboarding(api: TerradevAPI):
 
     configured_providers = []
 
-    print()
-    print("Tip: You only need to set up ONE provider to get started.")
-    print("Add more later with: terradev configure --provider <name>")
-    print("All keys are stored locally in ~/.terradev/credentials.json")
+    click.echo()
+    click.echo("Tip: You only need to set up ONE provider to get started.")
+    click.echo("Add more later with: terradev configure --provider <name>")
+    click.echo("All keys are stored locally in ~/.terradev/credentials.json")
 
     while True:
-        print()
-        print("-" * 70)
-        print("Available providers:")
+        click.echo()
+        click.echo("-" * 70)
+        click.echo("Available providers:")
         for i, (key, config) in enumerate(provider_configs.items(), 1):
             marker = " (configured)" if key in configured_providers else ""
-            print(f"   {i:2d}. {config['name']:<15} - {config['why']}{marker}")
-        print("    0.  Done / skip")
+            click.echo(f"   {i:2d}. {config['name']:<15} - {config['why']}{marker}")
+        click.echo("    0.  Done / skip")
 
         choice = click.prompt(
             "Which provider would you like to set up?",
@@ -943,22 +943,22 @@ def run_interactive_onboarding(api: TerradevAPI):
             if 0 <= idx < len(provider_configs):
                 choice = list(provider_configs.keys())[idx]
             else:
-                print("Invalid choice. Please pick a number from the list.")
+                click.echo("Invalid choice. Please pick a number from the list.", err=True)
                 continue
 
         if choice not in provider_configs:
-            print(f"Unknown provider '{choice}'. Please choose from the list.")
+            click.echo(f"Unknown provider '{choice}'. Please choose from the list.", err=True)
             continue
 
         provider_key = choice
         config = provider_configs[provider_key]
 
-        print()
-        print("=" * 60)
-        print(f"Setting up {config['name']}")
-        print(f"   {config['why']}")
-        print(f"   Help: {config['help']}")
-        print(f"   Environment variable: {config['env_var']}")
+        click.echo()
+        click.echo("=" * 60)
+        click.echo(f"Setting up {config['name']}")
+        click.echo(f"   {config['why']}")
+        click.echo(f"   Help: {config['help']}")
+        click.echo(f"   Environment variable: {config['env_var']}")
 
         existing = (
             api.credentials.get(f"{provider_key}_api_key")
@@ -971,35 +971,35 @@ def run_interactive_onboarding(api: TerradevAPI):
             and not any(pattern in existing.lower() for pattern in ["your_", "example_", "test_", "placeholder_", "xxx"])
         ):
             if not click.confirm(f"   {config['name']} is already configured. Reconfigure?", default=False):
-                print(f"   Kept existing {config['name']} configuration.")
+                click.echo(f"   Kept existing {config['name']} configuration.")
                 if provider_key not in configured_providers:
                     configured_providers.append(provider_key)
                 continue
 
         if not click.confirm(f"   Configure {config['name']}?", default=True):
-            print(f"   Skipped {config['name']}")
+            click.echo(f"   Skipped {config['name']}")
             continue
 
         got_input = _collect_provider(provider_key, config)
         if not got_input:
-            print(f"   Skipped {config['name']}")
+            click.echo(f"   Skipped {config['name']}")
             continue
 
-        print()
-        print(f"   Testing {config['name']} API connection...")
+        click.echo()
+        click.echo(f"   Testing {config['name']} API connection...")
         try:
-            success, msg = asyncio.run(_test_provider(provider_key))
+            success, msg = _run_with_timeout(_test_provider(provider_key))
         except Exception as exc:  # noqa: BLE001
             success, msg = False, str(exc)
 
         if not success:
-            print(f"   Warning: API check failed: {msg}")
+            click.echo(f"   Warning: API check failed: {msg}")
             if not click.confirm("   Save credentials anyway?", default=False):
                 _clear_provider_creds(provider_key)
-                print(f"   Discarded {config['name']} credentials.")
+                click.echo(f"   Discarded {config['name']} credentials.")
                 continue
         else:
-            print(f"   {config['name']} API connection verified")
+            click.echo(f"   {config['name']} API connection verified")
 
         configured_providers.append(provider_key)
 
@@ -1008,35 +1008,35 @@ def run_interactive_onboarding(api: TerradevAPI):
 
     if configured_providers:
         api.save_credentials()
-        print()
-        print("=" * 70)
-        print(f"SUCCESS! Configured {len(configured_providers)} provider(s):")
+        click.echo()
+        click.echo("=" * 70)
+        click.echo(f"SUCCESS! Configured {len(configured_providers)} provider(s):")
         for provider in configured_providers:
-            print(f"   {provider_configs[provider]['name']}")
+            click.echo(f"   {provider_configs[provider]['name']}")
     else:
-        print()
-        print("=" * 70)
-        print("No providers configured. You can add them anytime with:")
-        print("   terradev configure --provider runpod")
+        click.echo()
+        click.echo("=" * 70)
+        click.echo("No providers configured. You can add them anytime with:")
+        click.echo("   terradev configure --provider runpod")
 
-    print()
-    print("NEXT STEPS:")
+    click.echo()
+    click.echo("NEXT STEPS:")
     if configured_providers:
-        print("   1. Try it out: terradev quote -g A100")
-        print("   2. Provision GPU: terradev provision -g A100 --duration 4")
-        print("   3. Check status: terradev status")
+        click.echo("   1. Try it out: terradev quote -g A100")
+        click.echo("   2. Provision GPU: terradev provision -g A100 --duration 4")
+        click.echo("   3. Check status: terradev status")
     else:
-        print("   1. Configure at least one provider:")
-        print("      terradev configure --provider runpod")
-        print("   2. Then try: terradev quote -g A100")
+        click.echo("   1. Configure at least one provider:")
+        click.echo("      terradev configure --provider runpod")
+        click.echo("   2. Then try: terradev quote -g A100")
 
-    print()
-    print("NEED HELP?")
-    print("   Documentation: https://github.com/theoddden/terradev")
-    print("   Support: team@terradev.com")
-    print("   Quick start guide: https://github.com/theoddden/terradev#quick-start")
+    click.echo()
+    click.echo("NEED HELP?")
+    click.echo("   Documentation: https://github.com/theoddden/terradev")
+    click.echo("   Support: team@terradev.com")
+    click.echo("   Quick start guide: https://github.com/theoddden/terradev#quick-start")
 
-    print()
-    print("WELCOME TO TERRADEV! Happy GPU hunting!")
-    print("=" * 70)
-    print()
+    click.echo()
+    click.echo("WELCOME TO TERRADEV! Happy GPU hunting!")
+    click.echo("=" * 70)
+    click.echo()

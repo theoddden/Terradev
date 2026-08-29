@@ -91,7 +91,7 @@ def configure(provider):
         # Configure specific provider
         from terradev_cli.credential_prompt import prompt_for_credentials
 
-        print(f"   Configure {provider.upper()} credentials")
+        click.echo(f"   Configure {provider.upper()} credentials")
 
         # Use the injected API's config paths so tests can isolate credentials
         config_dir = getattr(api, "config_dir", None) or (Path.home() / ".terradev")
@@ -211,26 +211,26 @@ def configure(provider):
 
         config = provider_configs.get(provider.lower())
         if not config:
-            print(f"ERROR: Unknown provider '{provider}'")
-            print("\nAvailable providers:")
+            click.echo(f"ERROR: Unknown provider '{provider}'", err=True)
+            click.echo("\nAvailable providers:")
             for i, (key, val) in enumerate(provider_configs.items(), 1):
-                print(f"  {i}. {val['name']}")
-            print("\nUse 'terradev setup <provider>' for step-by-step instructions")
-            print("   Example: terradev setup runpod")
-            return
+                click.echo(f"  {i}. {val['name']}")
+            click.echo("\nUse 'terradev setup <provider>' for step-by-step instructions")
+            click.echo("   Example: terradev setup runpod")
+            raise SystemExit(1)
 
-        print(f"   {config['name']}")
-        print(f"   Help: {config['help']}")
-        print(f"   Example: {config['example']}")
+        click.echo(f"   {config['name']}")
+        click.echo(f"   Help: {config['help']}")
+        click.echo(f"   Example: {config['example']}")
 
         # Check if already configured
         existing_key = existing_creds.get(provider.lower(), {}).get("api_key")
         if existing_key:
-            print(f"   Already configured: {existing_key[:10]}...")
+            click.echo(f"   Already configured: {existing_key[:10]}...")
             if not click.confirm(
                 f"   Update {config['name']} credentials?", default=False
             ):
-                print("   Your existing credentials will be used")
+                click.echo("   Your existing credentials will be used")
                 return
 
         # Prompt for API key
@@ -332,15 +332,15 @@ def configure(provider):
 
             # Validate credentials
             if validate_credentials(provider, existing_creds[provider.lower()]):
-                print(f"   OK: {config['name']} credentials validated and saved")
-                print(
+                click.echo(f"   OK: {config['name']} credentials validated and saved")
+                click.echo(
                     f"   Test with: terradev quote --gpu-type a100 --providers {provider}"
                 )
-                print("   Then provision: terradev provision -g a100")
+                click.echo("   Then provision: terradev provision -g a100")
             else:
-                print(f"   ERROR: {config['name']} credentials validation failed")
-                print("   Please check your credentials and try again")
-                print(
+                click.echo(f"   ERROR: {config['name']} credentials validation failed")
+                click.echo("   Please check your credentials and try again")
+                click.echo(
                     f"   Use 'terradev setup {provider}' for step-by-step setup instructions"
                 )
 
@@ -355,15 +355,15 @@ def configure(provider):
         api.load_credentials()
 
         if configured_providers:
-            print(f"\nReady to get quotes from: {', '.join(configured_providers)}")
-            print("   Try: terradev quote --gpu-type a100")
-            print("   Then provision: terradev provision -g a100")
+            click.echo(f"\nReady to get quotes from: {', '.join(configured_providers)}")
+            click.echo("   Try: terradev quote --gpu-type a100")
+            click.echo("   Then provision: terradev provision -g a100")
         else:
-            print("\nNo providers configured")
-            print(
+            click.echo("\nNo providers configured")
+            click.echo(
                 "   Run 'terradev configure --provider <provider>' to add credentials"
             )
-            print(
+            click.echo(
                 "   Or use 'terradev setup runpod' for the easiest setup (5 minutes)"
             )
 
@@ -385,7 +385,7 @@ def configure(provider):
             if karpenter_enabled.lower() == "y":
                 api.credentials["kubernetes_karpenter_enabled"] = "true"
 
-            print(
+            click.echo(
                 "   Kubernetes configured  cluster management and Karpenter"
             )
 
@@ -430,7 +430,7 @@ def configure(provider):
                 api.credentials["wandb_alerts_enabled"] = "true"
                 api.credentials["wandb_integration_enabled"] = "true"
 
-            print("   W&B configured  experiment tracking, dashboards, and alerts")
+            click.echo("   W&B configured  experiment tracking, dashboards, and alerts")
 
         # LangChain (enhanced)
         langchain_config = click.prompt(
@@ -458,7 +458,7 @@ def configure(provider):
                 api.credentials["langchain_evaluation_enabled"] = "true"
                 api.credentials["langchain_workflow_enabled"] = "true"
 
-            print(
+            click.echo(
                 "   LangChain configured  chains and workflows"
             )
 
@@ -494,10 +494,10 @@ def configure(provider):
                 api.credentials["sglang_deployment_enabled"] = "true"
                 api.credentials["sglang_observability_enabled"] = "true"
 
-            print("   SGLang configured  model serving and optimization")
+            click.echo("   SGLang configured  model serving and optimization")
 
         # ── ML Platform Integrations ──
-        print("\nML Platform Integrations (optional)")
+        click.echo("\nML Platform Integrations (optional)")
 
         # KServe
         kserve_config = click.prompt(
@@ -518,7 +518,7 @@ def configure(provider):
             )
             if kserve_kubeconfig:
                 api.credentials["kserve_kubeconfig_path"] = kserve_kubeconfig
-            print("   KServe configured  model deployment on Kubernetes")
+            click.echo("   KServe configured  model deployment on Kubernetes")
 
         # DVC
         dvc_config = click.prompt(
@@ -540,7 +540,7 @@ def configure(provider):
             )
             if dvc_type:
                 api.credentials["dvc_remote_type"] = dvc_type
-            print("   DVC configured  data versioning and storage")
+            click.echo("   DVC configured  data versioning and storage")
 
         # MLflow
         mlflow_uri = click.prompt(
@@ -564,7 +564,7 @@ def configure(provider):
             )
             if mlflow_pass:
                 api.credentials["mlflow_password"] = mlflow_pass
-            print("   MLflow configured  experiment tracking")
+            click.echo("   MLflow configured  experiment tracking")
 
         # Ray
         ray_dashboard = click.prompt(
@@ -577,16 +577,16 @@ def configure(provider):
             )
             if ray_head:
                 api.credentials["ray_head_node_ip"] = ray_head
-            print("   Ray configured  distributed computing")
+            click.echo("   Ray configured  distributed computing")
 
         # Save all credentials (provider + integrations) to disk
         # Only in interactive mode - single-provider mode saves directly to file
         api.save_credentials()
 
-        print("\nCredentials saved successfully!")
-        print(f"Stored in: {api.credentials_file}")
-        print("Your keys are encrypted and stored locally only.")
-        print("\nOpen Source Mode: Unlimited access")
+        click.echo("\nCredentials saved successfully!")
+        click.echo(f"Stored in: {api.credentials_file}")
+        click.echo("Your keys are encrypted and stored locally only.")
+        click.echo("\nOpen Source Mode: Unlimited access")
 
 
 @cli.command(cls=ProvidersCommand)
@@ -602,7 +602,7 @@ def configure(provider):
     multiple=True,
     help="Filter to specific providers (multiple allowed, e.g., runpod,vastai)",
 )
-@click.option("--parallel", default=6, help="Number of parallel queries (default: 6)")
+@click.option("--parallel", default=6, type=click.IntRange(1, 100), help="Number of parallel queries (default: 6)")
 @click.option("--region", "-r", help="Filter by region (e.g., us-east-1, eu-west-1)")
 @click.option(
     "--quick", "-q", is_flag=True, help="Show quick provision command for best quote"
@@ -636,14 +636,14 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
 
     # Validate GPU type parameter
     if not gpu_type or gpu_type.strip() == "":
-        print("ERROR: GPU type is required")
-        print("\nUsage: terradev quote -g <gpu-type>")
-        print("\nExample GPU types:")
-        print("  terradev quote -g A100")
-        print("  terradev quote -g H100")
-        print("  terradev quote -g RTX4090")
-        print("\nCommon GPUs: A100, H100, RTX4090, L40S, V100, L4, T4")
-        return
+        click.echo("ERROR: GPU type is required", err=True)
+        click.echo("\nUsage: terradev quote -g <gpu-type>")
+        click.echo("\nExample GPU types:")
+        click.echo("  terradev quote -g A100")
+        click.echo("  terradev quote -g H100")
+        click.echo("  terradev quote -g RTX4090")
+        click.echo("\nCommon GPUs: A100, H100, RTX4090, L40S, V100, L4, T4")
+        raise SystemExit(1)
 
     if _telemetry:
         _telemetry.log_action(
@@ -694,12 +694,22 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
                                 }
                             )
                 if local_quotes:
-                    print(f"Included {len(local_quotes)} local GPU(s) from your pool")
+                    click.echo(f"Included {len(local_quotes)} local GPU(s) from your pool")
             except Exception as e:  # noqa: BLE001
-                print(f"Warning: Could not load local pool: {e}")
+                click.echo(f"Warning: Could not load local pool: {e}")
 
     # ── Fetch quotes from all providers in parallel ──
-    print(f"Querying providers for {gpu_type} pricing...")
+    click.echo(f"Querying providers for {gpu_type} pricing...")
+
+    async def _fetch_one(pname, fn):
+        try:
+            return await asyncio.wait_for(fn(gpu_type), timeout=30)
+        except asyncio.TimeoutError:
+            click.echo(f"WARNING: {pname} quote timed out")
+            return []
+        except Exception as exc:  # noqa: BLE001
+            click.echo(f"WARNING: {pname} quote failed: {exc}")
+            return []
 
     async def _fetch_all():
         tasks = []
@@ -724,32 +734,41 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
         ]
         for pname, fn in provider_list:
             if not providers or pname in providers:
-                tasks.append(fn(gpu_type))
+                tasks.append(asyncio.create_task(_fetch_one(pname, fn)))
         results = await asyncio.gather(*tasks, return_exceptions=True)
         out = []
         for r in results:
             if isinstance(r, list):
                 out.extend(r)
+            elif isinstance(r, Exception):
+                click.echo(f"WARNING: Provider quote task failed: {r}")
         return out
 
-    all_quotes = asyncio.run(_fetch_all())
+    try:
+        all_quotes = asyncio.run(asyncio.wait_for(_fetch_all(), timeout=120))
+    except asyncio.TimeoutError:
+        click.echo("ERROR: Quote request timed out after 120s. Try a smaller provider list or check your network.", err=True)
+        raise SystemExit(1)
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"ERROR: Quote request failed: {exc}", err=True)
+        raise SystemExit(1)
 
     # Merge local quotes with cloud quotes
     all_quotes = local_quotes + all_quotes
 
     if not all_quotes:
-        print("ERROR: No quotes returned from any provider")
-        print("\nTo fix this:")
-        print(
+        click.echo("ERROR: No quotes returned from any provider", err=True)
+        click.echo("\nTo fix this:")
+        click.echo(
             "   1. Configure provider credentials: terradev configure --provider <name>"
         )
-        print("      Example: terradev configure --provider runpod")
-        print("   2. Or get setup instructions: terradev setup <provider>")
-        print("      Example: terradev setup runpod")
-        print(
+        click.echo("      Example: terradev configure --provider runpod")
+        click.echo("   2. Or get setup instructions: terradev setup <provider>")
+        click.echo("      Example: terradev setup runpod")
+        click.echo(
             "   3. RunPod is the easiest to set up (5 minutes): terradev setup runpod --quick"
         )
-        return
+        raise SystemExit(1)
 
     # Filter by region if specified
     if region:
@@ -757,19 +776,19 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
             q for q in all_quotes if region.lower() in q.get("region", "").lower()
         ]
         if not all_quotes:
-            print(f"ERROR: No quotes returned for {gpu_type} in region {region}")
-            print("\nTip: Try a different region or remove the -r/--region filter")
-            return
+            click.echo(f"ERROR: No quotes returned for {gpu_type} in region {region}", err=True)
+            click.echo("\nTip: Try a different region or remove the -r/--region filter")
+            raise SystemExit(1)
 
     all_quotes.sort(key=lambda q: q.get("price", 999))
 
     # ── Display results ──
     best = all_quotes[0]
-    print(f"\nTerradev Quote  {gpu_type}")
-    print(
+    click.echo(f"\nTerradev Quote  {gpu_type}")
+    click.echo(
         f"{'#':<4} {'Provider':<14} {'Region':<16} {'$/hr':<10} {'GPUs':<6} {'Instance':<20} {'Spot':<8}"
     )
-    print("-" * 84)
+    click.echo("-" * 84)
     for i, q in enumerate(all_quotes[:10]):
         spot = "✓" if q.get("availability") == "spot" else ""
         gpu_count = q.get("gpu_count", 1)
@@ -778,13 +797,13 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
         provider_display = q.get("provider", q.get("gpu_name", "unknown"))
         if q.get("provider") == "local":
             provider_display = f"{q['pool_name']}"
-        print(
+        click.echo(
             f"{i+1:<4} {provider_display:<14} {q['region']:<16} ${q['price']:<9.2f} {gpu_display:<6} {instance_type:<20} {spot:<8}"
         )
 
-    print(f"\nBest: ${best['price']:.2f}/hr on {best['provider']} ({best['region']})")
+    click.echo(f"\nBest: ${best['price']:.2f}/hr on {best['provider']} ({best['region']})")
     monthly = best["price"] * 730
-    print(f"Estimated monthly: ${monthly:,.0f}")
+    click.echo(f"Estimated monthly: ${monthly:,.0f}")
 
     if _telemetry:
         _telemetry.log_action(
@@ -798,13 +817,13 @@ def quote(gpu_type, providers, parallel, region, quick, include_local):
         )
 
     if quick:
-        print(f"\nQuick provision: deploying {gpu_type} on {best['provider']}...")
-        print(
+        click.echo(f"\nQuick provision: deploying {gpu_type} on {best['provider']}...")
+        click.echo(
             f"   Run: terradev provision -g {gpu_type} --providers {best['provider'].lower().replace(' ', '_')} --dry-run"
         )
     else:
-        print(f"\nProvision: terradev provision -g {gpu_type}")
-        print(f"   Dry run:   terradev provision -g {gpu_type} --dry-run")
+        click.echo(f"\nProvision: terradev provision -g {gpu_type}")
+        click.echo(f"   Dry run:   terradev provision -g {gpu_type} --dry-run")
 
 
 @cli.command(cls=ProvidersCommand)
@@ -1013,20 +1032,20 @@ def setup(provider, quick):
         }
 
     if quick:
-        print(f"{info['name']} Quick Setup ({info['time']})")
-        print("=" * 50)
-        print(f"Difficulty: {info['difficulty']}")
-        print(f"URL: {info['url']}")
-        print()
-        print("Environment Variables:")
+        click.echo(f"{info['name']} Quick Setup ({info['time']})")
+        click.echo("=" * 50)
+        click.echo(f"Difficulty: {info['difficulty']}")
+        click.echo(f"URL: {info['url']}")
+        click.echo()
+        click.echo("Environment Variables:")
         for var in info["env_vars"]:
-            print(f"  {var}")
-        print()
-        print("Test Command:")
-        print(f"  terradev quote --providers {provider} --gpu a100")
-        print()
-        print("For detailed instructions, run:")
-        print(f"  terradev setup {provider}")
+            click.echo(f"  {var}")
+        click.echo()
+        click.echo("Test Command:")
+        click.echo(f"  terradev quote --providers {provider} --gpu a100")
+        click.echo()
+        click.echo("For detailed instructions, run:")
+        click.echo(f"  terradev setup {provider}")
         return
 
     # Full detailed setup
@@ -1037,18 +1056,18 @@ def setup(provider, quick):
         "ADVANCED": "****",
     }
 
-    print(
+    click.echo(
         f"{info['name']} Setup ({info['time']}) {difficulty_stars.get(info['difficulty'], '')}"
     )
-    print("=" * 60)
-    print()
+    click.echo("=" * 60)
+    click.echo()
 
     for i, step in enumerate(info["steps"], 1):
-        print(f"Step {i}: {step}")
+        click.echo(f"Step {i}: {step}")
         if i < len(info["steps"]):
-            print()
+            click.echo()
 
-    print(f"Done! Your {info['name']} is configured.")
+    click.echo(f"Done! Your {info['name']} is configured.")
 
 
 # Provider Profiles Commands
@@ -1093,25 +1112,25 @@ def load_profiles(path, override):
         if default_path.exists():
             path = str(default_path)
         else:
-            print("Error: No path specified and default file not found")
-            print(f"Expected: {default_path}")
-            print("Use --path to specify a profile file")
-            return
+            click.echo("Error: No path specified and default file not found", err=True)
+            click.echo(f"Expected: {default_path}")
+            click.echo("Use --path to specify a profile file")
+            raise SystemExit(1)
 
     try:
         load_profiles_from_file(path, override=override)
-        print(f"✓ Loaded provider profiles from: {path}")
+        click.echo(f"✓ Loaded provider profiles from: {path}")
         if override:
-            print("  (existing profiles were overridden)")
+            click.echo("  (existing profiles were overridden)")
         else:
-            print("  (existing profiles were preserved)")
+            click.echo("  (existing profiles were preserved)")
     except FileNotFoundError as e:
-        print(f"Error: {e}")
+        click.echo(f"Error: {e}", err=True)
     except ImportError as e:
-        print(f"Error: {e}")
-        print("Install PyYAML for YAML support: pip install pyyaml")
+        click.echo(f"Error: {e}", err=True)
+        click.echo("Install PyYAML for YAML support: pip install pyyaml")
     except Exception as e:  # noqa: BLE001
-        print(f"Error loading profiles: {e}")
+        click.echo(f"Error loading profiles: {e}", err=True)
 
 
 @providers.command()
@@ -1145,14 +1164,14 @@ def list_profiles(format):
                 "supports_spot": profile.supports_spot,
                 "compute_model": profile.compute_model,
             }
-        print(json.dumps(output, indent=2))
+        click.echo(json.dumps(output, indent=2))
 
     elif format == "yaml":
         try:
             import yaml
         except ImportError:
-            print("Error: PyYAML required for YAML output. Install with: pip install pyyaml")
-            return
+            click.echo("Error: PyYAML required for YAML output. Install with: pip install pyyaml", err=True)
+            raise SystemExit(1)
 
         output = {}
         for name, profile in profiles.items():
@@ -1163,15 +1182,15 @@ def list_profiles(format):
                 "supports_spot": profile.supports_spot,
                 "compute_model": profile.compute_model,
             }
-        print(yaml.dump(output, default_flow_style=False))
+        click.echo(yaml.dump(output, default_flow_style=False))
 
     else:  # table format
-        print(f"Registered Provider Profiles ({len(profiles)} total)")
-        print("=" * 80)
-        print(f"{'Name':<20} {'API Style':<10} {'Auth':<12} {'Egress':<8} {'Spot':<6} {'Model':<8}")
-        print("-" * 80)
+        click.echo(f"Registered Provider Profiles ({len(profiles)} total)")
+        click.echo("=" * 80)
+        click.echo(f"{'Name':<20} {'API Style':<10} {'Auth':<12} {'Egress':<8} {'Spot':<6} {'Model':<8}")
+        click.echo("-" * 80)
         for name, profile in sorted(profiles.items()):
-            print(
+            click.echo(
                 f"{name:<20} {profile.api_style:<10} {profile.auth_type:<12} "
                 f"${profile.egress_cost:<7.2f} {'Yes' if profile.supports_spot else 'No':<6} "
                 f"{profile.compute_model:<8}"
@@ -1213,14 +1232,14 @@ def show_profile(name, format):
             "quote_method": profile.quote_method,
             "rate_limit_per_minute": profile.rate_limit_per_minute,
         }
-        print(json.dumps(output, indent=2))
+        click.echo(json.dumps(output, indent=2))
 
     elif format == "yaml":
         try:
             import yaml
         except ImportError:
-            print("Error: PyYAML required for YAML output. Install with: pip install pyyaml")
-            return
+            click.echo("Error: PyYAML required for YAML output. Install with: pip install pyyaml", err=True)
+            raise SystemExit(1)
 
         output = {
             "name": profile.name,
@@ -1231,21 +1250,21 @@ def show_profile(name, format):
             "compute_model": profile.compute_model,
             "isolation_level": profile.isolation_level,
         }
-        print(yaml.dump(output, default_flow_style=False))
+        click.echo(yaml.dump(output, default_flow_style=False))
 
     else:  # table format
-        print(f"Provider Profile: {profile.name}")
-        print("=" * 50)
-        print(f"API Style:        {profile.api_style}")
-        print(f"Auth Type:        {profile.auth_type}")
-        print(f"Egress Cost:      ${profile.egress_cost:.2f}/GB")
-        print(f"Supports Spot:    {'Yes' if profile.supports_spot else 'No'}")
-        print(f"Compute Model:    {profile.compute_model}")
-        print(f"Isolation Level:  {profile.isolation_level}")
-        print(f"Quote Method:     {profile.quote_method}")
-        print(f"Rate Limit:       {profile.rate_limit_per_minute or 'None'} req/min")
+        click.echo(f"Provider Profile: {profile.name}")
+        click.echo("=" * 50)
+        click.echo(f"API Style:        {profile.api_style}")
+        click.echo(f"Auth Type:        {profile.auth_type}")
+        click.echo(f"Egress Cost:      ${profile.egress_cost:.2f}/GB")
+        click.echo(f"Supports Spot:    {'Yes' if profile.supports_spot else 'No'}")
+        click.echo(f"Compute Model:    {profile.compute_model}")
+        click.echo(f"Isolation Level:  {profile.isolation_level}")
+        click.echo(f"Quote Method:     {profile.quote_method}")
+        click.echo(f"Rate Limit:       {profile.rate_limit_per_minute or 'None'} req/min")
         if profile.has_fallback_routing:
-            print(f"Fallback Routing: {', '.join(profile.fallback_providers)}")
+            click.echo(f"Fallback Routing: {', '.join(profile.fallback_providers)}")
 
 
 @providers.command()
@@ -1269,9 +1288,10 @@ def remove_profile(name, force):
         click.confirm(f"Remove provider profile '{name}'?", abort=True)
 
     if unregister_profile(name):
-        print(f"✓ Removed provider profile: {name}")
+        click.echo(f"✓ Removed provider profile: {name}")
     else:
-        print(f"Profile '{name}' not found (may be a built-in profile)")
+        click.echo(f"Profile '{name}' not found (may be a built-in profile)", err=True)
+        raise SystemExit(1)
 
 
 @providers.command()
@@ -1332,8 +1352,8 @@ profiles:
     if output:
         with open(output, "w") as f:
             f.write(example_yaml)
-        print(f"✓ Exported example profiles to: {output}")
+        click.echo(f"✓ Exported example profiles to: {output}")
     else:
-        print(example_yaml)
+        click.echo(example_yaml)
 
 

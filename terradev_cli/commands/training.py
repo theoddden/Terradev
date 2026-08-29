@@ -16,6 +16,15 @@ from terradev_cli.core.training_stages import (
     FRAMEWORK_CHOICES,
 )
 
+
+def _run_with_timeout(coro, timeout=300):
+    """Run an async coroutine with a timeout to prevent hangs."""
+    try:
+        return _run_with_timeout(asyncio.wait_for(coro, timeout=timeout))
+    except asyncio.TimeoutError:
+        click.echo(f"ERROR: Training operation timed out after {timeout}s", err=True)
+        raise SystemExit(1)
+
 @cli.group()
 def train():
     """Launch distributed training jobs across provisioned GPU nodes"""
@@ -143,7 +152,7 @@ def train_start(
             provision_group, fmt
         )
         if not resolved_nodes:
-            sys.exit(1)
+            raise SystemExit(1)
 
     # ── Resolve nodes from local pool if --pool is specified ──
     if pool and not resolved_nodes:
@@ -163,39 +172,39 @@ def train_start(
                     else:
                         resolved_nodes = [host]
                     resolved_ssh_key = entry.get("key", "")
-                    print(f"Using local pool entry '{pool}': {host}")
+                    click.echo(f"Using local pool entry '{pool}': {host}")
                 else:
-                    print(f"ERROR: Pool entry '{pool}' not found in local pool")
-                    print(f"Available entries: {', '.join(pool_data.keys())}")
+                    click.echo(f"ERROR: Pool entry '{pool}' not found in local pool", err=True)
+                    click.echo(f"Available entries: {', '.join(pool_data.keys())}")
                     if overflow_to_cloud:
-                        print(
+                        click.echo(
                             "Proceeding with cloud providers (overflow-to-cloud enabled)..."
                         )
                     else:
-                        sys.exit(1)
+                        raise SystemExit(1)
             except Exception as e:  # noqa: BLE001
-                print(f"ERROR: Could not load local pool: {e}")
+                click.echo(f"ERROR: Could not load local pool: {e}", err=True)
                 if overflow_to_cloud:
-                    print(
+                    click.echo(
                         "Proceeding with cloud providers (overflow-to-cloud enabled)..."
                     )
                 else:
-                    sys.exit(1)
+                    raise SystemExit(1)
         else:
-            print("ERROR: No local pool found")
-            print("Register GPUs with: terradev local scan --register")
+            click.echo("ERROR: No local pool found", err=True)
+            click.echo("Register GPUs with: terradev local scan --register")
             if overflow_to_cloud:
-                print("Proceeding with cloud providers (overflow-to-cloud enabled)...")
+                click.echo("Proceeding with cloud providers (overflow-to-cloud enabled)...")
             else:
-                sys.exit(1)
+                raise SystemExit(1)
 
     # ── Cloud fallback if pool specified but no nodes resolved ──
     if pool and not resolved_nodes and overflow_to_cloud:
-        print(
+        click.echo(
             f"WARNING: Local pool '{pool}' unavailable, falling back to cloud providers"
         )
-        print("Run: terradev provision -g <gpu-type> -n <count>")
-        sys.exit(1)
+        click.echo("Run: terradev provision -g <gpu-type> -n <count>")
+        raise SystemExit(1)
 
     if config_path:
         config = TrainingConfig.from_yaml(config_path)
@@ -205,8 +214,8 @@ def train_start(
             config.ssh_key = resolved_ssh_key
     else:
         if not script:
-            print("ERROR: Either --config or --script is required")
-            sys.exit(1)
+            click.echo("ERROR: Either --config or --script is required", err=True)
+            raise SystemExit(1)
         config = TrainingConfig(
             script=script,
             framework=framework,
@@ -224,27 +233,27 @@ def train_start(
     result = orch.launch(config, skip_preflight=skip_preflight)
 
     if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
+        click.echo(json.dumps(result, indent=2, default=str))
     else:
         status = result.get("status", "unknown")
-        print(f"\nTraining Job: {result.get('job_id', 'N/A')}")
-        print(f"  Status: {status}")
-        print(f"  Framework: {result.get('framework')}")
-        print(f"  Backend: {result.get('backend', 'native')}")
-        print(f"  GPUs: {result.get('total_gpus', 0)}")
-        print(f"  Nodes: {result.get('nodes', [])}")
+        click.echo(f"\nTraining Job: {result.get('job_id', 'N/A')}")
+        click.echo(f"  Status: {status}")
+        click.echo(f"  Framework: {result.get('framework')}")
+        click.echo(f"  Backend: {result.get('backend', 'native')}")
+        click.echo(f"  GPUs: {result.get('total_gpus', 0)}")
+        click.echo(f"  Nodes: {result.get('nodes', [])}")
         if result.get("pid"):
-            print(f"  PID: {result['pid']}")
+            click.echo(f"  PID: {result['pid']}")
         if result.get("master_addr"):
-            print(f"  Master: {result['master_addr']}")
+            click.echo(f"  Master: {result['master_addr']}")
         fo = result.get("flashoptim", {})
         if fo.get("enabled"):
-            print(
+            click.echo(
                 f"  FlashOptim: {fo.get('optimizer_class', 'FlashAdamW')} (auto-applied  {fo.get('reason', '')})"
             )
         if status == "failed":
-            print(f"  Errors: {result.get('errors', '')}")
-        print()
+            click.echo(f"  Errors: {result.get('errors', '')}")
+        click.echo()
 @cli.command()
 @click.option("--job-id", "-j", default="", help="Job ID to monitor")
 @click.option("--nodes", "-n", multiple=True, help="Node IPs")
@@ -292,7 +301,7 @@ def monitor(
     if provision_group and not node_list:
         node_list, auto_ssh = _resolve_provision_nodes(provision_group, fmt)
         if not node_list:
-            sys.exit(1)
+            raise SystemExit(1)
         if auto_ssh and not ssh_key:
             resolved_ssh_key = auto_ssh
     if not node_list:
@@ -309,10 +318,10 @@ def monitor(
     if fmt == "json":
         if count == 1 or count == 0:
             snap = mon.snapshot(job_id)
-            print(json.dumps(snap.to_dict(), indent=2, default=str))
+            click.echo(json.dumps(snap.to_dict(), indent=2, default=str))
         else:
             snaps = mon.continuous(job_id, interval_s=interval, max_snapshots=count)
-            print(json.dumps([s.to_dict() for s in snaps], indent=2, default=str))
+            click.echo(json.dumps([s.to_dict() for s in snaps], indent=2, default=str))
     else:
         if count == 1:
             snap = mon.snapshot(job_id)
@@ -322,7 +331,7 @@ def monitor(
 @cli.command()
 @click.argument("action", type=click.Choice(["list", "restore", "promote", "delete"]))
 @click.option("--job-id", "-j", required=True, help="Job ID")
-@click.option("--step", type=int, default=None, help="Checkpoint step")
+@click.option("--step", type=click.IntRange(1, 1000000), default=None, help="Checkpoint step")
 @click.option("--checkpoint-id", default="", help="Checkpoint ID")
 @click.option("--dest", default="", help="Destination path (for promote)")
 @click.option(
@@ -348,21 +357,21 @@ def checkpoint(action, job_id, step, checkpoint_id, dest, fmt):
     if action == "list":
         ckpts = mgr.list(job_id)
         if fmt == "json":
-            print(json.dumps(ckpts, indent=2, default=str))
+            click.echo(json.dumps(ckpts, indent=2, default=str))
         else:
             if not ckpts:
-                print(f"No checkpoints for job {job_id}")
+                click.echo(f"No checkpoints for job {job_id}")
             else:
-                print(f"\nCheckpoints for {job_id}:")
+                click.echo(f"\nCheckpoints for {job_id}:")
                 for c in ckpts:
                     sid = c.get("checkpoint_id", c.get("id", "N/A"))
-                    print(
+                    click.echo(
                         f"  step={c.get('step', '?'):>8}  "
                         f"id={sid}  "
                         f"shards={c.get('shard_count', '?')}  "
                         f"size={c.get('total_size_bytes', 0) / (1024**3):.2f}GB"
                     )
-                print()
+                click.echo()
 
     elif action == "restore":
         try:
@@ -371,26 +380,26 @@ def checkpoint(action, job_id, step, checkpoint_id, dest, fmt):
             )
             result = manifest.to_dict()
             if fmt == "json":
-                print(json.dumps(result, indent=2, default=str))
+                click.echo(json.dumps(result, indent=2, default=str))
             else:
-                print(f"\nRestored: {result['checkpoint_id']} step={result['step']}")
-                print(f"  Shards: {result['shard_count']}")
-                print(f"  Size: {result['total_size_bytes'] / (1024**3):.2f}GB")
-                print()
+                click.echo(f"\nRestored: {result['checkpoint_id']} step={result['step']}")
+                click.echo(f"  Shards: {result['shard_count']}")
+                click.echo(f"  Size: {result['total_size_bytes'] / (1024**3):.2f}GB")
+                click.echo()
         except (FileNotFoundError, RuntimeError) as e:
-            print(f"ERROR: {e}")
-            sys.exit(1)
+            click.echo(f"ERROR: {e}", err=True)
+            raise SystemExit(1)
 
     elif action == "promote":
         result = mgr.promote(job_id, checkpoint_id, dest_path=dest)
-        print(f"Promoted: {result}")
+        click.echo(f"Promoted: {result}")
 
     elif action == "delete":
         if not checkpoint_id:
-            print("ERROR: --checkpoint-id required for delete")
-            sys.exit(1)
+            click.echo("ERROR: --checkpoint-id required for delete", err=True)
+            raise SystemExit(1)
         mgr.delete(job_id, checkpoint_id)
-        print(f"Deleted: {checkpoint_id}")
+        click.echo(f"Deleted: {checkpoint_id}")
 @train.command("status")
 @click.option("--job-id", "-j", default="", help="Job ID (empty = all running)")
 @click.option(
@@ -413,56 +422,56 @@ def train_status(job_id, fmt):
     if job_id:
         result = sm.job_metrics(job_id)
         if fmt == "json":
-            print(json.dumps(result, indent=2, default=str))
+            click.echo(json.dumps(result, indent=2, default=str))
         else:
             if "error" in result:
-                print(f"ERROR: {result['error']}")
-                sys.exit(1)
-            print(f"\nJob: {result['id']}")
-            print(f"  Name: {result['name']}")
-            print(f"  Status: {result['status']}")
-            print(f"  Framework: {result['framework']}")
-            print(
+                click.echo(f"ERROR: {result['error']}", err=True)
+                raise SystemExit(1)
+            click.echo(f"\nJob: {result['id']}")
+            click.echo(f"  Name: {result['name']}")
+            click.echo(f"  Status: {result['status']}")
+            click.echo(f"  Framework: {result['framework']}")
+            click.echo(
                 f"  Progress: {result.get('current_step', 0)}/{result.get('total_steps', 0)} "
                 f"({result.get('progress_pct', 0)}%)"
             )
-            print(f"  Elapsed: {result.get('elapsed_hours', 0):.1f}h")
-            print(f"  GPU-hours: {result.get('gpu_hours', 0):.1f}")
+            click.echo(f"  Elapsed: {result.get('elapsed_hours', 0):.1f}h")
+            click.echo(f"  GPU-hours: {result.get('gpu_hours', 0):.1f}")
             eta = result.get("eta_hours")
-            print(f"  ETA: {eta:.1f}h" if eta is not None else "  ETA: N/A")
-            print(f"  Cost: ${result.get('cost_usd', 0):.2f}")
-            print(
+            click.echo(f"  ETA: {eta:.1f}h" if eta is not None else "  ETA: N/A")
+            click.echo(f"  Cost: ${result.get('cost_usd', 0):.2f}")
+            click.echo(
                 f"  Efficiency: {result.get('efficiency_steps_per_gpuh', 0):.1f} steps/GPU-h"
             )
             if result.get("last_checkpoint_id"):
-                print(f"  Last checkpoint: {result['last_checkpoint_id']}")
+                click.echo(f"  Last checkpoint: {result['last_checkpoint_id']}")
             if result.get("error_message"):
-                print(f"  Error: {result['error_message']}")
-            print()
+                click.echo(f"  Error: {result['error_message']}")
+            click.echo()
     else:
         running = sm.running_jobs_summary()
         total = sm.total_cost()
         if fmt == "json":
-            print(
+            click.echo(
                 json.dumps(
                     {"running": running, "total_cost": total}, indent=2, default=str
                 )
             )
         else:
             if not running:
-                print("\nNo running training jobs.")
+                click.echo("\nNo running training jobs.")
             else:
-                print(f"\nRunning jobs ({len(running)}):")
+                click.echo(f"\nRunning jobs ({len(running)}):")
                 for j in running:
                     eta = j.get("eta_hours")
                     eta_str = f"ETA {eta:.1f}h" if eta is not None else ""
-                    print(
+                    click.echo(
                         f"  {j['id']}  {j['name']}  {j['framework']}  "
                         f"{j.get('current_step', 0)}/{j.get('total_steps', 0)}  "
                         f"{j.get('elapsed_hours', 0):.1f}h  "
                         f"${j.get('cost_usd', 0):.2f}  {eta_str}"
                     )
-            print(f"\nTotal cost across all jobs: ${total:.2f}\n")
+            click.echo(f"\nTotal cost across all jobs: ${total:.2f}\n")
 @train.command("stop")
 @click.option("--job-id", "-j", required=True, help="Job ID to stop")
 @click.option(
@@ -482,9 +491,9 @@ def train_stop(job_id, fmt):
     result = orch.stop(job_id)
 
     if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
+        click.echo(json.dumps(result, indent=2, default=str))
     else:
-        print(f"Job {job_id}: {result.get('status', 'unknown')}")
+        click.echo(f"Job {job_id}: {result.get('status', 'unknown')}")
 @train.command("resume")
 @click.option("--job-id", "-j", required=True, help="Job ID to resume")
 @click.option(
@@ -508,16 +517,16 @@ def train_resume(job_id, checkpoint_id, fmt):
     result = orch.resume(job_id, checkpoint_id=checkpoint_id or None)
 
     if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
+        click.echo(json.dumps(result, indent=2, default=str))
     else:
         status = result.get("status", "unknown")
-        print(f"\nResumed Job: {result.get('job_id', job_id)}")
-        print(f"  Status: {status}")
+        click.echo(f"\nResumed Job: {result.get('job_id', job_id)}")
+        click.echo(f"  Status: {status}")
         if result.get("pid"):
-            print(f"  PID: {result['pid']}")
+            click.echo(f"  PID: {result['pid']}")
         if status == "failed":
-            print(f"  Error: {result.get('errors', result.get('error', ''))}")
-        print()
+            click.echo(f"  Error: {result.get('errors', result.get('error', ''))}")
+        click.echo()
 @cli.group()
 def lora():
     """Production-grade LoRA adapter management with registry and cross-replica consistency.
@@ -543,7 +552,7 @@ def lora_register_cmd(name, path, base_model, rank, tenant, metadata):
     from terradev_cli.ml_services.lora_registry import get_lora_registry
 
     registry = get_lora_registry()
-    metadata_dict = json.loads(metadata) if metadata else {}
+    metadata_dict = _safe_json(metadata, "--metadata") if metadata else {}
 
     version = registry.register_adapter(
         adapter_name=name,
@@ -556,12 +565,12 @@ def lora_register_cmd(name, path, base_model, rank, tenant, metadata):
     if tenant:
         registry.map_tenant_to_adapter(tenant, name)
 
-    print(f"OK: Registered adapter '{name}' version {version.version_id}")
-    print(f"   Base model: {base_model}")
-    print(f"   Path: {path}")
-    print(f"   Rank: {rank}")
+    click.echo(f"OK: Registered adapter '{name}' version {version.version_id}")
+    click.echo(f"   Base model: {base_model}")
+    click.echo(f"   Path: {path}")
+    click.echo(f"   Rank: {rank}")
     if tenant:
-        print(f"   Tenant: {tenant}")
+        click.echo(f"   Tenant: {tenant}")
 @lora.command("versions")
 @click.option("--name", "-n", required=True, help="Adapter name")
 def lora_versions_cmd(name):
@@ -576,20 +585,20 @@ def lora_versions_cmd(name):
     versions = registry.get_adapter_versions(name)
 
     if not versions:
-        print(f"ERROR: No versions found for adapter '{name}'")
-        return
+        click.echo(f"ERROR: No versions found for adapter '{name}'", err=True)
+        raise SystemExit(1)
 
     active = registry.get_active_version(name)
 
-    print(f"Adapter: {name}")
-    print(f"Versions ({len(versions)}):")
+    click.echo(f"Adapter: {name}")
+    click.echo(f"Versions ({len(versions)}):")
     for v in versions:
         status_marker = " [ACTIVE]" if v.status.value == "active" else ""
-        print(f"  {v.version_id[:8]}...  {v.created_at.strftime('%Y-%m-%d %H:%M:%S')}  {v.status.value}{status_marker}")
-        print(f"    Path: {v.path}")
-        print(f"    Rank: {v.rank}")
+        click.echo(f"  {v.version_id[:8]}...  {v.created_at.strftime('%Y-%m-%d %H:%M:%S')}  {v.status.value}{status_marker}")
+        click.echo(f"    Path: {v.path}")
+        click.echo(f"    Rank: {v.rank}")
         if v.performance_metrics:
-            print(f"    Metrics: {v.performance_metrics}")
+            click.echo(f"    Metrics: {v.performance_metrics}")
 @lora.command("activate")
 @click.option("--name", "-n", required=True, help="Adapter name")
 @click.option("--version", "-v", required=True, help="Version ID to activate")
@@ -605,9 +614,9 @@ def lora_activate_cmd(name, version):
     success = registry.mark_version_active(name, version)
 
     if success:
-        print(f"OK: Activated version {version[:8]}... for adapter '{name}'")
+        click.echo(f"OK: Activated version {version[:8]}... for adapter '{name}'")
     else:
-        print(f"ERROR: Failed to activate version {version}")
+        click.echo(f"ERROR: Failed to activate version {version}", err=True)
 @lora.command("sync")
 @click.option("--deployment", "-d", required=True, help="Deployment name")
 @click.option("--name", "-n", required=True, help="Adapter name")
@@ -626,8 +635,8 @@ def lora_sync_cmd(deployment, name, replicas):
     active_version = registry.get_active_version(name)
 
     if not active_version:
-        print(f"ERROR: No active version found for adapter '{name}'")
-        return
+        click.echo(f"ERROR: No active version found for adapter '{name}'", err=True)
+        raise SystemExit(1)
 
     # Parse replicas
     replica_list = []
@@ -637,17 +646,17 @@ def lora_sync_cmd(deployment, name, replicas):
             replica_list.append({"replica_id": replica, "host": host, "port": int(port)})
 
     consistency_mgr = LoRAConsistencyManager(registry=registry, replicas=replica_list)
-    result = asyncio.run(consistency_mgr.sync_adapter_state(name, active_version.version_id))
+    result = _run_with_timeout(consistency_mgr.sync_adapter_state(name, active_version.version_id))
 
     if result["status"] == "success":
-        print(f"OK: Adapter '{name}' synchronized across replicas")
+        click.echo(f"OK: Adapter '{name}' synchronized across replicas")
         final = result.get("final_consistency", {})
-        print(f"   Expected replicas: {len(final.get('expected_replicas', []))}")
-        print(f"   Loaded replicas: {len(final.get('loaded_replicas', []))}")
+        click.echo(f"   Expected replicas: {len(final.get('expected_replicas', []))}")
+        click.echo(f"   Loaded replicas: {len(final.get('loaded_replicas', []))}")
     else:
-        print(f"ERROR: {result.get('error')}")
+        click.echo(f"ERROR: {result.get('error')}", err=True)
         if "load_result" in result:
-            print(f"   Load result: {result['load_result']}")
+            click.echo(f"   Load result: {result['load_result']}")
 @lora.command("list")
 @click.option(
     "--endpoint", "-e", required=True, help="vLLM endpoint (e.g. http://10.0.0.1:8000)"
@@ -668,41 +677,41 @@ def lora_list_cmd(endpoint, api_key, registry):
         stats = reg.get_registry_stats()
         adapters = reg.list_all_adapters()
 
-        print(f"Registry Statistics:")
-        print(f"  Total adapters: {stats['total_adapter_names']}")
-        print(f"  Total versions: {stats['total_versions']}")
-        print(f"  Active versions: {stats['active_versions']}")
-        print(f"  Total replicas: {stats['total_replicas']}")
-        print(f"  Total tenants: {stats['total_tenants']}")
-        print()
-        print(f"Registered adapters ({len(adapters)}):")
+        click.echo(f"Registry Statistics:")
+        click.echo(f"  Total adapters: {stats['total_adapter_names']}")
+        click.echo(f"  Total versions: {stats['total_versions']}")
+        click.echo(f"  Active versions: {stats['active_versions']}")
+        click.echo(f"  Total replicas: {stats['total_replicas']}")
+        click.echo(f"  Total tenants: {stats['total_tenants']}")
+        click.echo()
+        click.echo(f"Registered adapters ({len(adapters)}):")
         for adapter in adapters:
             active = reg.get_active_version(adapter)
             active_marker = " [ACTIVE]" if active else ""
-            print(f"  {adapter}{active_marker}")
+            click.echo(f"  {adapter}{active_marker}")
         return
 
     from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
 
     host, port = _parse_vllm_endpoint(endpoint)
     svc = VLLMService(VLLMConfig(model_name="", host=host, port=port, api_key=api_key))
-    result = asyncio.run(svc.lora_list())
+    result = _run_with_timeout(svc.lora_list())
 
     if result["status"] != "success":
-        print(f"ERROR: {result.get('error')}")
-        return
+        click.echo(f"ERROR: {result.get('error')}", err=True)
+        raise SystemExit(1)
 
     base = result.get("base_models", [])
     adapters = result.get("lora_adapters", [])
-    print(f"Base models ({len(base)}):")
+    click.echo(f"Base models ({len(base)}):")
     for m in base:
-        print(f"  {m.get('id', '?')}")
-    print(f"LoRA adapters ({len(adapters)}):")
+        click.echo(f"  {m.get('id', '?')}")
+    click.echo(f"LoRA adapters ({len(adapters)}):")
     if adapters:
         for a in adapters:
-            print(f"  {a.get('id', '?')}  (parent: {a.get('parent', '-')})")
+            click.echo(f"  {a.get('id', '?')}  (parent: {a.get('parent', '-')})")
     else:
-        print("  (none)")
+        click.echo("  (none)")
 @lora.command("add")
 @click.option("--endpoint", "-e", required=True, help="vLLM endpoint")
 @click.option(
@@ -731,8 +740,8 @@ def lora_add_cmd(endpoint, name, path, api_key, register, base_model, rank):
     version_id = None
     if register:
         if not base_model:
-            print("ERROR: --base-model required when using --register")
-            return
+            click.echo("ERROR: --base-model required when using --register", err=True)
+            raise SystemExit(1)
         from terradev_cli.ml_services.lora_registry import get_lora_registry
         
         registry = get_lora_registry()
@@ -743,15 +752,15 @@ def lora_add_cmd(endpoint, name, path, api_key, register, base_model, rank):
             rank=rank,
         )
         version_id = version.version_id
-        print(f"Registered adapter '{name}' as version {version_id[:8]}...")
+        click.echo(f"Registered adapter '{name}' as version {version_id[:8]}...")
 
     svc = VLLMService(VLLMConfig(model_name="", host=host, port=port, api_key=api_key))
-    result = asyncio.run(svc.lora_load(LoRAModule(name=name, path=path), version_id=version_id))
+    result = _run_with_timeout(svc.lora_load(LoRAModule(name=name, path=path), version_id=version_id))
 
     if result["status"] == "loaded":
-        print(f'OK: Adapter \'{name}\' loaded  use "model": "{name}" in requests')
+        click.echo(f'OK: Adapter \'{name}\' loaded  use "model": "{name}" in requests')
     else:
-        print(f"ERROR: {result.get('error')}")
+        click.echo(f"ERROR: {result.get('error')}", err=True)
 @lora.command("remove")
 @click.option("--endpoint", "-e", required=True, help="vLLM endpoint")
 @click.option("--name", "-n", required=True, help="Adapter name to unload")
@@ -766,12 +775,12 @@ def lora_remove_cmd(endpoint, name, api_key):
 
     host, port = _parse_vllm_endpoint(endpoint)
     svc = VLLMService(VLLMConfig(model_name="", host=host, port=port, api_key=api_key))
-    result = asyncio.run(svc.lora_unload(name))
+    result = _run_with_timeout(svc.lora_unload(name))
 
     if result["status"] == "unloaded":
-        print(f"OK: Adapter '{name}' unloaded")
+        click.echo(f"OK: Adapter '{name}' unloaded")
     else:
-        print(f"ERROR: {result.get('error')}")
+        click.echo(f"ERROR: {result.get('error')}", err=True)
 @lora.command("rollback")
 @click.option("--name", "-n", required=True, help="Adapter name to rollback")
 @click.option("--to-version", "-v", help="Target version ID (default: previous stable)")
@@ -802,7 +811,7 @@ def lora_rollback_cmd(name, to_version, replicas):
             registry=registry, replicas=replica_list
         )
 
-    result = asyncio.run(
+    result = _run_with_timeout(
         versioning_mgr.rollback_adapter(
             adapter_name=name,
             target_version_id=to_version,
@@ -811,16 +820,16 @@ def lora_rollback_cmd(name, to_version, replicas):
     )
 
     if result.success:
-        print(f"OK: Rolled back adapter '{name}'")
-        print(f"   From version: {result.from_version_id[:8] if result.from_version_id else 'none'}")
-        print(f"   To version: {result.to_version_id[:8]}")
-        print(f"   Replicas affected: {result.replicas_affected}")
+        click.echo(f"OK: Rolled back adapter '{name}'")
+        click.echo(f"   From version: {result.from_version_id[:8] if result.from_version_id else 'none'}")
+        click.echo(f"   To version: {result.to_version_id[:8]}")
+        click.echo(f"   Replicas affected: {result.replicas_affected}")
     else:
-        print(f"ERROR: {result.error}")
+        click.echo(f"ERROR: {result.error}", err=True)
 @lora.command("drift-check")
 @click.option("--name", "-n", required=True, help="Adapter name to check")
 @click.option("--version", "-v", help="Specific version to check (default: active)")
-@click.option("--threshold", "-t", type=float, default=0.1, help="Drift threshold (default: 0.1)")
+@click.option("--threshold", "-t", type=click.FloatRange(0.0, 10000.0), default=0.1, help="Drift threshold (default: 0.1)")
 @click.option("--source", default="phoenix-traces", help="Data source for drift detection")
 def lora_drift_check_cmd(name, version, threshold, source):
     """Check for performance drift in an adapter.
@@ -836,7 +845,7 @@ def lora_drift_check_cmd(name, version, threshold, source):
     registry = get_lora_registry()
     versioning_mgr = LoRAVersioningManager(registry=registry)
 
-    result = asyncio.run(
+    result = _run_with_timeout(
         versioning_mgr.detect_drift(
             adapter_name=name,
             version_id=version,
@@ -845,23 +854,23 @@ def lora_drift_check_cmd(name, version, threshold, source):
         )
     )
 
-    print(f"Adapter: {name}")
-    print(f"Version: {result.version_id[:8]}")
-    print(f"Baseline score: {result.baseline_score:.4f}")
-    print(f"Current score: {result.current_score:.4f}")
-    print(f"Drift magnitude: {result.drift_magnitude:.2%}")
-    print(f"Threshold: {result.drift_threshold}")
-    print(f"Has drift: {result.has_drift}")
-    print(f"Recommended action: {result.recommended_action}")
+    click.echo(f"Adapter: {name}")
+    click.echo(f"Version: {result.version_id[:8]}")
+    click.echo(f"Baseline score: {result.baseline_score:.4f}")
+    click.echo(f"Current score: {result.current_score:.4f}")
+    click.echo(f"Drift magnitude: {result.drift_magnitude:.2%}")
+    click.echo(f"Threshold: {result.drift_threshold}")
+    click.echo(f"Has drift: {result.has_drift}")
+    click.echo(f"Recommended action: {result.recommended_action}")
 
     if result.has_drift:
-        print(f"\nWARNING: Performance drift detected!")
+        click.echo(f"\nWARNING: Performance drift detected!")
         if result.recommended_action == "rollback":
-            print("Consider running: terradev lora rollback -n {name}")
+            click.echo("Consider running: terradev lora rollback -n {name}")
         elif result.recommended_action == "retrain":
-            print("Consider triggering retraining via drift service")
+            click.echo("Consider triggering retraining via drift service")
 @lora.command("cost-report")
-@click.option("--days", "-d", type=int, default=30, help="Number of days to report (default: 30)")
+@click.option("--days", "-d", type=click.IntRange(1, 1000000), default=30, help="Number of days to report (default: 30)")
 @click.option("--adapter", "-a", help="Specific adapter to report on")
 @click.option("--tenant", "-t", help="Specific tenant to report on")
 def lora_cost_report_cmd(days, adapter, tenant):
@@ -880,44 +889,44 @@ def lora_cost_report_cmd(days, adapter, tenant):
 
     if adapter:
         # Get adapter-specific breakdown
-        breakdown = asyncio.run(cost_service.get_cost_breakdown(adapter, days))
-        print(f"Cost Breakdown: {adapter}")
-        print(f"  Window: {days} days")
-        print(f"  Total requests: {breakdown['total_requests']}")
-        print(f"  GPU cost: ${breakdown['gpu_cost_usd']}")
-        print(f"  Token cost: ${breakdown['token_cost_usd']}")
-        print(f"  Total cost: ${breakdown['total_cost_usd']}")
-        print(f"\n  Cost by replica:")
+        breakdown = _run_with_timeout(cost_service.get_cost_breakdown(adapter, days))
+        click.echo(f"Cost Breakdown: {adapter}")
+        click.echo(f"  Window: {days} days")
+        click.echo(f"  Total requests: {breakdown['total_requests']}")
+        click.echo(f"  GPU cost: ${breakdown['gpu_cost_usd']}")
+        click.echo(f"  Token cost: ${breakdown['token_cost_usd']}")
+        click.echo(f"  Total cost: ${breakdown['total_cost_usd']}")
+        click.echo(f"\n  Cost by replica:")
         for replica in breakdown['cost_by_replica']:
-            print(f"    {replica['replica_id']}: ${replica['cost_usd']}")
+            click.echo(f"    {replica['replica_id']}: ${replica['cost_usd']}")
     elif tenant:
         # Get tenant-specific cost
-        tenant_record = asyncio.run(cost_service.get_tenant_cost(tenant))
+        tenant_record = _run_with_timeout(cost_service.get_tenant_cost(tenant))
         if tenant_record:
-            print(f"Cost Report: Tenant {tenant}")
-            print(f"  Adapters: {len(tenant_record.adapters)}")
-            print(f"  GPU hours: {tenant_record.gpu_hours:.2f}")
-            print(f"  Tokens processed: {tenant_record.tokens_processed:,}")
-            print(f"  Requests served: {tenant_record.requests_served:,}")
-            print(f"  Storage: {tenant_record.storage_gb:.2f} GB")
-            print(f"  Total cost: ${tenant_record.total_cost_usd:.2f}")
-            print(f"  Last updated: {tenant_record.last_updated}")
+            click.echo(f"Cost Report: Tenant {tenant}")
+            click.echo(f"  Adapters: {len(tenant_record.adapters)}")
+            click.echo(f"  GPU hours: {tenant_record.gpu_hours:.2f}")
+            click.echo(f"  Tokens processed: {tenant_record.tokens_processed:,}")
+            click.echo(f"  Requests served: {tenant_record.requests_served:,}")
+            click.echo(f"  Storage: {tenant_record.storage_gb:.2f} GB")
+            click.echo(f"  Total cost: ${tenant_record.total_cost_usd:.2f}")
+            click.echo(f"  Last updated: {tenant_record.last_updated}")
         else:
-            print(f"ERROR: No cost data found for tenant '{tenant}'")
+            click.echo(f"ERROR: No cost data found for tenant '{tenant}'", err=True)
     else:
         # Get overall summary
-        summary = asyncio.run(cost_service.get_cost_summary(days))
-        print(f"Cost Summary: Last {days} days")
-        print(f"  Total GPU hours: {summary['total_gpu_hours']}")
-        print(f"  Total tokens: {summary['total_tokens']:,}")
-        print(f"  Total requests: {summary['total_requests']:,}")
-        print(f"  Total cost: ${summary['total_cost_usd']}")
-        print(f"\n  Top adapters by cost:")
+        summary = _run_with_timeout(cost_service.get_cost_summary(days))
+        click.echo(f"Cost Summary: Last {days} days")
+        click.echo(f"  Total GPU hours: {summary['total_gpu_hours']}")
+        click.echo(f"  Total tokens: {summary['total_tokens']:,}")
+        click.echo(f"  Total requests: {summary['total_requests']:,}")
+        click.echo(f"  Total cost: ${summary['total_cost_usd']}")
+        click.echo(f"\n  Top adapters by cost:")
         for adapter in summary['top_adapters']:
-            print(f"    {adapter['name']}: ${adapter['cost_usd']}")
-        print(f"\n  Top tenants by cost:")
+            click.echo(f"    {adapter['name']}: ${adapter['cost_usd']}")
+        click.echo(f"\n  Top tenants by cost:")
         for tenant in summary['top_tenants']:
-            print(f"    {tenant['tenant_id']}: ${tenant['cost_usd']}")
+            click.echo(f"    {tenant['tenant_id']}: ${tenant['cost_usd']}")
 @lora.group()
 def lorax():
     """LoRAX (LoRA eXchange) multi-LoRA inference server from Predibase.
@@ -931,8 +940,8 @@ def lorax():
 @click.option("--host", default="localhost", help="LoRAX server host")
 @click.option("--port", "-p", default=8080, help="LoRAX server port")
 @click.option("--quantization", type=click.Choice(["none", "bitsandbytes", "gptq", "awq"]), default="none", help="Quantization method")
-@click.option("--gpu-memory-fraction", type=float, default=0.9, help="GPU memory fraction to use")
-@click.option("--max-loras", type=int, default=8, help="Maximum number of adapters to load")
+@click.option("--gpu-memory-fraction", type=click.FloatRange(0.0, 10000.0), default=0.9, help="GPU memory fraction to use")
+@click.option("--max-loras", type=click.IntRange(1, 1000000), default=8, help="Maximum number of adapters to load")
 @click.option("--docker", is_flag=True, help="Deploy using Docker")
 @click.option("--k8s", is_flag=True, help="Deploy using Kubernetes")
 @click.option("--namespace", default="default", help="Kubernetes namespace (for --k8s)")
@@ -944,32 +953,32 @@ def lorax_deploy_cmd(model_id, host, port, quantization, gpu_memory_fraction, ma
         terradev lora lorax deploy -m meta-llama/Llama-2-7b-hf --k8s --namespace lorax
     """
     if docker:
-        print(f"Deploying LoRAX with Docker...")
-        print(f"  Model: {model_id}")
-        print(f"  Port: {port}")
-        print(f"  Quantization: {quantization}")
-        print(f"\nDocker command:")
-        print(f"  docker run --gpus all --shm-size 1g -p {port}:80 \\")
-        print(f"    -v $PWD/data:/data \\")
-        print(f"    ghcr.io/predibase/lorax:main \\")
-        print(f"    --model-id {model_id} \\")
-        print(f"    --max-loras {max_loras}")
+        click.echo(f"Deploying LoRAX with Docker...")
+        click.echo(f"  Model: {model_id}")
+        click.echo(f"  Port: {port}")
+        click.echo(f"  Quantization: {quantization}")
+        click.echo(f"\nDocker command:")
+        click.echo(f"  docker run --gpus all --shm-size 1g -p {port}:80 \\")
+        click.echo(f"    -v $PWD/data:/data \\")
+        click.echo(f"    ghcr.io/predibase/lorax:main \\")
+        click.echo(f"    --model-id {model_id} \\")
+        click.echo(f"    --max-loras {max_loras}")
         if quantization != "none":
-            print(f"    --quantize {quantization}")
+            click.echo(f"    --quantize {quantization}")
     elif k8s:
-        print(f"Deploying LoRAX to Kubernetes...")
-        print(f"  Namespace: {namespace}")
-        print(f"  Model: {model_id}")
-        print(f"\nHelm command:")
-        print(f"  helm install lorax ./clusters/lorax-template/helm \\")
-        print(f"    -f clusters/lorax-template/helm/values-lorax.yaml \\")
-        print(f"    --set model.id={model_id} \\")
-        print(f"    --set service.port={port} \\")
-        print(f"    --set maxLoras={max_loras}")
-        print(f"\nNote: Create the lorax-template cluster first with:")
-        print(f"  terradev cluster create lorax-template")
+        click.echo(f"Deploying LoRAX to Kubernetes...")
+        click.echo(f"  Namespace: {namespace}")
+        click.echo(f"  Model: {model_id}")
+        click.echo(f"\nHelm command:")
+        click.echo(f"  helm install lorax ./clusters/lorax-template/helm \\")
+        click.echo(f"    -f clusters/lorax-template/helm/values-lorax.yaml \\")
+        click.echo(f"    --set model.id={model_id} \\")
+        click.echo(f"    --set service.port={port} \\")
+        click.echo(f"    --set maxLoras={max_loras}")
+        click.echo(f"\nNote: Create the lorax-template cluster first with:")
+        click.echo(f"  terradev cluster create lorax-template")
     else:
-        print(f"ERROR: Specify --docker or --k8s for deployment")
+        click.echo(f"ERROR: Specify --docker or --k8s for deployment", err=True)
 @lorax.command("test")
 @click.option("--host", default="localhost", help="LoRAX server host")
 @click.option("--port", "-p", default=8080, help="LoRAX server port")
@@ -984,21 +993,21 @@ def lorax_test_cmd(host, port):
     from terradev_cli.ml_services.lorax_service import get_lorax_service
 
     svc = get_lorax_service(host=host, port=port)
-    result = asyncio.run(svc.health_check())
+    result = _run_with_timeout(svc.health_check())
 
     if result["status"] == "healthy":
-        print(f"OK: LoRAX server is healthy at {host}:{port}")
-        model_info = asyncio.run(svc.get_model_info())
+        click.echo(f"OK: LoRAX server is healthy at {host}:{port}")
+        model_info = _run_with_timeout(svc.get_model_info())
         if "error" not in model_info:
-            print(f"   Model: {model_info.get('model_id', 'unknown')}")
-            print(f"   Architecture: {model_info.get('architecture', 'unknown')}")
+            click.echo(f"   Model: {model_info.get('model_id', 'unknown')}")
+            click.echo(f"   Architecture: {model_info.get('architecture', 'unknown')}")
     else:
-        print(f"ERROR: LoRAX server health check failed")
-        print(f"   Status: {result.get('status')}")
+        click.echo(f"ERROR: LoRAX server health check failed", err=True)
+        click.echo(f"   Status: {result.get('status')}")
         if "error" in result:
-            print(f"   Error: {result['error']}")
+            click.echo(f"   Error: {result['error']}")
 
-    asyncio.run(svc.close())
+    _run_with_timeout(svc.close())
 @lorax.command("list-adapters")
 @click.option("--host", default="localhost", help="LoRAX server host")
 @click.option("--port", "-p", default=8080, help="LoRAX server port")
@@ -1012,22 +1021,22 @@ def lorax_list_adapters_cmd(host, port):
     from terradev_cli.ml_services.lorax_service import get_lorax_service
 
     svc = get_lorax_service(host=host, port=port)
-    adapters = asyncio.run(svc.list_loaded_adapters())
+    adapters = _run_with_timeout(svc.list_loaded_adapters())
 
-    print(f"Loaded adapters on {host}:{port}:")
+    click.echo(f"Loaded adapters on {host}:{port}:")
     if adapters:
         for adapter in adapters:
-            print(f"  {adapter.adapter_id}")
+            click.echo(f"  {adapter.adapter_id}")
             if adapter.adapter_name:
-                print(f"    Name: {adapter.adapter_name}")
+                click.echo(f"    Name: {adapter.adapter_name}")
             if adapter.base_model:
-                print(f"    Base model: {adapter.base_model}")
+                click.echo(f"    Base model: {adapter.base_model}")
             if adapter.rank:
-                print(f"    Rank: {adapter.rank}")
+                click.echo(f"    Rank: {adapter.rank}")
     else:
-        print("  (no adapters loaded)")
+        click.echo("  (no adapters loaded)")
 
-    asyncio.run(svc.close())
+    _run_with_timeout(svc.close())
 @lorax.command("load-adapter")
 @click.option("--adapter-id", "-a", required=True, help="Adapter ID (HuggingFace repo or local path)")
 @click.option("--adapter-name", help="Custom name for the adapter")
@@ -1044,20 +1053,20 @@ def lorax_load_adapter_cmd(adapter_id, adapter_name, host, port):
     from terradev_cli.ml_services.lorax_service import get_lorax_service
 
     svc = get_lorax_service(host=host, port=port)
-    result = asyncio.run(svc.load_adapter(adapter_id, adapter_name))
+    result = _run_with_timeout(svc.load_adapter(adapter_id, adapter_name))
 
     if result["status"] == "loaded":
-        print(f"OK: Adapter '{adapter_id}' loaded")
+        click.echo(f"OK: Adapter '{adapter_id}' loaded")
         if adapter_name:
-            print(f"   Name: {adapter_name}")
+            click.echo(f"   Name: {adapter_name}")
     else:
-        print(f"ERROR: Failed to load adapter '{adapter_id}'")
+        click.echo(f"ERROR: Failed to load adapter '{adapter_id}'", err=True)
         if "error" in result:
-            print(f"   Error: {result['error']}")
+            click.echo(f"   Error: {result['error']}")
         if "response" in result:
-            print(f"   Response: {result['response']}")
+            click.echo(f"   Response: {result['response']}")
 
-    asyncio.run(svc.close())
+    _run_with_timeout(svc.close())
 @lorax.command("unload-adapter")
 @click.option("--adapter-id", "-a", required=True, help="Adapter ID to unload")
 @click.option("--host", default="localhost", help="LoRAX server host")
@@ -1072,18 +1081,18 @@ def lorax_unload_adapter_cmd(adapter_id, host, port):
     from terradev_cli.ml_services.lorax_service import get_lorax_service
 
     svc = get_lorax_service(host=host, port=port)
-    result = asyncio.run(svc.unload_adapter(adapter_id))
+    result = _run_with_timeout(svc.unload_adapter(adapter_id))
 
     if result["status"] == "unloaded":
-        print(f"OK: Adapter '{adapter_id}' unloaded")
+        click.echo(f"OK: Adapter '{adapter_id}' unloaded")
     else:
-        print(f"ERROR: Failed to unload adapter '{adapter_id}'")
+        click.echo(f"ERROR: Failed to unload adapter '{adapter_id}'", err=True)
         if "error" in result:
-            print(f"   Error: {result['error']}")
+            click.echo(f"   Error: {result['error']}")
         if "response" in result:
-            print(f"   Response: {result['response']}")
+            click.echo(f"   Response: {result['response']}")
 
-    asyncio.run(svc.close())
+    _run_with_timeout(svc.close())
 @lorax.command("sync-registry")
 @click.option("--host", default="localhost", help="LoRAX server host")
 @click.option("--port", "-p", default=8080, help="LoRAX server port")
@@ -1108,29 +1117,29 @@ def lorax_sync_registry_cmd(host, port, adapter):
 
     # Get LoRAX state
     svc = get_lorax_service(host=host, port=port)
-    lorax_adapters = asyncio.run(svc.list_loaded_adapters())
+    lorax_adapters = _run_with_timeout(svc.list_loaded_adapters())
     lorax_ids = {a.adapter_id for a in lorax_adapters}
 
-    print(f"Syncing registry with LoRAX at {host}:{port}")
-    print(f"  Registry adapters: {len(adapters)}")
-    print(f"  LoRAX loaded: {len(lorax_adapters)}")
+    click.echo(f"Syncing registry with LoRAX at {host}:{port}")
+    click.echo(f"  Registry adapters: {len(adapters)}")
+    click.echo(f"  LoRAX loaded: {len(lorax_adapters)}")
 
     for adapter_name in adapters:
         active_version = registry.get_active_version(adapter_name)
         if active_version:
             if active_version.path not in lorax_ids:
-                print(f"  [MISSING] {adapter_name} (version {active_version.version_id[:8]})")
-                print(f"    Path: {active_version.path}")
-                print(f"    To load: terradev lora lorax load-adapter -a {active_version.path}")
+                click.echo(f"  [MISSING] {adapter_name} (version {active_version.version_id[:8]})")
+                click.echo(f"    Path: {active_version.path}")
+                click.echo(f"    To load: terradev lora lorax load-adapter -a {active_version.path}")
             else:
-                print(f"  [SYNCED] {adapter_name}")
+                click.echo(f"  [SYNCED] {adapter_name}")
 
-    asyncio.run(svc.close())
+    _run_with_timeout(svc.close())
 @lorax.command("generate")
 @click.option("--prompt", "-p", required=True, help="Input prompt")
 @click.option("--adapter-id", "-a", help="Adapter ID to use")
-@click.option("--max-tokens", type=int, default=64, help="Max tokens to generate")
-@click.option("--temperature", type=float, default=0.7, help="Sampling temperature")
+@click.option("--max-tokens", type=click.IntRange(1, 1000000), default=64, help="Max tokens to generate")
+@click.option("--temperature", type=click.FloatRange(0.0, 10000.0), default=0.7, help="Sampling temperature")
 @click.option("--host", default="localhost", help="LoRAX server host")
 @click.option("--port", default=8080, help="LoRAX server port")
 def lorax_generate_cmd(prompt, adapter_id, max_tokens, temperature, host, port):
@@ -1144,22 +1153,22 @@ def lorax_generate_cmd(prompt, adapter_id, max_tokens, temperature, host, port):
     from terradev_cli.ml_services.lorax_service import get_lorax_service
 
     svc = get_lorax_service(host=host, port=port)
-    response = asyncio.run(svc.generate(
+    response = _run_with_timeout(svc.generate(
         prompt=prompt,
         adapter_id=adapter_id,
         max_new_tokens=max_tokens,
         temperature=temperature
     ))
 
-    print(f"Prompt: {prompt}")
+    click.echo(f"Prompt: {prompt}")
     if adapter_id:
-        print(f"Adapter: {adapter_id}")
-    print(f"Generated: {response.generated_text}")
+        click.echo(f"Adapter: {adapter_id}")
+    click.echo(f"Generated: {response.generated_text}")
     if response.finish_reason:
-        print(f"Finish reason: {response.finish_reason}")
-    print(f"Tokens: {response.tokens_generated}")
+        click.echo(f"Finish reason: {response.finish_reason}")
+    click.echo(f"Tokens: {response.tokens_generated}")
 
-    asyncio.run(svc.close())
+    _run_with_timeout(svc.close())
 @lora.group()
 def peft():
     """HuggingFace PEFT adapter import and management.
@@ -1174,7 +1183,7 @@ def peft():
 @click.option("--token", help="HuggingFace auth token (for private repos)")
 @click.option("--register", is_flag=True, help="Register imported adapter in Terradev registry")
 @click.option("--base-model", "-b", help="Base model (required with --register)")
-@click.option("--rank", type=int, help="LoRA rank (auto-detected if not specified)")
+@click.option("--rank", type=click.IntRange(1, 1000000), help="LoRA rank (auto-detected if not specified)")
 def peft_import_cmd(adapter_id, local_name, token, register, base_model, rank):
     """Import a LoRA adapter from HuggingFace.
 
@@ -1186,7 +1195,7 @@ def peft_import_cmd(adapter_id, local_name, token, register, base_model, rank):
 
     svc = get_peft_import_service()
 
-    print(f"Importing adapter from HuggingFace: {adapter_id}")
+    click.echo(f"Importing adapter from HuggingFace: {adapter_id}")
 
     try:
         config = svc.download_adapter(
@@ -1195,18 +1204,18 @@ def peft_import_cmd(adapter_id, local_name, token, register, base_model, rank):
             token=token
         )
 
-        print(f"OK: Adapter imported successfully")
-        print(f"  Local path: {config.local_path}")
-        print(f"  Base model: {config.base_model or 'unknown'}")
-        print(f"  Rank: {config.rank or 'unknown'}")
-        print(f"  Alpha: {config.alpha or 'unknown'}")
-        print(f"  PEFT type: {config.peft_type}")
+        click.echo(f"OK: Adapter imported successfully")
+        click.echo(f"  Local path: {config.local_path}")
+        click.echo(f"  Base model: {config.base_model or 'unknown'}")
+        click.echo(f"  Rank: {config.rank or 'unknown'}")
+        click.echo(f"  Alpha: {config.alpha or 'unknown'}")
+        click.echo(f"  PEFT type: {config.peft_type}")
 
         # Register if requested
         if register:
             if not base_model:
-                print(f"ERROR: --base-model required when using --register")
-                return
+                click.echo(f"ERROR: --base-model required when using --register", err=True)
+                raise SystemExit(1)
 
             from terradev_cli.ml_services.lora_registry import get_lorax_registry
             registry = get_lorax_registry()
@@ -1218,12 +1227,12 @@ def peft_import_cmd(adapter_id, local_name, token, register, base_model, rank):
                 rank=rank or config.rank or 64,
             )
 
-            print(f"\nRegistered in Terradev registry:")
-            print(f"  Version ID: {version.version_id}")
-            print(f"  Adapter name: {version.adapter_name}")
+            click.echo(f"\nRegistered in Terradev registry:")
+            click.echo(f"  Version ID: {version.version_id}")
+            click.echo(f"  Adapter name: {version.adapter_name}")
 
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Failed to import adapter: {e}")
+        click.echo(f"ERROR: Failed to import adapter: {e}", err=True)
 @peft.command("list")
 def peft_list_cmd():
     """List all locally imported PEFT adapters.
@@ -1236,20 +1245,20 @@ def peft_list_cmd():
     svc = get_peft_import_service()
     adapters = svc.list_local_adapters()
 
-    print(f"Local PEFT adapters ({len(adapters)}):")
+    click.echo(f"Local PEFT adapters ({len(adapters)}):")
     if adapters:
         for adapter in adapters:
-            print(f"  {adapter.adapter_id}")
-            print(f"    Path: {adapter.local_path}")
+            click.echo(f"  {adapter.adapter_id}")
+            click.echo(f"    Path: {adapter.local_path}")
             if adapter.base_model:
-                print(f"    Base model: {adapter.base_model}")
+                click.echo(f"    Base model: {adapter.base_model}")
             if adapter.rank:
-                print(f"    Rank: {adapter.rank}")
+                click.echo(f"    Rank: {adapter.rank}")
             if adapter.alpha:
-                print(f"    Alpha: {adapter.alpha}")
-            print(f"    PEFT type: {adapter.peft_type}")
+                click.echo(f"    Alpha: {adapter.alpha}")
+            click.echo(f"    PEFT type: {adapter.peft_type}")
     else:
-        print("  (no adapters imported)")
+        click.echo("  (no adapters imported)")
 @peft.command("validate")
 @click.option("--path", "-p", required=True, help="Path to adapter directory")
 def peft_validate_cmd(path):
@@ -1264,15 +1273,15 @@ def peft_validate_cmd(path):
     result = svc.validate_adapter(Path(path))
 
     if result["valid"]:
-        print(f"OK: Adapter is valid")
+        click.echo(f"OK: Adapter is valid")
     else:
-        print(f"ERROR: Adapter validation failed")
-        print(f"  Missing files: {', '.join(result['missing_files'])}")
+        click.echo(f"ERROR: Adapter validation failed", err=True)
+        click.echo(f"  Missing files: {', '.join(result['missing_files'])}")
 
     if result["warnings"]:
-        print(f"\nWarnings:")
+        click.echo(f"\nWarnings:")
         for warning in result["warnings"]:
-            print(f"  - {warning}")
+            click.echo(f"  - {warning}")
 @peft.command("delete")
 @click.option("--adapter-id", "-a", required=True, help="Adapter ID to delete")
 def peft_delete_cmd(adapter_id):
@@ -1285,9 +1294,9 @@ def peft_delete_cmd(adapter_id):
 
     svc = get_peft_import_service()
     if svc.delete_adapter(adapter_id):
-        print(f"OK: Deleted adapter '{adapter_id}'")
+        click.echo(f"OK: Deleted adapter '{adapter_id}'")
     else:
-        print(f"ERROR: Adapter '{adapter_id}' not found locally")
+        click.echo(f"ERROR: Adapter '{adapter_id}' not found locally", err=True)
 @cli.group()
 def retrain():
     """Drift-triggered continuous fine-tuning.
@@ -1317,7 +1326,7 @@ def retrain():
 @click.option(
     "--eval-threshold",
     default=0.85,
-    type=float,
+    type=click.FloatRange(0.0, 10000.0),
     help="Minimum eval score to deploy (0.0-1.0)",
 )
 @click.option(
@@ -1342,10 +1351,10 @@ def retrain():
     "--vllm-endpoint", "-e", default="", help="vLLM endpoint for eval and deploy"
 )
 @click.option("--vllm-api-key", default=None, help="vLLM API key")
-@click.option("--baseline", default=0.90, type=float, help="Baseline quality score")
-@click.option("--threshold", default=0.85, type=float, help="Drift trigger threshold")
+@click.option("--baseline", default=0.90, type=click.FloatRange(0.0, 10000.0), help="Baseline quality score")
+@click.option("--threshold", default=0.85, type=click.FloatRange(0.0, 10000.0), help="Drift trigger threshold")
 @click.option(
-    "--min-samples", default=50, type=int, help="Min samples before triggering"
+    "--min-samples", default=50, type=click.IntRange(1, 1000000), help="Min samples before triggering"
 )
 @click.option(
     "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
@@ -1398,15 +1407,15 @@ def retrain_drift(
 
     svc = DriftRetrainService(config)
 
-    print(f"\n{'='*60}")
-    print(f"  Drift-Triggered Retrain: {model}")
-    print(f"  Cycle ID: {config.cycle_id}")
-    print(f"{'='*60}\n")
+    click.echo(f"\n{'='*60}")
+    click.echo(f"  Drift-Triggered Retrain: {model}")
+    click.echo(f"  Cycle ID: {config.cycle_id}")
+    click.echo(f"{'='*60}\n")
 
     result = asyncio.get_event_loop().run_until_complete(svc.run_full_cycle())
 
     if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
+        click.echo(json.dumps(result, indent=2, default=str))
     else:
         outcome = result.get("outcome", "unknown")
         stages = result.get("stages", {})
@@ -1415,19 +1424,19 @@ def retrain_drift(
         drift = stages.get("drift_detection", {})
         if drift:
             icon = "\u26a0\ufe0f" if drift.get("drifted") else "\u2705"
-            print(
+            click.echo(
                 f"  {icon} Drift Detection: score={drift.get('score', '?')} "
                 f"(threshold={drift.get('threshold', '?')}, samples={drift.get('samples', 0)})"
             )
 
         if outcome == "no_drift":
-            print("\n  \u2705 No drift detected  model is healthy\n")
+            click.echo("\n  \u2705 No drift detected  model is healthy\n")
             return
 
         # Data
         data = stages.get("data_extraction", {})
         if data:
-            print(
+            click.echo(
                 f"  \U0001f4ca Data: {data.get('train_count', 0)} train / "
                 f"{data.get('holdout_count', 0)} holdout samples"
             )
@@ -1435,7 +1444,7 @@ def retrain_drift(
         # Training
         train = stages.get("training", {})
         if train:
-            print(
+            click.echo(
                 f"  \U0001f3cb Training: job_id={train.get('job_id', '?')} "
                 f"status={train.get('status', '?')}"
             )
@@ -1444,7 +1453,7 @@ def retrain_drift(
         ev = stages.get("evaluation", {})
         if ev:
             icon = "\u2705" if ev.get("passed") else "\u274c"
-            print(
+            click.echo(
                 f"  {icon} Eval: score={ev.get('score', '?')} "
                 f"(threshold={ev.get('threshold', '?')}, metric={ev.get('metric', '?')})"
             )
@@ -1454,23 +1463,23 @@ def retrain_drift(
         if dep:
             status = dep.get("status", "?")
             if status == "deployed":
-                print(
+                click.echo(
                     f"  \U0001f680 Deployed: adapter={dep.get('adapter_name')} "
                     f"on {dep.get('endpoint')}"
                 )
             elif status == "awaiting_approval":
-                print(
+                click.echo(
                     f"  \u23f3 Awaiting approval  run: terradev retrain deploy "
                     f"--cycle-id {config.cycle_id}"
                 )
             else:
-                print(f"  \u274c Deploy: {dep.get('error', status)}")
+                click.echo(f"  \u274c Deploy: {dep.get('error', status)}")
 
         # Summary
-        print(f"\n  Outcome: {outcome}")
+        click.echo(f"\n  Outcome: {outcome}")
         if result.get("manifest_path"):
-            print(f"  Manifest: {result['manifest_path']}")
-        print()
+            click.echo(f"  Manifest: {result['manifest_path']}")
+        click.echo()
 @retrain.command("detect")
 @click.option("--model", "-m", required=True, help="Model identifier")
 @click.option("--phoenix-endpoint", default="http://localhost:6006")
@@ -1507,19 +1516,19 @@ def retrain_detect(
     result = asyncio.get_event_loop().run_until_complete(svc.detect_drift())
 
     if fmt == "json":
-        print(json.dumps(result, indent=2))
+        click.echo(json.dumps(result, indent=2))
     else:
         icon = (
             "\u26a0\ufe0f  DRIFT DETECTED"
             if result.get("drifted")
             else "\u2705 No drift"
         )
-        print(f"\n  {icon}")
-        print(f"  Score:     {result.get('score', '?')}")
-        print(f"  Baseline:  {result.get('baseline', '?')}")
-        print(f"  Threshold: {result.get('threshold', '?')}")
-        print(f"  Samples:   {result.get('samples', 0)}")
-        print(f"  Detail:    {result.get('detail', '')}\n")
+        click.echo(f"\n  {icon}")
+        click.echo(f"  Score:     {result.get('score', '?')}")
+        click.echo(f"  Baseline:  {result.get('baseline', '?')}")
+        click.echo(f"  Threshold: {result.get('threshold', '?')}")
+        click.echo(f"  Samples:   {result.get('samples', 0)}")
+        click.echo(f"  Detail:    {result.get('detail', '')}\n")
 @retrain.command("deploy")
 @click.option("--cycle-id", required=True, help="Retrain cycle ID to deploy")
 @click.option("--vllm-endpoint", "-e", required=True, help="vLLM endpoint")
@@ -1542,8 +1551,8 @@ def retrain_deploy(cycle_id, vllm_endpoint, vllm_api_key, fmt):
 
     manifest_path = Path.home() / ".terradev" / "retrain_manifests" / f"{cycle_id}.json"
     if not manifest_path.exists():
-        print(f"ERROR: No manifest found for cycle {cycle_id}")
-        return
+        click.echo(f"ERROR: No manifest found for cycle {cycle_id}", err=True)
+        raise SystemExit(1)
 
     with open(manifest_path) as f:
         manifest = json.load(f)
@@ -1564,19 +1573,19 @@ def retrain_deploy(cycle_id, vllm_endpoint, vllm_api_key, fmt):
     result = asyncio.get_event_loop().run_until_complete(svc.deploy_adapter())
 
     if fmt == "json":
-        print(json.dumps(result, indent=2))
+        click.echo(json.dumps(result, indent=2))
     else:
         if result.get("status") == "deployed":
-            print("\n  \U0001f680 Adapter deployed!")
-            print(f"  Name:     {result.get('adapter_name')}")
-            print(f"  Endpoint: {result.get('endpoint')}")
-            print(f"  Path:     {result.get('adapter_path')}\n")
+            click.echo("\n  \U0001f680 Adapter deployed!")
+            click.echo(f"  Name:     {result.get('adapter_name')}")
+            click.echo(f"  Endpoint: {result.get('endpoint')}")
+            click.echo(f"  Path:     {result.get('adapter_path')}\n")
         else:
-            print(
+            click.echo(
                 f"\n  \u274c Deploy failed: {result.get('error', result.get('reason', '?'))}\n"
             )
 @retrain.command("history")
-@click.option("--limit", "-n", default=20, type=int, help="Number of cycles to show")
+@click.option("--limit", "-n", default=20, type=click.IntRange(1, 1000000), help="Number of cycles to show")
 @click.option(
     "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
 )
@@ -1592,23 +1601,23 @@ def retrain_history(limit, fmt):
     manifests = DriftRetrainService.list_retrain_history(limit=limit)
 
     if fmt == "json":
-        print(json.dumps(manifests, indent=2, default=str))
+        click.echo(json.dumps(manifests, indent=2, default=str))
     else:
         if not manifests:
-            print("\n  No retrain cycles found.\n")
+            click.echo("\n  No retrain cycles found.\n")
             return
-        print(
+        click.echo(
             f"\n  {'Cycle ID':<24} {'Model':<24} {'Status':<14} {'Eval':<8} {'Started'}"
         )
-        print(f"  {'─'*22}  {'─'*22}  {'─'*12}  {'─'*6}  {'─'*20}")
+        click.echo(f"  {'─'*22}  {'─'*22}  {'─'*12}  {'─'*6}  {'─'*20}")
         for m in manifests:
             cid = m.get("cycle_id", "?")[:22]
             model = m.get("model_id", "?")[:22]
             status = m.get("status", "?")[:12]
             score = m.get("eval_score", 0)
             started = m.get("started_at", "?")[:19]
-            print(f"  {cid:<24} {model:<24} {status:<14} {score:<8.4f} {started}")
-        print()
+            click.echo(f"  {cid:<24} {model:<24} {status:<14} {score:<8.4f} {started}")
+        click.echo()
 
 
 # ── New multi-stage training commands (SFT / DPO / GRPO / pipeline) ─────────
@@ -1626,11 +1635,11 @@ def retrain_history(limit, fmt):
 @click.option("--provider", default="auto", help="Cloud provider, or 'auto' for cheapest quote")
 @click.option("--checkpoint", default="", help="Output checkpoint directory")
 @click.option("--gpu-type", default="", help="GPU type (A100, H100, etc.)")
-@click.option("--gpu-count", default=1, type=int, help="Total GPUs")
-@click.option("--node-count", default=1, type=int, help="Number of nodes")
-@click.option("--gpus-per-node", default=8, type=int, help="GPUs per node")
+@click.option("--gpu-count", default=1, type=click.IntRange(1, 1000000), help="Total GPUs")
+@click.option("--node-count", default=1, type=click.IntRange(1, 1000000), help="Number of nodes")
+@click.option("--gpus-per-node", default=8, type=click.IntRange(1, 1000000), help="GPUs per node")
 @click.option("--spot/--no-spot", default=False, help="Use spot/preemptible instances")
-@click.option("--max-price", default=0.0, type=float, help="Max $/hr per GPU")
+@click.option("--max-price", default=0.0, type=click.FloatRange(0.0, 10000.0), help="Max $/hr per GPU")
 @click.option("--num-train-epochs", default=1, type=int)
 @click.option("--per-device-batch-size", default=1, type=int)
 @click.option("--gradient-accumulation-steps", default=4, type=int)
@@ -1684,8 +1693,8 @@ def train_sft(
         resolved_nodes, ssh_key = _resolve_provision_nodes(from_provision, fmt)
 
     if not resolved_nodes:
-        print("ERROR: Provide --nodes, --from-provision, or let --provider auto provision")
-        sys.exit(1)
+        click.echo("ERROR: Provide --nodes, --from-provision, or let --provider auto provision", err=True)
+        raise SystemExit(1)
 
     stage = StageConfig(
         type="sft",
@@ -1750,7 +1759,7 @@ def train_sft(
 @click.option("--gradient-accumulation-steps", default=4, type=int)
 @click.option("--learning-rate", default=2e-4, type=float)
 @click.option("--warmup-ratio", default=0.1, type=float)
-@click.option("--beta", default=0.1, type=float, help="DPO beta / SimPO beta")
+@click.option("--beta", default=0.1, type=click.FloatRange(0.0, 10000.0), help="DPO beta / SimPO beta")
 @click.option("--max-seq-length", default=2048, type=int)
 @click.option("--lora-rank", default=64, type=int)
 @click.option("--lora-alpha", default=16, type=int)
@@ -1801,8 +1810,8 @@ def train_dpo(
     if from_provision and not resolved_nodes:
         resolved_nodes, ssh_key = _resolve_provision_nodes(from_provision, fmt)
     if not resolved_nodes:
-        print("ERROR: Provide --nodes, --from-provision, or let --provider auto provision")
-        sys.exit(1)
+        click.echo("ERROR: Provide --nodes, --from-provision, or let --provider auto provision", err=True)
+        raise SystemExit(1)
 
     stage = StageConfig(
         type="dpo",
@@ -1860,7 +1869,7 @@ def train_dpo(
 @click.option("--gpu-count", default=8, type=int)
 @click.option("--node-count", default=2, type=int)
 @click.option("--gpus-per-node", default=8, type=int)
-@click.option("--num-generations", default=8, type=int, help="GRPO group size")
+@click.option("--num-generations", default=8, type=click.IntRange(1, 1000000), help="GRPO group size")
 @click.option("--spot/--no-spot", default=False)
 @click.option("--max-price", default=0.0, type=float)
 @click.option("--num-train-epochs", default=1, type=int)
@@ -1916,8 +1925,8 @@ def train_grpo(
     if from_provision and not resolved_nodes:
         resolved_nodes, ssh_key = _resolve_provision_nodes(from_provision, fmt)
     if not resolved_nodes:
-        print("ERROR: Provide --nodes, --from-provision, or let --provider auto provision")
-        sys.exit(1)
+        click.echo("ERROR: Provide --nodes, --from-provision, or let --provider auto provision", err=True)
+        raise SystemExit(1)
 
     stage = StageConfig(
         type="grpo",
@@ -1981,33 +1990,33 @@ def train_pipeline(config, dry_run, teardown, fmt):
             else:
                 dag.add_node(name, lambda _ctx: stage.__dict__)
             prev = name
-        print(json.dumps(dag.describe(), indent=2, default=str))
+        click.echo(json.dumps(dag.describe(), indent=2, default=str))
         return
 
     results = run_pipeline_from_yaml(config, dry_run=False)
     if fmt == "json":
-        print(json.dumps([r.__dict__ for r in results], indent=2, default=str))
+        click.echo(json.dumps([r.__dict__ for r in results], indent=2, default=str))
     else:
-        print(f"\nPipeline finished: {len(results)} stage(s)")
+        click.echo(f"\nPipeline finished: {len(results)} stage(s)")
         for r in results:
-            print(f"  {r.name or 'stage'}: {r.status}  job={r.job_id}  nodes={len(r.nodes)}")
+            click.echo(f"  {r.name or 'stage'}: {r.status}  job={r.job_id}  nodes={len(r.nodes)}")
 
 
 def _print_stage_result(result, fmt: str):
     if result is None:
-        print("ERROR: stage produced no result")
-        sys.exit(1)
+        click.echo("ERROR: stage produced no result", err=True)
+        raise SystemExit(1)
     if fmt == "json":
-        print(json.dumps(result.__dict__, indent=2, default=str))
+        click.echo(json.dumps(result.__dict__, indent=2, default=str))
     else:
-        print(f"\nTraining Stage: {result.name}")
-        print(f"  Status: {result.status}")
-        print(f"  Job ID: {result.job_id}")
-        print(f"  Output: {result.output_dir}")
+        click.echo(f"\nTraining Stage: {result.name}")
+        click.echo(f"  Status: {result.status}")
+        click.echo(f"  Job ID: {result.job_id}")
+        click.echo(f"  Output: {result.output_dir}")
         if result.description:
-            print(f"  Description: {result.description}")
+            click.echo(f"  Description: {result.description}")
         if result.command:
-            print(f"  Command: {' '.join(str(c) for c in result.command)}")
+            click.echo(f"  Command: {' '.join(str(c) for c in result.command)}")
         if result.error:
-            print(f"  Error: {result.error}")
-        print()
+            click.echo(f"  Error: {result.error}")
+        click.echo()

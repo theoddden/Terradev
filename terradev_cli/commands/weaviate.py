@@ -17,6 +17,14 @@ from terradev_cli.core.adapters.orchestrator import UniversalOrchestrator
 weaviate = click.Group("weaviate", help="Weaviate vector database operations.")
 
 
+def _parse_json_arg(raw: str, name: str):
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        click.echo(f"ERROR: Invalid JSON in {name}: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
 def _weaviate_manifest(
     environment: str,
     host: str,
@@ -42,7 +50,11 @@ def _weaviate_manifest(
     if api_key:
         config["api_key"] = api_key
     if headers:
-        config["headers"] = json.loads(headers)
+        try:
+            config["headers"] = json.loads(headers)
+        except json.JSONDecodeError as exc:
+            click.echo(f"ERROR: Invalid JSON in --headers: {exc}", err=True)
+            raise SystemExit(1) from exc
 
     component = Component(
         kind="vector_store",
@@ -59,7 +71,11 @@ def _weaviate_manifest(
 
 def _run(coro):
     """Run a single coroutine and return its result."""
-    return asyncio.run(coro)
+    try:
+        return asyncio.run(asyncio.wait_for(coro, timeout=120))
+    except asyncio.TimeoutError:
+        click.echo("ERROR: Weaviate operation timed out", err=True)
+        raise SystemExit(1)
 
 
 def _weaviate_exec(operation: str, args: Dict[str, Any], manifest: UniversalManifest):
@@ -79,8 +95,8 @@ def _weaviate_exec(operation: str, args: Dict[str, Any], manifest: UniversalMani
 @weaviate.command("up")
 @click.option("--environment", "-e", default="local", type=click.Choice(["local", "embedded", "cloud", "custom"]))
 @click.option("--host", "-H", default="localhost", help="Weaviate HTTP host")
-@click.option("--http-port", "-p", default=8080, type=int, help="Weaviate HTTP port")
-@click.option("--grpc-port", default=50051, type=int, help="Weaviate gRPC port")
+@click.option("--http-port", "-p", default=8080, type=click.IntRange(1, 65535), help="Weaviate HTTP port")
+@click.option("--grpc-port", default=50051, type=click.IntRange(1, 65535), help="Weaviate gRPC port")
 @click.option("--secure", is_flag=True, help="Use HTTPS/gRPC TLS")
 @click.option("--cluster-url", help="Weaviate Cloud cluster URL")
 @click.option("--api-key", help="Weaviate API key (or WEAVIATE_API_KEY env)")
@@ -112,8 +128,8 @@ def weaviate_up(
 @weaviate.command("list-collections")
 @click.option("--environment", "-e", default="local", type=click.Choice(["local", "embedded", "cloud", "custom"]))
 @click.option("--host", "-H", default="localhost")
-@click.option("--http-port", "-p", default=8080, type=int)
-@click.option("--grpc-port", default=50051, type=int)
+@click.option("--http-port", "-p", default=8080, type=click.IntRange(1, 65535))
+@click.option("--grpc-port", default=50051, type=click.IntRange(1, 65535))
 @click.option("--secure", is_flag=True)
 @click.option("--cluster-url")
 @click.option("--api-key")
@@ -137,13 +153,13 @@ def weaviate_list_collections(environment, host, http_port, grpc_port, secure, c
 
 @weaviate.command("create-collection")
 @click.option("--name", "-n", required=True, help="Collection name")
-@click.option("--vector-size", type=int, help="Vector dimension (omit when using vectorizer)")
+@click.option("--vector-size", type=click.IntRange(1, 10000), help="Vector dimension (omit when using vectorizer)")
 @click.option("--vectorizer", type=click.Choice(["openai", "cohere", "huggingface", "ollama"]), help="Built-in vectorizer module")
 @click.option("--properties", default="[]", help="JSON list of properties [{name, data_type}]")
 @click.option("--environment", "-e", default="local", type=click.Choice(["local", "embedded", "cloud", "custom"]))
 @click.option("--host", "-H", default="localhost")
-@click.option("--http-port", "-p", default=8080, type=int)
-@click.option("--grpc-port", default=50051, type=int)
+@click.option("--http-port", "-p", default=8080, type=click.IntRange(1, 65535))
+@click.option("--grpc-port", default=50051, type=click.IntRange(1, 65535))
 @click.option("--secure", is_flag=True)
 @click.option("--cluster-url")
 @click.option("--api-key")
@@ -170,7 +186,7 @@ def weaviate_create_collection(
             "collection": name,
             "vector_size": vector_size,
             "vectorizer": vectorizer,
-            "properties": json.loads(properties),
+            "properties": _parse_json_arg(properties, "--properties"),
         },
         manifest,
     )
@@ -185,8 +201,8 @@ def weaviate_create_collection(
 @click.option("--name", "-n", required=True, help="Collection name")
 @click.option("--environment", "-e", default="local", type=click.Choice(["local", "embedded", "cloud", "custom"]))
 @click.option("--host", "-H", default="localhost")
-@click.option("--http-port", "-p", default=8080, type=int)
-@click.option("--grpc-port", default=50051, type=int)
+@click.option("--http-port", "-p", default=8080, type=click.IntRange(1, 65535))
+@click.option("--grpc-port", default=50051, type=click.IntRange(1, 65535))
 @click.option("--secure", is_flag=True)
 @click.option("--cluster-url")
 @click.option("--api-key")
@@ -207,8 +223,8 @@ def weaviate_delete_collection(name, environment, host, http_port, grpc_port, se
 @click.option("--objects", required=True, help="JSON list of objects [{properties: {...}, vector: [...]}]")
 @click.option("--environment", "-e", default="local", type=click.Choice(["local", "embedded", "cloud", "custom"]))
 @click.option("--host", "-H", default="localhost")
-@click.option("--http-port", "-p", default=8080, type=int)
-@click.option("--grpc-port", default=50051, type=int)
+@click.option("--http-port", "-p", default=8080, type=click.IntRange(1, 65535))
+@click.option("--grpc-port", default=50051, type=click.IntRange(1, 65535))
 @click.option("--secure", is_flag=True)
 @click.option("--cluster-url")
 @click.option("--api-key")
@@ -231,12 +247,12 @@ def weaviate_insert(collection, objects, environment, host, http_port, grpc_port
 @weaviate.command("query")
 @click.option("--collection", "-c", required=True)
 @click.option("--vector", required=True, help="JSON array of floats")
-@click.option("--top-k", default=10, type=int)
+@click.option("--top-k", default=10, type=click.IntRange(1, 1000))
 @click.option("--filters", default="{}", help="JSON filter payload")
 @click.option("--environment", "-e", default="local", type=click.Choice(["local", "embedded", "cloud", "custom"]))
 @click.option("--host", "-H", default="localhost")
-@click.option("--http-port", "-p", default=8080, type=int)
-@click.option("--grpc-port", default=50051, type=int)
+@click.option("--http-port", "-p", default=8080, type=click.IntRange(1, 65535))
+@click.option("--grpc-port", default=50051, type=click.IntRange(1, 65535))
 @click.option("--secure", is_flag=True)
 @click.option("--cluster-url")
 @click.option("--api-key")
@@ -260,12 +276,12 @@ def weaviate_query(collection, vector, top_k, filters, environment, host, http_p
 @weaviate.command("hybrid-search")
 @click.option("--collection", "-c", required=True)
 @click.option("--query", required=True, help="Text query")
-@click.option("--alpha", default=0.7, type=float, help="Balance between vector (1.0) and keyword (0.0)")
-@click.option("--top-k", default=10, type=int)
+@click.option("--alpha", default=0.7, type=click.FloatRange(0.0, 1.0), help="Balance between vector (1.0) and keyword (0.0)")
+@click.option("--top-k", default=10, type=click.IntRange(1, 1000))
 @click.option("--environment", "-e", default="local", type=click.Choice(["local", "embedded", "cloud", "custom"]))
 @click.option("--host", "-H", default="localhost")
-@click.option("--http-port", "-p", default=8080, type=int)
-@click.option("--grpc-port", default=50051, type=int)
+@click.option("--http-port", "-p", default=8080, type=click.IntRange(1, 65535))
+@click.option("--grpc-port", default=50051, type=click.IntRange(1, 65535))
 @click.option("--secure", is_flag=True)
 @click.option("--cluster-url")
 @click.option("--api-key")

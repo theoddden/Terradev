@@ -37,7 +37,7 @@ def _find_unsloth() -> str:
             "or see https://unsloth.ai/docs",
             err=True,
         )
-        sys.exit(1)
+        raise SystemExit(1)
     return exe
 
 
@@ -77,13 +77,13 @@ def _health_url(host: str, port: int) -> str:
 @click.argument("agent", type=click.Choice(SUPPORTED_AGENTS))
 @click.option("--model", "-m", help="Model to load and serve (e.g. unsloth/Llama-3.1-8B)")
 @click.option("--host", "-H", default="127.0.0.1", help="Server host")
-@click.option("--port", "-p", default=8888, type=int, help="Server port")
+@click.option("--port", "-p", default=8888, type=click.IntRange(1, 65535), help="Server port")
 @click.option("--enable-tools/--disable-tools", default=True, help="Enable/disable tool use")
 @click.option("--no-cloudflare", is_flag=True, help="Do not use Cloudflare tunnel")
 @click.option("--gguf-variant", help="Preferred GGUF quantization variant")
-@click.option("--context-length", type=int, help="Maximum context length")
+@click.option("--context-length", type=click.IntRange(1, 10000000), help="Maximum context length")
 @click.option("--no-load-in-4bit", is_flag=True, help="Disable 4-bit loading")
-@click.option("--tensor-parallel", type=int, help="Tensor parallel size")
+@click.option("--tensor-parallel", type=click.IntRange(1, 128), help="Tensor parallel size")
 @click.option("--project", "-C", default=".", help="Project directory")
 @click.option("--background", is_flag=True, help="Run in background instead of foreground")
 def unsloth_start(
@@ -135,7 +135,7 @@ def unsloth_start(
     cwd = Path(project) if project else Path.cwd()
     if not cwd.exists():
         click.echo(f"ERROR: project directory {cwd} does not exist", err=True)
-        sys.exit(1)
+        raise SystemExit(1)
 
     click.echo(f"Starting Unsloth agent '{agent}' in {cwd.resolve()}")
     click.echo(f"  Command: {' '.join(cmd)}")
@@ -162,13 +162,13 @@ def unsloth_start(
 @unsloth.command("run")
 @click.option("--model", "-m", required=True, help="Model to serve (e.g. unsloth/Llama-3.1-8B)")
 @click.option("--host", "-H", default="127.0.0.1", help="Server host")
-@click.option("--port", "-p", default=8888, type=int, help="Server port")
+@click.option("--port", "-p", default=8888, type=click.IntRange(1, 65535), help="Server port")
 @click.option("--enable-tools/--disable-tools", default=False, help="Enable/disable tool use")
 @click.option("--no-cloudflare", is_flag=True, help="Do not use Cloudflare tunnel")
 @click.option("--gguf-variant", help="Preferred GGUF quantization variant")
-@click.option("--context-length", type=int, help="Maximum context length")
+@click.option("--context-length", type=click.IntRange(1, 10000000), help="Maximum context length")
 @click.option("--no-load-in-4bit", is_flag=True, help="Disable 4-bit loading")
-@click.option("--tensor-parallel", type=int, help="Tensor parallel size")
+@click.option("--tensor-parallel", type=click.IntRange(1, 128), help="Tensor parallel size")
 @click.option(
     "--pid-file",
     default=".unsloth-run.pid",
@@ -245,7 +245,7 @@ def unsloth_stop(pid_file, signal):
     pid_path = Path(pid_file)
     if not pid_path.exists():
         click.echo(f"ERROR: no PID file {pid_path}. Is the server running?", err=True)
-        sys.exit(1)
+        raise SystemExit(1)
 
     pid = int(pid_path.read_text().strip())
     import signal as _signal
@@ -253,7 +253,7 @@ def unsloth_stop(pid_file, signal):
     sig_num = getattr(_signal, signal, None)
     if sig_num is None:
         click.echo(f"ERROR: unknown signal {signal}", err=True)
-        sys.exit(1)
+        raise SystemExit(1)
 
     try:
         os.kill(pid, sig_num)
@@ -264,4 +264,4 @@ def unsloth_stop(pid_file, signal):
         pid_path.unlink()
     except PermissionError:
         click.echo(f"ERROR: permission denied to signal PID {pid}", err=True)
-        sys.exit(1)
+        raise SystemExit(1)

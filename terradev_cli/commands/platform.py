@@ -25,19 +25,23 @@ def sso_status():
     api = TerradevAPI()
 
     if not api.enterprise_auth:
-        print("WARNING:  Enterprise auth not initialized")
-        print(
-            "   Install enterprise dependencies: pip install terradev-cli[enterprise]"
+        click.echo('WARNING:  Enterprise auth not initialized', err=True)
+        click.echo(
+            '   Install enterprise dependencies: pip install terradev-cli[enterprise]',
+            err=True,
         )
         return
 
     enabled_providers = api.enterprise_auth.list_enabled_providers()
     if enabled_providers:
-        print("OK: SSO is configured")
-        print("   Enabled providers:", ", ".join(enabled_providers))
+        click.echo('OK: SSO is configured')
+        click.echo('   Enabled providers: ' + ', '.join(enabled_providers))
     else:
-        print("WARNING:  No SSO providers configured")
-        print("   Configure providers with: terradev sso configure")
+        click.echo('WARNING:  No SSO providers configured', err=True)
+        click.echo(
+            '   Configure providers with: terradev sso configure',
+            err=True,
+        )
 @sso.command("configure")
 @click.option(
     "--provider",
@@ -67,11 +71,12 @@ def sso_configure(
     api = TerradevAPI()
 
     if not api.enterprise_auth:
-        print("ERROR: Enterprise auth not initialized")
-        print(
-            "   Install enterprise dependencies: pip install terradev-cli[enterprise]"
+        click.echo('ERROR: Enterprise auth not initialized', err=True)
+        click.echo(
+            '   Install enterprise dependencies: pip install terradev-cli[enterprise]',
+            err=True,
         )
-        return
+        raise SystemExit(1)
 
     config = {}
 
@@ -82,8 +87,8 @@ def sso_configure(
         # OIDC providers
         if provider == "auth0":
             if not domain:
-                print("ERROR: Domain required for Auth0")
-                return
+                click.echo('ERROR: Domain required for Auth0', err=True)
+                raise SystemExit(1)
             config = api.enterprise_auth.get_sso_provider_config(provider)
             config.update(
                 {
@@ -95,8 +100,8 @@ def sso_configure(
             )
         elif provider == "azure_ad":
             if not tenant_id:
-                print("ERROR: Tenant ID required for Azure AD")
-                return
+                click.echo('ERROR: Tenant ID required for Azure AD', err=True)
+                raise SystemExit(1)
             config = api.enterprise_auth.get_sso_provider_config(provider)
             config.update(
                 {
@@ -133,19 +138,20 @@ def sso_configure(
         if provider in ["google_workspace", "auth0"] or (
             provider == "azure_ad" and not is_saml
         ):
-            print("ERROR: Client ID and secret required for OIDC providers")
+            click.echo('ERROR: Client ID and secret required for OIDC providers', err=True)
         elif provider in ["okta"] or (provider == "azure_ad" and not is_oidc):
-            print("ERROR: Entity ID and SSO URL required for SAML providers")
+            click.echo('ERROR: Entity ID and SSO URL required for SAML providers', err=True)
         else:
-            print(f"ERROR: {provider} not supported with the provided credentials")
-        return
+            click.echo(f'ERROR: {provider} not supported with the provided credentials', err=True)
+        raise SystemExit(1)
 
     try:
         api.enterprise_auth.enable_sso_provider(provider, config)
-        print(f"OK: {provider} SSO provider configured successfully")
-        print("   Test the configuration with: terradev sso test")
+        click.echo(f'OK: {provider} SSO provider configured successfully')
+        click.echo('   Test the configuration with: terradev sso test')
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Failed to configure {provider}: {e}")
+        click.echo(f'ERROR: Failed to configure {provider}: {e}', err=True)
+        raise SystemExit(1)
 @sso.command("test")
 @click.option("--provider", "-p", help="Test specific provider")
 def sso_test(provider):
@@ -153,34 +159,34 @@ def sso_test(provider):
     api = TerradevAPI()
 
     if not api.enterprise_auth:
-        print("ERROR: Enterprise auth not initialized")
-        return
+        click.echo('ERROR: Enterprise auth not initialized', err=True)
+        raise SystemExit(1)
 
     if provider:
         # Test specific provider
         config = api.enterprise_auth.get_sso_provider_config(provider)
         if not config or not config.get("enabled"):
-            print(f"ERROR: Provider {provider} not configured")
-            return
+            click.echo(f'ERROR: Provider {provider} not configured', err=True)
+            raise SystemExit(1)
 
-        print(f"Testing {provider}...")
+        click.echo(f'Testing {provider}...')
         if api.enterprise_auth.test_sso_provider(provider):
-            print(f"OK: {provider} configuration appears valid")
+            click.echo(f'OK: {provider} configuration appears valid')
         else:
-            print(f"WARNING: {provider} configuration test failed")
+            click.echo(f'WARNING: {provider} configuration test failed', err=True)
     else:
         # Test all providers
         enabled_providers = api.enterprise_auth.list_enabled_providers()
         if not enabled_providers:
-            print("WARNING:  No SSO providers configured")
+            click.echo('WARNING:  No SSO providers configured', err=True)
             return
 
-        print("Testing all configured providers...")
+        click.echo('Testing all configured providers...')
         for p in enabled_providers:
             if api.enterprise_auth.test_sso_provider(p):
-                print(f"OK: {p} configuration appears valid")
+                click.echo(f'OK: {p} configuration appears valid')
             else:
-                print(f"WARNING: {p} configuration test failed")
+                click.echo(f'WARNING: {p} configuration test failed', err=True)
 @cli.command("mcp")
 @click.argument("action", type=click.Choice(["serve", "install", "list-tools"]))
 @click.option(
@@ -339,7 +345,7 @@ def local_scan(host, user, key, detailed, register, name):
             click.echo(
                 f"No GPUs found on {target} or nvidia-smi not available.", err=True
             )
-            return
+            raise SystemExit(1)
         for line in raw.splitlines():
             parts = [p.strip() for p in line.split(",")]
             if len(parts) < 11:
@@ -423,13 +429,13 @@ def local_register(name, host, user, key):
 
         if not re.match(r"^[a-zA-Z0-9._-]+$", user):
             click.echo("Error: Invalid username format", err=True)
-            return
+            raise SystemExit(1)
         if not re.match(r"^[a-zA-Z0-9._-]+$", host):
             click.echo("Error: Invalid hostname format", err=True)
-            return
+            raise SystemExit(1)
         if key and not re.match(r"^[a-zA-Z0-9._/~-]+$", key):
             click.echo("Error: Invalid key path format", err=True)
-            return
+            raise SystemExit(1)
 
         # Build SSH command as argument list (no shell=True)
         ssh_args = [
@@ -454,7 +460,7 @@ def local_register(name, host, user, key):
             raw = result.stdout.strip()
         except Exception as e:  # noqa: BLE001
             click.echo(f"Error scanning {target}: {e}", err=True)
-            return
+            raise SystemExit(1)
     else:
         # Local execution - use list-args for injection safety
         cmd = ["nvidia-smi", f"--query-gpu={query}", "--format=csv,noheader,nounits"]
@@ -465,10 +471,10 @@ def local_register(name, host, user, key):
             raw = result.stdout.strip()
         except Exception as e:  # noqa: BLE001
             click.echo(f"Error scanning {target}: {e}", err=True)
-            return
+            raise SystemExit(1)
     if not raw:
         click.echo(f"No GPUs found on {target}.", err=True)
-        return
+        raise SystemExit(1)
     gpus = []
     for line in raw.splitlines():
         parts = [p.strip() for p in line.split(",")]
@@ -530,6 +536,7 @@ def local_pool(fmt, remove):
             click.echo(f"Removed '{remove}' from pool.")
         else:
             click.echo(f"'{remove}' not found in pool.", err=True)
+            raise SystemExit(1)
         return
 
     if fmt == "json":
@@ -598,14 +605,14 @@ def agent():
     """
     pass
 @agent.command(name="plan")
-@click.option("--agents", "-n", type=int, required=True, help="Number of concurrent agent loops to provision for")
+@click.option('--agents', '-n', type=click.IntRange(1, 10000), required=True, help='Number of concurrent agent loops to provision for')
 @click.option("--model", "-m", default="meta-llama/Llama-3.1-70B-Instruct", help="Model to serve across the fleet")
 @click.option("--reasoning", type=click.Choice(["instant", "thinking"]), default="instant", help="Reasoning mode: instant (faster) or thinking (extended CoT, 45-67% more output tokens)")
 @click.option("--planner-gpu", default=None, help="Override reasoning tier GPU type (e.g. H100_SXM)")
-@click.option("--planner-count", type=int, default=None, help="Override reasoning tier instance count")
+@click.option('--planner-count', type=click.IntRange(1, 10000), default=None, help='Override reasoning tier instance count')
 @click.option("--worker-gpu", default=None, help="Override decode tier GPU type (e.g. A100_SXM_80)")
-@click.option("--worker-count", type=int, default=None, help="Override decode tier instance count")
-@click.option("--cpu-cores", type=int, default=48, help="vCPU count for CPU tools tier instances")
+@click.option('--worker-count', type=click.IntRange(1, 10000), default=None, help='Override decode tier instance count')
+@click.option('--cpu-cores', type=click.IntRange(1, 512), default=48, help='vCPU count for CPU tools tier instances')
 @click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table", help="Output format")
 def agent_plan(agents, model, reasoning, planner_gpu, planner_count, worker_gpu, worker_count, cpu_cores, fmt):
     """Plan a heterogeneous agent fleet without provisioning.
@@ -664,17 +671,17 @@ def agent_plan(agents, model, reasoning, planner_gpu, planner_count, worker_gpu,
             f"--worker-gpu {d.gpu_type} --worker-count {d.count}"
         )
 @agent.command(name="deploy")
-@click.option("--agents", "-n", type=int, default=None, help="Number of concurrent agent loops")
+@click.option('--agents', '-n', type=click.IntRange(1, 10000), default=None, help='Number of concurrent agent loops')
 @click.option("--model", "-m", default="meta-llama/Llama-3.1-70B-Instruct", help="Model to serve")
 @click.option("--reasoning", type=click.Choice(["instant", "thinking"]), default="instant")
 @click.option("--topology", type=click.Path(exists=True), default=None, help="Path to agent-fleet.yaml spec file")
 @click.option("--planner-gpu", default=None, help="Reasoning tier GPU type")
-@click.option("--planner-count", type=int, default=None, help="Reasoning tier instance count")
+@click.option('--planner-count', type=click.IntRange(1, 10000), default=None, help='Reasoning tier instance count')
 @click.option("--worker-gpu", default=None, help="Decode tier GPU type")
-@click.option("--worker-count", type=int, default=None, help="Decode tier instance count")
-@click.option("--cpu-cores", type=int, default=48, help="vCPU count for CPU tools tier")
+@click.option('--worker-count', type=click.IntRange(1, 10000), default=None, help='Decode tier instance count')
+@click.option('--cpu-cores', type=click.IntRange(1, 512), default=48, help='vCPU count for CPU tools tier')
 @click.option("--providers", "-p", multiple=True, help="Cloud providers to use (e.g. runpod vastai)")
-@click.option("--max-price", type=float, default=None, help="Max price per GPU/hr in USD")
+@click.option('--max-price', type=click.FloatRange(0.0, 10000.0), default=None, help='Max price per GPU/hr in USD')
 @click.option("--dry-run", is_flag=True, help="Show allocation plan without provisioning")
 @click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
 def agent_deploy(agents, model, reasoning, topology, planner_gpu, planner_count, worker_gpu, worker_count, cpu_cores, providers, max_price, dry_run, fmt):
@@ -729,12 +736,16 @@ def agent_deploy(agents, model, reasoning, topology, planner_gpu, planner_count,
         planner.print_plan(spec)
 
     provisioner = AgenticProvisioner()
-    result = asyncio.run(provisioner.provision_fleet(
-        spec=spec,
-        dry_run=dry_run,
-        providers=list(providers) if providers else None,
-        max_price_hr=max_price,
-    ))
+    try:
+        result = asyncio.run(asyncio.wait_for(provisioner.provision_fleet(
+            spec=spec,
+            dry_run=dry_run,
+            providers=list(providers) if providers else None,
+            max_price_hr=max_price,
+        ), timeout=300))
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f'ERROR: Failed to provision fleet: {exc}', err=True)
+        raise SystemExit(1)
 
     if fmt == "json":
         output = {
@@ -771,6 +782,7 @@ def agent_deploy(agents, model, reasoning, topology, planner_gpu, planner_count,
         click.echo(f"\nProvisioning errors:", err=True)
         for e in result.errors:
             click.echo(f"  {e}", err=True)
+        raise SystemExit(1)
 @agent.command(name="status")
 @click.option("--fleet-id", required=True, help="Fleet ID returned by 'terradev agent deploy'")
 @click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
@@ -789,7 +801,11 @@ def agent_status(fleet_id, fmt):
     from terradev_cli.core.agentic_provisioner import AgenticProvisioner
 
     provisioner = AgenticProvisioner()
-    status = asyncio.run(provisioner.fleet_status(fleet_id))
+    try:
+        status = asyncio.run(asyncio.wait_for(provisioner.fleet_status(fleet_id), timeout=120))
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f'ERROR: Failed to get fleet status: {exc}', err=True)
+        raise SystemExit(1)
 
     if status is None:
         click.echo(f"Fleet {fleet_id} not found.", err=True)
@@ -843,7 +859,7 @@ def agent_status(fleet_id, fmt):
 @agent.command(name="scale")
 @click.option("--fleet-id", required=True, help="Fleet ID")
 @click.option("--tier", required=True, type=click.Choice(["reasoning", "decode", "cpu_tools"]), help="Tier to scale")
-@click.option("--count", required=True, type=int, help="New instance count for this tier")
+@click.option('--count', required=True, type=click.IntRange(1, 10000), help='New instance count for this tier')
 @click.option("--providers", "-p", multiple=True, help="Providers to use for scale-out instances")
 def agent_scale(fleet_id, tier, count, providers):
     """Scale a single fleet tier up or down without affecting other tiers.
@@ -862,12 +878,16 @@ def agent_scale(fleet_id, tier, count, providers):
     from terradev_cli.core.agentic_provisioner import AgenticProvisioner
 
     provisioner = AgenticProvisioner()
-    result = asyncio.run(provisioner.scale_tier(
-        fleet_id=fleet_id,
-        tier=tier,
-        new_count=count,
-        providers=list(providers) if providers else None,
-    ))
+    try:
+        result = asyncio.run(asyncio.wait_for(provisioner.scale_tier(
+            fleet_id=fleet_id,
+            tier=tier,
+            new_count=count,
+            providers=list(providers) if providers else None,
+        ), timeout=300))
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f'ERROR: Failed to scale fleet: {exc}', err=True)
+        raise SystemExit(1)
     click.echo(_json.dumps(result, indent=2))
 @agent.command(name="cost")
 @click.option("--fleet-id", required=True, help="Fleet ID")
@@ -958,11 +978,18 @@ def agent_teardown(fleet_id, yes):
         click.confirm(f"Destroy fleet {fleet_id} and all its instances?", abort=True)
 
     provisioner = AgenticProvisioner()
-    result = asyncio.run(provisioner.teardown_fleet(fleet_id))
+    try:
+        result = asyncio.run(asyncio.wait_for(provisioner.teardown_fleet(fleet_id), timeout=300))
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f'ERROR: Failed to teardown fleet: {exc}', err=True)
+        raise SystemExit(1)
     click.echo(_json.dumps(result, indent=2))
 def _agent_vector_db_manifest(name: str, adapter: str, config: str) -> UniversalManifest:
     """Build a manifest for an agent-facing vector database."""
-    cfg = json.loads(config) if config else {}
+    try:
+        cfg = json.loads(config) if config else {}
+    except json.JSONDecodeError as exc:
+        raise click.ClickException(f'Invalid JSON in --config: {exc}')
     component = Component(
         kind="vector_store",
         name=name,
@@ -1013,7 +1040,7 @@ def vector_db_up(name, adapter, config, manifest):
         return orchestrator.to_result().result
 
     try:
-        result = asyncio.run(_main())
+        result = asyncio.run(asyncio.wait_for(_main(), timeout=120))
         click.echo(f"OK: Vector DB '{name}' ({adapter}) is ready")
         click.echo(json.dumps(result, indent=2, default=str))
     except Exception as e:  # noqa: BLE001
@@ -1042,7 +1069,7 @@ def vector_db_down(name, adapter, config, manifest):
     orchestrator = UniversalOrchestrator(m)
 
     try:
-        asyncio.run(orchestrator.teardown())
+        asyncio.run(asyncio.wait_for(orchestrator.teardown(), timeout=120))
         click.echo(f"OK: Vector DB '{name}' torn down")
     except Exception as e:  # noqa: BLE001
         click.echo(f"ERROR: Failed to teardown vector DB: {e}", err=True)
@@ -1107,9 +1134,17 @@ def skill_attach(agent_id, skill, label, environment):
     try:
         client = letta._get_client(environment)
     except SystemExit:
-        return
+        raise
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f'ERROR: Could not create Letta client: {exc}', err=True)
+        raise SystemExit(1)
 
-    content = Path(skill).read_text()
+    try:
+        content = Path(skill).read_text()
+    except OSError as exc:
+        click.echo(f'ERROR: Could not read {skill}: {exc}', err=True)
+        raise SystemExit(1)
+
     try:
         client.agents.core_memory.append(
             agent_id=agent_id,
@@ -1117,11 +1152,18 @@ def skill_attach(agent_id, skill, label, environment):
             value=content,
         )
     except AttributeError:
-        client.agents.messages.create(
-            agent_id=agent_id,
-            input=f"Skill '{label}' instructions:\n{content}",
-        )
+        try:
+            client.agents.messages.create(
+                agent_id=agent_id,
+                input=f"Skill '{label}' instructions:\n{content}",
+            )
+        except Exception as exc:  # noqa: BLE001
+            click.echo(f'ERROR: Could not attach skill: {exc}', err=True)
+            raise SystemExit(1)
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f'ERROR: Could not attach skill: {exc}', err=True)
+        raise SystemExit(1)
 
-    click.echo(f"OK: Attached skill '{skill}' to agent {agent_id} under '{label}'")
+    click.echo(f'OK: Attached skill \'{skill}\' to agent {agent_id} under \'{label}\'')
 
 

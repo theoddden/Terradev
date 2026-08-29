@@ -17,6 +17,14 @@ from terradev_cli.core.universal_manifest import UniversalManifest, Component
 from terradev_cli.core.output import get_output
 
 
+def _safe_json(raw: str, option: str):
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        click.echo(f"ERROR: Invalid JSON in {option}: {exc}", err=True)
+        raise SystemExit(1) from exc
+
+
 def _load_or_build_manifest(
     manifest: Optional[str],
     adapter: str,
@@ -28,7 +36,7 @@ def _load_or_build_manifest(
     if manifest:
         return UniversalManifest.load(Path(manifest))
 
-    cfg = json.loads(config) if config else {}
+    cfg = _safe_json(config, "--config") if config else {}
     component = Component(
         kind=component_kind,
         name=name,
@@ -44,7 +52,11 @@ def _load_or_build_manifest(
 
 def _run(coro):
     """Run a single coroutine and return its result."""
-    return asyncio.run(coro)
+    try:
+        return asyncio.run(asyncio.wait_for(coro, timeout=120))
+    except asyncio.TimeoutError:
+        click.echo("ERROR: Database operation timed out", err=True)
+        raise SystemExit(1)
 
 
 @cli.group("database")
@@ -107,8 +119,8 @@ def database_crud(manifest, adapter, name, config, operation, table, data, filte
                 {
                     "operation": operation,
                     "table": table,
-                    "data": json.loads(data),
-                    "filters": json.loads(filters),
+                    "data": _safe_json(data, "--data"),
+                    "filters": _safe_json(filters, "--filters"),
                 },
             )
         finally:
@@ -124,7 +136,7 @@ def database_crud(manifest, adapter, name, config, operation, table, data, filte
 @click.option("--config", "-c", default="{}")
 @click.option("--table", required=True)
 @click.option("--vector", required=True, help="JSON array of floats")
-@click.option("--top-k", default=10, type=int)
+@click.option("--top-k", default=10, type=click.IntRange(1, 1000))
 @click.option("--filters", default="{}")
 def database_search(manifest, adapter, name, config, table, vector, top_k, filters):
     """Run vector similarity search on a vector store component."""
@@ -141,9 +153,9 @@ def database_search(manifest, adapter, name, config, table, vector, top_k, filte
                 "vector_search",
                 {
                     "table": table,
-                    "vector": json.loads(vector),
+                    "vector": _safe_json(vector, "--vector"),
                     "top_k": top_k,
-                    "filters": json.loads(filters),
+                    "filters": _safe_json(filters, "--filters"),
                 },
             )
         finally:
@@ -177,7 +189,7 @@ def database_sql(manifest, adapter, name, config, query, table, params):
             return await instance.adapter.sql(
                 query=query,
                 table=table,
-                params=json.loads(params),
+                params=_safe_json(params, "--params"),
             )
         finally:
             await orchestrator.teardown()
@@ -215,7 +227,7 @@ def _qdrant_exec(name, operation, args):
 @click.option("--config", "-c", default="{}")
 @click.option("--collection", required=True)
 @click.option("--vector", required=True, help="JSON array of floats")
-@click.option("--top-k", default=10, type=int)
+@click.option("--top-k", default=10, type=click.IntRange(1, 1000))
 @click.option("--filters", default="{}")
 def qdrant_search(name, config, collection, vector, top_k, filters):
     """Vector similarity search in a Qdrant collection."""
@@ -226,9 +238,9 @@ def qdrant_search(name, config, collection, vector, top_k, filters):
             "search",
             {
                 "collection": collection,
-                "vector": json.loads(vector),
+                "vector": _safe_json(vector, "--vector"),
                 "top_k": top_k,
-                "filters": json.loads(filters),
+                "filters": _safe_json(filters, "--filters"),
             },
         )
     )
@@ -239,7 +251,7 @@ def qdrant_search(name, config, collection, vector, top_k, filters):
 @click.option("--config", "-c", default="{}")
 @click.option("--collection", required=True)
 @click.option("--filters", default="{}")
-@click.option("--limit", default=10, type=int)
+@click.option("--limit", default=10, type=click.IntRange(1, 10000))
 @click.option("--with-vectors", is_flag=True)
 def qdrant_scroll(name, config, collection, filters, limit, with_vectors):
     """Scroll points in a Qdrant collection."""
@@ -250,7 +262,7 @@ def qdrant_scroll(name, config, collection, filters, limit, with_vectors):
             "scroll",
             {
                 "collection": collection,
-                "filters": json.loads(filters),
+                "filters": _safe_json(filters, "--filters"),
                 "limit": limit,
                 "with_vectors": with_vectors,
             },
@@ -272,7 +284,7 @@ def qdrant_upsert(name, config, collection, points):
             "upsert",
             {
                 "collection": collection,
-                "points": json.loads(points),
+                "points": _safe_json(points, "--points"),
             },
         )
     )
@@ -282,7 +294,7 @@ def qdrant_upsert(name, config, collection, points):
 @click.option("--name", "-n", default="db")
 @click.option("--config", "-c", default="{}")
 @click.option("--collection", required=True)
-@click.option("--vector-size", required=True, type=int)
+@click.option("--vector-size", required=True, type=click.IntRange(1, 10000))
 @click.option("--distance", default="Cosine", type=click.Choice(["Cosine", "Euclid", "Dot"]))
 def qdrant_create_collection(name, config, collection, vector_size, distance):
     """Create a Qdrant collection."""

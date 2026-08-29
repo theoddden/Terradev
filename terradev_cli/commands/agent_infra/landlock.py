@@ -243,10 +243,14 @@ def main() -> None:
     import sys
 
     if len(sys.argv) < 2:
-        print("usage: landlock.py <config.json>", file=sys.stderr)
-        sys.exit(1)
+        click.echo("usage: landlock.py <config.json>", err=True)
+        raise SystemExit(1)
 
-    cfg = json.loads(sys.argv[1])
+    try:
+        cfg = json.loads(sys.argv[1])
+    except json.JSONDecodeError as exc:
+        click.echo(f"ERROR: Invalid JSON in landlock config: {exc}", err=True)
+        raise SystemExit(1) from exc
     command = cfg["command"]
     env = cfg["env"]
     read_dirs = cfg.get("read_dirs", ["/"])

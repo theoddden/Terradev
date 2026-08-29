@@ -97,7 +97,11 @@ def letta_create(name, model, human, persona, memory_blocks, vector_db, skill, e
     """
     client = _get_client(environment)
 
-    blocks = json.loads(memory_blocks)
+    try:
+        blocks = json.loads(memory_blocks)
+    except json.JSONDecodeError as exc:
+        click.echo(f"ERROR: Invalid JSON in --memory-blocks: {exc}", err=True)
+        raise SystemExit(1) from exc
     if human:
         blocks.append({"label": "human", "value": human})
     if persona:
@@ -110,7 +114,7 @@ def letta_create(name, model, human, persona, memory_blocks, vector_db, skill, e
             blocks.append({"label": "skill", "value": skill_path.read_text()})
         else:
             click.echo(f"ERROR: skill file not found: {skill}", err=True)
-            sys.exit(1)
+            raise SystemExit(1)
 
     try:
         agent = client.agents.create(
@@ -120,7 +124,7 @@ def letta_create(name, model, human, persona, memory_blocks, vector_db, skill, e
         )
     except Exception as e:  # noqa: BLE001
         click.echo(f"ERROR: failed to create Letta agent: {e}", err=True)
-        sys.exit(1)
+        raise SystemExit(1)
 
     if fmt == "json":
         click.echo(json.dumps({"id": agent.id, "name": name, "model": model}, indent=2))
@@ -152,7 +156,7 @@ def letta_list(environment, fmt):
         agents = client.agents.list()
     except Exception as e:  # noqa: BLE001
         click.echo(f"ERROR: failed to list Letta agents: {e}", err=True)
-        sys.exit(1)
+        raise SystemExit(1)
 
     if fmt == "json":
         click.echo(json.dumps([{"id": a.id, "name": getattr(a, "name", "")} for a in agents], indent=2))
@@ -193,7 +197,7 @@ def letta_chat(agent_id, message, environment, fmt):
         )
     except Exception as e:  # noqa: BLE001
         click.echo(f"ERROR: failed to chat with Letta agent: {e}", err=True)
-        sys.exit(1)
+        raise SystemExit(1)
 
     if fmt == "json":
         messages = []
@@ -237,7 +241,7 @@ def letta_status(agent_id, environment, fmt):
         agent = client.agents.retrieve(agent_id)
     except Exception as e:  # noqa: BLE001
         click.echo(f"ERROR: failed to retrieve Letta agent: {e}", err=True)
-        sys.exit(1)
+        raise SystemExit(1)
 
     if fmt == "json":
         click.echo(json.dumps({"id": agent.id, "name": getattr(agent, "name", "")}, indent=2, default=str))
@@ -262,7 +266,7 @@ def letta_delete(agent_id, environment):
         client.agents.delete(agent_id)
     except Exception as e:  # noqa: BLE001
         click.echo(f"ERROR: failed to delete Letta agent: {e}", err=True)
-        sys.exit(1)
+        raise SystemExit(1)
 
     click.echo(f"Deleted Letta agent: {agent_id}")
 
@@ -301,6 +305,6 @@ def letta_remember(agent_id, text, label, environment):
             )
     except Exception as e:  # noqa: BLE001
         click.echo(f"ERROR: failed to store memory: {e}", err=True)
-        sys.exit(1)
+        raise SystemExit(1)
 
     click.echo(f"Stored memory under label '{label}' for agent {agent_id}")

@@ -80,27 +80,27 @@ def orchestrator_start(gpu_id, memory_gb, policy):
 
     async def run_orchestrator():
         await orchestrator.start()
-        print(f"Model Orchestrator started on GPU {gpu_id}")
-        print(
+        click.echo(f"Model Orchestrator started on GPU {gpu_id}")
+        click.echo(
             f"Memory: {memory_gb}GB total, {orchestrator.memory_threshold_gb:.1f}GB usable"
         )
-        print(f"Policy: {policy}")
-        print("Press Ctrl+C to stop...")
+        click.echo(f"Policy: {policy}")
+        click.echo("Press Ctrl+C to stop...")
 
         try:
             while True:
                 await asyncio.sleep(10)
                 status = orchestrator.get_status()
-                print(
+                click.echo(
                     f"Status: {status['warm_models_count']} warm models, "
                     f"{status['used_memory_gb']:.1f}GB used "
                     f"({status['memory_utilization_percent']:.1f}%)"
                 )
         except KeyboardInterrupt:
-            print("\nStopping orchestrator...")
+            click.echo("\nStopping orchestrator...")
             await orchestrator.stop()
 
-    asyncio.run(run_orchestrator())
+    _run_with_timeout(run_orchestrator())
 
 
 @orchestrator.command("register")
@@ -125,7 +125,7 @@ def orchestrator_register(model_id, model_path, framework, priority, tags):
     orchestrator = ModelOrchestrator()
     tag_set = set(tags.split(",")) if tags else None
 
-    asyncio.run(orchestrator.register_model(
+    _run_with_timeout(orchestrator.register_model(
         model_id=model_id,
         model_path=model_path,
         framework=framework,
@@ -133,11 +133,11 @@ def orchestrator_register(model_id, model_path, framework, priority, tags):
         tags=tag_set,
     ))
 
-    print(f"Model registered: {model_id}")
-    print(f"  Path: {model_path}")
-    print(f"  Framework: {framework}")
-    print(f"  Priority: {priority}")
-    print(f"  Tags: {', '.join(tag_set) if tag_set else 'None'}")
+    click.echo(f"Model registered: {model_id}")
+    click.echo(f"  Path: {model_path}")
+    click.echo(f"  Framework: {framework}")
+    click.echo(f"  Priority: {priority}")
+    click.echo(f"  Tags: {', '.join(tag_set) if tag_set else 'None'}")
 
 
 @orchestrator.command("load")
@@ -153,15 +153,15 @@ def orchestrator_load(model_id, force):
         success = await orchestrator.load_model(model_id, force=force)
         if success:
             details = orchestrator.get_model_details(model_id)
-            print(f"Model {model_id} loaded successfully!")
-            print(f"  State: {details['state']}")
-            print(f"  Memory: {details['metrics']['memory_gb']:.1f}GB")
-            print(f"  Load time: {details['metrics']['load_time_s']:.1f}s")
-            print(f"  Warmup time: {details['metrics']['warmup_time_s']:.1f}s")
+            click.echo(f"Model {model_id} loaded successfully!")
+            click.echo(f"  State: {details['state']}")
+            click.echo(f"  Memory: {details['metrics']['memory_gb']:.1f}GB")
+            click.echo(f"  Load time: {details['metrics']['load_time_s']:.1f}s")
+            click.echo(f"  Warmup time: {details['metrics']['warmup_time_s']:.1f}s")
         else:
-            print(f"Failed to load model {model_id}")
+            click.echo(f"Failed to load model {model_id}", err=True)
 
-    asyncio.run(load_model())
+    _run_with_timeout(load_model())
 
 
 @orchestrator.command("evict")
@@ -175,11 +175,11 @@ def orchestrator_evict(model_id):
     async def evict_model():
         success = await orchestrator.evict_model(model_id)
         if success:
-            print(f"Model {model_id} evicted successfully")
+            click.echo(f"Model {model_id} evicted successfully")
         else:
-            print(f"Failed to evict model {model_id}")
+            click.echo(f"Failed to evict model {model_id}", err=True)
 
-    asyncio.run(evict_model())
+    _run_with_timeout(evict_model())
 
 
 @orchestrator.command("status")
@@ -193,37 +193,37 @@ def orchestrator_status(model_id):
     if model_id:
         details = orchestrator.get_model_details(model_id)
         if details:
-            print(f"Model Details: {model_id}")
-            print(f"  Framework: {details['framework']}")
-            print(f"  State: {details['state']}")
-            print(f"  Priority: {details['priority']}")
-            print(f"  Tags: {', '.join(details['tags'])}")
-            print(f"  Memory: {details['metrics']['memory_gb']:.1f}GB")
-            print(f"  Load time: {details['metrics']['load_time_s']:.1f}s")
-            print(f"  Warmup time: {details['metrics']['warmup_time_s']:.1f}s")
-            print(f"  Requests/hour: {details['metrics']['requests_per_hour']:.1f}")
-            print(f"  Avg latency: {details['metrics']['avg_latency_ms']:.1f}ms")
-            print(f"  Error rate: {details['metrics']['error_rate']:.2f}")
-            print(f"  Last accessed: {details['last_accessed']}")
+            click.echo(f"Model Details: {model_id}")
+            click.echo(f"  Framework: {details['framework']}")
+            click.echo(f"  State: {details['state']}")
+            click.echo(f"  Priority: {details['priority']}")
+            click.echo(f"  Tags: {', '.join(details['tags'])}")
+            click.echo(f"  Memory: {details['metrics']['memory_gb']:.1f}GB")
+            click.echo(f"  Load time: {details['metrics']['load_time_s']:.1f}s")
+            click.echo(f"  Warmup time: {details['metrics']['warmup_time_s']:.1f}s")
+            click.echo(f"  Requests/hour: {details['metrics']['requests_per_hour']:.1f}")
+            click.echo(f"  Avg latency: {details['metrics']['avg_latency_ms']:.1f}ms")
+            click.echo(f"  Error rate: {details['metrics']['error_rate']:.2f}")
+            click.echo(f"  Last accessed: {details['last_accessed']}")
         else:
-            print(f"Model {model_id} not found")
+            click.echo(f"Model {model_id} not found")
     else:
         status = orchestrator.get_status()
-        print("Orchestrator Status:")
-        print(f"  GPU: {status['gpu_id']}")
-        print(f"  Total memory: {status['total_memory_gb']:.1f}GB")
-        print(f"  Used memory: {status['used_memory_gb']:.1f}GB")
-        print(f"  Available: {status['available_memory_gb']:.1f}GB")
-        print(f"  Utilization: {status['memory_utilization_percent']:.1f}%")
-        print(f"  Policy: {status['scaling_policy']}")
-        print(f"  Total models: {status['total_models']}")
-        print(f"  Warm models: {status['warm_models_count']}")
-        print(f"  Warm memory: {status['warm_models_memory_gb']:.1f}GB")
+        click.echo("Orchestrator Status:")
+        click.echo(f"  GPU: {status['gpu_id']}")
+        click.echo(f"  Total memory: {status['total_memory_gb']:.1f}GB")
+        click.echo(f"  Used memory: {status['used_memory_gb']:.1f}GB")
+        click.echo(f"  Available: {status['available_memory_gb']:.1f}GB")
+        click.echo(f"  Utilization: {status['memory_utilization_percent']:.1f}%")
+        click.echo(f"  Policy: {status['scaling_policy']}")
+        click.echo(f"  Total models: {status['total_models']}")
+        click.echo(f"  Warm models: {status['warm_models_count']}")
+        click.echo(f"  Warm memory: {status['warm_models_memory_gb']:.1f}GB")
 
-        print("\nModels by state:")
+        click.echo("\nModels by state:")
         for state, model_ids in status["models_by_state"].items():
             if model_ids:
-                print(f"  {state}: {', '.join(model_ids)}")
+                click.echo(f"  {state}: {', '.join(model_ids)}")
 
 
 @orchestrator.command("infer")
@@ -237,12 +237,12 @@ def orchestrator_infer(model_id):
     async def test_inference():
         success, latency_ms = await orchestrator.handle_request(model_id)
         if success:
-            print(f"Inference successful for {model_id}")
-            print(f"  Latency: {latency_ms:.1f}ms")
+            click.echo(f"Inference successful for {model_id}")
+            click.echo(f"  Latency: {latency_ms:.1f}ms")
         else:
-            print(f"Inference failed for {model_id}")
+            click.echo(f"Inference failed for {model_id}")
 
-    asyncio.run(test_inference())
+    _run_with_timeout(test_inference())
 
 
 @cli.group(name="warm-pool", cls=InferenceGroup)
@@ -291,25 +291,25 @@ def warm_pool_start(strategy, max_warm, min_warm):
 
     async def run_warm_pool():
         await warm_pool.start()
-        print("Warm Pool Manager started")
-        print(f"Strategy: {strategy}")
-        print(f"Capacity: {min_warm}-{max_warm} models")
-        print("Press Ctrl+C to stop...")
+        click.echo("Warm Pool Manager started")
+        click.echo(f"Strategy: {strategy}")
+        click.echo(f"Capacity: {min_warm}-{max_warm} models")
+        click.echo("Press Ctrl+C to stop...")
 
         try:
             while True:
                 await asyncio.sleep(30)
                 status = warm_pool.get_status()
-                print(
+                click.echo(
                     f"Status: {status['warm_models_count']} warm, "
                     f"{status['cache_hit_rate']:.1%} hit rate, "
                     f"{status['total_requests']} requests"
                 )
         except KeyboardInterrupt:
-            print("\nStopping warm pool manager...")
+            click.echo("\nStopping warm pool manager...")
             await warm_pool.stop()
 
-    asyncio.run(run_warm_pool())
+    _run_with_timeout(run_warm_pool())
 
 
 @warm_pool.command("register")
@@ -322,8 +322,8 @@ def warm_pool_register(model_id, priority):
     warm_pool = WarmPoolManager(WarmPoolConfig())
     warm_pool.register_model(model_id, priority)
 
-    print(f"Model {model_id} registered with warm pool")
-    print(f"  Priority: {priority}")
+    click.echo(f"Model {model_id} registered with warm pool")
+    click.echo(f"  Priority: {priority}")
 
 
 @warm_pool.command("status")
@@ -334,18 +334,18 @@ def warm_pool_status():
     warm_pool = WarmPoolManager(WarmPoolConfig())
     status = warm_pool.get_status()
 
-    print("Warm Pool Status:")
-    print(f"  Warm models: {status['warm_models_count']}")
-    print(f"  Warming models: {status['warming_models_count']}")
-    print(f"  Total models: {status['total_models']}")
-    print(f"  Strategy: {status['strategy']}")
-    print(f"  Cache hit rate: {status['cache_hit_rate']:.1%}")
-    print(f"  Total requests: {status['total_requests']}")
-    print(f"  Cold starts: {status['cold_starts']}")
-    print(f"  Avg warm latency: {status['avg_warm_latency_ms']:.1f}ms")
-    print(f"  Avg cold latency: {status['avg_cold_latency_ms']:.1f}ms")
-    print(f"  Memory saved: {status['memory_saved_gb']:.1f}GB")
-    print(f"  Cost saved: ${status['cost_saved_usd']:.2f}")
+    click.echo("Warm Pool Status:")
+    click.echo(f"  Warm models: {status['warm_models_count']}")
+    click.echo(f"  Warming models: {status['warming_models_count']}")
+    click.echo(f"  Total models: {status['total_models']}")
+    click.echo(f"  Strategy: {status['strategy']}")
+    click.echo(f"  Cache hit rate: {status['cache_hit_rate']:.1%}")
+    click.echo(f"  Total requests: {status['total_requests']}")
+    click.echo(f"  Cold starts: {status['cold_starts']}")
+    click.echo(f"  Avg warm latency: {status['avg_warm_latency_ms']:.1f}ms")
+    click.echo(f"  Avg cold latency: {status['avg_cold_latency_ms']:.1f}ms")
+    click.echo(f"  Memory saved: {status['memory_saved_gb']:.1f}GB")
+    click.echo(f"  Cost saved: ${status['cost_saved_usd']:.2f}")
 
 
 
@@ -390,21 +390,21 @@ def inferx_configure(api_key, endpoint, region, snapshot, gpu_slicing, multi_ten
     with open(config_file, "w") as f:
         json.dump(config, f, indent=2)
 
-    print("OK: InferX configured successfully")
-    print(f" Endpoint: {endpoint}")
-    print(f" Region: {region}")
-    print(f" Snapshot: {'Enabled' if snapshot else 'Disabled'}")
-    print(f" GPU Slicing: {'Enabled' if gpu_slicing else 'Disabled'}")
-    print(f" Multi-tenant: {'Enabled' if multi_tenant else 'Disabled'}")
+    click.echo("OK: InferX configured successfully")
+    click.echo(f" Endpoint: {endpoint}")
+    click.echo(f" Region: {region}")
+    click.echo(f" Snapshot: {'Enabled' if snapshot else 'Disabled'}")
+    click.echo(f" GPU Slicing: {'Enabled' if gpu_slicing else 'Disabled'}")
+    click.echo(f" Multi-tenant: {'Enabled' if multi_tenant else 'Disabled'}")
 
 
 @inferx.command()
 @click.option("--model", required=True, help="Model ID or HuggingFace model name")
 @click.option("--image", help="Docker image for model")
 @click.option("--gpu-type", default="A100", help="GPU type")
-@click.option("--gpu-memory", type=int, default=16, help="GPU memory in GB")
+@click.option("--gpu-memory", type=click.IntRange(1, 256), default=16, help="GPU memory in GB")
 @click.option(
-    "--max-concurrency", type=int, default=10, help="Maximum concurrent requests"
+    "--max-concurrency", type=click.IntRange(1, 10000), default=10, help="Maximum concurrent requests"
 )
 @click.option("--framework", default="pytorch", help="Model framework")
 @click.option(
@@ -412,7 +412,7 @@ def inferx_configure(api_key, endpoint, region, snapshot, gpu_slicing, multi_ten
     default=True,
     help="OpenAI-compatible API",
 )
-@click.option("--timeout", type=int, default=300, help="Request timeout in seconds")
+@click.option("--timeout", type=click.IntRange(1, 3600), default=300, help="Request timeout in seconds")
 def deploy(
     model,
     image,
@@ -430,8 +430,8 @@ def deploy(
     # Load InferX config
     config_file = Path.home() / ".terradev" / "inferx_config.json"
     if not config_file.exists():
-        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
-        sys.exit(1)
+        click.echo("ERROR: InferX not configured. Run 'terradev inferx configure' first.", err=True)
+        raise SystemExit(1)
 
     with open(config_file) as f:
         config = json.load(f)
@@ -451,31 +451,31 @@ def deploy(
         "timeout": timeout,
     }
 
-    print(f" Deploying {model} to InferX...")
-    print(f" GPU: {gpu_type} ({gpu_memory}GB)")
-    print(f" Max Concurrency: {max_concurrency}")
-    print(f" Framework: {framework}")
+    click.echo(f" Deploying {model} to InferX...")
+    click.echo(f" GPU: {gpu_type} ({gpu_memory}GB)")
+    click.echo(f" Max Concurrency: {max_concurrency}")
+    click.echo(f" Framework: {framework}")
 
     try:
-        result = asyncio.run(provider.deploy_model(model_config))
+        result = _run_with_timeout(provider.deploy_model(model_config))
 
-        print("OK: Model deployed successfully!")
-        print(f" Model ID: {result['model_id']}")
-        print(f" Endpoint: {result['endpoint']}")
-        print(f" Cold Start: {result['cold_start_time']}s")
-        print(f" GPU Utilization: {result['gpu_utilization']}%")
-        print(f"PACKAGE: Models per Node: {result['models_per_node']}")
+        click.echo("OK: Model deployed successfully!")
+        click.echo(f" Model ID: {result['model_id']}")
+        click.echo(f" Endpoint: {result['endpoint']}")
+        click.echo(f" Cold Start: {result['cold_start_time']}s")
+        click.echo(f" GPU Utilization: {result['gpu_utilization']}%")
+        click.echo(f"PACKAGE: Models per Node: {result['models_per_node']}")
 
         if result["openai_compatible"]:
-            print(" OpenAI Compatible: Yes")
-            print(
+            click.echo(" OpenAI Compatible: Yes")
+            click.echo(
                 f"Tip: Usage: curl -X POST {result['endpoint']} -H 'Authorization: Bearer YOUR_API_KEY'"
             )
 
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Deployment failed: {e}")
+        click.echo(f"ERROR: Deployment failed: {e}", err=True)
     finally:
-        asyncio.run(provider.close())
+        _run_with_timeout(provider.close())
 
 
 @inferx.command()
@@ -488,8 +488,8 @@ def inferx_status(model_id):
     # Load InferX config
     config_file = Path.home() / ".terradev" / "inferx_config.json"
     if not config_file.exists():
-        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
-        sys.exit(1)
+        click.echo("ERROR: InferX not configured. Run 'terradev inferx configure' first.", err=True)
+        raise SystemExit(1)
 
     with open(config_file) as f:
         config = json.load(f)
@@ -499,20 +499,20 @@ def inferx_status(model_id):
     provider = InferXProvider(config)
 
     try:
-        result = asyncio.run(provider.get_model_status(model_id))
+        result = _run_with_timeout(provider.get_model_status(model_id))
 
-        print(f" Model Status: {result.get('status', 'Unknown')}")
-        print(f" GPU Type: {result.get('gpu_type', 'Unknown')}")
-        print(f" Cold Start Time: {result.get('cold_start_time', 'Unknown')}s")
-        print(f" Requests/min: {result.get('requests_per_minute', 0)}")
-        print(f" GPU Utilization: {result.get('gpu_utilization', 0)}%")
-        print(f"PACKAGE: Models on GPU: {result.get('models_on_gpu', 0)}")
-        print(f"   Error rate: {result.get('error_rate', 0)}%")
+        click.echo(f" Model Status: {result.get('status', 'Unknown')}")
+        click.echo(f" GPU Type: {result.get('gpu_type', 'Unknown')}")
+        click.echo(f" Cold Start Time: {result.get('cold_start_time', 'Unknown')}s")
+        click.echo(f" Requests/min: {result.get('requests_per_minute', 0)}")
+        click.echo(f" GPU Utilization: {result.get('gpu_utilization', 0)}%")
+        click.echo(f"PACKAGE: Models on GPU: {result.get('models_on_gpu', 0)}")
+        click.echo(f"   Error rate: {result.get('error_rate', 0)}%")
 
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Failed to get status: {e}")
+        click.echo(f"ERROR: Failed to get status: {e}", err=True)
     finally:
-        asyncio.run(provider.close())
+        _run_with_timeout(provider.close())
 
 
 @inferx.command()
@@ -525,8 +525,8 @@ def inferx_delete(model_id):
     # Load InferX config
     config_file = Path.home() / ".terradev" / "inferx_config.json"
     if not config_file.exists():
-        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
-        sys.exit(1)
+        click.echo("ERROR: InferX not configured. Run 'terradev inferx configure' first.", err=True)
+        raise SystemExit(1)
 
     with open(config_file) as f:
         config = json.load(f)
@@ -535,20 +535,20 @@ def inferx_delete(model_id):
 
     provider = InferXProvider(config)
 
-    print(f"  Deleting model {model_id}...")
+    click.echo(f"  Deleting model {model_id}...")
 
     try:
-        success = asyncio.run(provider.delete_model(model_id))
+        success = _run_with_timeout(provider.delete_model(model_id))
 
         if success:
-            print("OK: Model deleted successfully")
+            click.echo("OK: Model deleted successfully")
         else:
-            print("ERROR: Failed to delete model")
+            click.echo("ERROR: Failed to delete model", err=True)
 
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Failed to delete model: {e}")
+        click.echo(f"ERROR: Failed to delete model: {e}", err=True)
     finally:
-        asyncio.run(provider.close())
+        _run_with_timeout(provider.close())
 
 
 @inferx.command("list")
@@ -560,8 +560,8 @@ def inferx_list():
     # Load InferX config
     config_file = Path.home() / ".terradev" / "inferx_config.json"
     if not config_file.exists():
-        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
-        sys.exit(1)
+        click.echo("ERROR: InferX not configured. Run 'terradev inferx configure' first.", err=True)
+        raise SystemExit(1)
 
     with open(config_file) as f:
         config = json.load(f)
@@ -571,27 +571,27 @@ def inferx_list():
     provider = InferXProvider(config)
 
     try:
-        models = asyncio.run(provider.list_models())
+        models = _run_with_timeout(provider.list_models())
 
         if not models:
-            print(" No models deployed")
+            click.echo(" No models deployed")
             return
 
-        print(f" Deployed Models ({len(models)}):")
-        print("-" * 80)
+        click.echo(f" Deployed Models ({len(models)}):")
+        click.echo("-" * 80)
 
         for model in models:
-            print(f"PACKAGE: {model.get('model_id', 'Unknown')}")
-            print(f"   Status: {model.get('status', 'Unknown')}")
-            print(f"   GPU: {model.get('gpu_type', 'Unknown')}")
-            print(f"   Endpoint: {model.get('endpoint', 'Unknown')}")
-            print(f"   Created: {model.get('created_at', 'Unknown')}")
-            print()
+            click.echo(f"PACKAGE: {model.get('model_id', 'Unknown')}")
+            click.echo(f"   Status: {model.get('status', 'Unknown')}")
+            click.echo(f"   GPU: {model.get('gpu_type', 'Unknown')}")
+            click.echo(f"   Endpoint: {model.get('endpoint', 'Unknown')}")
+            click.echo(f"   Created: {model.get('created_at', 'Unknown')}")
+            click.echo()
 
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Failed to list models: {e}")
+        click.echo(f"ERROR: Failed to list models: {e}", err=True)
     finally:
-        asyncio.run(provider.close())
+        _run_with_timeout(provider.close())
 
 
 @inferx.command()
@@ -603,8 +603,8 @@ def usage():
     # Load InferX config
     config_file = Path.home() / ".terradev" / "inferx_config.json"
     if not config_file.exists():
-        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
-        sys.exit(1)
+        click.echo("ERROR: InferX not configured. Run 'terradev inferx configure' first.", err=True)
+        raise SystemExit(1)
 
     with open(config_file) as f:
         config = json.load(f)
@@ -614,21 +614,21 @@ def usage():
     provider = InferXProvider(config)
 
     try:
-        stats = asyncio.run(provider.get_usage_stats())
+        stats = _run_with_timeout(provider.get_usage_stats())
 
-        print(" InferX Usage Statistics")
-        print("-" * 40)
-        print(f" Total Requests: {stats.get('total_requests', 0):,}")
-        print(f"COST: Total Cost: ${stats.get('total_cost', 0):.4f}")
-        print(f"PACKAGE: Active Models: {stats.get('active_models', 0)}")
-        print(f" GPU Hours: {stats.get('gpu_hours', 0):.2f}")
-        print(f" Average Latency: {stats.get('average_latency', 0):.0f}ms")
-        print(f" GPU Utilization: {stats.get('gpu_utilization', 0):.1f}%")
+        click.echo(" InferX Usage Statistics")
+        click.echo("-" * 40)
+        click.echo(f" Total Requests: {stats.get('total_requests', 0):,}")
+        click.echo(f"COST: Total Cost: ${stats.get('total_cost', 0):.4f}")
+        click.echo(f"PACKAGE: Active Models: {stats.get('active_models', 0)}")
+        click.echo(f" GPU Hours: {stats.get('gpu_hours', 0):.2f}")
+        click.echo(f" Average Latency: {stats.get('average_latency', 0):.0f}ms")
+        click.echo(f" GPU Utilization: {stats.get('gpu_utilization', 0):.1f}%")
 
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Failed to get usage stats: {e}")
+        click.echo(f"ERROR: Failed to get usage stats: {e}", err=True)
     finally:
-        asyncio.run(provider.close())
+        _run_with_timeout(provider.close())
 
 
 @inferx.command()
@@ -642,8 +642,8 @@ def inferx_quote(gpu_type, region):
     # Load InferX config
     config_file = Path.home() / ".terradev" / "inferx_config.json"
     if not config_file.exists():
-        print("ERROR: InferX not configured. Run 'terradev inferx configure' first.")
-        sys.exit(1)
+        click.echo("ERROR: InferX not configured. Run 'terradev inferx configure' first.", err=True)
+        raise SystemExit(1)
 
     with open(config_file) as f:
         config = json.load(f)
@@ -653,34 +653,33 @@ def inferx_quote(gpu_type, region):
     provider = InferXProvider(config)
 
     try:
-        quotes = asyncio.run(provider.get_instance_quotes(gpu_type, region))
+        quotes = _run_with_timeout(provider.get_instance_quotes(gpu_type, region))
 
         if not quotes:
-            print("ERROR: No quotes available")
-            return
-
+            click.echo("ERROR: No quotes available", err=True)
+            raise SystemExit(1)
         quote = quotes[0]
 
-        print("COST: InferX Pricing Quote")
-        print("-" * 40)
-        print(f" GPU Type: {quote['gpu_type']}")
-        print(
+        click.echo("COST: InferX Pricing Quote")
+        click.echo("-" * 40)
+        click.echo(f" GPU Type: {quote['gpu_type']}")
+        click.echo(
             f" Hourly Cost: ${quote['price_per_hour']:.4f} (Serverless - pay per request)"
         )
-        print(f" Per Request: ${quote['price_per_request']:.4f} per 1K tokens")
-        print(f" Cold Start: {quote['cold_start_time']}s")
-        print(f" GPU Utilization: {quote['gpu_utilization']}%")
-        print(f"PACKAGE: Models per Node: {quote['models_per_node']}")
-        print(f" Region: {quote['region']}")
-        print()
-        print(" Key Features:")
+        click.echo(f" Per Request: ${quote['price_per_request']:.4f} per 1K tokens")
+        click.echo(f" Cold Start: {quote['cold_start_time']}s")
+        click.echo(f" GPU Utilization: {quote['gpu_utilization']}%")
+        click.echo(f"PACKAGE: Models per Node: {quote['models_per_node']}")
+        click.echo(f" Region: {quote['region']}")
+        click.echo()
+        click.echo(" Key Features:")
         for feature in quote["features"]:
-            print(f"   OK: {feature.replace('_', ' ').title()}")
+            click.echo(f"   OK: {feature.replace('_', ' ').title()}")
 
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Failed to get quotes: {e}")
+        click.echo(f"ERROR: Failed to get quotes: {e}", err=True)
     finally:
-        asyncio.run(provider.close())
+        _run_with_timeout(provider.close())
 
 
 @inferx.command()
@@ -731,55 +730,55 @@ def inferx_optimize(cluster_config, usage_metrics, tier, output, implement):
         with open(usage_metrics) as f:
             usage_metrics_data = json.load(f)
 
-    print(f" Analyzing InferX costs for {tier} tier...")
+    click.echo(f" Analyzing InferX costs for {tier} tier...")
 
     # Generate cost report
-    report = asyncio.run(
+    report = _run_with_timeout(
         optimizer.generate_cost_report(
             cluster_config_data, usage_metrics_data, target_tier
         )
     )
 
     # Display results
-    print("\n Cost Analysis Results:")
-    print("=" * 50)
-    print(
+    click.echo("\n Cost Analysis Results:")
+    click.echo("=" * 50)
+    click.echo(
         f"COST: Current Monthly Cost: ${report['summary']['current_monthly_cost']:,.2f}"
     )
-    print(
+    click.echo(
         f" Potential Monthly Savings: ${report['summary']['potential_monthly_savings']:,.2f}"
     )
-    print(f" Savings Percentage: {report['summary']['savings_percentage']:.1f}%")
-    print(
+    click.echo(f" Savings Percentage: {report['summary']['savings_percentage']:.1f}%")
+    click.echo(
         f" Optimized Monthly Cost: ${report['summary']['optimized_monthly_cost']:,.2f}"
     )
-    print(f"  Payback Period: {report['summary']['payback_period_months']:.1f} months")
-    print(f" Annual ROI: {report['summary']['annual_roi']:.1f}%")
-    print()
+    click.echo(f"  Payback Period: {report['summary']['payback_period_months']:.1f} months")
+    click.echo(f" Annual ROI: {report['summary']['annual_roi']:.1f}%")
+    click.echo()
 
-    print(" Key Insights:")
+    click.echo(" Key Insights:")
     for insight in report["key_insights"]:
-        print(f"    {insight}")
-    print()
+        click.echo(f"    {insight}")
+    click.echo()
 
-    print(" Top Recommendations:")
+    click.echo(" Top Recommendations:")
     for i, rec in enumerate(report["recommendations"][:5], 1):
-        print(f"   {i}. {rec['description']}")
-        print(f"      Savings: ${rec['estimated_savings']:,.2f}/month")
-        print(f"      Risk: {rec['risk_level']}, Priority: {rec['priority']}")
-        print()
+        click.echo(f"   {i}. {rec['description']}")
+        click.echo(f"      Savings: ${rec['estimated_savings']:,.2f}/month")
+        click.echo(f"      Risk: {rec['risk_level']}, Priority: {rec['priority']}")
+        click.echo()
 
     # Save report
     if output:
         with open(output, "w") as f:
             json.dump(report, f, indent=2)
-        print(f" Detailed report saved to: {output}")
+        click.echo(f" Detailed report saved to: {output}")
 
     # Implement optimizations if requested
     if implement:
-        print(" Implementing cost optimizations...")
+        click.echo(" Implementing cost optimizations...")
         # Implementation logic would go here
-        print("OK: Optimizations implemented successfully!")
+        click.echo("OK: Optimizations implemented successfully!")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -808,7 +807,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
             get_provision_ssh_key_path as _db_ssh_path,
         )
     except ImportError:
-        print("ERROR: Cost tracker not available")
+        click.echo("ERROR: Cost tracker not available", err=True)
         return [], None
 
     # Resolve "latest" to actual group ID
@@ -816,16 +815,16 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
     if group_id == "latest":
         group_id = get_latest_parallel_group()
         if not group_id:
-            print(
+            click.echo(
                 "ERROR: No previous provision groups found. Run 'terradev provision' first."
             )
             return [], None
         if fmt != "json":
-            print(f"  Resolved 'latest' -> {group_id}")
+            click.echo(f"  Resolved 'latest' -> {group_id}")
 
     instances = get_active_instances(parallel_group=group_id)
     if not instances:
-        print(f"ERROR: No active instances in provision group {group_id}")
+        click.echo(f"ERROR: No active instances in provision group {group_id}", err=True)
         return [], None
 
     node_ips = []
@@ -841,7 +840,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
     # Resolve remaining IPs via provider APIs
     if unresolved:
         if fmt != "json":
-            print(f"  Resolving IPs for {len(unresolved)} instance(s)...")
+            click.echo(f"  Resolving IPs for {len(unresolved)} instance(s)...")
 
         api = TerradevAPI()
 
@@ -875,7 +874,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
             await asyncio.gather(*[_get_ip(i) for i in unresolved])
             return results
 
-        resolved = asyncio.run(_resolve_ips())
+        resolved = _run_with_timeout(_resolve_ips())
 
         for inst in unresolved:
             ip = resolved.get(inst["instance_id"], inst["instance_id"])
@@ -888,7 +887,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
                 pass
 
     if fmt != "json":
-        print(f"  Nodes from provision group {group_id}: {node_ips}")
+        click.echo(f"  Nodes from provision group {group_id}: {node_ips}")
 
     # ── Auto-resolve SSH key from provision group ──
     resolved_ssh_key = None
@@ -898,7 +897,7 @@ def _resolve_provision_nodes(provision_group: str, fmt: str = "text"):
 
             resolved_ssh_key = decrypt_private_key(group_id)
             if resolved_ssh_key and fmt != "json":
-                print(
+                click.echo(
                     "  SSH key auto-resolved from provision group (ephemeral decrypt)"
                 )
     except Exception as _exc:  # noqa: BLE001
@@ -946,7 +945,7 @@ def preflight(nodes, ssh_user, ssh_key, provision_group, quick, fmt):
     if provision_group and not node_list:
         node_list, auto_ssh = _resolve_provision_nodes(provision_group, fmt)
         if not node_list:
-            sys.exit(1)
+            raise SystemExit(1)
         if auto_ssh and not ssh_key:
             resolved_ssh_key = auto_ssh
     if not node_list:
@@ -962,20 +961,20 @@ def preflight(nodes, ssh_user, ssh_key, provision_group, quick, fmt):
     summary = report.summary()
 
     if fmt == "json":
-        print(json.dumps(summary, indent=2, default=str))
+        click.echo(json.dumps(summary, indent=2, default=str))
     else:
         passed = summary.get("passed", False)
         status_icon = "PASS" if passed else "FAIL"
-        print(f"\nPreflight: {status_icon}")
-        print(f"  Nodes: {summary.get('nodes_checked', 0)}")
-        print(
+        click.echo(f"\nPreflight: {status_icon}")
+        click.echo(f"  Nodes: {summary.get('nodes_checked', 0)}")
+        click.echo(
             f"  Checks passed: {summary.get('checks_passed', 0)}/{summary.get('total_checks', 0)}"
         )
         if summary.get("failures"):
-            print("  Failures:")
+            click.echo("  Failures:")
             for f in summary["failures"]:
-                print(f"    - {f}")
-        print()
+                click.echo(f"    - {f}")
+        click.echo()
 
 
 
@@ -998,8 +997,8 @@ def infer():
 )
 @click.option("--gpu-type", "-g", help="GPU type preference")
 @click.option("--region", "-r", help="Region preference")
-@click.option("--max-latency", type=float, help="Max latency in ms")
-@click.option("--max-cost", type=float, help="Max cost per request")
+@click.option("--max-latency", type=click.FloatRange(0.0, 10000.0), help="Max latency in ms")
+@click.option("--max-cost", type=click.FloatRange(0.0, 1000.0), help="Max cost per request")
 def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_cost):
     """Compare and select the cheapest inference option across providers.
 
@@ -1008,23 +1007,23 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
 
     siliconflow, inferx.
     """
-    print(f"Deploying inference for model: {model}")
+    click.echo(f"Deploying inference for model: {model}")
 
     if type:
-        print(f"Model type: {type}")
+        click.echo(f"Model type: {type}")
     if provider:
-        print(f"Provider: {provider}")
+        click.echo(f"Provider: {provider}")
     if gpu_type:
-        print(f"GPU type: {gpu_type}")
+        click.echo(f"GPU type: {gpu_type}")
     if region:
-        print(f"Region: {region}")
+        click.echo(f"Region: {region}")
     if max_latency:
-        print(f"Max latency: {max_latency}ms")
+        click.echo(f"Max latency: {max_latency}ms")
     if max_cost:
-        print(f"Max cost: ${max_cost}/request")
+        click.echo(f"Max cost: ${max_cost}/request")
 
     # Get real quotes from providers
-    print("Getting inference quotes from terradev_cli.providers...")
+    click.echo("Getting inference quotes from terradev_cli.providers...")
 
     api = TerradevAPI()
     target_gpu = gpu_type or "A100"
@@ -1052,7 +1051,7 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
                 pass
         return all_q
 
-    quotes = asyncio.run(_fetch_inference_quotes())
+    quotes = _run_with_timeout(_fetch_inference_quotes())
 
     # Filter by latency if specified
     if max_latency:
@@ -1084,20 +1083,20 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
         pass
 
     if not quotes:
-        print("No suitable inference options found")
+        click.echo("No suitable inference options found")
         return
 
     # Select best option (lowest price, then lowest latency)
     best_quote = min(quotes, key=lambda x: (x["price"], x["latency"]))
 
-    print(f"\nBest option: {best_quote['provider']}")
-    print(f"Price: ${best_quote['price']}/request")
-    print(f"Latency: {best_quote['latency']}ms")
-    print(f"GPU: {best_quote['gpu_type']}")
+    click.echo(f"\nBest option: {best_quote['provider']}")
+    click.echo(f"Price: ${best_quote['price']}/request")
+    click.echo(f"Latency: {best_quote['latency']}ms")
+    click.echo(f"GPU: {best_quote['gpu_type']}")
 
     # Deploy to optimal provider via real API
     pname = best_quote["provider"]
-    print(f"\nDeploying to {pname}...")
+    click.echo(f"\nDeploying to {pname}...")
 
     async def _deploy_inference():
         from terradev_cli.providers.provider_factory import ProviderFactory
@@ -1113,21 +1112,21 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
         )
 
     try:
-        prov_result = asyncio.run(_deploy_inference())
+        prov_result = _run_with_timeout(_deploy_inference())
         endpoint_id = prov_result.get("instance_id", f"inf_{pname}_{int(time.time())}")
         endpoint_url = prov_result.get(
             "endpoint_url", f"https://{pname}.api/inference/{endpoint_id}"
         )
     except Exception as e:  # noqa: BLE001
-        print(f"Warning  Provisioning error: {e}")
+        click.echo(f"Warning  Provisioning error: {e}")
         endpoint_id = f"inf_{pname}_{int(time.time())}"
         endpoint_url = ""
 
-    print("Inference endpoint deployed")
-    print(f"ID Endpoint ID: {endpoint_id}")
+    click.echo("Inference endpoint deployed")
+    click.echo(f"ID Endpoint ID: {endpoint_id}")
     if endpoint_url:
-        print(f"URL: {endpoint_url}")
-    print("Status Status: Active")
+        click.echo(f"URL: {endpoint_url}")
+    click.echo("Status Status: Active")
 
     # Save to usage tracking
     api.usage["inference_endpoints"].append(
@@ -1157,7 +1156,7 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
             region=best_quote.get("region", ""),
             price_per_hour=best_quote["price"],
         )
-        print("SHIELD:  Registered for health monitoring & auto-failover")
+        click.echo("SHIELD:  Registered for health monitoring & auto-failover")
     except Exception as _exc:  # noqa: BLE001
         logger.exception(_exc)
         pass
@@ -1172,9 +1171,9 @@ def infer_deploy_main(model, type, provider, gpu_type, region, max_latency, max_
     type=click.Choice(["runpod", "vastai", "baseten", "huggingface", "siliconflow", "inferx"]),
 )
 @click.option("--gpu-type", "-g", help="GPU type (A100|H100|RTX4090)")
-@click.option("--min-workers", type=int, default=1, help="Minimum workers")
-@click.option("--max-workers", type=int, default=5, help="Maximum workers")
-@click.option("--idle-timeout", type=int, default=300, help="Idle timeout in seconds")
+@click.option("--min-workers", type=click.IntRange(0, 1000), default=1, help="Minimum workers")
+@click.option("--max-workers", type=click.IntRange(0, 1000), default=5, help="Maximum workers")
+@click.option("--idle-timeout", type=click.IntRange(0, 86400), default=300, help="Idle timeout in seconds")
 @click.option("--cost-optimize", is_flag=True, help="Enable cost optimization")
 @click.option("--dry-run", is_flag=True, help="Show deployment plan without deploying")
 def infer_endpoint(
@@ -1200,21 +1199,21 @@ def infer_endpoint(
       terradev infer endpoint meta-llama/Llama-3.1-8B-Instruct -n my-ep
       terradev infer endpoint my-org/my-model -n my-ep --provider siliconflow -g A100
     """
-    print(f"Deploying inference endpoint: {name}")
-    print(f"Model path: {model_path}")
+    click.echo(f"Deploying inference endpoint: {name}")
+    click.echo(f"Model path: {model_path}")
 
     if provider:
-        print(f"Provider: {provider}")
+        click.echo(f"Provider: {provider}")
     if gpu_type:
-        print(f"GPU type: {gpu_type}")
+        click.echo(f"GPU type: {gpu_type}")
 
-    print(f"Workers: {min_workers}-{max_workers}")
-    print(f"Idle timeout: {idle_timeout}s")
+    click.echo(f"Workers: {min_workers}-{max_workers}")
+    click.echo(f"Idle timeout: {idle_timeout}s")
     if cost_optimize:
-        print("Cost optimization: Enabled")
+        click.echo("Cost optimization: Enabled")
 
     # Real deployment via provider API
-    print("\nAnalyzing model requirements...")
+    click.echo("\nAnalyzing model requirements...")
 
     api = TerradevAPI()
     target_gpu = gpu_type or "A100"
@@ -1243,20 +1242,20 @@ def infer_endpoint(
                 pass
         return best
 
-    best = asyncio.run(_get_best_quote())
+    best = _run_with_timeout(_get_best_quote())
     if not best:
-        print("No providers returned quotes for this GPU type")
+        click.echo("No providers returned quotes for this GPU type")
         return
 
     pname = best["provider"]
-    print(f"Selected provider: {pname} (${best['price']:.2f}/hr)")
+    click.echo(f"Selected provider: {pname} (${best['price']:.2f}/hr)")
 
     if dry_run:
-        print("\n Dry run  deployment plan shown above. No resources provisioned.")
+        click.echo("\n Dry run  deployment plan shown above. No resources provisioned.")
         return
 
     # Provision the instance
-    print("Deploying endpoint...")
+    click.echo("Deploying endpoint...")
 
     async def _provision():
         from terradev_cli.providers.provider_factory import ProviderFactory
@@ -1284,21 +1283,20 @@ def infer_endpoint(
         )
 
     try:
-        prov_result = asyncio.run(_provision())
+        prov_result = _run_with_timeout(_provision())
         endpoint_id = prov_result.get("instance_id", f"ep_{name}_{int(time.time())}")
         endpoint_url = prov_result.get(
             "endpoint_url", f"https://{pname}.api/inference/{endpoint_id}"
         )
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Deployment failed: {e}")
-        return
-
-    print("\nEndpoint deployed successfully!")
-    print(f"ID Endpoint ID: {endpoint_id}")
-    print(f"Endpoint URL: {endpoint_url}")
-    print("Status Status: Active")
-    print(f"Workers: {min_workers}/{max_workers}")
-    print(f"Cost: ${best['price']:.2f}/hr")
+        click.echo(f"ERROR: Deployment failed: {e}", err=True)
+        raise SystemExit(1)
+    click.echo("\nEndpoint deployed successfully!")
+    click.echo(f"ID Endpoint ID: {endpoint_id}")
+    click.echo(f"Endpoint URL: {endpoint_url}")
+    click.echo("Status Status: Active")
+    click.echo(f"Workers: {min_workers}/{max_workers}")
+    click.echo(f"Cost: ${best['price']:.2f}/hr")
 
     # Silent: record inference deployment tick for ML training data
     try:
@@ -1348,7 +1346,7 @@ def infer_endpoint(
             region=best.get("region", ""),
             price_per_hour=best["price"],
         )
-        print("SHIELD:  Registered for health monitoring & auto-failover")
+        click.echo("SHIELD:  Registered for health monitoring & auto-failover")
     except Exception as _exc:  # noqa: BLE001
         logger.exception(_exc)
         pass
@@ -1376,32 +1374,32 @@ def infer_status(check):
     try:
         from terradev_cli.core.inference_router import InferenceRouter
     except ImportError:
-        print("ERROR: Inference router module not available.")
-        sys.exit(1)
+        click.echo("ERROR: Inference router module not available.", err=True)
+        raise SystemExit(1)
 
     router = InferenceRouter()
 
     if not router.endpoints:
-        print(" No inference endpoints registered.")
-        print("   Deploy one with: terradev infer --model <model>")
+        click.echo(" No inference endpoints registered.")
+        click.echo("   Deploy one with: terradev infer --model <model>")
         return
 
     if check:
-        print(" Running health probes...")
-        asyncio.run(router.check_all_endpoints())
-        print()
+        click.echo(" Running health probes...")
+        _run_with_timeout(router.check_all_endpoints())
+        click.echo()
 
     status = router.get_status()
-    print(" Inference Endpoint Status")
-    print("=" * 70)
-    print(
+    click.echo(" Inference Endpoint Status")
+    click.echo("=" * 70)
+    click.echo(
         f"   Total: {status['total_endpoints']}  |  Healthy: {status['healthy']}  |  Unhealthy: {status['unhealthy']}"
     )
-    print()
+    click.echo()
 
     header = f"{'ID':<28} {'Provider':<12} {'Health':<12} {'Latency':<10} {'$/hr':<8} {'Role':<10}"
-    print(header)
-    print("-" * 70)
+    click.echo(header)
+    click.echo("-" * 70)
 
     for ep in status["endpoints"]:
         health_icon = {
@@ -1412,7 +1410,7 @@ def infer_status(check):
         }.get(ep["health"], "")
         role = "PRIMARY" if ep["is_primary"] else f"backup→{ep.get('backup', '?')}"
         lat = f"{ep['avg_latency_ms']}ms" if ep["avg_latency_ms"] > 0 else ""
-        print(
+        click.echo(
             f"{ep['endpoint_id']:<28} {ep['provider']:<12} {health_icon} {ep['health']:<9} {lat:<10} ${ep['price_per_hour']:<7.2f} {role}"
         )
 
@@ -1423,9 +1421,9 @@ def infer_status(check):
             with open(failover_log, "r") as f:
                 events = json.load(f)
             if events:
-                print("\nPlan Recent Failover Events (last 5):")
+                click.echo("\nPlan Recent Failover Events (last 5):")
                 for ev in events[-5:]:
-                    print(
+                    click.echo(
                         f"   {ev['timestamp']}  {ev['failed_provider']}/{ev['failed_endpoint'][:16]} → {ev['new_provider']}/{ev['new_primary'][:16]}"
                     )
         except Exception as _exc:  # noqa: BLE001
@@ -1453,31 +1451,31 @@ def infer_failover(dry_run):
     #     print(f"ERROR: Inference failover requires Research+ or Enterprise tier.")
     #     print(f"   Current tier: {api.tier['name']}")
     #     print(f"   Run: terradev upgrade")
-    #     sys.exit(1)
+    #     raise SystemExit(1)
 
     try:
         from terradev_cli.core.inference_router import InferenceRouter
     except ImportError:
-        print("ERROR: Inference router module not available.")
-        sys.exit(1)
+        click.echo("ERROR: Inference router module not available.", err=True)
+        raise SystemExit(1)
 
     router = InferenceRouter()
 
     if not router.endpoints:
-        print(" No inference endpoints registered.")
-        sys.exit(1)
+        click.echo(" No inference endpoints registered.")
+        raise SystemExit(1)
 
-    print(" Running health checks on all inference endpoints...")
-    probes = asyncio.run(router.check_all_endpoints())
+    click.echo(" Running health checks on all inference endpoints...")
+    probes = _run_with_timeout(router.check_all_endpoints())
 
     for eid, probe in probes.items():
         ep = router.endpoints.get(eid)
         icon = "" if probe.healthy else ""
         lat = f"{probe.latency_ms:.0f}ms" if probe.latency_ms > 0 else ""
-        print(f"   {icon} {eid[:24]:<24} {ep.provider:<12} {lat}")
+        click.echo(f"   {icon} {eid[:24]:<24} {ep.provider:<12} {lat}")
 
     if dry_run:
-        print("\n DRY RUN  checking for failover candidates...")
+        click.echo("\n DRY RUN  checking for failover candidates...")
         for eid, ep in router.endpoints.items():
             if (
                 ep.is_primary
@@ -1486,26 +1484,26 @@ def infer_failover(dry_run):
             ):
                 backup = router.endpoints.get(ep.backup_endpoint_id)
                 if backup:
-                    print(
+                    click.echo(
                         f"   Warning  WOULD FAILOVER: {ep.provider}/{eid[:16]} → {backup.provider}/{backup.endpoint_id[:16]}"
                     )
-        print("   (No changes made)")
+        click.echo("   (No changes made)")
         return
 
-    print("\n Checking for auto-failover...")
-    events = asyncio.run(router.check_and_failover())
+    click.echo("\n Checking for auto-failover...")
+    events = _run_with_timeout(router.check_and_failover())
 
     if events:
         for ev in events:
-            print(
+            click.echo(
                 f"    FAILOVER: {ev['failed_provider']}/{ev['failed_endpoint'][:16]} → {ev['new_provider']}/{ev['new_primary'][:16]}"
             )
-            print(f"      Reason: {ev['reason']}")
-        print(
+            click.echo(f"      Reason: {ev['reason']}")
+        click.echo(
             f"\nOK: {len(events)} failover(s) executed. Traffic shifted to healthy providers."
         )
     else:
-        print("   OK: All primary endpoints healthy  no failover needed.")
+        click.echo("   OK: All primary endpoints healthy  no failover needed.")
 
 
 @infer.command("route")
@@ -1540,25 +1538,25 @@ def infer_route(model, strategy, measure):
     # if 'all' not in tier_features and 'inference' not in tier_features:
     #     print(f"ERROR: Inference routing requires Research+ or Enterprise tier.")
     #     print(f"   Run: terradev upgrade")
-    #     sys.exit(1)
+    #     raise SystemExit(1)
 
     try:
         from terradev_cli.core.inference_router import InferenceRouter
     except ImportError:
-        print("ERROR: Inference router module not available.")
-        sys.exit(1)
+        click.echo("ERROR: Inference router module not available.", err=True)
+        raise SystemExit(1)
 
     router = InferenceRouter()
 
     if not router.endpoints:
-        print(" No inference endpoints registered.")
+        click.echo(" No inference endpoints registered.")
         return
 
     if measure:
-        print(" Running latency measurements...")
+        click.echo(" Running latency measurements...")
         wpt_key = os.environ.get("WPT_API_KEY")
         if wpt_key:
-            print("    WebPageTest integration enabled")
+            click.echo("    WebPageTest integration enabled")
 
         async def _measure_all():
             await router.check_all_endpoints()
@@ -1576,31 +1574,31 @@ def infer_route(model, strategy, measure):
                             ep.latency_history
                         )
                         source = "WPT" if wpt_key else "HTTP"
-                        print(f"   Status {eid[:24]}: {lat:.0f}ms ({source})")
+                        click.echo(f"   Status {eid[:24]}: {lat:.0f}ms ({source})")
             router._save_endpoints()
 
-        asyncio.run(_measure_all())
-        print()
+        _run_with_timeout(_measure_all())
+        click.echo()
 
     best = router.get_best_endpoint(model=model, strategy=strategy)
 
     if not best:
-        print(
+        click.echo(
             "ERROR: No healthy endpoints found"
             + (f" for model '{model}'" if model else "")
         )
         return
 
-    print(f" Best endpoint (strategy: {strategy}):")
-    print(f"   Endpoint:  {best.endpoint_id}")
-    print(f"   Provider:  {best.provider}")
-    print(f"   Model:     {best.model}")
-    print(f"   Region:    {best.region}")
-    print(f"   Latency:   {best.avg_latency_ms:.0f}ms")
-    print(f"   Cost:      ${best.price_per_hour:.2f}/hr")
-    print(f"   Health:    {best.health.value}")
+    click.echo(f" Best endpoint (strategy: {strategy}):")
+    click.echo(f"   Endpoint:  {best.endpoint_id}")
+    click.echo(f"   Provider:  {best.provider}")
+    click.echo(f"   Model:     {best.model}")
+    click.echo(f"   Region:    {best.region}")
+    click.echo(f"   Latency:   {best.avg_latency_ms:.0f}ms")
+    click.echo(f"   Cost:      ${best.price_per_hour:.2f}/hr")
+    click.echo(f"   Health:    {best.health.value}")
     if best.url:
-        print(f"   URL:       {best.url}")
+        click.echo(f"   URL:       {best.url}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1798,10 +1796,10 @@ def _kubectl_apply(manifest_dict: Dict[str, Any], dry_run: bool = False) -> bool
             cmd.append("--dry-run=client")
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            print(f"   {result.stdout.strip()}")
+            click.echo(f"   {result.stdout.strip()}")
             return True
         except subprocess.CalledProcessError as e:
-            print(f"   ERROR: kubectl error: {e.stderr.strip()}")
+            click.echo(f"   ERROR: kubectl error: {e.stderr.strip()}")
             return False
         finally:
             os.unlink(f.name)

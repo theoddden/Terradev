@@ -31,6 +31,12 @@ def _secret_value(
     from_stdin: bool,
 ) -> Tuple[str, str]:
     """Resolve a secret from explicit value, env var, or stdin."""
+    sources = [bool(value), bool(from_env), from_stdin]
+    if sum(sources) > 1:
+        raise click.ClickException(
+            "Use only one of --value, --from-env, or --from-stdin"
+        )
+
     if from_env:
         if from_env not in os.environ:
             raise click.ClickException(f"Environment variable {from_env} is not set")
@@ -185,7 +191,7 @@ def vault_get(provider: str, key: str, raw: bool):
     if value is None:
         output.error(f"No secret found for {provider}.{key}")
         output.set_result({"found": False})
-        return
+        raise SystemExit(1)
 
     if raw:
         if output.format == "human":
@@ -232,7 +238,7 @@ def vault_remove(provider: str, key: Optional[str]):
     if not removed:
         output.error(f"No secret found for {provider}{f'.{key}' if key else ''}")
         output.set_result({"removed": False})
-        return
+        raise SystemExit(1)
 
     output.success(f"Removed {provider}{f'.{key}' if key else ''}")
     output.set_result({"removed": True, "provider": provider, "key": key})
@@ -281,7 +287,8 @@ def vault_env(provider: str, raw: bool):
     for name, value in env.items():
         # shlex.quote is safe, but the value itself is secret.
         line = f'export {name}={shlex.quote(value)}'
-        output._write_raw(line + "\n")
+        if output.format == "human":
+            output._write_raw(line + "\n")
 
     output.set_result({"exports": env})
 
@@ -308,7 +315,8 @@ def vault_run(command: Tuple[str, ...], provider: Optional[str], no_exec: bool):
         env = v.build_run_env(provider)
         for name, value in env.items():
             if name.startswith(v.ENV_PREFIX):
-                output._write_raw(f'export {name}={shlex.quote(value)}\n')
+                if output.format == "human":
+                    output._write_raw(f'export {name}={shlex.quote(value)}\n')
         output.set_result({"exports": env})
         return
 
@@ -344,4 +352,4 @@ def vault_run(command: Tuple[str, ...], provider: Optional[str], no_exec: bool):
 
     output.set_result({"exit_code": proc.returncode, "command": list(command)})
     if proc.returncode != 0:
-        sys.exit(proc.returncode)
+        raise SystemExit(proc.returncode)

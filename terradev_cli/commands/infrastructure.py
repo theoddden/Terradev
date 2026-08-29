@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 
 @cli.command()
 @click.option("--gpu-type", required=True, help="GPU type")
-@click.option("--budget", type=float, required=True, help="Budget constraint ($/hr)")
-@click.option("--gpu-count", type=int, default=1, help="Number of GPUs")
-@click.option("--hours", type=float, default=1.0, help="Estimated runtime in hours")
+@click.option("--budget", type=click.FloatRange(0.0, 10000.0), required=True, help="Budget constraint ($/hr)")
+@click.option("--gpu-count", type=click.IntRange(1, 1000), default=1, help="Number of GPUs")
+@click.option("--hours", type=click.FloatRange(0.0, 100000.0), default=1.0, help="Estimated runtime in hours")
 @click.option("--region", help="Preferred region")
 @click.option("--workload", default="training", help="Workload type")
 def budget_optimize(gpu_type, budget, gpu_count, hours, region, workload):
@@ -33,34 +33,38 @@ def budget_optimize(gpu_type, budget, gpu_count, hours, region, workload):
             "region": region,
         }
 
-        print(f"COST: Finding options under ${budget:.2f}/hr budget for {gpu_type}...")
+        click.echo(f"COST: Finding options under ${budget:.2f}/hr budget for {gpu_type}...")
 
         options = await optimizer.optimize_for_budget(requirements, budget)
 
         if not options:
-            print(f"ERROR: No options found under ${budget:.2f}/hr budget")
-            return
+            click.echo(f"ERROR: No options found under ${budget:.2f}/hr budget", err=True)
+            raise SystemExit(1)
 
-        print("\n Budget-Optimized Options:")
-        print("=" * 80)
-        print(
+        click.echo("\n Budget-Optimized Options:")
+        click.echo("=" * 80)
+        click.echo(
             f"{'Provider':<12} {'Instance':<20} {'Cost':<10} {'Risk':<8} {'Budget Used':<12} {'Confidence':<12}"
         )
-        print("-" * 80)
+        click.echo("-" * 80)
 
         for option in options:
-            print(
+            click.echo(
                 f"{option['provider']:<12} {option['instance_type']:<20} ${option['price']:<9.2f} {option['risk_score']:<7.1%} {option['budget_utilization']:<11.1%} {option['confidence']:<12.1%}"
             )
-            print(
+            click.echo(
                 f"   Predicted total: ${option['predicted_cost']:.2f} (risk-adjusted: ${option['risk_adjusted_cost']:.2f})"
             )
-            print(
+            click.echo(
                 f"   Capacity: {option['capacity']} | Spot: {'Yes' if option['spot'] else 'No'}"
             )
-            print()
+            click.echo()
 
-    asyncio.run(_budget_optimize())
+    try:
+        asyncio.run(asyncio.wait_for(_budget_optimize(), timeout=120))
+    except asyncio.TimeoutError:
+        click.echo("ERROR: Budget optimization timed out")
+        raise SystemExit(1)
 @cli.command()
 @click.option(
     "--workload",
@@ -73,13 +77,13 @@ def budget_optimize(gpu_type, budget, gpu_count, hours, region, workload):
     help="GPU type (A100, H100, V100, L4, L40S, RTX 4090, T4, etc.)",
 )
 @click.option("--image", required=True, help="Docker image")
-@click.option("--gpu-count", type=int, default=1, help="Number of GPUs")
-@click.option("--memory", type=int, help="Memory in GB")
-@click.option("--storage", type=int, help="Storage in GB")
-@click.option("--budget", type=float, help="Budget constraint ($/hr)")
+@click.option("--gpu-count", type=click.IntRange(1, 1000), default=1, help="Number of GPUs")
+@click.option("--memory", type=click.IntRange(1, 10000), help="Memory in GB")
+@click.option("--storage", type=click.IntRange(1, 100000), help="Storage in GB")
+@click.option("--budget", type=click.FloatRange(0.0, 10000.0), help="Budget constraint ($/hr)")
 @click.option("--region", help="Preferred region")
 @click.option(
-    "--port", type=int, multiple=True, help="Expose port(s) via Service (repeatable)"
+    "--port", type=click.IntRange(1, 65535), multiple=True, help="Expose port(s) via Service (repeatable)"
 )
 @click.option(
     "--stack",
@@ -127,65 +131,65 @@ def helm_generate(
     }
 
     if dry_run:
-        print("Helm Chart Configuration (Dry Run):")
-        print("=" * 50)
-        print(f"Workload: {workload}")
-        print(f"GPU: {gpu_type} x{gpu_count}")
-        print(f"Image: {image}")
-        print(f"Memory: {workload_config['memory_gb']}GB")
-        print(f"Storage: {workload_config['storage_gb']}GB")
+        click.echo("Helm Chart Configuration (Dry Run):")
+        click.echo("=" * 50)
+        click.echo(f"Workload: {workload}")
+        click.echo(f"GPU: {gpu_type} x{gpu_count}")
+        click.echo(f"Image: {image}")
+        click.echo(f"Memory: {workload_config['memory_gb']}GB")
+        click.echo(f"Storage: {workload_config['storage_gb']}GB")
         if budget:
-            print(f"Budget: ${budget}/hr")
-        print(f"Region: {workload_config['region']}")
-        print(f"Spot: {workload_config['spot']}")
+            click.echo(f"Budget: ${budget}/hr")
+        click.echo(f"Region: {workload_config['region']}")
+        click.echo(f"Spot: {workload_config['spot']}")
         if port:
-            print(f"Ports: {list(port)}")
+            click.echo(f"Ports: {list(port)}")
         if stack:
-            print(f"Stack: {list(stack)}")
-        print()
-        print("Chart files that would be generated:")
-        print("   Chart.yaml")
-        print("   values.yaml")
-        print("   templates/")
+            click.echo(f"Stack: {list(stack)}")
+        click.echo()
+        click.echo("Chart files that would be generated:")
+        click.echo("   Chart.yaml")
+        click.echo("   values.yaml")
+        click.echo("   templates/")
         if workload in ("training", "cost-optimized"):
-            print("     - job.yaml")
+            click.echo("     - job.yaml")
         else:
-            print("     - deployment.yaml")
-            print("     - service.yaml")
-            print("     - hpa.yaml")
-            print("     - pdb.yaml")
-        print("     - configmap.yaml")
-        print("     - pvc.yaml (if storage)")
-        print("     - serviceaccount.yaml")
-        print("     - _helpers.tpl")
-        print("     - NOTES.txt")
-        print("   README.md")
+            click.echo("     - deployment.yaml")
+            click.echo("     - service.yaml")
+            click.echo("     - hpa.yaml")
+            click.echo("     - pdb.yaml")
+        click.echo("     - configmap.yaml")
+        click.echo("     - pvc.yaml (if storage)")
+        click.echo("     - serviceaccount.yaml")
+        click.echo("     - _helpers.tpl")
+        click.echo("     - NOTES.txt")
+        click.echo("   README.md")
         return
 
     # Generate chart
     chart_name = name or f"terradev-{workload}"
     output_dir = output or f"./{chart_name}"
 
-    print(f"Generating Helm chart for {workload} workload...")
+    click.echo(f"Generating Helm chart for {workload} workload...")
 
     try:
         chart_path = generator.generate_chart(workload_config, output_dir)
-        print("Helm chart generated successfully!")
-        print(f"   Location: {chart_path}")
-        print()
-        print("Next steps:")
-        print(f"   1. Review the chart: cd {chart_path}")
-        print("   2. Customize values: vim values.yaml")
-        print(f"   3. Install chart: helm install my-{workload} .")
-        print(
+        click.echo("Helm chart generated successfully!")
+        click.echo(f"   Location: {chart_path}")
+        click.echo()
+        click.echo("Next steps:")
+        click.echo(f"   1. Review the chart: cd {chart_path}")
+        click.echo("   2. Customize values: vim values.yaml")
+        click.echo(f"   3. Install chart: helm install my-{workload} .")
+        click.echo(
             f"   4. Check status: kubectl get all -l app.kubernetes.io/name=my-{workload}"
         )
-        print()
-        print(f"   Chart README: {chart_path}/README.md")
-        print("   Terradev docs: https://terradev.dev/docs")
+        click.echo()
+        click.echo(f"   Chart README: {chart_path}/README.md")
+        click.echo("   Terradev docs: https://terradev.dev/docs")
 
     except Exception as e:  # noqa: BLE001
-        print(f"Failed to generate Helm chart: {e}")
+        click.echo(f"Failed to generate Helm chart: {e}")
 @cli.command()
 @click.option("--gpu-type", "-g", help="GPU type filter (shows all if omitted)")
 @click.option(
@@ -196,51 +200,51 @@ def availability(gpu_type, window):
     try:
         from terradev_cli.core.price_intelligence import get_availability, get_availability_summary
     except ImportError:
-        print("ERROR: Price intelligence module not available")
-        sys.exit(1)
+        click.echo("ERROR: Price intelligence module not available", err=True)
+        raise SystemExit(1)
 
     if gpu_type:
         data = get_availability(gpu_type, hours=window)
         providers = data.get("providers", {})
 
         if not providers:
-            print(
-                f"ERROR: No availability data for {gpu_type.upper()} in the last {window}h"
+            click.echo(
+                f"ERROR: No availability data for {gpu_type.upper()} in the last {window}h", err=True
             )
-            print(
-                f"Tip: Run 'terradev quote -g {gpu_type}' to start tracking availability."
+            click.echo(
+                f"Tip: Run 'terradev quote -g {gpu_type}' to start tracking availability.", err=True
             )
-            return
+            raise SystemExit(1)
 
-        print(f"\n Availability  {gpu_type.upper()} (last {window}h)")
-        print(
+        click.echo(f"\n Availability  {gpu_type.upper()} (last {window}h)")
+        click.echo(
             f"{'Provider':<14} {'Status':<12} {'Rate':>8} {'Checks':>8} {'Avail':>8} {'Avg ms':>10} {'Last Seen':<20}"
         )
-        print("─" * 90)
+        click.echo("─" * 90)
         for prov, stats in sorted(providers.items()):
             status = "OK: In Stock" if stats["available"] else "ERROR: Sold Out"
             rate_pct = f"{stats['availability_rate'] * 100:.1f}%"
-            print(
+            click.echo(
                 f"{prov:<14} {status:<12} {rate_pct:>8} {stats['total_checks']:>8} "
                 f"{stats['available_checks']:>8} {stats['avg_response_ms']:>9.0f}ms "
                 f"{stats['last_seen'][:19]:<20}"
             )
             if stats.get("last_error"):
-                print(f"{'':>14} Warning  Last error: {stats['last_error'][:60]}")
+                click.echo(f"{'':>14} Warning  Last error: {stats['last_error'][:60]}")
     else:
         summary = get_availability_summary()
         if not summary:
-            print("ERROR: No availability data yet.")
-            print("Tip: Run 'terradev quote -g <GPU>' to start tracking.")
-            return
+            click.echo("ERROR: No availability data yet.", err=True)
+            click.echo("Tip: Run 'terradev quote -g <GPU>' to start tracking.", err=True)
+            raise SystemExit(1)
 
-        print("\n Availability Summary (all GPUs, last check)")
-        print(f"{'GPU Type':<14} {'Provider':<14} {'Status':<12}")
-        print("─" * 42)
+        click.echo("\n Availability Summary (all GPUs, last check)")
+        click.echo(f"{'GPU Type':<14} {'Provider':<14} {'Status':<12}")
+        click.echo("─" * 42)
         for gtype in sorted(summary.keys()):
             for prov in sorted(summary[gtype].keys()):
                 status = "OK: In Stock" if summary[gtype][prov] else "ERROR: Sold Out"
-                print(f"{gtype:<14} {prov:<14} {status:<12}")
+                click.echo(f"{gtype:<14} {prov:<14} {status:<12}")
 @cli.command()
 @click.option("--provider", "-p", help="Filter to a single provider")
 @click.option(
@@ -255,26 +259,26 @@ def reliability(provider, window, ranking):
             get_provider_ranking,
         )
     except ImportError:
-        print("ERROR: Price intelligence module not available")
-        sys.exit(1)
+        click.echo("ERROR: Price intelligence module not available", err=True)
+        raise SystemExit(1)
 
     if ranking:
         ranked = get_provider_ranking()
         if not ranked:
-            print("ERROR: No reliability data yet.")
-            print(
-                "Tip: Run 'terradev quote' or 'terradev provision' to start tracking."
+            click.echo("ERROR: No reliability data yet.", err=True)
+            click.echo(
+                "Tip: Run 'terradev quote' or 'terradev provision' to start tracking.", err=True
             )
-            return
+            raise SystemExit(1)
 
-        print("\n Provider Reliability Ranking")
-        print(
+        click.echo("\n Provider Reliability Ranking")
+        click.echo(
             f"{'#':<4} {'Provider':<14} {'Score':>8} {'Quote %':>9} {'Prov %':>9} {'Q ms':>8} {'P ms':>8} {'Events':>8}"
         )
-        print("─" * 75)
+        click.echo("─" * 75)
         for i, r in enumerate(ranked, 1):
             medal = "" if i == 1 else "" if i == 2 else "" if i == 3 else f" {i}"
-            print(
+            click.echo(
                 f"{medal:<4} {r['provider']:<14} {r['overall_score']:>7.1f} "
                 f"{r['quote_success_rate']*100:>8.1f}% {r['provision_success_rate']*100:>8.1f}% "
                 f"{r['avg_quote_latency_ms']:>7.0f} {r['avg_provision_latency_ms']:>7.0f} "
@@ -286,24 +290,24 @@ def reliability(provider, window, ranking):
     providers = data.get("providers", {})
 
     if not providers:
-        print(
+        click.echo(
             "ERROR: No reliability data"
             + (f" for {provider}" if provider else "")
             + f" in the last {window}h"
-        )
-        print("Tip: Run 'terradev quote' or 'terradev provision' to start tracking.")
-        return
+        , err=True)
+        click.echo("Tip: Run 'terradev quote' or 'terradev provision' to start tracking.", err=True)
+        raise SystemExit(1)
 
-    print(f"\n Provider Reliability (last {window}h)")
-    print(
+    click.echo(f"\n Provider Reliability (last {window}h)")
+    click.echo(
         f"{'Provider':<14} {'Score':>8} {'Quote %':>9} {'Prov %':>9} {'Q ms':>8} {'P ms':>8} {'Quotes':>8} {'Provs':>8} {'Errors':>8}"
     )
-    print("─" * 95)
+    click.echo("─" * 95)
     for prov, stats in sorted(
         providers.items(), key=lambda x: x[1]["overall_score"], reverse=True
     ):
         err_count = sum(stats["errors"].values())
-        print(
+        click.echo(
             f"{prov:<14} {stats['overall_score']:>7.1f} "
             f"{stats['quote_success_rate']*100:>8.1f}% {stats['provision_success_rate']*100:>8.1f}% "
             f"{stats['avg_quote_latency_ms']:>7.0f} {stats['avg_provision_latency_ms']:>7.0f} "
@@ -315,11 +319,11 @@ def reliability(provider, window, ranking):
             for err_msg, cnt in sorted(stats["errors"].items(), key=lambda x: -x[1])[
                 :3
             ]:
-                print(f"{'':>14} Warning  {err_msg[:60]} (×{cnt})")
+                click.echo(f"{'':>14} Warning  {err_msg[:60]} (×{cnt})")
 
     # Overall summary
     all_scores = [s["overall_score"] for s in providers.values()]
     avg_score = sum(all_scores) / len(all_scores)
-    print(
+    click.echo(
         f"\nStatus Average reliability: {avg_score:.1f}/100 across {len(providers)} provider(s)"
     )

@@ -9,7 +9,6 @@ import base64
 import binascii
 import json
 import os
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -173,61 +172,61 @@ def canary_report(output, file, provider, gpu):
         out = get_output()
         if out is not None:
             out._closed = True
-        sys.stdout.write(json.dumps(summary, indent=2, default=str) + "\n")
+        click.echo(json.dumps(summary, indent=2, default=str))
         return
 
-    print("=" * 60)
-    print("TERRADEV CANARY REPORT".center(60))
-    print("=" * 60)
+    click.echo("=" * 60)
+    click.echo("TERRADEV CANARY REPORT".center(60))
+    click.echo("=" * 60)
 
     if not records:
-        print("No canary records found.")
-        print(f"Run canary tests first or point to a results file with --file.")
-        return
+        click.echo("No canary records found.")
+        click.echo(f"Run canary tests first or point to a results file with --file.")
+        raise SystemExit(1)
 
-    print(f"Total runs:     {summary['total']}")
-    print(f"Passed:         {summary['passed']}")
-    print(f"Failed:         {summary['failed']}")
-    print(f"Skipped:        {summary['skipped']}")
+    click.echo(f"Total runs:     {summary['total']}")
+    click.echo(f"Passed:         {summary['passed']}")
+    click.echo(f"Failed:         {summary['failed']}")
+    click.echo(f"Skipped:        {summary['skipped']}")
     if summary["first_seen"]:
-        print(f"First seen:     {summary['first_seen']}")
+        click.echo(f"First seen:     {summary['first_seen']}")
     if summary["last_seen"]:
-        print(f"Last seen:      {summary['last_seen']}")
+        click.echo(f"Last seen:      {summary['last_seen']}")
 
     dur = summary["duration_ms"]
     if dur["avg"] is not None:
-        print(f"Duration (ms):  min={dur['min']}, max={dur['max']}, avg={dur['avg']:.1f}")
+        click.echo(f"Duration (ms):  min={dur['min']}, max={dur['max']}, avg={dur['avg']:.1f}")
 
-    print("-" * 60)
-    print("By provider:")
+    click.echo("-" * 60)
+    click.echo("By provider:")
     for p, count in sorted(summary["providers"].items(), key=lambda x: -x[1]):
-        print(f"  {p:<20} {count}")
+        click.echo(f"  {p:<20} {count}")
 
     if summary["regions"]:
-        print("-" * 60)
-        print("By region:")
+        click.echo("-" * 60)
+        click.echo("By region:")
         for r, count in sorted(summary["regions"].items(), key=lambda x: -x[1]):
-            print(f"  {r:<20} {count}")
+            click.echo(f"  {r:<20} {count}")
 
     if summary["gpu_types"]:
-        print("-" * 60)
-        print("By GPU type:")
+        click.echo("-" * 60)
+        click.echo("By GPU type:")
         for g, count in sorted(summary["gpu_types"].items(), key=lambda x: -x[1]):
-            print(f"  {g:<20} {count}")
+            click.echo(f"  {g:<20} {count}")
 
     if summary["tpu_types"]:
-        print("-" * 60)
-        print("By TPU type:")
+        click.echo("-" * 60)
+        click.echo("By TPU type:")
         for t, count in sorted(summary["tpu_types"].items(), key=lambda x: -x[1]):
-            print(f"  {t:<20} {count}")
+            click.echo(f"  {t:<20} {count}")
 
     if summary["tpu_chips"]:
-        print("-" * 60)
-        print("By TPU chip count:")
+        click.echo("-" * 60)
+        click.echo("By TPU chip count:")
         for t, count in sorted(summary["tpu_chips"].items(), key=lambda x: -x[1]):
-            print(f"  {t:<20} {count}")
+            click.echo(f"  {t:<20} {count}")
 
-    print("=" * 60)
+    click.echo("=" * 60)
 
 
 @canary.command("tail")
@@ -242,7 +241,7 @@ def canary_report(output, file, provider, gpu):
     "--limit",
     "-n",
     default=10,
-    type=int,
+    type=click.IntRange(1, 1000),
     help="Number of recent records to show",
 )
 def canary_tail(file, limit):
@@ -251,10 +250,10 @@ def canary_tail(file, limit):
     records = _load_canary_records(path)
     recent = records[-limit:]
     if not recent:
-        print("No canary records found.")
-        return
+        click.echo("No canary records found.")
+        raise SystemExit(1)
     for rec in recent:
-        print(json.dumps(rec, indent=2, default=str))
+        click.echo(json.dumps(rec, indent=2, default=str))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -507,7 +506,8 @@ def _load_drift_credentials(providers: List[str]) -> Dict[str, Union[str, Dict[s
         try:
             with open(creds_path, "r", encoding="utf-8") as f:
                 file_data = json.load(f)
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as exc:
+            click.echo(f"WARNING: Failed to load credentials file {creds_path}: {exc}", err=True)
             file_data = {}
 
     for provider in providers:
@@ -530,8 +530,8 @@ def _render_drift_human(summary: Dict[str, Any]) -> None:
     """Print a human-readable drift report."""
     date = summary["checked_at"][:10]
     width = 50
-    print(f"Provider Drift Report — {date}")
-    print("─" * width)
+    click.echo(f"Provider Drift Report — {date}")
+    click.echo("─" * width)
 
     for p in summary["providers"]:
         if p["drift_detected"]:
@@ -558,10 +558,10 @@ def _render_drift_human(summary: Dict[str, Any]) -> None:
         else:
             detail = f"{ok}/{total} endpoints"
 
-        print(f"{symbol} {p['provider']:<15} {status:<10} {detail}")
+        click.echo(f"{symbol} {p['provider']:<15} {status:<10} {detail}")
 
-    print("─" * width)
-    print(f"{summary['healthy']} healthy  |  {summary['drifted']} drifted  |  {summary['skipped']} skipped")
+    click.echo("─" * width)
+    click.echo(f"{summary['healthy']} healthy  |  {summary['drifted']} drifted  |  {summary['skipped']} skipped")
 
 
 @canary.command("drift")
@@ -594,7 +594,7 @@ def _render_drift_human(summary: Dict[str, Any]) -> None:
 @click.option(
     "--timeout",
     "drift_timeout",
-    type=int,
+    type=click.IntRange(1, 600),
     default=30,
     help="HTTP timeout in seconds for each drift endpoint call.",
 )
@@ -609,15 +609,13 @@ def _render_drift_human(summary: Dict[str, Any]) -> None:
 def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format, drift_timeout, no_credentials):
     """Run a provider API drift check against live endpoints."""
     if not drift_all and not provider:
-        get_output(ctx).error("Specify --all or --provider <name>")
+        get_output(ctx.find_root()).error("Specify --all or --provider <name>")
         ctx.exit(2)
-        return
 
     contracts_path = Path(contracts_dir) if contracts_dir else _default_contracts_dir()
     if not contracts_path.exists():
-        get_output(ctx).error(f"Contracts directory not found: {contracts_path}")
+        get_output(ctx.find_root()).error(f"Contracts directory not found: {contracts_path}")
         ctx.exit(2)
-        return
 
     contract_files = sorted(contracts_path.glob("*.yaml"))
     if provider:
@@ -637,9 +635,8 @@ def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format, drift_ti
         contract_files = matching_files
 
     if not contract_files:
-        get_output(ctx).error(f"No matching provider contracts in {contracts_path}")
+        get_output(ctx.find_root()).error(f"No matching provider contracts in {contracts_path}")
         ctx.exit(2)
-        return
 
     providers = []
     for p in contract_files:
@@ -653,24 +650,22 @@ def canary_drift(ctx, drift_all, provider, contracts_dir, drift_format, drift_ti
         monitor.results.append(monitor.check_provider(p))
     summary = monitor.summary()
 
-    out = get_output(ctx)
+    out = get_output(ctx.find_root())
     if drift_format:
         out.set_format(drift_format)
 
     if out.format == "json":
         out._closed = True  # noqa: SLF001
-        sys.stdout.write(json.dumps(summary, indent=2, default=str) + "\n")
+        click.echo(json.dumps(summary, indent=2, default=str))
         if summary["drifted"]:
             ctx.exit(1)
-        return
 
     if out.format == "jsonl":
         out._closed = True  # noqa: SLF001
         for r in summary["providers"]:
-            sys.stdout.write(json.dumps(r, default=str) + "\n")
+            click.echo(json.dumps(r, default=str))
         if summary["drifted"]:
             ctx.exit(1)
-        return
 
     _render_drift_human(summary)
     if summary["drifted"]:
@@ -705,7 +700,7 @@ def _default_ml_contracts_dir() -> Path:
 @click.option(
     "--timeout",
     "drift_timeout",
-    type=int,
+    type=click.IntRange(1, 600),
     default=30,
     help="HTTP timeout in seconds for each drift endpoint call.",
 )
@@ -726,15 +721,13 @@ def _default_ml_contracts_dir() -> Path:
 def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url, no_credentials):
     """Run drift checks for self-hosted ML/inference services."""
     if not ml_all and not provider:
-        get_output(ctx).error("Specify --all or --provider <name>")
+        get_output(ctx.find_root()).error("Specify --all or --provider <name>")
         ctx.exit(2)
-        return
 
     contracts_path = _default_ml_contracts_dir()
     if not contracts_path.exists():
-        get_output(ctx).error(f"Contracts directory not found: {contracts_path}")
+        get_output(ctx.find_root()).error(f"Contracts directory not found: {contracts_path}")
         ctx.exit(2)
-        return
 
     contract_files = sorted(contracts_path.glob("*.yaml"))
     if provider:
@@ -754,9 +747,8 @@ def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url
         contract_files = matching_files
 
     if not contract_files:
-        get_output(ctx).error(f"No matching ML service contracts in {contracts_path}")
+        get_output(ctx.find_root()).error(f"No matching ML service contracts in {contracts_path}")
         ctx.exit(2)
-        return
 
     providers = []
     for p in contract_files:
@@ -773,28 +765,30 @@ def canary_ml_drift(ctx, ml_all, provider, drift_format, drift_timeout, base_url
         base_url_overrides=overrides,
     )
     monitor.results = []
-    for p in contract_files:
-        monitor.results.append(monitor.check_provider(p))
-    summary = monitor.summary()
+    try:
+        for p in contract_files:
+            monitor.results.append(monitor.check_provider(p))
+        summary = monitor.summary()
+    except Exception as exc:
+        get_output(ctx.find_root()).error(f"ML drift check failed: {exc}")
+        ctx.exit(1)
 
-    out = get_output(ctx)
+    out = get_output(ctx.find_root())
     if drift_format:
         out.set_format(drift_format)
 
     if out.format == "json":
         out._closed = True  # noqa: SLF001
-        sys.stdout.write(json.dumps(summary, indent=2, default=str) + "\n")
+        click.echo(json.dumps(summary, indent=2, default=str))
         if summary["drifted"]:
             ctx.exit(1)
-        return
 
     if out.format == "jsonl":
         out._closed = True  # noqa: SLF001
         for r in summary["providers"]:
-            sys.stdout.write(json.dumps(r, default=str) + "\n")
+            click.echo(json.dumps(r, default=str))
         if summary["drifted"]:
             ctx.exit(1)
-        return
 
     _render_drift_human(summary)
     if summary["drifted"]:

@@ -658,7 +658,7 @@ def registry_group():
 @click.option("--url", help="URL for http transport")
 @click.option("--env", multiple=True, help="Environment KEY=VALUE")
 @click.option("--network-allow", multiple=True, help="Allowed network hosts")
-@click.option("--isolation", type=click.Choice(["firecracker", "gvisor", "bwrap", "none"]))
+@click.option("--isolation", type=click.Choice(["firecracker", "gvisor", "bwrap", "none"]), help="Sandbox isolation level for the MCP server process")
 @click.option("--config", "config_path", default=lambda: str(Path.home() / ".terradev" / "mcp_registry.json"), help="Registry file path")
 def mcp_registry_add(
     name,
@@ -704,14 +704,14 @@ def mcp_registry_add(
 
 @registry_group.command("list")
 @click.option("--config", "config_path", default=lambda: str(Path.home() / ".terradev" / "mcp_registry.json"), help="Registry file path")
-@click.option("--format", type=click.Choice(["text", "json"]), default="text")
-def mcp_registry_list(config_path, format):
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def mcp_registry_list(config_path, fmt):
     """List MCP servers in the registry."""
     try:
         reg = McpRegistry.load(Path(config_path))
     except McpError as exc:
         raise click.BadOptionUsage("--config", f"{exc}") from exc
-    if format == "json":
+    if fmt == "json":
         click.echo(json.dumps([s.model_dump() for s in reg.servers], indent=2, default=str))
     else:
         click.echo(f"MCP REGISTRY ({len(reg.servers)})")
@@ -756,7 +756,7 @@ def mcp_serve(transport, config, port, host):
                 await bridge.close()
 
     try:
-        asyncio.run(_main())
+        _run_with_timeout(_main())
     except (click.ClickException, SystemExit):
         raise
     except Exception as exc:  # noqa: BLE001
@@ -767,11 +767,11 @@ def mcp_serve(transport, config, port, host):
 @mcp.command("call")
 @click.option("--server", "-s", required=True, help="Server name or full server.tool")
 @click.option("--tool", "-t", help="Tool name if --server is a server name")
-@click.option("--input", "-i", default="{}", help="JSON arguments for the tool")
+@click.option("--input", "-i", "tool_input", default="{}", help="JSON arguments for the tool")
 @click.option("--config", "-c", default=lambda: str(Path.home() / ".terradev" / "mcp_registry.json"), help="Registry file path")
-@click.option("--timeout", default=30.0, help="Call timeout")
-@click.option("--format", type=click.Choice(["text", "json"]), default="text")
-def mcp_call(server, tool, input, config, timeout, format):
+@click.option("--timeout", default=30.0, help="Call timeout (seconds)")
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def mcp_call(server, tool, tool_input, config, timeout, fmt):
     """Call a tool on a single MCP server."""
     import asyncio
 
@@ -785,7 +785,7 @@ def mcp_call(server, tool, input, config, timeout, format):
             if not tool:
                 raise click.BadOptionUsage("--tool", "--tool is required")
             try:
-                arguments = json.loads(input) if input else {}
+                arguments = json.loads(tool_input) if tool_input else {}
             except json.JSONDecodeError as exc:
                 raise click.BadOptionUsage("--input", f"Invalid JSON: {exc}") from exc
 
@@ -795,7 +795,7 @@ def mcp_call(server, tool, input, config, timeout, format):
             try:
                 result = await conn.call_tool(tool, arguments)
 
-                if format == "json":
+                if fmt == "json":
                     click.echo(json.dumps(result, indent=2, default=str))
                 else:
                     click.echo("OK:")
@@ -806,7 +806,7 @@ def mcp_call(server, tool, input, config, timeout, format):
                 await conn.close()
 
     try:
-        asyncio.run(_main())
+        _run_with_timeout(_main())
     except (click.ClickException, SystemExit):
         raise
     except Exception as exc:  # noqa: BLE001

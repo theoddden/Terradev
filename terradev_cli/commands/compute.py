@@ -18,6 +18,15 @@ from . import cli
 logger = logging.getLogger(__name__)
 
 
+def _run_with_timeout(coro, timeout=300):
+    """Run an async coroutine with a timeout to prevent hangs."""
+    try:
+        return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
+    except asyncio.TimeoutError:
+        click.echo(f"ERROR: Operation timed out after {timeout}s", err=True)
+        raise SystemExit(1)
+
+
 @cli.command()
 @click.option(
     "--gpu-type",
@@ -26,10 +35,10 @@ logger = logging.getLogger(__name__)
     help="GPU/TPU type (required: A100, H100, RTX4090, TPU-V6E-8T, etc.)",
 )
 @click.option(
-    "--count", "-n", default=1, help="Number of instances to provision (default: 1)"
+    "--count", "-n", default=1, type=click.IntRange(1, 1000), help="Number of instances to provision (default: 1)"
 )
 @click.option(
-    "--max-price", type=float, help="Maximum price per hour in USD (e.g., 2.50)"
+    "--max-price", type=click.FloatRange(0.0, 10000.0), help="Maximum price per hour in USD (e.g., 2.50)"
 )
 @click.option(
     "--providers",
@@ -37,7 +46,7 @@ logger = logging.getLogger(__name__)
     multiple=True,
     help="Filter to specific providers (multiple allowed, e.g., runpod,vastai)",
 )
-@click.option("--parallel", default=6, help="Max parallel deploy threads (default: 6)")
+@click.option("--parallel", default=6, type=click.IntRange(1, 100), help="Max parallel deploy threads (default: 6)")
 @click.option(
     "--dry-run", is_flag=True, help="Show allocation plan without launching instances"
 )
@@ -49,10 +58,10 @@ logger = logging.getLogger(__name__)
 @click.option("--model-name", help="Model to deploy (for inference workloads)")
 @click.option("--endpoint-name", help="Endpoint name (for inference workloads)")
 @click.option(
-    "--min-workers", type=int, help="Minimum workers for auto-scaling (inference)"
+    "--min-workers", type=click.IntRange(0, 1000), help="Minimum workers for auto-scaling (inference)"
 )
 @click.option(
-    "--max-workers", type=int, help="Maximum workers for auto-scaling (inference)"
+    "--max-workers", type=click.IntRange(0, 1000), help="Maximum workers for auto-scaling (inference)"
 )
 @click.option(
     "--spot",
@@ -83,7 +92,7 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     "--agents",
-    type=int,
+    type=click.IntRange(1, 1000),
     default=None,
     help="Number of concurrent agents. Triggers multi-agent KV VRAM planner.",
 )
@@ -195,14 +204,14 @@ def provision(
             try:
                 ctx_k = int(float(raw))
             except ValueError:
-                print(f"ERROR: Invalid --context value '{context_k}'. Use e.g. 32k or 128.")
-                return 1
+                click.echo(f"ERROR: Invalid --context value '{context_k}'. Use e.g. 32k or 128.", err=True)
+                raise SystemExit(1)
 
         _model = model_name or "meta-llama/Llama-3.1-70B-Instruct"
-        print(f"\nMulti-Agent KV Cache Planner")
-        print(f"  Agents: {agents}  |  Context: {ctx_k}K tokens  |  Model: {_model}")
-        print(f"  Topology: {sharing_topology}  |  dtype: {dtype}")
-        print()
+        click.echo(f"\nMulti-Agent KV Cache Planner")
+        click.echo(f"  Agents: {agents}  |  Context: {ctx_k}K tokens  |  Model: {_model}")
+        click.echo(f"  Topology: {sharing_topology}  |  dtype: {dtype}")
+        click.echo()
 
         try:
             from terradev_cli.core.kv_sharing import (
@@ -227,10 +236,10 @@ def provision(
             )
 
             for line in kv_plan.summary_lines():
-                print(f"  {line}")
+                click.echo(f"  {line}")
 
-            print()
-            print("  Heterogeneous fleet spec:")
+            click.echo()
+            click.echo("  Heterogeneous fleet spec:")
             fleet_spec = AgentTopologyPlanner().infer_from_agent_count(
                 n_agents=agents,
                 model=_model,
@@ -239,11 +248,11 @@ def provision(
                 dtype=dtype,
             )
 
-            print(
+            click.echo(
                 f"  {'TIER':<16} {'INSTANCES':>9} {'GPU':>14} {'TP':>4} "
                 f"{'CONC':>6} {'CONTEXT':>8}  {'$/HR':>7}"
             )
-            print("  " + "-" * 72)
+            click.echo("  " + "-" * 72)
             from terradev_cli.core.agentic_topology import GPU_SPOT_PRICE_HR
             for tier_name, role in fleet_spec.tiers.items():
                 gpu_str = role.gpu_type or "CPU"
@@ -253,57 +262,57 @@ def provision(
                     * GPU_SPOT_PRICE_HR.get(role.gpu_type or "", 0.60)
                     if role.gpu_type else role.count * 0.60
                 )
-                print(
+                click.echo(
                     f"  {tier_name:<16} {role.count:>9} {gpu_str:>14} "
                     f"{role.tensor_parallel:>4} {role.concurrency_per_instance:>6} "
                     f"{ctx_str:>8}  ${tier_cost:>6.2f}"
                 )
-            print("  " + "-" * 72)
-            print(
+            click.echo("  " + "-" * 72)
+            click.echo(
                 f"  {'TOTAL':<16} {'':>9} {'':>14} {'':>4} {'':>6} {'':>8}"
                 f"  ${fleet_spec.total_cost_hr_estimate:>6.2f}/hr"
             )
-            print()
-            print(f"  KV budget (with sharing): {kv_plan.total_kv_with_sharing_gb:.1f} GB")
-            print(f"  KV budget (naive):        {kv_plan.total_kv_naive_gb:.1f} GB")
-            print(f"  GPU count (with sharing): {kv_plan.recommended_gpu_count} × {kv_plan.recommended_gpu_type}")
-            print(f"  GPU count (naive):        {kv_plan.recommended_gpu_count_naive} × {kv_plan.recommended_gpu_type}")
-            print(
+            click.echo()
+            click.echo(f"  KV budget (with sharing): {kv_plan.total_kv_with_sharing_gb:.1f} GB")
+            click.echo(f"  KV budget (naive):        {kv_plan.total_kv_naive_gb:.1f} GB")
+            click.echo(f"  GPU count (with sharing): {kv_plan.recommended_gpu_count} × {kv_plan.recommended_gpu_type}")
+            click.echo(f"  GPU count (naive):        {kv_plan.recommended_gpu_count_naive} × {kv_plan.recommended_gpu_type}")
+            click.echo(
                 f"  Sharing saves:            ${kv_plan.hourly_savings:.2f}/hr"
                 f" = ${kv_plan.hourly_savings * 24:.0f}/day"
             )
 
             if dry_run:
-                print()
-                print("  [dry-run] No instances launched.")
+                click.echo()
+                click.echo("  [dry-run] No instances launched.")
                 return 0
 
-            print()
-            print(f"  Deploying fleet: terradev agent deploy --agents {agents}"
+            click.echo()
+            click.echo(f"  Deploying fleet: terradev agent deploy --agents {agents}"
                   f" --model {_model} --context {ctx_k}k")
-            print("  (Use 'terradev agent deploy' for full fleet provisioning)")
+            click.echo("  (Use 'terradev agent deploy' for full fleet provisioning)")
             return 0
 
         except ImportError as exc:
-            print(f"  WARNING: KV planner unavailable ({exc}). Falling through to standard provision.")
+            click.echo(f"  WARNING: KV planner unavailable ({exc}). Falling through to standard provision.")
         except Exception as exc:  # noqa: BLE001
-            print(f"  ERROR in KV planner: {exc}")
+            click.echo(f"  ERROR in KV planner: {exc}")
             import traceback
             traceback.print_exc()
-            return 1
+            raise SystemExit(1)
 
     if backend:
-        print(f"Inference backend: {backend}")
+        click.echo(f"Inference backend: {backend}")
         if backend == "llmd":
-            print(
+            click.echo(
                 "Note: llmd backend requires Kubernetes cluster with KServe + Gateway API"
             )
 
     if type:
-        print(f"Workload type: {type}")
+        click.echo(f"Workload type: {type}")
         if type == "inference":
-            print(f"Model: {model_name or 'Not specified'}")
-            print(f"Endpoint: {endpoint_name or 'Auto-generated'}")
+            click.echo(f"Model: {model_name or 'Not specified'}")
+            click.echo(f"Endpoint: {endpoint_name or 'Auto-generated'}")
 
     # ── Spot vs On-Demand Selection Logic ──
     use_spot = None
@@ -311,53 +320,53 @@ def provision(
     _strategy_aliases = {"cheapest": "aggressive", "safe": "conservative"}
     spot_strategy = _strategy_aliases.get(spot_strategy, spot_strategy)
     if spot and on_demand:
-        print("ERROR: Cannot specify both --spot and --on-demand")
-        return 1
+        click.echo("ERROR: Cannot specify both --spot and --on-demand", err=True)
+        raise SystemExit(1)
     elif spot:
         use_spot = True
-        print("COST: Using spot instances (60-80% savings, 2-min termination notice)")
-        print(f"   Strategy: {spot_strategy}")
+        click.echo("COST: Using spot instances (60-80% savings, 2-min termination notice)")
+        click.echo(f"   Strategy: {spot_strategy}")
     elif on_demand:
         use_spot = False
-        print("LOCKED: Using on-demand instances (guaranteed availability)")
+        click.echo("LOCKED: Using on-demand instances (guaranteed availability)")
     else:
         # Auto-select based on workload type and user preferences
         if type == "training":
             # Training jobs are often long-running - default to on-demand for reliability
             use_spot = False
-            print(
+            click.echo(
                 "LOCKED: Auto-selected: on-demand instances (training jobs need reliability)"
             )
         elif type == "inference":
             # Inference can handle interruptions - default to spot for cost savings
             use_spot = True
-            print(
+            click.echo(
                 "COST: Auto-selected: spot instances (inference can handle interruptions)"
             )
-            print(f"   Strategy: {spot_strategy}")
+            click.echo(f"   Strategy: {spot_strategy}")
         else:
             # No workload type specified - use balanced approach
             use_spot = True
-            print("  Auto-selected: spot instances (cost-optimized default)")
-            print(f"   Strategy: {spot_strategy}")
-            print(
+            click.echo("  Auto-selected: spot instances (cost-optimized default)")
+            click.echo(f"   Strategy: {spot_strategy}")
+            click.echo(
                 "   Tip: Use --on-demand for guaranteed availability or --spot to force spot instances"
             )
 
     # Show cost comparison if spot selected
     if use_spot:
-        print("\nTip: Spot Instance Benefits:")
-        print("   OK: 60-80% cost savings vs on-demand")
-        print("   OK: Automatic state checkpointing (KV cache, weights)")
-        print("   OK: <2 minute recovery from interruptions")
-        print("   WARNING:  2-minute termination notice")
-        print("   Tip: Use --on-demand if you need guaranteed availability")
+        click.echo("\nTip: Spot Instance Benefits:")
+        click.echo("   OK: 60-80% cost savings vs on-demand")
+        click.echo("   OK: Automatic state checkpointing (KV cache, weights)")
+        click.echo("   OK: <2 minute recovery from interruptions")
+        click.echo("   WARNING:  2-minute termination notice")
+        click.echo("   Tip: Use --on-demand if you need guaranteed availability")
     else:
-        print("\nLOCKED: On-Demand Instance Benefits:")
-        print("   OK: Guaranteed availability")
-        print("   OK: No interruptions")
-        print("   ERROR: Higher cost (2-5x spot pricing)")
-        print("   Tip: Use --spot for cost savings on interruptible workloads")
+        click.echo("\nLOCKED: On-Demand Instance Benefits:")
+        click.echo("   OK: Guaranteed availability")
+        click.echo("   OK: No interruptions")
+        click.echo("   ERROR: Higher cost (2-5x spot pricing)")
+        click.echo("   Tip: Use --spot for cost savings on interruptible workloads")
 
     # Tier gates removed - unlimited concurrent instances and provisions (open source)
 
@@ -392,30 +401,30 @@ def provision(
                                 }
                             )
                 if matching_local:
-                    print(
+                    click.echo(
                         f"\nFOUND {len(matching_local)} local GPU(s) matching {gpu_type} in your pool"
                     )
-                    print("Using local GPUs instead of cloud providers (cost: $0/hr)")
+                    click.echo("Using local GPUs instead of cloud providers (cost: $0/hr)")
                     for match in matching_local[:count]:
-                        print(
+                        click.echo(
                             f"  - {match['pool_name']}: {match['gpu'].get('name', 'Unknown')} ({match['host']})"
                         )
-                    print("\nTo use cloud providers instead, omit --prefer-local")
-                    print(
+                    click.echo("\nTo use cloud providers instead, omit --prefer-local")
+                    click.echo(
                         f"Your local pool is registered. Use: terradev train --script train.py --pool {matching_local[0]['pool_name']}"
                     )
                     return
             except Exception as e:  # noqa: BLE001
-                print(f"Warning: Could not load local pool: {e}")
+                click.echo(f"Warning: Could not load local pool: {e}")
         else:
-            print(
+            click.echo(
                 "No local pool found. Register GPUs with: terradev local scan --register"
             )
-            print("Proceeding with cloud providers...")
+            click.echo("Proceeding with cloud providers...")
 
     # ── Step 1: Fetch quotes from providers using ProviderRegistry for pre-filtering ──
-    print(f"Provisioning {count}x {gpu_type} (parallel={parallel})")
-    print("Querying providers for real-time pricing...")
+    click.echo(f"Provisioning {count}x {gpu_type} (parallel={parallel})")
+    click.echo("Querying providers for real-time pricing...")
 
     async def _fetch_all():
         from terradev_cli.providers.registry import ProviderRegistry
@@ -465,15 +474,15 @@ def provision(
                 out.extend(r)
         return out
 
-    all_quotes = asyncio.run(_fetch_all())
+    all_quotes = _run_with_timeout(_fetch_all())
     if not all_quotes:
-        print("ERROR: No quotes returned from any provider")
-        print("\nTip: To fix this:")
-        print(
+        click.echo("ERROR: No quotes returned from any provider", err=True)
+        click.echo("\nTip: To fix this:")
+        click.echo(
             "   1. Configure provider credentials: terradev configure --provider <name>"
         )
-        print("   2. Get setup instructions: terradev setup <provider>")
-        print(
+        click.echo("   2. Get setup instructions: terradev setup <provider>")
+        click.echo(
             "   3. Quick start with RunPod (5 minutes): terradev setup runpod --quick"
         )
         return
@@ -490,18 +499,18 @@ def provision(
                 for q in all_quotes
                 if q.get("availability") == "spot" or q.get("spot", False)
             ]
-            print(
+            click.echo(
                 f"COST: Filtering for spot instances: {len(all_quotes)}/{original_count} available"
             )
             if not all_quotes:
-                print("ERROR: No spot instances available for this GPU type/region.")
-                print("\nTo fix this:")
-                print("   1. Use --on-demand for guaranteed availability (costs ~2-3x more)")
-                print("   2. Try a different GPU type: terradev quote -g H100")
-                print("   3. Try a different region: terradev provision -g A100 -r us-west-2")
-                print("   4. Check provider status: terradev status")
-                print("\nExample with on-demand:")
-                print("   terradev provision -g A100 --on-demand")
+                click.echo("ERROR: No spot instances available for this GPU type/region.", err=True)
+                click.echo("\nTo fix this:")
+                click.echo("   1. Use --on-demand for guaranteed availability (costs ~2-3x more)")
+                click.echo("   2. Try a different GPU type: terradev quote -g H100")
+                click.echo("   3. Try a different region: terradev provision -g A100 -r us-west-2")
+                click.echo("   4. Check provider status: terradev status")
+                click.echo("\nExample with on-demand:")
+                click.echo("   terradev provision -g A100 --on-demand")
                 return
         else:
             # Filter for on-demand instances only
@@ -510,11 +519,11 @@ def provision(
                 for q in all_quotes
                 if q.get("availability") != "spot" and not q.get("spot", False)
             ]
-            print(
+            click.echo(
                 f"LOCKED: Filtering for on-demand instances: {len(all_quotes)}/{original_count} available"
             )
             if not all_quotes:
-                print(
+                click.echo(
                     "ERROR: No on-demand instances available. This should not happen - please report this issue."
                 )
                 return
@@ -524,7 +533,7 @@ def provision(
             spot_price = all_quotes[0]["price"]
             estimated_on_demand = spot_price * 2.5  # Rough estimate
             savings = ((estimated_on_demand - spot_price) / estimated_on_demand) * 100
-            print(
+            click.echo(
                 f"COST: Spot savings: ~{savings:.0f}% vs on-demand (${spot_price:.2f}/hr vs ~${estimated_on_demand:.2f}/hr)"
             )
     else:
@@ -544,14 +553,14 @@ def provision(
             best_spot = spot_quotes[0]["price"]
             best_on_demand = on_demand_quotes[0]["price"]
             savings = ((best_on_demand - best_spot) / best_on_demand) * 100
-            print(
+            click.echo(
                 f"Tip: Available: {len(spot_quotes)} spot (${best_spot:.2f}/hr) and {len(on_demand_quotes)} on-demand (${best_on_demand:.2f}/hr)"
             )
-            print(f"   Spot savings: ~{savings:.0f}% (use --spot to force spot-only)")
+            click.echo(f"   Spot savings: ~{savings:.0f}% (use --spot to force spot-only)")
         elif spot_quotes:
-            print(f"Tip: Only spot instances available ({len(spot_quotes)} options)")
+            click.echo(f"Tip: Only spot instances available ({len(spot_quotes)} options)")
         else:
-            print(
+            click.echo(
                 f"LOCKED: Only on-demand instances available ({len(on_demand_quotes)} options)"
             )
 
@@ -565,9 +574,9 @@ def provision(
             return None
         
         # Display instance table
-        print(f"\nAvailable {gpu_type} Instances:")
-        print(f"{'#':<4} {'Provider':<14} {'Region':<14} {'$/hr':<10} {'VRAM':<8} {'Instance':<20} {'Spot'}")
-        print("-" * 78)
+        click.echo(f"\nAvailable {gpu_type} Instances:")
+        click.echo(f"{'#':<4} {'Provider':<14} {'Region':<14} {'$/hr':<10} {'VRAM':<8} {'Instance':<20} {'Spot'}")
+        click.echo("-" * 78)
         for i, q in enumerate(quotes):
             if q.get("tpu_chips"):
                 vram_str = f"{q['tpu_chips']}xTPU"
@@ -577,8 +586,8 @@ def provision(
                 vram_str = "N/A"
             spot_mark = "✓" if q.get("availability") == "spot" else ""
             instance_short = q.get("instance_type", "N/A")[:20]
-            print(f"{i+1:<4} {q['provider']:<14} {q['region']:<14} ${q['price']:<9.2f} {vram_str:<8} {instance_short:<20} {spot_mark}")
-        print("-" * 78)
+            click.echo(f"{i+1:<4} {q['provider']:<14} {q['region']:<14} ${q['price']:<9.2f} {vram_str:<8} {instance_short:<20} {spot_mark}")
+        click.echo("-" * 78)
         
         # Determine selection
         selected_index = None
@@ -591,7 +600,7 @@ def provision(
                 if 0 <= idx < len(quotes):
                     selected_index = idx
                 else:
-                    print(f"ERROR: Invalid selection {select_arg}. Must be 1-{len(quotes)}")
+                    click.echo(f"ERROR: Invalid selection {select_arg}. Must be 1-{len(quotes)}", err=True)
                     return None
             elif select_arg == "cheapest":
                 selected_index = 0
@@ -600,14 +609,14 @@ def provision(
                 if spot_quotes:
                     selected_index = quotes.index(spot_quotes[0])
                 else:
-                    print("ERROR: No spot instances available")
+                    click.echo("ERROR: No spot instances available", err=True)
                     return None
             elif select_arg == "cheapest-secure":
                 secure_quotes = [q for q in quotes if q.get("availability") != "spot"]
                 if secure_quotes:
                     selected_index = quotes.index(secure_quotes[0])
                 else:
-                    print("ERROR: No secure (non-spot) instances available")
+                    click.echo("ERROR: No secure (non-spot) instances available", err=True)
                     return None
             else:
                 # GPU memory variant selection (e.g., SXM4-40GB, 80GB PCIe)
@@ -618,12 +627,12 @@ def provision(
                         selected_index = i
                         break
                 if selected_index is None:
-                    print(f"ERROR: No instance matching '{select_arg}' found")
+                    click.echo(f"ERROR: No instance matching '{select_arg}' found", err=True)
                     return None
         elif auto_mode or not sys.stdin.isatty():
             # --auto or non-interactive context: select cheapest
             selected_index = 0
-            print(f"Auto-selecting cheapest instance (option 1)")
+            click.echo(f"Auto-selecting cheapest instance (option 1)")
         else:
             # Interactive mode: prompt for selection
             try:
@@ -635,18 +644,18 @@ def provision(
                     if 0 <= idx < len(quotes):
                         selected_index = idx
                     else:
-                        print(f"ERROR: Invalid selection. Must be 1-{len(quotes)}")
+                        click.echo(f"ERROR: Invalid selection. Must be 1-{len(quotes)}", err=True)
                         return None
                 else:
-                    print(f"ERROR: Invalid input. Enter a number 1-{len(quotes)}")
+                    click.echo(f"ERROR: Invalid input. Enter a number 1-{len(quotes)}", err=True)
                     return None
             except (EOFError, KeyboardInterrupt):
-                print("\nSelection cancelled")
+                click.echo("\nSelection cancelled")
                 return None
         
         if selected_index is not None:
             selected = quotes[selected_index]
-            print(f"\nSelected: {selected['provider']} {selected['region']} ${selected['price']:.2f}/hr {selected.get('instance_type', 'N/A')}")
+            click.echo(f"\nSelected: {selected['provider']} {selected['region']} ${selected['price']:.2f}/hr {selected.get('instance_type', 'N/A')}")
             return selected
         
         return None
@@ -654,9 +663,8 @@ def provision(
     # Apply instance selection
     selected_instance = _select_instance(all_quotes, select_instance, auto)
     if selected_instance is None:
-        print("ERROR: No instance selected")
-        return
-    
+        click.echo("ERROR: No instance selected", err=True)
+        raise SystemExit(1)    
     # Use only the selected instance for provisioning
     all_quotes = [selected_instance]
     count = 1  # Always provision 1 when selecting specific instance
@@ -671,7 +679,7 @@ def provision(
         pass
 
     # ── Step 2: Build allocation plan (cheapest-spread across clouds) ──
-    print(f"{len(all_quotes)} quotes  building allocation plan...")
+    click.echo(f"{len(all_quotes)} quotes  building allocation plan...")
 
     # Silent: record price ticks for ML training data
     try:
@@ -697,13 +705,13 @@ def provision(
     if max_price:
         all_quotes = [q for q in all_quotes if q["price"] <= max_price]
         if not all_quotes:
-            print(f"ERROR: No instances available under ${max_price:.2f}/hr")
-            print("\nTip: Suggestions:")
-            print(
+            click.echo(f"ERROR: No instances available under ${max_price:.2f}/hr", err=True)
+            click.echo("\nTip: Suggestions:")
+            click.echo(
                 f"   - Increase max-price: terradev provision -g {gpu_type} --max-price {max_price * 1.5:.2f}"
             )
-            print("   - Try different GPU type: terradev quote -g RTX4090")
-            print(
+            click.echo("   - Try different GPU type: terradev quote -g RTX4090")
+            click.echo(
                 f"   - Use spot instances for 60-80% savings: terradev provision -g {gpu_type} --spot"
             )
             return
@@ -728,33 +736,32 @@ def provision(
     allocations = allocations[:count]
 
     if not allocations:
-        print("ERROR: Could not build allocation plan")
-        print("\nTip: Try:")
-        print(
+        click.echo("ERROR: Could not build allocation plan", err=True)
+        click.echo("\nTip: Try:")
+        click.echo(
             "   - Use --dry-run to preview the plan: terradev provision -g A100 --dry-run"
         )
-        print("   - Check provider status: terradev status --live")
-        print("   - Verify credentials: terradev configure --provider <name>")
-        return
-
+        click.echo("   - Check provider status: terradev status --live")
+        click.echo("   - Verify credentials: terradev configure --provider <name>")
+        raise SystemExit(1)
     # ── Dry-run: show plan and exit ──
     if dry_run:
-        print(f"\nDRY RUN  allocation plan ({count} instance(s)):")
-        print(f"{'#':<4} {'Provider':<14} {'Region':<14} {'$/hr':<10} {'Type':<10}")
-        print("-" * 56)
+        click.echo(f"\nDRY RUN  allocation plan ({count} instance(s)):")
+        click.echo(f"{'#':<4} {'Provider':<14} {'Region':<14} {'$/hr':<10} {'Type':<10}")
+        click.echo("-" * 56)
         total_hr = 0
         for i, q in enumerate(allocations):
             spot = "spot" if q.get("availability") == "spot" else "on-demand"
             total_hr += q["price"]
-            print(
+            click.echo(
                 f"{i+1:<4} {q['provider']:<14} {q['region']:<14} ${q['price']:<9.2f} {spot:<10}"
             )
         elapsed = (time.time() - provision_start) * 1000
-        print(f"\nEstimated: ${total_hr:.2f}/hr  (${total_hr*24:.2f}/day)")
-        print(f"Plan built in {elapsed:.0f}ms")
+        click.echo(f"\nEstimated: ${total_hr:.2f}/hr  (${total_hr*24:.2f}/day)")
+        click.echo(f"Plan built in {elapsed:.0f}ms")
 
         # ── Preflight validation for the selected allocation ──────────────────
-        print("\nPreflight validation (read-only, no billing):")
+        click.echo("\nPreflight validation (read-only, no billing):")
         async def _preflight_all():
             from terradev_cli.core.provision_preflight import preflight_provision
             from terradev_cli.providers.provider_factory import ProviderFactory
@@ -776,33 +783,33 @@ def provision(
                 )
             return await asyncio.gather(*tasks, return_exceptions=True)
 
-        preflight_reports = asyncio.run(_preflight_all())
+        preflight_reports = _run_with_timeout(_preflight_all())
         for report in preflight_reports:
             if isinstance(report, Exception):
-                print(f"   [!] Preflight failed: {report}")
+                click.echo(f"   [!] Preflight failed: {report}")
                 continue
             icon = "OK" if report.passed else "ERROR"
-            print(f"   [{icon}] {report.provider}: {report.gpu_type} in {report.region}")
+            click.echo(f"   [{icon}] {report.provider}: {report.gpu_type} in {report.region}")
             for check in report.checks:
                 cicon = "OK" if check.passed else "FAIL"
-                print(f"      [{cicon}] {check.name}: {check.message}")
+                click.echo(f"      [{cicon}] {check.name}: {check.message}")
             if report.payload:
-                print("      Payload (exact JSON to be sent):")
+                click.echo("      Payload (exact JSON to be sent):")
                 for line in json.dumps(report.payload, indent=8, default=str).splitlines():
-                    print(f"            {line}")
+                    click.echo(f"            {line}")
             if not report.passed:
-                print(f"\n   Tip: Fix the failed checks, then re-run with --dry-run")
-                return 1
-        print("\nPreflight passed. Remove --dry-run to launch instances.")
+                click.echo(f"\n   Tip: Fix the failed checks, then re-run with --dry-run")
+                raise SystemExit(1)
+        click.echo("\nPreflight passed. Remove --dry-run to launch instances.")
         return
 
     # ── Step 3: Deploy across clouds in parallel via real provider APIs ──
     unique_clouds = set(q["provider"] for q in allocations)
-    print(
+    click.echo(
         f"Deploying {count} instance(s) across {len(unique_clouds)} cloud(s) simultaneously..."
     )
     for q in allocations:
-        print(f"   {q['provider']} / {q['region']}  ${q['price']:.2f}/hr")
+        click.echo(f"   {q['provider']} / {q['region']}  ${q['price']:.2f}/hr")
 
     group_id = f"pg_{int(time.time())}_{uuid.uuid4().hex[:8]}"
 
@@ -812,9 +819,9 @@ def provision(
         from terradev_cli.core.ssh_key_manager import generate_provision_keypair
 
         _ssh_priv_path, _provision_ssh_pubkey = generate_provision_keypair(group_id)
-        print(f"   SSH keypair generated for {group_id} (Ed25519, encrypted at rest)")
+        click.echo(f"   SSH keypair generated for {group_id} (Ed25519, encrypted at rest)")
     except Exception as _ssh_err:  # noqa: BLE001
-        print(
+        click.echo(
             f"   Warning: SSH key generation failed ({_ssh_err})  manual --ssh-key needed for train"
         )
 
@@ -965,7 +972,7 @@ def provision(
 
         return await asyncio.gather(*[_do_one(q) for q in allocations])
 
-    results = asyncio.run(_provision_all())
+    results = _run_with_timeout(_provision_all())
     provision_time = (time.time() - provision_start) * 1000
 
     # ── Step 4: Record results to cost DB + usage file ──
@@ -974,12 +981,12 @@ def provision(
 
     # ── Gang scheduling: for multi-node jobs, partial success = failure ──
     if count > 1 and 0 < len(succeeded) < count:
-        print(f"\n{'='*60}")
-        print(f"PARTIAL FAILURE: Got {len(succeeded)}/{count} instances.")
-        print(
+        click.echo(f"\n{'='*60}")
+        click.echo(f"PARTIAL FAILURE: Got {len(succeeded)}/{count} instances.")
+        click.echo(
             f"   {len(failed)} instance(s) failed  cannot run distributed training with {len(succeeded)}/{count} nodes."
         )
-        print(
+        click.echo(
             f"   Cleaning up {len(succeeded)} successful provision(s) to avoid billing waste..."
         )
 
@@ -993,27 +1000,26 @@ def provision(
                     _creds = api._provider_creds(_pname)
                     _prov = _factory.create_provider(_pname, _creds)
                     await _prov.terminate_instance(r["instance_id"])
-                    print(f"   [+] Terminated {r['instance_id']} on {r['provider']}")
+                    click.echo(f"   [+] Terminated {r['instance_id']} on {r['provider']}")
                 except Exception as _e:  # noqa: BLE001
-                    print(
+                    click.echo(
                         f"   [!] FAILED to terminate {r['instance_id']} on {r['provider']}: {_e}"
                     )
-                    print(
+                    click.echo(
                         f"       MANUAL CLEANUP NEEDED  terminate in your {r['provider']} console"
                     )
 
-        asyncio.run(_gang_cleanup())
+        _run_with_timeout(_gang_cleanup())
 
-        print("\n   Failed providers:")
+        click.echo("\n   Failed providers:")
         for r in failed:
-            print(f"      {r['provider']}: {r['error']}")
+            click.echo(f"      {r['provider']}: {r['error']}")
         failed_provs = set(r["provider"].lower().replace(" ", "_") for r in failed)
-        print(
+        click.echo(
             f"\n   Suggestion: retry with --providers excluding: {', '.join(failed_provs)}"
         )
-        print(f"   Total cleanup time: {(time.time() - provision_start)*1000:.0f}ms")
-        return
-
+        click.echo(f"   Total cleanup time: {(time.time() - provision_start)*1000:.0f}ms")
+        raise SystemExit(1)
     # Record provider reliability events for every provision attempt
     try:
         from terradev_cli.core.price_intelligence import record_provider_event, record_availability
@@ -1180,52 +1186,52 @@ def provision(
         pass
 
     # ── Step 6: Print results ──
-    print(f"\n{'='*60}")
+    click.echo(f"\n{'='*60}")
     if succeeded:
         total_hr = sum(r["price"] for r in succeeded)
-        print(
+        click.echo(
             f"{len(succeeded)}/{count} instances launched across {len(set(r['provider'] for r in succeeded))} cloud(s)"
         )
-        print(f"{'Provider':<14} {'Instance ID':<36} {'$/hr':<8} {'ms':<8} {'Status'}")
-        print("-" * 82)
+        click.echo(f"{'Provider':<14} {'Instance ID':<36} {'$/hr':<8} {'ms':<8} {'Status'}")
+        click.echo("-" * 82)
         for r in succeeded:
             v = r.get("verified")
             tag = "verified" if v is True else "unverified" if v is None else "pending"
             icon = "+" if v is True else "?" if v is None else "~"
-            print(
+            click.echo(
                 f"{r['provider']:<14} {r['instance_id']:<36} ${r['price']:<7.2f} {r['elapsed_ms']:<.0f}ms  [{icon}] {tag}"
             )
-        print(f"\nTotal: ${total_hr:.2f}/hr  (${total_hr*24:.2f}/day)")
-        print(f"Group: {group_id}")
+        click.echo(f"\nTotal: ${total_hr:.2f}/hr  (${total_hr*24:.2f}/day)")
+        click.echo(f"Group: {group_id}")
         if wandb_injected:
-            print(
+            click.echo(
                 "W&B: WANDB_* env vars ready for injection  use `terradev run` to auto-configure"
             )
 
         # Print explicit SSH / web terminal connection metadata
-        print("\nConnection details:")
+        click.echo("\nConnection details:")
         for r in succeeded:
             conn = r.get("connection") or {}
             if conn.get("ssh_command"):
-                print(f"\n  {r['provider']} / {r['instance_id']}")
-                print(f"    Direct SSH Command:")
-                print(f"      {conn['ssh_command']}")
+                click.echo(f"\n  {r['provider']} / {r['instance_id']}")
+                click.echo(f"    Direct SSH Command:")
+                click.echo(f"      {conn['ssh_command']}")
             if conn.get("web_terminal_url"):
-                print(f"    Web Terminal:")
-                print(f"      {conn['web_terminal_url']}")
+                click.echo(f"    Web Terminal:")
+                click.echo(f"      {conn['web_terminal_url']}")
             if not conn.get("ssh_command") and not conn.get("web_terminal_url"):
-                print(f"\n  {r['provider']} / {r['instance_id']}: connection metadata not yet available")
-                print(f"    Check status: terradev manage -i {r['instance_id']} -a status")
+                click.echo(f"\n  {r['provider']} / {r['instance_id']}: connection metadata not yet available")
+                click.echo(f"    Check status: terradev manage -i {r['instance_id']} -a status")
     if failed:
-        print(f"\n{len(failed)} instance(s) failed:")
+        click.echo(f"\n{len(failed)} instance(s) failed:")
         for r in failed:
-            print(f"   {r['provider']}/{r['region']}: {r['error']}")
-    print(f"Total provision time: {provision_time:.0f}ms")
+            click.echo(f"   {r['provider']}/{r['region']}: {r['error']}")
+    click.echo(f"Total provision time: {provision_time:.0f}ms")
     if _provision_ssh_pubkey and succeeded:
-        print(f"\nSSH key (Ed25519, encrypted): ~/.terradev/ssh/{group_id}.key")
+        click.echo(f"\nSSH key (Ed25519, encrypted): ~/.terradev/ssh/{group_id}.key")
     if type == "inference":
-        print(f"Model: {model_name or 'Not specified'}")
-        print("Type: Inference workload")
+        click.echo(f"Model: {model_name or 'Not specified'}")
+        click.echo("Type: Inference workload")
 
     # Tier limit check removed - unlimited provisions (open source)
     # if limit != 'unlimited':
@@ -1278,17 +1284,16 @@ def manage(instance_id, action):
             break
 
     if not instance:
-        print(f"ERROR: Instance '{instance_id}' not found")
-        print("\nTip: To find your instance ID:")
-        print("   terradev status                    # List all instances")
-        print("   terradev status --live              # Get live status from providers")
-        print("\nTip: If you recently provisioned:")
-        print("   terradev status --format json       # Get full instance details")
-        return
-
+        click.echo(f"ERROR: Instance '{instance_id}' not found", err=True)
+        click.echo("\nTip: To find your instance ID:")
+        click.echo("   terradev status                    # List all instances")
+        click.echo("   terradev status --live              # Get live status from providers")
+        click.echo("\nTip: If you recently provisioned:")
+        click.echo("   terradev status --format json       # Get full instance details")
+        raise SystemExit(1)
     pname = instance["provider"].lower().replace(" ", "_")
-    print(f"{action.upper()}  {instance_id}")
-    print(
+    click.echo(f"{action.upper()}  {instance_id}")
+    click.echo(
         f"   Provider: {instance['provider']}  |  GPU: {instance['gpu_type']}  |  Region: {instance.get('region', '?')}"
     )
 
@@ -1308,7 +1313,7 @@ def manage(instance_id, action):
             return await provider.terminate_instance(instance_id)
 
     try:
-        result = asyncio.run(_run())
+        result = _run_with_timeout(_run())
 
         if action == "terminate":
             api.usage["instances_created"] = [
@@ -1322,18 +1327,18 @@ def manage(instance_id, action):
             except Exception as _exc:  # noqa: BLE001
                 logger.exception(_exc)
                 pass
-            print(f"Terminated {instance_id}")
+            click.echo(f"Terminated {instance_id}")
         elif action == "stop":
-            print(f"Stopped {instance_id}")
+            click.echo(f"Stopped {instance_id}")
         elif action == "start":
-            print(f"Started {instance_id}")
+            click.echo(f"Started {instance_id}")
         else:
             st = (
                 result.get("status", "unknown")
                 if isinstance(result, dict)
                 else "unknown"
             )
-            print(f"Status: {st}")
+            click.echo(f"Status: {st}")
 
         if isinstance(result, dict):
             ip = result.get("ip") or result.get("ip_address") or result.get("public_ip")
@@ -1356,14 +1361,14 @@ def manage(instance_id, action):
                 except Exception as _exc:  # noqa: BLE001
                     logger.exception(_exc)
                     pass
-                print(f"   SSH: {ssh_cmd}")
+                click.echo(f"   SSH: {ssh_cmd}")
             for k in ("gpu_utilization", "uptime"):
                 if result.get(k):
-                    print(f"   {k}: {result[k]}")
+                    click.echo(f"   {k}: {result[k]}")
 
     except Exception as e:  # noqa: BLE001
-        print(f"Warning  Provider API error: {e}")
-        print("   (Action may still have succeeded  check provider dashboard)")
+        click.echo(f"Warning  Provider API error: {e}")
+        click.echo("   (Action may still have succeeded  check provider dashboard)")
 
 
 @cli.command()
@@ -1403,21 +1408,21 @@ def status(format, live):
     """
     api = click.get_current_context().obj["api"]
 
-    print("Terradev Status")
-    print("=" * 50)
+    click.echo("Terradev Status")
+    click.echo("=" * 50)
 
     # Tier system removed - open source unlimited access
-    print(
+    click.echo(
         "Mode: Open Source (Free)  |  Provisions: Unlimited  |  Max instances: Unlimited  |  Seats: Unlimited"
     )
-    print("Providers: All cloud providers supported")
+    click.echo("Providers: All cloud providers supported")
 
     # Cost DB summary
     try:
         from terradev_cli.core.cost_tracker import get_spend_summary
 
         summary = get_spend_summary(30)
-        print(
+        click.echo(
             f"\nLast 30 days: ${summary['total_provision_cost']:.2f} provision cost  |  {summary['quotes_fetched']} quotes fetched"
         )
         if summary["by_provider"]:
@@ -1425,34 +1430,34 @@ def status(format, live):
                 f"{p}: ${d['cost']:.2f} ({d['count']}x)"
                 for p, d in summary["by_provider"].items()
             ]
-            print(f"   By provider: {', '.join(parts)}")
+            click.echo(f"   By provider: {', '.join(parts)}")
         if summary["egress_cost"] > 0:
-            print(f"   Egress cost: ${summary['egress_cost']:.2f}")
+            click.echo(f"   Egress cost: ${summary['egress_cost']:.2f}")
     except Exception as _exc:  # noqa: BLE001
         logger.exception(_exc)
-        print(
+        click.echo(
             f"\nProvisions this month: {api.usage.get('provisions_this_month', 0)} (unlimited)"
         )
 
     # Instances
     instances = api.usage.get("instances_created", [])
-    print(f"\nActive Instances ({len(instances)}):")
+    click.echo(f"\nActive Instances ({len(instances)}):")
 
     if not instances:
-        print("   No active instances")
-        print("\nTip: To provision instances:")
-        print("   terradev quote -g A100              # Check pricing")
-        print("   terradev provision -g A100 -n 2   # Provision 2x A100")
+        click.echo("   No active instances")
+        click.echo("\nTip: To provision instances:")
+        click.echo("   terradev quote -g A100              # Check pricing")
+        click.echo("   terradev provision -g A100 -n 2   # Provision 2x A100")
         return
 
     if format == "json":
-        print(json.dumps(instances, indent=2))
+        click.echo(json.dumps(instances, indent=2))
         return
 
     # If --live, query each provider for real status
     live_statuses = {}
     if live and instances:
-        print("   (querying providers for live status...)")
+        click.echo("   (querying providers for live status...)")
 
         async def _query_all():
             from terradev_cli.providers.provider_factory import ProviderFactory
@@ -1474,15 +1479,15 @@ def status(format, live):
             return results
 
         try:
-            live_statuses = asyncio.run(_query_all())
+            live_statuses = _run_with_timeout(_query_all())
         except Exception as _exc:  # noqa: BLE001
             logger.exception(_exc)
             pass
 
-    print(
+    click.echo(
         f"{'ID':<36} {'Provider':<12} {'GPU':<8} {'$/hr':<8} {'Region':<14} {'Status':<10}"
     )
-    print("-" * 92)
+    click.echo("-" * 92)
     for inst in instances:
         iid = inst["id"][:35]
         prov = inst.get("provider", "?")
@@ -1490,7 +1495,7 @@ def status(format, live):
         price = f"${inst.get('price', 0):.2f}"
         region = inst.get("region", "?")[:13]
         st = live_statuses.get(inst["id"], "tracked") if live else "tracked"
-        print(f"{iid:<36} {prov:<12} {gpu:<8} {price:<8} {region:<14} {st:<10}")
+        click.echo(f"{iid:<36} {prov:<12} {gpu:<8} {price:<8} {region:<14} {st:<10}")
 
 
 @cli.command()
@@ -1519,9 +1524,9 @@ def stage(dataset, target_regions, compression, plan_only):
         else ["us-east-1", "us-west-2", "eu-west-1"]
     )
 
-    print(f"PACKAGE: Dataset: {dataset}")
-    print(f"Region Regions: {', '.join(regions)}")
-    print(f"COMPRESSED:  Compression: {compression}")
+    click.echo(f"PACKAGE: Dataset: {dataset}")
+    click.echo(f"Region Regions: {', '.join(regions)}")
+    click.echo(f"COMPRESSED:  Compression: {compression}")
 
     try:
         from terradev_cli.core.dataset_stager import DatasetStager
@@ -1531,39 +1536,39 @@ def stage(dataset, target_regions, compression, plan_only):
         # Show plan
         plan = stager.plan(dataset, regions, compression)
         pd = plan.to_dict()
-        print("\nPlan Staging Plan:")
-        print(f"   Original size:   {pd['original_size']}")
-        print(
+        click.echo("\nPlan Staging Plan:")
+        click.echo(f"   Original size:   {pd['original_size']}")
+        click.echo(
             f"   Compressed size: {pd['compressed_size']}  ({pd['compression_ratio']} reduction, {pd['compression_algo']})"
         )
-        print(f"   Chunks:          {pd['chunks']}  (chunk size: {pd['chunk_size']})")
-        print(f"   Target regions:  {', '.join(pd['regions'])}")
+        click.echo(f"   Chunks:          {pd['chunks']}  (chunk size: {pd['chunk_size']})")
+        click.echo(f"   Target regions:  {', '.join(pd['regions'])}")
 
         if plan_only:
             return
 
         # Execute
         def _progress(phase, msg):
-            print(f"    [{phase}] {msg}")
+            click.echo(f"    [{phase}] {msg}")
 
-        result = asyncio.run(
+        result = _run_with_timeout(
             stager.stage(dataset, regions, compression, progress_callback=_progress)
         )
 
-        print("\nStaging complete")
-        print(f"   Original:    {result['original_size']:,} bytes")
-        print(
+        click.echo("\nStaging complete")
+        click.echo(f"   Original:    {result['original_size']:,} bytes")
+        click.echo(
             f"   Compressed:  {result['compressed_size']:,} bytes  ({result['compression_ratio']} saved)"
         )
-        print(f"   Chunks:      {result['chunks']}")
-        print(
+        click.echo(f"   Chunks:      {result['chunks']}")
+        click.echo(
             f"   Checksums:   {', '.join(c[:12] + '...' for c in result['checksums'][:3])}"
         )
-        print(f"   Staged to:   {result['staged_at']}")
-        print(f"   Elapsed:     {result['total_elapsed_ms']:.0f}ms")
+        click.echo(f"   Staged to:   {result['staged_at']}")
+        click.echo(f"   Elapsed:     {result['total_elapsed_ms']:.0f}ms")
 
         for rname, rdata in result["regions"].items():
-            print(
+            click.echo(
                 f"   � {rname}: {rdata['chunks_uploaded']} chunks, {rdata['elapsed_ms']:.0f}ms"
             )
 
@@ -1607,10 +1612,10 @@ def stage(dataset, target_regions, compression, plan_only):
             pass
 
     except ImportError:
-        print("Warning  dataset_stager module not found  falling back to basic copy")
+        click.echo("Warning  dataset_stager module not found  falling back to basic copy")
         for region in regions:
-            print(f"   UPLOAD: Uploading to {region}...")
-        print(f"\nDataset staged across {len(regions)} regions")
+            click.echo(f"   UPLOAD: Uploading to {region}...")
+        click.echo(f"\nDataset staged across {len(regions)} regions")
 
 
 @cli.command()
@@ -1658,17 +1663,16 @@ def execute(instance_id, cmd, async_exec):
             break
 
     if not instance:
-        print(f"ERROR: Instance '{instance_id}' not found")
-        print("\nTip: To find your instance ID:")
-        print("   terradev status                    # List all instances")
-        print("   terradev status --live              # Get live status from providers")
-        print("\nTip: If you recently provisioned:")
-        print("   terradev status --format json       # Get full instance details")
-        return
-
+        click.echo(f"ERROR: Instance '{instance_id}' not found", err=True)
+        click.echo("\nTip: To find your instance ID:")
+        click.echo("   terradev status                    # List all instances")
+        click.echo("   terradev status --live              # Get live status from providers")
+        click.echo("\nTip: If you recently provisioned:")
+        click.echo("   terradev status --format json       # Get full instance details")
+        raise SystemExit(1)
     pname = instance["provider"].lower().replace(" ", "_")
-    print(f"Executing on {instance_id} ({instance['provider']}):")
-    print(f"   $ {cmd}")
+    click.echo(f"Executing on {instance_id} ({instance['provider']}):")
+    click.echo(f"   $ {cmd}")
 
     async def _exec():
         from terradev_cli.providers.provider_factory import ProviderFactory
@@ -1679,14 +1683,14 @@ def execute(instance_id, cmd, async_exec):
         return await provider.execute_command(instance_id, cmd, async_exec)
 
     try:
-        result = asyncio.run(_exec())
+        result = _run_with_timeout(_exec())
         if async_exec:
             job_id = (
                 result.get("job_id", "unknown")
                 if isinstance(result, dict)
                 else "unknown"
             )
-            print(f"Submitted async  job ID: {job_id}")
+            click.echo(f"Submitted async  job ID: {job_id}")
         else:
             stdout = (
                 result.get("stdout", "") if isinstance(result, dict) else str(result)
@@ -1694,88 +1698,81 @@ def execute(instance_id, cmd, async_exec):
             stderr = result.get("stderr", "") if isinstance(result, dict) else ""
             exit_code = result.get("exit_code", 0) if isinstance(result, dict) else 0
             if stdout:
-                print(f"Output:\n{stdout}")
+                click.echo(f"Output:\n{stdout}")
             if stderr:
-                print(f"Warning  Stderr:\n{stderr}")
-            print(f"Exit code: {exit_code}")
+                click.echo(f"Warning  Stderr:\n{stderr}")
+            click.echo(f"Exit code: {exit_code}")
     except Exception as e:  # noqa: BLE001
-        print(f"Warning  Execution error: {e}")
+        click.echo(f"Warning  Execution error: {e}")
 
 
 @cli.command()
-@click.option("--days", "-d", default=7, help="Number of days to analyze (default: 7)")
+@click.option(
+    "--days",
+    "-d",
+    default=7,
+    type=click.IntRange(1, 365),
+    help="Number of days to analyze (default: 7, min: 1, max: 365)",
+)
 @click.option(
     "--format",
     "-f",
+    "fmt",
     type=click.Choice(["table", "json"]),
     default="table",
     help="Output format",
 )
-def analytics(days, format):
+def analytics(days, fmt):
     """Show cost analytics from the cost tracking database."""
+    from terradev_cli.core.cost_tracker import get_spend_summary, get_daily_spend
 
+    summary = get_spend_summary(days)
+
+    if fmt == "json":
+        click.echo(json.dumps(summary, indent=2, default=str))
+        return
+
+    click.echo("Cost Analytics Dashboard")
+    click.echo("=" * 50)
+    click.echo(f"Analysis Period: Last {days} days\n")
+
+    total_cost = summary.get("total_provision_cost", 0)
+    total_provisions = summary.get("total_provisions", 0)
+    quotes_fetched = summary.get("quotes_fetched", 0)
+    egress_cost = summary.get("egress_cost", 0)
+    by_provider = summary.get("by_provider", {})
+
+    click.echo(f"* Total Provision Cost: ${total_cost:.2f}")
+    click.echo(f"* Total Provisions:     {total_provisions}")
+    click.echo(f"* Quotes Fetched:       {quotes_fetched}")
+    if egress_cost > 0:
+        click.echo(f"  Egress Cost:          ${egress_cost:.2f}")
+    click.echo(f"  All-in Cost:          ${total_cost + egress_cost:.2f}")
+
+    if by_provider:
+        click.echo("\n  Cost by Provider:")
+        for prov, data in sorted(
+            by_provider.items(), key=lambda x: x[1]["cost"], reverse=True
+        ):
+            click.echo(
+                f"   {prov:<14} ${data['cost']:>8.2f}  ({data['count']} provisions)"
+            )
+
+    # Daily spend trend
     try:
-        from terradev_cli.core.cost_tracker import get_spend_summary, get_daily_spend
-
-        summary = get_spend_summary(days)
-
-        if format == "json":
-            print(json.dumps(summary, indent=2, default=str))
-            return
-
-        print("Cost Analytics Dashboard")
-        print("=" * 50)
-        print(f"Analysis Period: Last {days} days\n")
-
-        total_cost = summary.get("total_provision_cost", 0)
-        total_provisions = summary.get("total_provisions", 0)
-        quotes_fetched = summary.get("quotes_fetched", 0)
-        egress_cost = summary.get("egress_cost", 0)
-        by_provider = summary.get("by_provider", {})
-
-        print(f"� Total Provision Cost: ${total_cost:.2f}")
-        print(f"�  Total Provisions:     {total_provisions}")
-        print(f"� Quotes Fetched:       {quotes_fetched}")
-        if egress_cost > 0:
-            print(f" Egress Cost:          ${egress_cost:.2f}")
-        print(f" All-in Cost:          ${total_cost + egress_cost:.2f}")
-
-        if by_provider:
-            print("\n Cost by Provider:")
-            for prov, data in sorted(
-                by_provider.items(), key=lambda x: x[1]["cost"], reverse=True
-            ):
-                print(
-                    f"   {prov:<14} ${data['cost']:>8.2f}  ({data['count']} provisions)"
+        daily = get_daily_spend(days)
+        if daily:
+            click.echo(f"\n  Daily Spend (last {min(days, len(daily))} days):")
+            for row in daily[-7:]:
+                bar = (
+                    "█"
+                    * max(1, int(row["cost"] / max(r["cost"] for r in daily) * 20))
+                    if row["cost"] > 0
+                    else "░"
                 )
-
-        # Daily spend trend
-        try:
-            daily = get_daily_spend(days)
-            if daily:
-                print(f"\n Daily Spend (last {min(days, len(daily))} days):")
-                for row in daily[-7:]:
-                    bar = (
-                        "█"
-                        * max(1, int(row["cost"] / max(r["cost"] for r in daily) * 20))
-                        if row["cost"] > 0
-                        else "░"
-                    )
-                    print(f"   {row['date']}  ${row['cost']:>7.2f}  {bar}")
-        except Exception as _exc:  # noqa: BLE001
-            logger.exception(_exc)
-            pass
-
-    except Exception as e:  # noqa: BLE001
-        # Fallback to local usage file
-        api = click.get_current_context().obj["api"]
-        total_cost = sum(
-            inst.get("price", 0) * 24 for inst in api.usage.get("instances_created", [])
-        )
-        print(f"Estimated Cost: ${total_cost:.2f} (from local tracking)")
-        print(f"Instances: {len(api.usage.get('instances_created', []))}")
-        print(f"WARNING: Cost DB unavailable: {e}", file=sys.stderr)
-        sys.exit(1)
+                click.echo(f"   {row['date']}  ${row['cost']:>7.2f}  {bar}")
+    except Exception as _exc:  # noqa: BLE001
+        click.echo(f"WARNING: Daily spend trend unavailable: {_exc}", err=True)
 
 
 @cli.command()
@@ -1834,11 +1831,11 @@ def optimize(instance_id, auto_apply):
                     continue
             return all_q
 
-        market = asyncio.run(_fetch())
+        market = _run_with_timeout(_fetch())
     except Exception as e:  # noqa: BLE001
         # Handle complete market fetch failure gracefully
         market = {}
-        print(f"Warning: Could not fetch market data: {e}")
+        click.echo(f"Warning: Could not fetch market data: {e}")
 
     total_savings = 0
     recommendations = []
@@ -1975,16 +1972,16 @@ def optimize(instance_id, auto_apply):
             continue
 
     # Display results
-    print(f"\n{'='*80}")
-    print("OPTIMIZATION ANALYSIS RESULTS")
-    print(f"{'='*80}")
+    click.echo(f"\n{'='*80}")
+    click.echo("OPTIMIZATION ANALYSIS RESULTS")
+    click.echo(f"{'='*80}")
 
     if recommendations:
-        print(f"\n RECOMMENDED OPTIMIZATIONS ({len(recommendations)} found):")
-        print(
+        click.echo(f"\n RECOMMENDED OPTIMIZATIONS ({len(recommendations)} found):")
+        click.echo(
             f"{'Instance':<20} {'Type':<20} {'Impact':<15} {'Cost+':<8} {'Description'}"
         )
-        print(f"{'-'*80}")
+        click.echo(f"{'-'*80}")
 
         for rec in recommendations:
             instance_id = str(rec.get("instance_id", "unknown"))[:18]
@@ -2008,23 +2005,23 @@ def optimize(instance_id, auto_apply):
                 else rec["description"]
             )
 
-            print(
+            click.echo(
                 f"{instance_id:<20} {opt_type:<20} {impact:<15} {cost_plus:<8} {description}"
             )
 
         # Auto-apply if requested
         if auto_apply:
-            print("\n AUTO-APPLYING OPTIMIZATIONS...")
+            click.echo("\n AUTO-APPLYING OPTIMIZATIONS...")
             applied_count = 0
 
             for rec in recommendations:
-                print(
+                click.echo(
                     f"  OK: Applying {rec['type'].replace('_', ' ').title()} to {rec['instance_id']}"
                 )
                 # In real implementation, this would actually apply the optimization
                 applied_count += 1
 
-            print(f"\nOK: Successfully applied {applied_count} optimizations!")
+            click.echo(f"\nOK: Successfully applied {applied_count} optimizations!")
 
             # Calculate total impact
             total_speedup = 1.0
@@ -2037,31 +2034,31 @@ def optimize(instance_id, auto_apply):
                     total_cost_increase += rec["cost_increase"]
 
             if total_speedup > 1.0:
-                print(f" Total Performance Gain: {total_speedup:.2f}x")
+                click.echo(f" Total Performance Gain: {total_speedup:.2f}x")
             if total_cost_increase > 0.0:
-                print(f"COST: Total Cost Increase: {total_cost_increase:.1%}")
+                click.echo(f"COST: Total Cost Increase: {total_cost_increase:.1%}")
 
     else:
-        print("\nOK: No optimization opportunities found - current setup is optimal!")
+        click.echo("\nOK: No optimization opportunities found - current setup is optimal!")
 
     # Summary
     cost_savings = sum(rec.get("monthly_savings", 0) for rec in recommendations)
     performance_optimizations = [r for r in recommendations if "expected_speedup" in r]
 
-    print("\n OPTIMIZATION SUMMARY:")
-    print(f"  Instances analyzed: {len(instances)}")
-    print(f"  Total opportunities: {len(recommendations)}")
-    print(f"  Cost savings: ${cost_savings:.2f}/month")
-    print(f"  Performance optimizations: {len(performance_optimizations)}")
+    click.echo("\n OPTIMIZATION SUMMARY:")
+    click.echo(f"  Instances analyzed: {len(instances)}")
+    click.echo(f"  Total opportunities: {len(recommendations)}")
+    click.echo(f"  Cost savings: ${cost_savings:.2f}/month")
+    click.echo(f"  Performance optimizations: {len(performance_optimizations)}")
 
     if performance_optimizations:
         avg_speedup = sum(
             rec["expected_speedup"] for rec in performance_optimizations
         ) / len(performance_optimizations)
-        print(f"  Average speedup: {avg_speedup:.2f}x")
+        click.echo(f"  Average speedup: {avg_speedup:.2f}x")
 
-    print("\nTip: Use --auto-apply to automatically apply all optimizations")
-    print(f"{'='*80}")
+    click.echo("\nTip: Use --auto-apply to automatically apply all optimizations")
+    click.echo(f"{'='*80}")
 
 
 
@@ -2069,7 +2066,7 @@ def optimize(instance_id, auto_apply):
 @cli.command()
 def cleanup():
     """Clean up unused resources and temporary files"""
-    print("Cleaning up unused resources...")
+    click.echo("Cleaning up unused resources...")
 
     api = click.get_current_context().obj["api"]
 
@@ -2083,21 +2080,21 @@ def cleanup():
             old_instances.append(inst)
 
     if old_instances:
-        print(f"Found {len(old_instances)} old instances")
+        click.echo(f"Found {len(old_instances)} old instances")
 
         # BYOAPI: Billing disabled - no cleanup billing
 
         for inst in old_instances:
-            print(f"   Removing {inst['id']} ({inst['provider']})")
+            click.echo(f"   Removing {inst['id']} ({inst['provider']})")
 
         api.usage["instances_created"] = [
             i for i in api.usage["instances_created"] if i not in old_instances
         ]
         api.save_usage()
     else:
-        print("OK: No old instances found")
+        click.echo("OK: No old instances found")
 
-    print("Cleanup complete!")
+    click.echo("Cleanup complete!")
 
 
 @cli.command("job")
@@ -2105,10 +2102,10 @@ def cleanup():
 @click.option("--optimize", help="Optimization criteria (cost, latency, balanced)")
 def job(job_file, optimize):
     """Run Terradev job from YAML configuration"""
-    print(f"Running job: {job_file}")
+    click.echo(f"Running job: {job_file}")
 
     if optimize:
-        print(f"Optimization: {optimize}")
+        click.echo(f"Optimization: {optimize}")
 
     # Load job configuration
     try:
@@ -2117,20 +2114,20 @@ def job(job_file, optimize):
         with open(job_file, "r") as f:
             job_config = yaml.safe_load(f)
 
-        print("Job Configuration:")
-        print(f"   Name: {job_config.get('name', 'Unknown')}")
-        print(f"   GPU Type: {job_config.get('gpu_type', 'A100')}")
-        print(f"   Count: {job_config.get('count', 1)}")
-        print(f"   Max Price: ${job_config.get('max_price', 0):.2f}")
+        click.echo("Job Configuration:")
+        click.echo(f"   Name: {job_config.get('name', 'Unknown')}")
+        click.echo(f"   GPU Type: {job_config.get('gpu_type', 'A100')}")
+        click.echo(f"   Count: {job_config.get('count', 1)}")
+        click.echo(f"   Max Price: ${job_config.get('max_price', 0):.2f}")
 
         # Execute job (mock)
-        print("\nExecuting job...")
+        click.echo("\nExecuting job...")
 
         # This would integrate with the provision command
-        print("OK: Job completed successfully!")
+        click.echo("OK: Job completed successfully!")
 
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Error loading job file: {e}")
+        click.echo(f"ERROR: Error loading job file: {e}", err=True)
 
 
 
@@ -2167,7 +2164,7 @@ def job(job_file, optimize):
 @click.option(
     "--port",
     multiple=True,
-    type=int,
+    type=click.IntRange(1, 65535),
     help="Ports to expose (multiple allowed, e.g., 8000 for HTTP)",
 )
 @click.option(
@@ -2177,7 +2174,7 @@ def job(job_file, optimize):
     help="Environment variables KEY=VALUE (multiple allowed, e.g., WANDB_KEY=xxx)",
 )
 @click.option(
-    "--max-price", type=float, help="Maximum price per hour in USD (e.g., 2.50)"
+    "--max-price", type=click.FloatRange(0.0, 10000.0), help="Maximum price per hour in USD (e.g., 2.50)"
 )
 @click.option(
     "--providers",
@@ -2241,25 +2238,25 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
     is_tpu = str(gpu).upper().startswith("TPU-")
     is_vllm_tpu = is_tpu and "vllm-tpu" in image.lower()
 
-    print("Deploying terradev run")
-    print(f"   {'TPU' if is_tpu else 'GPU'}:     {gpu}")
-    print(f"   Image:   {image}")
+    click.echo("Deploying terradev run")
+    click.echo(f"   {'TPU' if is_tpu else 'GPU'}:     {gpu}")
+    click.echo(f"   Image:   {image}")
     if model:
-        print(f"   Model:   {model}")
+        click.echo(f"   Model:   {model}")
     if cmd:
-        print(f"   Command: {cmd}")
+        click.echo(f"   Command: {cmd}")
     if mount:
         for m in mount:
-            print(f"   Mount:   {m}")
+            click.echo(f"   Mount:   {m}")
     if port:
-        print(f"   Ports:   {', '.join(str(p) for p in port)}")
+        click.echo(f"   Ports:   {', '.join(str(p) for p in port)}")
     if keep_alive:
-        print("   Mode:    keep-alive (instance stays running)")
+        click.echo("   Mode:    keep-alive (instance stays running)")
     else:
-        print("   Mode:    auto-terminate on completion")
+        click.echo("   Mode:    auto-terminate on completion")
 
     # ── Step 1: Get quotes ──
-    print(f"\n Finding cheapest {gpu} instance...")
+    click.echo(f"\n Finding cheapest {gpu} instance...")
 
     async def _fetch_quotes():
         tasks = []
@@ -2293,11 +2290,10 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
                 out.extend(r)
         return out
 
-    all_quotes = asyncio.run(_fetch_quotes())
+    all_quotes = _run_with_timeout(_fetch_quotes())
     if not all_quotes:
-        print("No quotes returned. Run 'terradev configure' to set up API keys.")
-        return
-
+        click.echo("No quotes returned. Run 'terradev configure' to set up API keys.")
+        raise SystemExit(1)
     # Silent: record price ticks for ML training data
     try:
         from terradev_cli.core.price_intelligence import record_price_ticks_batch
@@ -2323,25 +2319,25 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
     if max_price:
         all_quotes = [q for q in all_quotes if q["price"] <= max_price]
         if not all_quotes:
-            print(f"No instances under ${max_price:.2f}/hr")
+            click.echo(f"No instances under ${max_price:.2f}/hr")
             return
 
     best = all_quotes[0]
-    print(
+    click.echo(
         f"   Best: {best['provider']} / {best.get('region', '?')}  ${best['price']:.2f}/hr"
     )
 
     if dry_run:
-        print(
+        click.echo(
             f"\nDRY RUN  would provision {best['provider']} {gpu} at ${best['price']:.2f}/hr"
         )
-        print(f"   Then pull {image} and run: {cmd or '(interactive)'}")
+        click.echo(f"   Then pull {image} and run: {cmd or '(interactive)'}")
         elapsed = (time.time() - run_start) * 1000
-        print(f"   Plan built in {elapsed:.0f}ms")
+        click.echo(f"   Plan built in {elapsed:.0f}ms")
         return
 
     # ── Step 2: Provision ──
-    print(f"\nProvisioning on {best['provider']}...")
+    click.echo(f"\nProvisioning on {best['provider']}...")
 
     async def _provision():
         from terradev_cli.providers.provider_factory import ProviderFactory
@@ -2360,15 +2356,15 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
         return result, provider, pname
 
     try:
-        prov_result, provider_obj, pname = asyncio.run(_provision())
+        prov_result, provider_obj, pname = _run_with_timeout(_provision())
     except Exception as e:  # noqa: BLE001
-        print(f"Provisioning failed: {e}")
+        click.echo(f"Provisioning failed: {e}")
         return
 
     instance_id = prov_result.get(
         "instance_id", f"{pname}_{int(time.time())}_{uuid.uuid4().hex[:6]}"
     )
-    print(f"   Instance: {instance_id}")
+    click.echo(f"   Instance: {instance_id}")
 
     # Record to usage
     inst_data = {
@@ -2406,7 +2402,7 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
         pass
 
     # ── Step 3: Deploy Docker container ──
-    print(f"\n Deploying container: {image}")
+    click.echo(f"\n Deploying container: {image}")
 
     if is_tpu:
         # TPU VMs require privileged mode, host networking and large /dev/shm.
@@ -2447,7 +2443,7 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
             wandb_env = build_env_vars(api.credentials)
             for k, v in wandb_env.items():
                 docker_cmd_parts.extend(["-e", f"{k}={v}"])
-            print(f"   Status W&B env vars injected ({len(wandb_env)} vars)")
+            click.echo(f"   Status W&B env vars injected ({len(wandb_env)} vars)")
     except Exception as _exc:  # noqa: BLE001
         logger.exception(_exc)
         pass
@@ -2469,7 +2465,7 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
             f"--max-model-len 2048 "
             f"--download-dir /tmp"
         )
-        print(f"   Default vLLM TPU command: {cmd}")
+        click.echo(f"   Default vLLM TPU command: {cmd}")
 
     docker_cmd_parts.extend(["--name", f"terradev-{instance_id[:12]}"])
     docker_cmd_parts.append(image)
@@ -2477,7 +2473,7 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
         docker_cmd_parts.extend(["sh", "-c", cmd])
 
     docker_cmd = " ".join(docker_cmd_parts)
-    print(f"   $ {docker_cmd}")
+    click.echo(f"   $ {docker_cmd}")
 
     async def _deploy_and_exec():
         from terradev_cli.providers.provider_factory import ProviderFactory
@@ -2488,7 +2484,7 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
         return await prov.execute_command(instance_id, docker_cmd, False)
 
     try:
-        exec_result = asyncio.run(_deploy_and_exec())
+        exec_result = _run_with_timeout(_deploy_and_exec())
         stdout = (
             exec_result.get("stdout", "")
             if isinstance(exec_result, dict)
@@ -2500,28 +2496,28 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
         )
 
         if stdout:
-            print(f"\nStatus Output:\n{stdout}")
+            click.echo(f"\nStatus Output:\n{stdout}")
         if stderr:
-            print(f"Warning  Stderr:\n{stderr}")
+            click.echo(f"Warning  Stderr:\n{stderr}")
 
     except Exception as e:  # noqa: BLE001
-        print(f"Warning  Container deployment error: {e}")
-        print("   (Instance is still running  use 'terradev execute' to retry)")
+        click.echo(f"Warning  Container deployment error: {e}")
+        click.echo("   (Instance is still running  use 'terradev execute' to retry)")
         exit_code = 1
 
     # ── Step 4: Cleanup or keep alive ──
     total_time = (time.time() - run_start) * 1000
 
     if keep_alive:
-        print(f"\nOK: Container running on {best['provider']} ({instance_id})")
-        print(f"   COST: Cost: ${best['price']:.2f}/hr")
+        click.echo(f"\nOK: Container running on {best['provider']} ({instance_id})")
+        click.echo(f"   COST: Cost: ${best['price']:.2f}/hr")
         if port:
-            print(f"    Ports: {', '.join(str(p) for p in port)}")
-        print(f"    Manage: terradev manage -i {instance_id} -a status")
-        print(f"    Stop:   terradev manage -i {instance_id} -a terminate")
+            click.echo(f"    Ports: {', '.join(str(p) for p in port)}")
+        click.echo(f"    Manage: terradev manage -i {instance_id} -a status")
+        click.echo(f"    Stop:   terradev manage -i {instance_id} -a terminate")
     else:
         if exit_code == 0:
-            print("\n Auto-terminating instance...")
+            click.echo("\n Auto-terminating instance...")
 
             async def _terminate():
                 from terradev_cli.providers.provider_factory import ProviderFactory
@@ -2532,7 +2528,7 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
                 return await prov.terminate_instance(instance_id)
 
             try:
-                asyncio.run(_terminate())
+                _run_with_timeout(_terminate())
                 api.usage["instances_created"] = [
                     i for i in api.usage["instances_created"] if i["id"] != instance_id
                 ]
@@ -2545,20 +2541,20 @@ def run(gpu, image, cmd, model, mount, port, env, max_price, providers, keep_ali
                     logger.exception(_exc)
                     pass
                 # BYOAPI: Billing disabled - no termination billing
-                print("   OK: Terminated")
+                click.echo("   OK: Terminated")
             except Exception as e:  # noqa: BLE001
-                print(f"   Warning  Auto-terminate failed: {e}")
-                print(f"    Manual: terradev manage -i {instance_id} -a terminate")
+                click.echo(f"   Warning  Auto-terminate failed: {e}")
+                click.echo(f"    Manual: terradev manage -i {instance_id} -a terminate")
         else:
-            print(
+            click.echo(
                 f"\nWarning  Command exited with code {exit_code}  instance kept alive for debugging"
             )
-            print(
+            click.echo(
                 f"    Debug:  terradev execute -i {instance_id} -c 'docker logs terradev-{instance_id[:12]}'"
             )
-            print(f"    Stop:   terradev manage -i {instance_id} -a terminate")
+            click.echo(f"    Stop:   terradev manage -i {instance_id} -a terminate")
 
-    print(f" Total time: {total_time:.0f}ms")
+    click.echo(f" Total time: {total_time:.0f}ms")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

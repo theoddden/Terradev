@@ -30,35 +30,46 @@ logger = logging.getLogger(__name__)
 class _CallbackHandler(BaseHTTPRequestHandler):
     """Minimal handler that captures the token from the browser redirect."""
 
-    token: Optional[str] = None
-    error: Optional[str] = None
-    received = threading.Event()
-
     def do_GET(self):  # noqa: N802
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
+        cb = self.server.callback_state
+        expected_state = self.server.expected_state
+
+        state = query.get("state", [None])[0]
+        if state != expected_state:
+            cb["error"] = "Invalid or missing state parameter"
+            cb["received"].set()
+            self.send_response(403)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(
+                "<h1>Invalid callback state</h1>"
+                "<p>Close this tab and try again.</p>".encode("utf-8")
+            )
+            return
 
         if "token" in query:
-            _CallbackHandler.token = query["token"][0]
-            _CallbackHandler.error = None
-            _CallbackHandler.received.set()
+            cb["token"] = query["token"][0]
+            cb["error"] = None
+            cb["received"].set()
         elif "error" in query:
-            _CallbackHandler.error = query["error"][0]
-            _CallbackHandler.received.set()
+            cb["error"] = query["error"][0]
+            cb["received"].set()
 
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.end_headers()
 
-        if _CallbackHandler.token:
+        if cb["token"]:
             body = (
                 "<h1>Terradev CLI authenticated</h1>"
                 "<p>You can close this tab and return to the terminal.</p>"
             )
-        elif _CallbackHandler.error:
+        elif cb["error"]:
             body = (
-                f"<h1>Authentication failed</h1>"
-                f"<p>{_CallbackHandler.error}</p>"
+                "<h1>Authentication failed</h1>"
+                f"<p>{cb['error']}</p>"
             )
         else:
             body = (
@@ -75,7 +86,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 @cli.command("login")
 @click.option(
     "--port",
-    type=int,
+    type=click.IntRange(0, 65535),
     default=0,
     help="Local callback port (0 = ephemeral)",
 )
@@ -91,7 +102,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 )
 @click.option(
     "--timeout",
-    type=int,
+    type=click.IntRange(1, 3600),
     default=120,
     help="Seconds to wait for the browser callback",
 )
@@ -105,11 +116,11 @@ def login(port: int, no_browser: bool, endpoint: str, timeout: int):
     output = get_output()
 
     state = secrets.token_urlsafe(16)
-    _CallbackHandler.token = None
-    _CallbackHandler.error = None
-    _CallbackHandler.received.clear()
+    callback_state = {"token": None, "error": None, "received": threading.Event()}
 
     server = HTTPServer(("127.0.0.1", port), _CallbackHandler)
+    server.expected_state = state
+    server.callback_state = callback_state
     actual_port = server.server_address[1]
     callback_url = f"http://127.0.0.1:{actual_port}/callback"
 
@@ -138,23 +149,28 @@ def login(port: int, no_browser: bool, endpoint: str, timeout: int):
         if not received:
             output.error("Timed out waiting for browser authentication")
             output.set_result({"status": "timeout"})
-            return
+            raise SystemExit(1)
 
-        if _CallbackHandler.error:
-            output.error(f"Authentication failed: {_CallbackHandler.error}")
-            output.set_result({"status": "failed", "error": _CallbackHandler.error})
-            return
+        if callback_state["error"]:
+            output.error(f"Authentication failed: {callback_state['error']}")
+            output.set_result({"status": "failed", "error": callback_state["error"]})
+            raise SystemExit(1)
 
-        if not _CallbackHandler.token:
+        if not callback_state["token"]:
             output.error("No token received from browser")
             output.set_result({"status": "failed", "error": "missing token"})
-            return
+            raise SystemExit(1)
 
         # Persist to vault
         vault = VaultAdapter(Path.home() / ".terradev")
-        vault.set("telinea", "api_key", _CallbackHandler.token)
+        try:
+            vault.set("telinea", "api_key", callback_state["token"])
+        except Exception as exc:  # noqa: BLE001
+            output.error(f"Could not save API key to vault: {exc}")
+            output.set_result({"status": "failed", "error": str(exc)})
+            raise SystemExit(1)
 
-        masked = _CallbackHandler.token[:8] + "•" * 8
+        masked = callback_state["token"][:8] + "•" * 8
         output.success(f"Telinea API key saved ({masked})")
         output.set_result({"status": "authenticated", "masked_key": masked})
 

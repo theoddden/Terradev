@@ -32,13 +32,13 @@ class GatewayCommand(click.Command):
             raise
         except Exception as exc:  # noqa: BLE001
             click.echo(f"ERROR: {exc}", err=True)
-            raise click.exceptions.Exit(1) from exc
+            raise SystemExit(1) from exc
 
         output = ctx.obj.get("terradev_output") if ctx.obj else None
         if output is not None and (rv is None or rv == 0):
             messages = getattr(output, "_messages", [])
             if any(m.level == "error" for m in messages):
-                raise click.exceptions.Exit(1)
+                raise SystemExit(1)
         return rv
 
 
@@ -54,8 +54,16 @@ class GatewayGroup(click.Group):
         return super().group(*args, **kwargs)
 
 
+async def _run_with_timeout(coro):
+    try:
+        return await asyncio.wait_for(coro, timeout=120)
+    except asyncio.TimeoutError:
+        click.echo("ERROR: Gateway operation timed out", err=True)
+        raise SystemExit(1)
+
+
 def _run_async(coro):
-    return asyncio.run(coro)
+    return asyncio.run(_run_with_timeout(coro))
 
 
 def _start_gateway_service(config: Dict[str, Any]) -> None:
@@ -64,41 +72,41 @@ def _start_gateway_service(config: Dict[str, Any]) -> None:
         cfg = create_gateway_config(**config)
         gateway = GatewayService(cfg)
     except ImportError as e:
-        print(f"ERROR: {e}")
-        print("To install required dependencies:")
-        print("  pip install fastapi uvicorn")
-        sys.exit(1)
+        click.echo(f"ERROR: {e}", err=True)
+        click.echo("To install required dependencies:", err=True)
+        click.echo("  pip install fastapi uvicorn", err=True)
+        raise SystemExit(1)
 
     host = config["host"]
     port = config["port"]
 
-    print(f"\n{'='*70}")
-    print("TERRADEV INFERENCE GATEWAY")
-    print(f"{'='*70}")
-    print(f"Host: {host}:{port}")
-    print(f"OpenAI API: {'ENABLED' if config.get('enable_openai') else 'DISABLED'}")
-    print(f"Anthropic API: {'ENABLED' if config.get('enable_anthropic') else 'DISABLED'}")
-    print(f"Custom Workflows: {'ENABLED' if config.get('enable_custom') else 'DISABLED'}")
-    print(f"CORS: {'ENABLED' if config.get('enable_cors') else 'DISABLED'}")
-    print(f"Inference Router: {'ENABLED' if config.get('enable_inference_router') else 'DISABLED'}")
-    print(f"Max Concurrent Requests: {config['max_concurrent_requests']}")
-    print(f"Request Timeout: {config['request_timeout']}s")
-    print(f"Default Model: {config['default_model']}")
-    print(f"{'='*70}\n")
-    print("Starting gateway server...")
-    print(f"OpenAI endpoint: http://{host}:{port}/v1/chat/completions")
-    print(f"Anthropic endpoint: http://{host}:{port}/v1/messages")
-    print(f"Health check: http://{host}:{port}/health")
-    print(f"Gateway status: http://{host}:{port}/v1/gateway/status")
-    print("\nPress Ctrl+C to stop the server\n")
+    click.echo(f"\n{'='*70}")
+    click.echo("TERRADEV INFERENCE GATEWAY")
+    click.echo(f"{'='*70}")
+    click.echo(f"Host: {host}:{port}")
+    click.echo(f"OpenAI API: {'ENABLED' if config.get('enable_openai') else 'DISABLED'}")
+    click.echo(f"Anthropic API: {'ENABLED' if config.get('enable_anthropic') else 'DISABLED'}")
+    click.echo(f"Custom Workflows: {'ENABLED' if config.get('enable_custom') else 'DISABLED'}")
+    click.echo(f"CORS: {'ENABLED' if config.get('enable_cors') else 'DISABLED'}")
+    click.echo(f"Inference Router: {'ENABLED' if config.get('enable_inference_router') else 'DISABLED'}")
+    click.echo(f"Max Concurrent Requests: {config['max_concurrent_requests']}")
+    click.echo(f"Request Timeout: {config['request_timeout']}s")
+    click.echo(f"Default Model: {config['default_model']}")
+    click.echo(f"{'='*70}\n")
+    click.echo("Starting gateway server...")
+    click.echo(f"OpenAI endpoint: http://{host}:{port}/v1/chat/completions")
+    click.echo(f"Anthropic endpoint: http://{host}:{port}/v1/messages")
+    click.echo(f"Health check: http://{host}:{port}/health")
+    click.echo(f"Gateway status: http://{host}:{port}/v1/gateway/status")
+    click.echo("\nPress Ctrl+C to stop the server\n")
 
     try:
         gateway.run_sync()
     except KeyboardInterrupt:
-        print("\n\nGateway server stopped.")
+        click.echo("\n\nGateway server stopped.")
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Failed to start gateway server: {e}")
-        sys.exit(1)
+        click.echo(f"ERROR: Failed to start gateway server: {e}", err=True)
+        raise SystemExit(1)
 
 
 def _load_provider(provider: str, api: TerradevAPI, overrides: Optional[Dict[str, str]] = None):
@@ -300,15 +308,15 @@ ADAPTERS = {
 
 @cli.group(name="gateway", invoke_without_command=True, cls=GatewayGroup)
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind the gateway server")
-@click.option("--port", "-p", default=8000, type=int, help="Port for the gateway server")
+@click.option("--port", "-p", default=8000, type=click.IntRange(1, 65535), help="Port for the gateway server")
 @click.option("--openai", is_flag=True, default=True, help="Enable OpenAI-compatible endpoints")
 @click.option("--no-openai", is_flag=True, help="Disable OpenAI-compatible endpoints")
 @click.option("--anthropic", is_flag=True, default=True, help="Enable Anthropic-compatible endpoints")
 @click.option("--no-anthropic", is_flag=True, help="Disable Anthropic-compatible endpoints")
 @click.option("--custom", is_flag=True, default=True, help="Enable custom workflow endpoints")
 @click.option("--no-custom", is_flag=True, help="Disable custom workflow endpoints")
-@click.option("--max-concurrent", type=int, default=100, help="Maximum concurrent requests")
-@click.option("--timeout", type=int, default=120, help="Request timeout in seconds")
+@click.option("--max-concurrent", type=click.IntRange(1, 65535), default=100, help="Maximum concurrent requests")
+@click.option("--timeout", type=click.IntRange(1, 3600), default=120, help="Request timeout in seconds")
 @click.option("--cors", is_flag=True, default=True, help="Enable CORS")
 @click.option("--no-cors", is_flag=True, help="Disable CORS")
 @click.option("--cors-origins", multiple=True, help="CORS allowed origins")
@@ -390,7 +398,7 @@ def serve():
 
 @gateway.command("status")
 @click.option("--host", "-h", default="0.0.0.0", help="Gateway host")
-@click.option("--port", "-p", default=8000, type=int, help="Gateway port")
+@click.option("--port", "-p", default=8000, type=click.IntRange(1, 65535), help="Gateway port")
 @click.pass_context
 def gateway_status(ctx, host, port):
     """Show the running gateway server status."""
@@ -398,14 +406,14 @@ def gateway_status(ctx, host, port):
     try:
         with urlopen(url, timeout=5) as resp:
             data = json.load(resp)
-            print(json.dumps(data, indent=2, default=str))
+            click.echo(json.dumps(data, indent=2, default=str))
     except URLError as e:
-        print(f"ERROR: Gateway not reachable at {url}: {e}")
-        print("Start a gateway with: terradev gateway serve")
-        sys.exit(1)
+        click.echo(f"ERROR: Gateway not reachable at {url}: {e}", err=True)
+        click.echo("Start a gateway with: terradev gateway serve", err=True)
+        raise SystemExit(1)
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
-        sys.exit(1)
+        click.echo(f"ERROR: {e}", err=True)
+        raise SystemExit(1)
 
 
 def _build_provider_group(provider: str):
@@ -435,6 +443,9 @@ def _build_provider_group(provider: str):
         api = ctx.obj["api"]
         creds: Dict[str, str] = {"api_key": api_key or ""}
 
+        if not api_key:
+            raise click.ClickException("API key is required")
+
         if provider == "huggingface" and not namespace:
             raise click.ClickException("HuggingFace requires --namespace")
 
@@ -448,7 +459,7 @@ def _build_provider_group(provider: str):
             creds["api_endpoint"] = endpoint
 
         api._save_provider_creds(provider, creds)
-        print(f"OK: {provider} credentials saved.")
+        click.echo(f"OK: {provider} credentials saved.")
 
     @group.command("deploy")
     @click.option("--model", "-m", required=True, help="Model to deploy / serve")
@@ -466,11 +477,11 @@ def _build_provider_group(provider: str):
         result = _run_async(adapter.deploy(model, gpu_type, region))
         endpoint_id, url = _register_endpoint(api, provider, result, model, gpu_type, region)
 
-        print(f"OK: {provider} endpoint deployed")
-        print(f"  ID: {endpoint_id}")
+        click.echo(f"OK: {provider} endpoint deployed")
+        click.echo(f"  ID: {endpoint_id}")
         if url:
-            print(f"  URL: {url}")
-        print(f"  Status: {result.get('status', 'unknown')}")
+            click.echo(f"  URL: {url}")
+        click.echo(f"  Status: {result.get('status', 'unknown')}")
 
     @group.command("list")
     @click.pass_context
@@ -483,13 +494,13 @@ def _build_provider_group(provider: str):
         adapter = Adapter(provider, api)
         items = _run_async(adapter.list())
         if not items:
-            print(f"No {provider} endpoints found")
+            click.echo(f"No {provider} endpoints found")
             return
 
-        print(f"{provider} endpoints:")
+        click.echo(f"{provider} endpoints:")
         for item in items:
             iid = item.get("instance_id") or item.get("id") or item.get("model_id") or "unknown"
-            print(f"  {iid}: {item.get('status', 'unknown')}")
+            click.echo(f"  {iid}: {item.get('status', 'unknown')}")
 
     @group.command("status")
     @click.argument("endpoint-id")
@@ -502,7 +513,7 @@ def _build_provider_group(provider: str):
         api = ctx.obj["api"]
         adapter = Adapter(provider, api)
         result = _run_async(adapter.status(endpoint_id))
-        print(json.dumps(result, indent=2, default=str))
+        click.echo(json.dumps(result, indent=2, default=str))
 
     @group.command("delete")
     @click.argument("endpoint-id")
@@ -515,14 +526,14 @@ def _build_provider_group(provider: str):
         api = ctx.obj["api"]
         adapter = Adapter(provider, api)
         result = _run_async(adapter.delete(endpoint_id))
-        print(f"OK: {endpoint_id} deletion initiated")
-        print(json.dumps(result, indent=2, default=str))
+        click.echo(f"OK: {endpoint_id} deletion initiated")
+        click.echo(json.dumps(result, indent=2, default=str))
 
     @group.command("chat")
     @click.option("--model", "-m", required=True, help="Model or endpoint ID to query")
     @click.option("--prompt", "-p", required=True, help="Prompt text")
-    @click.option("--max-tokens", default=2048, type=int, help="Maximum tokens")
-    @click.option("--temperature", default=0.7, type=float, help="Sampling temperature")
+    @click.option("--max-tokens", default=2048, type=click.IntRange(1, 8192), help="Maximum tokens")
+    @click.option("--temperature", default=0.7, type=click.FloatRange(0.0, 2.0), help="Sampling temperature")
     @click.pass_context
     def chat_cmd(ctx, model, prompt, max_tokens, temperature):
         """Send a chat/prompt to this provider.
@@ -533,7 +544,7 @@ def _build_provider_group(provider: str):
         api = ctx.obj["api"]
         adapter = Adapter(provider, api)
         response = _run_async(adapter.chat(model, prompt, max_tokens, temperature))
-        print(response)
+        click.echo(response)
 
     @group.command("models")
     @click.pass_context
@@ -547,20 +558,20 @@ def _build_provider_group(provider: str):
         try:
             items = _run_async(adapter.models())
         except NotImplementedError as e:
-            print(f"ERROR: {e}")
-            sys.exit(1)
+            click.echo(f"ERROR: {e}", err=True)
+            raise SystemExit(1)
 
         if not items:
-            print(f"No {provider} models found")
+            click.echo(f"No {provider} models found")
             return
 
-        print(f"{provider} models:")
+        click.echo(f"{provider} models:")
         for item in items:
             if isinstance(item, dict):
                 mid = item.get("id") or item.get("model") or item.get("name") or item.get("model_id", "unknown")
-                print(f"  {mid}")
+                click.echo(f"  {mid}")
             else:
-                print(f"  {item}")
+                click.echo(f"  {item}")
 
     return group
 

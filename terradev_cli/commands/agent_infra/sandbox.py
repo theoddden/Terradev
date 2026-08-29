@@ -30,6 +30,7 @@ from .core import (
     SandboxTimeoutError,
     UnsupportedRuntimeError,
     _parse_size,
+    _run_with_timeout,
 )
 from .dependency_manager import DependencyError, DependencyManager
 from .otel import Span, Tracer, get_tracer
@@ -570,7 +571,7 @@ def sandbox_runtimes():
         for name, available, priority in sorted(rows, key=lambda x: -x[2]):
             click.echo(f"{name:<16} {available:<10} {priority:<10}")
 
-    asyncio.run(_main())
+    _run_with_timeout(_main())
 
 
 @sandbox.command("run")
@@ -594,8 +595,8 @@ def sandbox_runtimes():
 )
 @click.option("--network", default="none", type=click.Choice(["none", "allowlist", "denylist", "host"]))
 @click.option("--memory", help="Memory limit (e.g. 512m, 2g)")
-@click.option("--cpus", type=int, help="CPU limit")
-@click.option("--pids", type=int, help="PID limit")
+@click.option("--cpus", type=click.IntRange(1, 1000000), help="CPU limit")
+@click.option("--pids", type=click.IntRange(1, 1000000), help="PID limit")
 @click.option("--read-only/--no-read-only", default=True, help="Mount rootfs read-only")
 @click.option("--image", help="OCI image or rootfs to use")
 @click.option("--kernel", help="Kernel image (Firecracker)")
@@ -706,7 +707,7 @@ def sandbox_run(
         return result.exit_code
 
     try:
-        return asyncio.run(_main())
+        return _run_with_timeout(_main())
     except SandboxTimeoutError as exc:
         click.echo(f"ERROR: {exc}", err=True)
         raise SystemExit(124)

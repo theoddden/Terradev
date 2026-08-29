@@ -495,13 +495,22 @@ class McpTransport(ABC):
 # ---------------------------------------------------------------------------
 
 
+def _run_with_timeout(coro, timeout=300):
+    """Run an async coroutine with a timeout to prevent hangs."""
+    try:
+        return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
+    except asyncio.TimeoutError:
+        click.echo(f"ERROR: Agent operation timed out after {timeout}s", err=True)
+        raise SystemExit(1)
+
+
 def async_command(coro: Callable[..., Any]) -> click.Command:
     """Wrap an async coroutine so it can be used as a Click command callback."""
 
     @click.pass_context
     def wrapper(ctx: click.Context, *args, **kwargs):
         # Ensure each CLI invocation gets its own fresh event loop.
-        return asyncio.run(coro(*args, **kwargs))
+        return _run_with_timeout(coro(*args, **kwargs))
 
     # Preserve function signature metadata for Click help generation.
     wrapper.__name__ = coro.__name__

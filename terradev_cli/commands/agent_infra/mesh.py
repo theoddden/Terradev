@@ -601,7 +601,7 @@ def node():
 @click.option("--listen", default="127.0.0.1:4222", help="Listen address")
 @click.option("--bootstrap", multiple=True, help="Bootstrap peer multiaddr or URL")
 @click.option("--config", "-c", type=click.Path(exists=True, dir_okay=False), help="Config file")
-@click.option("--timeout", default=30, type=int, help="Task delegation timeout (seconds)")
+@click.option("--timeout", default=30, type=click.IntRange(1, 86400), help="Task delegation timeout (seconds)")
 def mesh_node_join(protocol, transport, topology, listen, bootstrap, config, timeout):
     """Join the agent mesh as a node."""
     import asyncio
@@ -617,7 +617,11 @@ def mesh_node_join(protocol, transport, topology, listen, bootstrap, config, tim
 
         if config:
             with open(config, "r", encoding="utf-8") as f:
-                data = json.load(f) if config.endswith(".json") else {}
+                if config.endswith(".json"):
+                    data = json.load(f)
+                else:
+                    import yaml as _yaml
+                    data = _yaml.safe_load(f) or {}
             if data:
                 cfg = cfg.model_copy(update=data)
 
@@ -634,7 +638,7 @@ def mesh_node_join(protocol, transport, topology, listen, bootstrap, config, tim
             await node.stop()
 
     try:
-        asyncio.run(_main())
+        _run_with_timeout(_main())
     except (click.ClickException, SystemExit):
         raise
     except Exception as exc:  # noqa: BLE001
@@ -654,7 +658,7 @@ def card():
 @click.option("--skills", "-s", multiple=True, help="Comma-separated skills")
 @click.option("--version", default="1.0.0", help="Agent version")
 @click.option("--listen", default="127.0.0.1:4222", help="Local node listen address")
-@click.option("--transport", default="http", type=click.Choice(["http", "libp2p", "wireguard"]))
+@click.option("--transport", default="http", type=click.Choice(["http", "libp2p", "wireguard"]), help="Underlying transport")
 def mesh_card_publish(name, endpoint, skills, version, listen, transport):
     """Publish an Agent Card to the mesh."""
     import asyncio
@@ -677,7 +681,7 @@ def mesh_card_publish(name, endpoint, skills, version, listen, transport):
             await node.stop()
 
     try:
-        asyncio.run(_main())
+        _run_with_timeout(_main())
     except (click.ClickException, SystemExit):
         raise
     except Exception as exc:  # noqa: BLE001
@@ -692,14 +696,14 @@ def task():
 
 
 @task.command("create")
-@click.option("--input", "-i", required=True, help="Task input/prompt")
+@click.option("--input", "-i", "task_input", required=True, help="Task input/prompt")
 @click.option("--skills", "-s", multiple=True, help="Comma-separated skills")
 @click.option("--peer", "-p", help="Specific peer endpoint to delegate to")
 @click.option("--slo", default="latency", type=click.Choice(["latency", "cost", "throughput"]), help="Routing strategy")
 @click.option("--listen", default="127.0.0.1:4222", help="Local node listen address")
-@click.option("--transport", default="http", type=click.Choice(["http", "libp2p", "wireguard"]))
-@click.option("--format", type=click.Choice(["text", "json"]), default="text")
-def mesh_task_create(input, skills, peer, slo, listen, transport, format):
+@click.option("--transport", default="http", type=click.Choice(["http", "libp2p", "wireguard"]), help="Underlying transport")
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def mesh_task_create(task_input, skills, peer, slo, listen, transport, fmt):
     """Create and delegate a task to the mesh."""
     import asyncio
 
@@ -722,10 +726,10 @@ def mesh_task_create(input, skills, peer, slo, listen, transport, format):
                 click.echo("ERROR: No peer found for requested skills", err=True)
                 raise SystemExit(1)
 
-            t = Task(input=input, skills=skill_list)
+            t = Task(input=task_input, skills=skill_list)
             completed = await node.delegate(card, t)
 
-            if format == "json":
+            if fmt == "json":
                 click.echo(json.dumps(completed.model_dump(), indent=2, default=str))
             else:
                 click.echo(f"OK: Task {completed.id} -> {card.name}")
@@ -740,7 +744,7 @@ def mesh_task_create(input, skills, peer, slo, listen, transport, format):
             await node.stop()
 
     try:
-        asyncio.run(_main())
+        _run_with_timeout(_main())
     except (click.ClickException, SystemExit):
         raise
     except Exception as exc:  # noqa: BLE001
@@ -750,10 +754,10 @@ def mesh_task_create(input, skills, peer, slo, listen, transport, format):
 
 @mesh.command("peers")
 @click.option("--skills", "-s", multiple=True, help="Filter by skill")
-@click.option("--listen", default="127.0.0.1:4222")
-@click.option("--transport", default="http", type=click.Choice(["http", "libp2p", "wireguard"]))
-@click.option("--format", type=click.Choice(["text", "json"]), default="text")
-def mesh_peers(skills, listen, transport, format):
+@click.option("--listen", default="127.0.0.1:4222", help="Local node listen address")
+@click.option("--transport", default="http", type=click.Choice(["http", "libp2p", "wireguard"]), help="Underlying transport")
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def mesh_peers(skills, listen, transport, fmt):
     """List known peers in the mesh."""
     import asyncio
 
@@ -764,7 +768,7 @@ def mesh_peers(skills, listen, transport, format):
         await node.start()
         try:
             cards = await node.discover(skill_list)
-            if format == "json":
+            if fmt == "json":
                 click.echo(json.dumps([c.model_dump() for c in cards], indent=2))
             else:
                 click.echo(f"PEERS ({len(cards)})")
@@ -774,7 +778,7 @@ def mesh_peers(skills, listen, transport, format):
             await node.stop()
 
     try:
-        asyncio.run(_main())
+        _run_with_timeout(_main())
     except (click.ClickException, SystemExit):
         raise
     except Exception as exc:  # noqa: BLE001
@@ -783,12 +787,12 @@ def mesh_peers(skills, listen, transport, format):
 
 
 @mesh.command("route")
-@click.option("--task-id", help="Task to inspect routing for")
-@click.option("--skills", "-s", multiple=True)
-@click.option("--listen", default="127.0.0.1:4222")
-@click.option("--transport", default="http", type=click.Choice(["http", "libp2p", "wireguard"]))
-@click.option("--format", type=click.Choice(["text", "json"]), default="text")
-def mesh_route(task_id, skills, listen, transport, format):
+@click.option("--task-id", default=None, help="Task ID to inspect routing for (informational; filters log output)")
+@click.option("--skills", "-s", multiple=True, help="Filter peers by skill")
+@click.option("--listen", default="127.0.0.1:4222", help="Local node listen address")
+@click.option("--transport", default="http", type=click.Choice(["http", "libp2p", "wireguard"]), help="Underlying transport")
+@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def mesh_route(task_id, skills, listen, transport, fmt):
     """Show the selected route for a set of skills."""
     import asyncio
 
@@ -802,7 +806,9 @@ def mesh_route(task_id, skills, listen, transport, format):
             if not card:
                 click.echo("No route available.")
                 return
-            if format == "json":
+            if task_id:
+                click.echo(f"Routing task {task_id}")
+            if fmt == "json":
                 click.echo(json.dumps(card.model_dump(), indent=2))
             else:
                 click.echo(f"ROUTE: {card.name} @ {card.endpoint} skills={','.join(card.skills)}")
@@ -810,7 +816,7 @@ def mesh_route(task_id, skills, listen, transport, format):
             await node.stop()
 
     try:
-        asyncio.run(_main())
+        _run_with_timeout(_main())
     except (click.ClickException, SystemExit):
         raise
     except Exception as exc:  # noqa: BLE001

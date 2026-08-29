@@ -63,7 +63,7 @@ class BaseProvider(ABC):
     async def __aenter__(self):
         """Async context manager entry"""
         connector = await self._get_shared_connector()
-        self.session = aiohttp.ClientSession(connector=connector)
+        self.session = aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=30, connect=10))
         self._owns_session = True
         return self
 
@@ -155,7 +155,7 @@ class BaseProvider(ABC):
         """
         if not self.session or self.session.closed:
             connector = await self._get_shared_connector()
-            self.session = aiohttp.ClientSession(connector=connector)
+            self.session = aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=30, connect=10))
             self._owns_session = True
 
         try:
@@ -287,7 +287,7 @@ class BaseProvider(ABC):
         """Make HTTP request with authentication and rate limiting"""
         if not self.session or self.session.closed:
             connector = await self._get_shared_connector()
-            self.session = aiohttp.ClientSession(connector=connector)
+            self.session = aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=30, connect=10))
             self._owns_session = True
 
         # Acquire rate-limit permit for this provider (best-effort)

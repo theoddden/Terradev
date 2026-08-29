@@ -16,6 +16,14 @@ import click
 from . import cli
 from terradev_cli.commands._api import TerradevAPI
 
+
+def _safe_json(raw: str, option: str):
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        click.echo(f"ERROR: Invalid JSON in {option}: {exc}", err=True)
+        raise SystemExit(1) from exc
+
 def _get_api():
     """Resolve the TerradevAPI instance from the Click context or create a real one."""
     ctx = click.get_current_context()
@@ -89,31 +97,31 @@ def wandb_test():
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
-            print(get_enhanced_wandb_setup_instructions())
+            click.echo(get_enhanced_wandb_setup_instructions())
             return
 
         service = create_enhanced_wandb_service_from_credentials(creds)
-        print(" Testing W&B connection...")
-        result = asyncio.run(service.test_connection())
+        click.echo(" Testing W&B connection...")
+        result = _run_with_timeout(service.test_connection())
 
         if result["status"] == "connected":
-            print("OK: W&B connected successfully")
-            print(f"   Entity: {result['entity']}")
-            print(f"   Project: {result['project']}")
-            print(f"   Base URL: {result['base_url']}")
-            print(
+            click.echo("OK: W&B connected successfully")
+            click.echo(f"   Entity: {result['entity']}")
+            click.echo(f"   Project: {result['project']}")
+            click.echo(f"   Base URL: {result['base_url']}")
+            click.echo(
                 f"   Dashboard: {'Enabled' if creds.get('wandb_dashboard_enabled') == 'true' else 'Disabled'}"
             )
-            print(
+            click.echo(
                 f"   Reports: {'Enabled' if creds.get('wandb_reports_enabled') == 'true' else 'Disabled'}"
             )
-            print(
+            click.echo(
                 f"   Alerts: {'Enabled' if creds.get('wandb_alerts_enabled') == 'true' else 'Disabled'}"
             )
         else:
-            print(f"ERROR: W&B connection failed: {result['error']}")
+            click.echo(f"ERROR: W&B connection failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced W&B service not available.")
+        click.echo("ERROR: Enhanced W&B service not available.", err=True)
 @wandb.command("list-projects")
 def wandb_list_projects():
     """List all W&B projects."""
@@ -124,17 +132,17 @@ def wandb_list_projects():
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
-            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
-            return
+            click.echo("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_enhanced_wandb_service_from_credentials(creds)
-        print(" Listing W&B projects...")
-        projects = asyncio.run(service.list_projects())
+        click.echo(" Listing W&B projects...")
+        projects = _run_with_timeout(service.list_projects())
 
         for project in projects:
-            print(f"   Path {project['name']} (ID: {project['id']})")
+            click.echo(f"   Path {project['name']} (ID: {project['id']})")
     except ImportError:
-        print("ERROR: Enhanced W&B service not available.")
+        click.echo("ERROR: Enhanced W&B service not available.", err=True)
 @wandb.command("create-project")
 @click.argument("project_name")
 def wandb_create_project(project_name):
@@ -146,17 +154,17 @@ def wandb_create_project(project_name):
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
-            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
-            return
+            click.echo("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_enhanced_wandb_service_from_credentials(creds)
-        print(f"Path Creating project: {project_name}")
-        result = asyncio.run(
+        click.echo(f"Path Creating project: {project_name}")
+        result = _run_with_timeout(
             service.create_project(project_name, "Created via Terradev CLI")
         )
-        print(f"OK: Project created: {result['name']}")
+        click.echo(f"OK: Project created: {result['name']}")
     except ImportError:
-        print("ERROR: Enhanced W&B service not available.")
+        click.echo("ERROR: Enhanced W&B service not available.", err=True)
 @wandb.command("list-runs")
 @click.option("--limit", "-l", default=20, help="Max runs to return")
 def wandb_list_runs(limit):
@@ -168,19 +176,19 @@ def wandb_list_runs(limit):
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
-            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
-            return
+            click.echo("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_enhanced_wandb_service_from_credentials(creds)
-        print(" Listing recent runs...")
-        runs = asyncio.run(service.list_runs(limit=limit))
+        click.echo(" Listing recent runs...")
+        runs = _run_with_timeout(service.list_runs(limit=limit))
 
         for run in runs[:limit]:
-            print(
+            click.echo(
                 f"    {run['name'][:30]} - {run['state']} - {run['createdAt'][:10]}"
             )
     except ImportError:
-        print("ERROR: Enhanced W&B service not available.")
+        click.echo("ERROR: Enhanced W&B service not available.", err=True)
 @wandb.command("create-dashboard")
 def wandb_create_dashboard():
     """Create Terradev dashboard in W&B."""
@@ -191,22 +199,22 @@ def wandb_create_dashboard():
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
-            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
-            return
+            click.echo("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_enhanced_wandb_service_from_credentials(creds)
-        print("Status Creating Terradev dashboard...")
-        result = asyncio.run(service.create_terradev_dashboard())
+        click.echo("Status Creating Terradev dashboard...")
+        result = _run_with_timeout(service.create_terradev_dashboard())
 
         if result["status"] == "created":
-            print(f"OK: Dashboard created: {result['dashboard']['id']}")
-            print(
+            click.echo(f"OK: Dashboard created: {result['dashboard']['id']}")
+            click.echo(
                 f"   Access at: https://wandb.ai/{creds.get('wandb_entity', 'default')}/{creds.get('wandb_project', 'terradev')}"
             )
         else:
-            print(f"ERROR: Dashboard creation failed: {result['error']}")
+            click.echo(f"ERROR: Dashboard creation failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced W&B service not available.")
+        click.echo("ERROR: Enhanced W&B service not available.", err=True)
 @wandb.command("create-report")
 def wandb_create_report():
     """Generate infrastructure report in W&B."""
@@ -217,11 +225,11 @@ def wandb_create_report():
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
-            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
-            return
+            click.echo("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_enhanced_wandb_service_from_credentials(creds)
-        print("Plan Generating infrastructure report...")
+        click.echo("Plan Generating infrastructure report...")
         # Mock metrics data for demonstration
         metrics_data = {
             "total_instances": 10,
@@ -233,17 +241,17 @@ def wandb_create_report():
             },
         }
 
-        result = asyncio.run(service.create_terradev_report(metrics_data))
+        result = _run_with_timeout(service.create_terradev_report(metrics_data))
 
         if result["status"] == "created":
-            print(f"OK: Report created: {result['report']['id']}")
-            print(
+            click.echo(f"OK: Report created: {result['report']['id']}")
+            click.echo(
                 f"   Access at: https://wandb.ai/{creds.get('wandb_entity', 'default')}/{creds.get('wandb_project', 'terradev')}/reports"
             )
         else:
-            print(f"ERROR: Report creation failed: {result['error']}")
+            click.echo(f"ERROR: Report creation failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced W&B service not available.")
+        click.echo("ERROR: Enhanced W&B service not available.", err=True)
 @wandb.command("setup-alerts")
 def wandb_setup_alerts():
     """Set up Terradev alerts in W&B."""
@@ -254,24 +262,24 @@ def wandb_setup_alerts():
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
-            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
-            return
+            click.echo("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_enhanced_wandb_service_from_credentials(creds)
-        print(" Setting up Terradev alerts...")
-        result = asyncio.run(service.create_terradev_alerts())
+        click.echo(" Setting up Terradev alerts...")
+        result = _run_with_timeout(service.create_terradev_alerts())
 
         if result["status"] == "completed":
-            print(f"OK: Alerts set up: {len(result['alerts'])} alerts created")
+            click.echo(f"OK: Alerts set up: {len(result['alerts'])} alerts created")
             for alert in result["alerts"]:
                 if alert["status"] == "created":
-                    print(f"   OK: {alert['alert']['name']}")
+                    click.echo(f"   OK: {alert['alert']['name']}")
                 else:
-                    print(f"   ERROR: {alert['alert']['name']}: {alert['error']}")
+                    click.echo(f"   ERROR: {alert['alert']['name']}: {alert['error']}")
         else:
-            print(f"ERROR: Alert setup failed: {result['error']}")
+            click.echo(f"ERROR: Alert setup failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced W&B service not available.")
+        click.echo("ERROR: Enhanced W&B service not available.", err=True)
 @wandb.command("dashboard-status")
 def wandb_dashboard_status():
     """Get comprehensive dashboard status."""
@@ -282,25 +290,25 @@ def wandb_dashboard_status():
         creds = api._provider_creds("wandb")
 
         if not creds.get("api_key"):
-            print("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.")
-            return
+            click.echo("ERROR: W&B not configured. Run 'terradev ml wandb configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_enhanced_wandb_service_from_credentials(creds)
-        print("Status Getting comprehensive dashboard status...")
-        result = asyncio.run(service.get_dashboard_status())
+        click.echo("Status Getting comprehensive dashboard status...")
+        result = _run_with_timeout(service.get_dashboard_status())
 
         if result["status"] == "connected":
-            print(f"   Entity: {result['entity']}")
-            print(f"   Project: {result['project']}")
-            print(f"   Projects: {len(result['projects'])}")
-            print(f"   Recent Runs: {len(result['recent_runs'])}")
-            print(f"   Dashboards: {len(result['dashboards'])}")
-            print(f"   Reports: {len(result['reports'])}")
-            print(f"   Monitoring: {result['monitoring']}")
+            click.echo(f"   Entity: {result['entity']}")
+            click.echo(f"   Project: {result['project']}")
+            click.echo(f"   Projects: {len(result['projects'])}")
+            click.echo(f"   Recent Runs: {len(result['recent_runs'])}")
+            click.echo(f"   Dashboards: {len(result['dashboards'])}")
+            click.echo(f"   Reports: {len(result['reports'])}")
+            click.echo(f"   Monitoring: {result['monitoring']}")
         else:
-            print(f"ERROR: Dashboard status failed: {result['error']}")
+            click.echo(f"ERROR: Dashboard status failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced W&B service not available.")
+        click.echo("ERROR: Enhanced W&B service not available.", err=True)
 langchain = MLGroup(
     "langchain", help="LangChain integration with workflows, LangGraph, and SGLang."
 )
@@ -319,32 +327,32 @@ def langchain_test():
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print(get_langchain_setup_instructions())
+            click.echo(get_langchain_setup_instructions())
             return
 
         service = create_langchain_service_from_credentials(creds)
-        print(" Testing LangChain connection...")
-        result = asyncio.run(service.test_connection())
+        click.echo(" Testing LangChain connection...")
+        result = _run_with_timeout(service.test_connection())
 
         if result["status"] == "connected":
-            print("OK: LangChain connected successfully")
-            print(f"   Environment: {result['environment']}")
-            print(
+            click.echo("OK: LangChain connected successfully")
+            click.echo(f"   Environment: {result['environment']}")
+            click.echo(
                 f"   Dashboard: {'Enabled' if creds.get('langchain_dashboard_enabled') == 'true' else 'Disabled'}"
             )
-            print(
+            click.echo(
                 f"   Tracing: {'Enabled' if creds.get('langchain_tracing_enabled') == 'true' else 'Disabled'}"
             )
-            print(
+            click.echo(
                 f"   Evaluation: {'Enabled' if creds.get('langchain_evaluation_enabled') == 'true' else 'Disabled'}"
             )
-            print(
+            click.echo(
                 f"   Workflow: {'Enabled' if creds.get('langchain_workflow_enabled') == 'true' else 'Disabled'}"
             )
         else:
-            print(f"ERROR: LangChain connection failed: {result['error']}")
+            click.echo(f"ERROR: LangChain connection failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced LangChain service not available.")
+        click.echo("ERROR: Enhanced LangChain service not available.", err=True)
 @langchain.command("create-workflow")
 @click.argument("workflow_name")
 def langchain_create_workflow(workflow_name):
@@ -356,25 +364,25 @@ def langchain_create_workflow(workflow_name):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
-            return
+            click.echo("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_langchain_service_from_credentials(creds)
-        print(" Creating LangChain workflow...")
+        click.echo(" Creating LangChain workflow...")
         workflow_config = {
             "name": workflow_name,
             "description": f"LangChain workflow '{workflow_name}' created via Terradev CLI",
         }
-        result = asyncio.run(service.create_workflow(workflow_config))
+        result = _run_with_timeout(service.create_workflow(workflow_config))
 
         if result["status"] == "created":
-            print(f"OK: Workflow created: {result['workflow_id']}")
-            print(f"   Name: {result['name']}")
-            print(f"   Description: {result['description']}")
+            click.echo(f"OK: Workflow created: {result['workflow_id']}")
+            click.echo(f"   Name: {result['name']}")
+            click.echo(f"   Description: {result['description']}")
         else:
-            print(f"ERROR: Workflow creation failed: {result['error']}")
+            click.echo(f"ERROR: Workflow creation failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced LangChain service not available.")
+        click.echo("ERROR: Enhanced LangChain service not available.", err=True)
 @langchain.command("create-langgraph")
 @click.argument("graph_name")
 def langchain_create_langgraph(graph_name):
@@ -386,25 +394,25 @@ def langchain_create_langgraph(graph_name):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
-            return
+            click.echo("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_langchain_service_from_credentials(creds)
-        print(" Creating LangGraph workflow...")
+        click.echo(" Creating LangGraph workflow...")
         graph_config = {
             "name": graph_name,
             "description": f"LangGraph workflow '{graph_name}' created via Terradev CLI",
         }
-        result = asyncio.run(service.create_langgraph_workflow(graph_config))
+        result = _run_with_timeout(service.create_langgraph_workflow(graph_config))
 
         if result["status"] == "created":
-            print(f"OK: LangGraph workflow created: {result['workflow_id']}")
-            print(f"   Name: {result['name']}")
-            print(f"   Description: {result['description']}")
+            click.echo(f"OK: LangGraph workflow created: {result['workflow_id']}")
+            click.echo(f"   Name: {result['name']}")
+            click.echo(f"   Description: {result['description']}")
         else:
-            print(f"ERROR: LangGraph creation failed: {result['error']}")
+            click.echo(f"ERROR: LangGraph creation failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced LangChain service not available.")
+        click.echo("ERROR: Enhanced LangChain service not available.", err=True)
 @langchain.command("create-pipeline")
 @click.argument("pipeline_name")
 def langchain_create_pipeline(pipeline_name):
@@ -416,25 +424,25 @@ def langchain_create_pipeline(pipeline_name):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
-            return
+            click.echo("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_langchain_service_from_credentials(creds)
-        print(" Creating SGLang pipeline...")
+        click.echo(" Creating SGLang pipeline...")
         pipeline_config = {
             "name": pipeline_name,
             "description": f"SGLang pipeline '{pipeline_name}' created via Terradev CLI",
         }
-        result = asyncio.run(service.create_sglang_pipeline(pipeline_config))
+        result = _run_with_timeout(service.create_sglang_pipeline(pipeline_config))
 
         if result["status"] == "created":
-            print(f"OK: SGLang pipeline created: {result['pipeline_id']}")
-            print(f"   Name: {result['name']}")
-            print(f"   Description: {result['description']}")
+            click.echo(f"OK: SGLang pipeline created: {result['pipeline_id']}")
+            click.echo(f"   Name: {result['name']}")
+            click.echo(f"   Description: {result['description']}")
         else:
-            print(f"ERROR: Pipeline creation failed: {result['error']}")
+            click.echo(f"ERROR: Pipeline creation failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced LangChain service not available.")
+        click.echo("ERROR: Enhanced LangChain service not available.", err=True)
 langgraph = MLGroup(
     "langgraph", help="LangGraph workflow orchestration with monitoring."
 )
@@ -453,39 +461,39 @@ def langgraph_test():
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print(get_langgraph_setup_instructions())
+            click.echo(get_langgraph_setup_instructions())
             return
 
         service = create_langgraph_service_from_credentials(creds)
-        print(" Testing LangGraph connection...")
-        result = asyncio.run(service.test_connection())
+        click.echo(" Testing LangGraph connection...")
+        result = _run_with_timeout(service.test_connection())
 
         if result["status"] == "connected":
-            print("OK: LangGraph connected successfully")
-            print(f"   Environment: {result['environment']}")
-            print(
+            click.echo("OK: LangGraph connected successfully")
+            click.echo(f"   Environment: {result['environment']}")
+            click.echo(
                 f"   Dashboard: {'Enabled' if creds.get('langchain_dashboard_enabled') == 'true' else 'Disabled'}"
             )
-            print(
+            click.echo(
                 f"   Tracing: {'Enabled' if creds.get('langchain_tracing_enabled') == 'true' else 'Disabled'}"
             )
-            print(
+            click.echo(
                 f"   Evaluation: {'Enabled' if creds.get('langchain_evaluation_enabled') == 'true' else 'Disabled'}"
             )
-            print(
+            click.echo(
                 f"   Deployment: {'Enabled' if creds.get('langchain_deployment_enabled') == 'true' else 'Disabled'}"
             )
-            print(
+            click.echo(
                 f"   Observability: {'Enabled' if creds.get('langchain_observability_enabled') == 'true' else 'Disabled'}"
             )
         else:
-            print(f"ERROR: LangGraph connection failed: {result['error']}")
+            click.echo(f"ERROR: LangGraph connection failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced LangGraph service not available.")
+        click.echo("ERROR: Enhanced LangGraph service not available.", err=True)
 @langgraph.command("create-workflow")
 @click.argument("workflow_name")
-@click.option("--type", "-t", required=True, type=click.Choice(["orchestrator-worker", "evaluator-optimizer"]), help="Workflow type")
-def langgraph_create_workflow(workflow_name, type):
+@click.option("--type", "-t", "workflow_type", required=True, type=click.Choice(["orchestrator-worker", "evaluator-optimizer"]), help="Workflow type")
+def langgraph_create_workflow(workflow_name, workflow_type):
     """Create a LangGraph workflow."""
     try:
         from terradev_cli.ml_services.langgraph_service import create_langgraph_service_from_credentials
@@ -494,36 +502,36 @@ def langgraph_create_workflow(workflow_name, type):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
-            return
+            click.echo("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_langgraph_service_from_credentials(creds)
-        print(f" Creating {type} LangGraph workflow...")
+        click.echo(f" Creating {workflow_type} LangGraph workflow...")
         workflow_config = {
             "name": workflow_name,
-            "description": f"LangGraph {type} workflow '{workflow_name}' created via Terradev CLI",
-            "type": type,
+            "description": f"LangGraph {workflow_type} workflow '{workflow_name}' created via Terradev CLI",
+            "type": workflow_type,
         }
 
-        if type == "orchestrator-worker":
-            result = asyncio.run(
+        if workflow_type == "orchestrator-worker":
+            result = _run_with_timeout(
                 service.create_orchestrator_worker_workflow(workflow_config)
             )
-        elif type == "evaluator-optimizer":
-            result = asyncio.run(
+        elif workflow_type == "evaluator-optimizer":
+            result = _run_with_timeout(
                 service.create_evaluation_workflow(workflow_config)
             )
         else:
-            result = asyncio.run(service.create_workflow(workflow_config))
+            result = _run_with_timeout(service.create_workflow(workflow_config))
 
         if result["status"] == "created":
-            print(f"OK: {type} workflow created: {result['workflow_id']}")
-            print(f"   Name: {result['name']}")
-            print(f"   Description: {result['description']}")
+            click.echo(f"OK: {workflow_type} workflow created: {result['workflow_id']}")
+            click.echo(f"   Name: {result['name']}")
+            click.echo(f"   Description: {result['description']}")
         else:
-            print(f"ERROR: Workflow creation failed: {result['error']}")
+            click.echo(f"ERROR: Workflow creation failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced LangGraph service not available.")
+        click.echo("ERROR: Enhanced LangGraph service not available.", err=True)
 @langgraph.command("status")
 @click.argument("workflow_id")
 def langgraph_status(workflow_id):
@@ -535,22 +543,22 @@ def langgraph_status(workflow_id):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
-            return
+            click.echo("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_langgraph_service_from_credentials(creds)
-        print(f"Status Getting workflow status: {workflow_id}")
-        result = asyncio.run(service.get_workflow_status(workflow_id))
+        click.echo(f"Getting workflow status: {workflow_id}")
+        result = _run_with_timeout(service.get_workflow_status(workflow_id))
 
         if result["status"] == "running":
-            print(f"   Status: {result['status']}")
-            print(f"   Workflow ID: {result['workflow_id']}")
-            print(f"   Metrics: {result['metrics']}")
-            print(f"   Monitoring: {result['monitoring']}")
+            click.echo(f"   Status: {result['status']}")
+            click.echo(f"   Workflow ID: {result['workflow_id']}")
+            click.echo(f"   Metrics: {result['metrics']}")
+            click.echo(f"   Monitoring: {result['monitoring']}")
         else:
-            print(f"ERROR: Status check failed: {result['error']}")
+            click.echo(f"ERROR: Status check failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: Enhanced LangGraph service not available.")
+        click.echo("ERROR: Enhanced LangGraph service not available.", err=True)
 @langgraph.command("deploy")
 @click.argument("workflow_name")
 def langgraph_deploy(workflow_name):
@@ -562,16 +570,17 @@ def langgraph_deploy(workflow_name):
         creds = api._provider_creds("langchain")
 
         if not creds.get("api_key"):
-            print("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.")
-            return
+            click.echo("ERROR: LangChain not configured. Run 'terradev agent langchain configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_langgraph_service_from_credentials(creds)
-        print(f"Deploying workflow: {workflow_name}")
-        # This would integrate with LangGraph's deployment APIs
-        print(f"OK: Workflow deployed: {workflow_name}")
-        print(f"   Access at: https://smith.langchain.com/deployments/{workflow_name}")
+        click.echo(f"Deploying workflow: {workflow_name}")
+        raise click.ClickException(
+            "'langgraph deploy' is not yet implemented. "
+            "Use the LangGraph Cloud CLI or LangSmith UI to deploy workflows."
+        )
     except ImportError:
-        print("ERROR: Enhanced LangGraph service not available.")
+        click.echo("ERROR: Enhanced LangGraph service not available.", err=True)
 @ml.group()
 def kserve():
     """KServe model deployment and management."""
@@ -589,20 +598,20 @@ def kserve_test():
         creds = api._provider_creds("kserve")
 
         if not any(creds.values()):
-            print(get_kserve_setup_instructions())
+            click.echo(get_kserve_setup_instructions())
             return
 
         service = create_kserve_service_from_credentials(creds)
-        print(" Testing KServe connection...")
-        result = asyncio.run(service.test_connection())
+        click.echo(" Testing KServe connection...")
+        result = _run_with_timeout(service.test_connection())
 
         if result["status"] == "connected":
-            print("OK: KServe connected successfully")
-            print(f"   Namespace: {result['namespace']}")
+            click.echo("OK: KServe connected successfully")
+            click.echo(f"   Namespace: {result['namespace']}")
         else:
-            print(f"ERROR: KServe connection failed: {result['error']}")
+            click.echo(f"ERROR: KServe connection failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: KServe service not available. Install with: pip install kserve")
+        click.echo("ERROR: KServe service not available. Install with: pip install kserve", err=True)
 @ml.group()
 def dvc():
     """DVC (Data Version Control) management."""
@@ -620,20 +629,20 @@ def dvc_test():
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
-            print(get_dvc_setup_instructions())
+            click.echo(get_dvc_setup_instructions())
             return
 
         service = create_dvc_service_from_credentials(creds)
-        print(" Testing DVC connection...")
-        result = asyncio.run(service.test_connection())
+        click.echo(" Testing DVC connection...")
+        result = _run_with_timeout(service.test_connection())
 
         if result["status"] == "connected":
-            print("OK: DVC connected successfully")
-            print(f"   Repository: {result['repo_path']}")
+            click.echo("OK: DVC connected successfully")
+            click.echo(f"   Repository: {result['repo_path']}")
         else:
-            print(f"ERROR: DVC connection failed: {result['error']}")
+            click.echo(f"ERROR: DVC connection failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: DVC service not available. Install with: pip install dvc")
+        click.echo("ERROR: DVC service not available. Install with: pip install dvc", err=True)
 @dvc.command("init")
 def dvc_init():
     """Initialize DVC repository."""
@@ -644,15 +653,15 @@ def dvc_init():
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
-            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
-            return
+            click.echo("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_dvc_service_from_credentials(creds)
-        print("Path Initializing DVC repository...")
-        result = asyncio.run(service.init_repo())
-        print(f"OK: Repository initialized: {result['repo_path']}")
+        click.echo("Path Initializing DVC repository...")
+        result = _run_with_timeout(service.init_repo())
+        click.echo(f"OK: Repository initialized: {result['repo_path']}")
     except ImportError:
-        print("ERROR: DVC service not available. Install with: pip install dvc")
+        click.echo("ERROR: DVC service not available. Install with: pip install dvc", err=True)
 @dvc.command("add-remote")
 @click.argument("remote_spec")
 def dvc_add_remote(remote_spec):
@@ -664,20 +673,20 @@ def dvc_add_remote(remote_spec):
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
-            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
-            return
+            click.echo("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.", err=True)
+            raise SystemExit(1)
 
         if ":" not in remote_spec:
-            print("ERROR: Remote format should be: name:url")
-            return
+            click.echo("ERROR: Remote format should be: name:url", err=True)
+            raise SystemExit(1)
 
         name, url = remote_spec.split(":", 1)
         service = create_dvc_service_from_credentials(creds)
-        print(f"PACKAGE: Adding remote: {name} -> {url}")
-        result = asyncio.run(service.add_remote(name, url))
-        print(f"OK: Remote added: {result['name']}")
+        click.echo(f"PACKAGE: Adding remote: {name} -> {url}")
+        result = _run_with_timeout(service.add_remote(name, url))
+        click.echo(f"OK: Remote added: {result['name']}")
     except ImportError:
-        print("ERROR: DVC service not available. Install with: pip install dvc")
+        click.echo("ERROR: DVC service not available. Install with: pip install dvc", err=True)
 @dvc.command("add-data")
 @click.argument("data_path")
 def dvc_add_data(data_path):
@@ -689,15 +698,15 @@ def dvc_add_data(data_path):
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
-            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
-            return
+            click.echo("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_dvc_service_from_credentials(creds)
-        print(f"Status Adding data to tracking: {data_path}")
-        result = asyncio.run(service.add_data(data_path))
-        print(f"OK: Data added: {data_path}")
+        click.echo(f"Status Adding data to tracking: {data_path}")
+        result = _run_with_timeout(service.add_data(data_path))
+        click.echo(f"OK: Data added: {data_path}")
     except ImportError:
-        print("ERROR: DVC service not available. Install with: pip install dvc")
+        click.echo("ERROR: DVC service not available. Install with: pip install dvc", err=True)
 @dvc.command("push")
 def dvc_push():
     """Push data to remote."""
@@ -708,15 +717,15 @@ def dvc_push():
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
-            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
-            return
+            click.echo("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_dvc_service_from_credentials(creds)
-        print("UPLOAD: Pushing data to remote...")
-        result = asyncio.run(service.push_data())
-        print(f"OK: Data pushed: {result['targets']}")
+        click.echo("UPLOAD: Pushing data to remote...")
+        result = _run_with_timeout(service.push_data())
+        click.echo(f"OK: Data pushed: {result['targets']}")
     except ImportError:
-        print("ERROR: DVC service not available. Install with: pip install dvc")
+        click.echo("ERROR: DVC service not available. Install with: pip install dvc", err=True)
 @dvc.command("pull")
 def dvc_pull():
     """Pull data from remote."""
@@ -727,15 +736,15 @@ def dvc_pull():
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
-            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
-            return
+            click.echo("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_dvc_service_from_credentials(creds)
-        print(" Pulling data from remote...")
-        result = asyncio.run(service.pull_data())
-        print(f"OK: Data pulled: {result['targets']}")
+        click.echo(" Pulling data from remote...")
+        result = _run_with_timeout(service.pull_data())
+        click.echo(f"OK: Data pulled: {result['targets']}")
     except ImportError:
-        print("ERROR: DVC service not available. Install with: pip install dvc")
+        click.echo("ERROR: DVC service not available. Install with: pip install dvc", err=True)
 @dvc.command("status")
 def dvc_status():
     """Show repository status."""
@@ -746,16 +755,16 @@ def dvc_status():
         creds = api._provider_creds("dvc")
 
         if not creds.get("repo_path"):
-            print("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.")
-            return
+            click.echo("ERROR: DVC not configured. Run 'terradev ml dvc configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_dvc_service_from_credentials(creds)
-        print("Status Repository status:")
-        result = asyncio.run(service.get_status())
+        click.echo("Status Repository status:")
+        result = _run_with_timeout(service.get_status())
         for detail in result["details"]:
-            print(f"   {detail}")
+            click.echo(f"   {detail}")
     except ImportError:
-        print("ERROR: DVC service not available. Install with: pip install dvc")
+        click.echo("ERROR: DVC service not available. Install with: pip install dvc", err=True)
 @ml.group()
 def mlflow_legacy():
     """MLflow experiment tracking and model registry."""
@@ -773,21 +782,21 @@ def mlflow_legacy_test():
         creds = api._provider_creds("mlflow")
 
         if not creds.get("tracking_uri"):
-            print(get_mlflow_setup_instructions())
+            click.echo(get_mlflow_setup_instructions())
             return
 
         service = create_mlflow_service_from_credentials(creds)
-        print(" Testing MLflow connection...")
-        result = asyncio.run(service.test_connection())
+        click.echo(" Testing MLflow connection...")
+        result = _run_with_timeout(service.test_connection())
 
         if result["status"] == "connected":
-            print("OK: MLflow connected successfully")
-            print(f"   Tracking URI: {result['tracking_uri']}")
-            print(f"   Experiments: {result['experiments_count']}")
+            click.echo("OK: MLflow connected successfully")
+            click.echo(f"   Tracking URI: {result['tracking_uri']}")
+            click.echo(f"   Experiments: {result['experiments_count']}")
         else:
-            print(f"ERROR: MLflow connection failed: {result['error']}")
+            click.echo(f"ERROR: MLflow connection failed: {result['error']}", err=True)
     except ImportError:
-        print("ERROR: MLflow service not available. Install with: pip install mlflow")
+        click.echo("ERROR: MLflow service not available. Install with: pip install mlflow", err=True)
 @mlflow_legacy.command("list-experiments")
 def mlflow_legacy_list_experiments():
     """List all MLflow experiments."""
@@ -798,17 +807,17 @@ def mlflow_legacy_list_experiments():
         creds = api._provider_creds("mlflow")
 
         if not creds.get("tracking_uri"):
-            print("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.")
-            return
+            click.echo("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_mlflow_service_from_credentials(creds)
-        print("Plan Listing MLflow experiments...")
-        experiments = asyncio.run(service.list_experiments())
+        click.echo("Plan Listing MLflow experiments...")
+        experiments = _run_with_timeout(service.list_experiments())
 
         for exp in experiments:
-            print(f"    {exp['name']} (ID: {exp['experiment_id']})")
+            click.echo(f"    {exp['name']} (ID: {exp['experiment_id']})")
     except ImportError:
-        print("ERROR: MLflow service not available. Install with: pip install mlflow")
+        click.echo("ERROR: MLflow service not available. Install with: pip install mlflow", err=True)
 @mlflow_legacy.command("create-experiment")
 @click.argument("experiment_name")
 def mlflow_legacy_create_experiment(experiment_name):
@@ -820,17 +829,17 @@ def mlflow_legacy_create_experiment(experiment_name):
         creds = api._provider_creds("mlflow")
 
         if not creds.get("tracking_uri"):
-            print("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.")
-            return
+            click.echo("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_mlflow_service_from_credentials(creds)
-        print(f" Creating experiment: {experiment_name}")
-        result = asyncio.run(
+        click.echo(f" Creating experiment: {experiment_name}")
+        result = _run_with_timeout(
             service.create_experiment(experiment_name, "Created via Terradev CLI")
         )
-        print(f"OK: Experiment created: {result['experiment_id']}")
+        click.echo(f"OK: Experiment created: {result['experiment_id']}")
     except ImportError:
-        print("ERROR: MLflow service not available. Install with: pip install mlflow")
+        click.echo("ERROR: MLflow service not available. Install with: pip install mlflow", err=True)
 @mlflow_legacy.command("list-runs")
 @click.argument("experiment_id")
 def mlflow_legacy_list_runs(experiment_id):
@@ -842,20 +851,20 @@ def mlflow_legacy_list_runs(experiment_id):
         creds = api._provider_creds("mlflow")
 
         if not creds.get("tracking_uri"):
-            print("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.")
-            return
+            click.echo("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_mlflow_service_from_credentials(creds)
-        print(f"Status Listing runs in experiment: {experiment_id}")
-        runs = asyncio.run(service.list_runs([experiment_id]))
+        click.echo(f"Status Listing runs in experiment: {experiment_id}")
+        runs = _run_with_timeout(service.list_runs([experiment_id]))
 
         for run in runs[:10]:
             info = run.get("info", {})
-            print(
+            click.echo(
                 f"    {info.get('run_id', 'N/A')[:8]} - {info.get('status', 'N/A')}"
             )
     except ImportError:
-        print("ERROR: MLflow service not available. Install with: pip install mlflow")
+        click.echo("ERROR: MLflow service not available. Install with: pip install mlflow", err=True)
 @mlflow_legacy.command("export")
 @click.argument("experiment_id")
 @click.option("--format", "-f", type=click.Choice(["json", "csv"]), default="json", help="Export format")
@@ -868,15 +877,15 @@ def mlflow_legacy_export(experiment_id, format):
         creds = api._provider_creds("mlflow")
 
         if not creds.get("tracking_uri"):
-            print("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.")
-            return
+            click.echo("ERROR: MLflow not configured. Run 'terradev ml mlflow-legacy configure' first.", err=True)
+            raise SystemExit(1)
 
         service = create_mlflow_service_from_credentials(creds)
-        print("UPLOAD: Exporting experiment data...")
-        data = asyncio.run(service.export_experiment_data(experiment_id, format))
-        print(data)
+        click.echo("UPLOAD: Exporting experiment data...")
+        data = _run_with_timeout(service.export_experiment_data(experiment_id, format))
+        click.echo(data)
     except ImportError:
-        print("ERROR: MLflow service not available. Install with: pip install mlflow")
+        click.echo("ERROR: MLflow service not available. Install with: pip install mlflow", err=True)
 @ml.group()
 def ray():
     """Enhanced Ray distributed computing with monitoring and dashboards."""
@@ -894,26 +903,26 @@ def ray_test():
 
         # Ray can work without credentials for local clusters
         service = create_enhanced_ray_service_from_credentials(creds)
-        print(" Testing enhanced Ray connection...")
-        result = asyncio.run(service.test_connection())
+        click.echo(" Testing enhanced Ray connection...")
+        result = _run_with_timeout(service.test_connection())
 
         if result["status"] == "connected":
-            print("OK: Ray connected successfully")
-            print(f"   Version: {result.get('ray_version', 'N/A')}")
-            print(f"   Cluster: {result.get('cluster_name', 'local')}")
-            print(f"   Dashboard: {result.get('dashboard_uri', 'N/A')}")
+            click.echo("OK: Ray connected successfully")
+            click.echo(f"   Version: {result.get('ray_version', 'N/A')}")
+            click.echo(f"   Cluster: {result.get('cluster_name', 'local')}")
+            click.echo(f"   Dashboard: {result.get('dashboard_uri', 'N/A')}")
         elif result["status"] == "not_connected":
-            print("Warning  Ray installed but cluster not running")
-            print(f"   Version: {result.get('ray_version', 'N/A')}")
-            print(f"   Error: {result['error']}")
-            print(f"   Tip: Suggestion: {result.get('suggestion')}")
+            click.echo("Warning  Ray installed but cluster not running")
+            click.echo(f"   Version: {result.get('ray_version', 'N/A')}")
+            click.echo(f"   Error: {result['error']}")
+            click.echo(f"   Tip: Suggestion: {result.get('suggestion')}")
         else:
-            print(f"ERROR: Ray connection failed: {result['error']}")
+            click.echo(f"ERROR: Ray connection failed: {result['error']}", err=True)
             if "not installed" in result["error"]:
-                print("   Tip: Install Ray: pip install ray[default]")
-                print("    For full features: pip install ray[default,train]")
+                click.echo("   Tip: Install Ray: pip install ray[default]")
+                click.echo("    For full features: pip install ray[default,train]")
     except ImportError:
-        print(
+        click.echo(
             "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
         )
 @ray.command("install")
@@ -922,9 +931,9 @@ def ray_install():
     try:
         from terradev_cli.ml_services.ray_enhanced import get_enhanced_ray_setup_instructions
 
-        print(get_enhanced_ray_setup_instructions())
+        click.echo(get_enhanced_ray_setup_instructions())
     except ImportError:
-        print(
+        click.echo(
             "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
         )
 @ray.command("status")
@@ -936,33 +945,33 @@ def ray_status():
         api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
-        print("Status Enhanced Ray cluster status:")
-        result = asyncio.run(service.get_monitoring_status())
+        click.echo("Status Enhanced Ray cluster status:")
+        result = _run_with_timeout(service.get_monitoring_status())
 
         if result.get("ray", {}).get("status") == "running":
-            print(f"   OK: Status: {result['ray']['status']}")
-            print(f"   Version: {result['ray'].get('version', 'N/A')}")
-            print(f"   Cluster: {result['ray'].get('cluster_name', 'local')}")
-            print(f"   Dashboard: {result['ray'].get('dashboard_uri', 'N/A')}")
+            click.echo(f"   OK: Status: {result['ray']['status']}")
+            click.echo(f"   Version: {result['ray'].get('version', 'N/A')}")
+            click.echo(f"   Cluster: {result['ray'].get('cluster_name', 'local')}")
+            click.echo(f"   Dashboard: {result['ray'].get('dashboard_uri', 'N/A')}")
 
             if result.get("metrics"):
                 metrics = result["metrics"]
-                print(f"   Workers: {metrics.get('total_workers', 0)}")
-                print(f"   CPU Total: {metrics.get('cpu_total', 0)}")
-                print(f"   CPU Used: {metrics.get('cpu_used', 0)}")
-                print(f"   Memory Total: {metrics.get('memory_total', 0)}")
-                print(f"   Memory Used: {metrics.get('memory_used', 0)}")
-                print(f"   GPU Total: {metrics.get('gpu_total', 0)}")
-                print(f"   GPU Used: {metrics.get('gpu_used', 0)}")
+                click.echo(f"   Workers: {metrics.get('total_workers', 0)}")
+                click.echo(f"   CPU Total: {metrics.get('cpu_total', 0)}")
+                click.echo(f"   CPU Used: {metrics.get('cpu_used', 0)}")
+                click.echo(f"   Memory Total: {metrics.get('memory_total', 0)}")
+                click.echo(f"   Memory Used: {metrics.get('memory_used', 0)}")
+                click.echo(f"   GPU Total: {metrics.get('gpu_total', 0)}")
+                click.echo(f"   GPU Used: {metrics.get('gpu_used', 0)}")
         else:
-            print(
+            click.echo(
                 f"   ERROR: Status: {result.get('ray', {}).get('status', 'Unknown')}"
             )
-            print(
+            click.echo(
                 f"   Error: {result.get('ray', {}).get('error', 'Unknown error')}"
             )
     except ImportError:
-        print(
+        click.echo(
             "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
         )
 @ray.command("list-nodes")
@@ -974,19 +983,19 @@ def ray_list_nodes():
         api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
-        print(" Listing Ray nodes...")
-        result = asyncio.run(service.get_monitoring_status())
+        click.echo(" Listing Ray nodes...")
+        result = _run_with_timeout(service.get_monitoring_status())
 
         if result.get("ray", {}).get("status") == "running":
             metrics = result.get("metrics", {})
             total_workers = metrics.get("total_workers", 0)
-            print(f"   Total Workers: {total_workers}")
-            print(f"   Active Workers: {total_workers}")
-            print(f"   Head Node: {creds.get('ray_head_node_ip', 'localhost')}")
+            click.echo(f"   Total Workers: {total_workers}")
+            click.echo(f"   Active Workers: {total_workers}")
+            click.echo(f"   Head Node: {creds.get('ray_head_node_ip', 'localhost')}")
         else:
-            print("   INFO:  No active Ray cluster found")
+            click.echo("   INFO:  No active Ray cluster found")
     except ImportError:
-        print(
+        click.echo(
             "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
         )
 @ray.command("start")
@@ -998,11 +1007,11 @@ def ray_start():
         api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
-        print("Deploying Starting enhanced Ray cluster...")
-        result = asyncio.run(service.start_cluster(head_node=True))
-        print(f"OK: Cluster started: {result['status']}")
+        click.echo("Deploying Starting enhanced Ray cluster...")
+        result = _run_with_timeout(service.start_cluster(head_node=True))
+        click.echo(f"OK: Cluster started: {result['status']}")
     except ImportError:
-        print(
+        click.echo(
             "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
         )
 @ray.command("stop")
@@ -1014,11 +1023,11 @@ def ray_stop():
         api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
-        print(" Stopping Ray cluster...")
-        result = asyncio.run(service.stop_cluster())
-        print(f"OK: Cluster stopped: {result['status']}")
+        click.echo(" Stopping Ray cluster...")
+        result = _run_with_timeout(service.stop_cluster())
+        click.echo(f"OK: Cluster stopped: {result['status']}")
     except ImportError:
-        print(
+        click.echo(
             "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
         )
 @ray.command("dashboard")
@@ -1030,14 +1039,14 @@ def ray_dashboard():
         api = _get_api()
         creds = api._provider_creds("ray")
         service = create_enhanced_ray_service_from_credentials(creds)
-        print("Status Getting Ray dashboard URL...")
-        url = asyncio.run(service.get_ray_dashboard_url())
+        click.echo("Status Getting Ray dashboard URL...")
+        url = _run_with_timeout(service.get_ray_dashboard_url())
         if url:
-            print(f" Dashboard: {url}")
+            click.echo(f" Dashboard: {url}")
         else:
-            print("ERROR: Dashboard URL not found")
+            click.echo("ERROR: Dashboard URL not found", err=True)
     except ImportError:
-        print(
+        click.echo(
             "ERROR: Enhanced Ray service not available. Install with: pip install ray[default]"
         )
 @ml.group()
@@ -1053,7 +1062,7 @@ def vllm():
     default="throughput",
     help="Optimization type",
 )
-@click.option("--gpu-count", "-G", type=int, default=1, help="Number of GPUs")
+@click.option("--gpu-count", "-G", type=click.IntRange(1, 1000), default=1, help="Number of GPUs")
 @click.option(
     "--output",
     "-o",
@@ -1097,9 +1106,9 @@ def vllm_optimize(model, type, gpu_count, output):
 
         service = VLLMService(config)
         args = service._build_server_args()
-        print(" ".join(args))
+        click.echo(" ".join(args))
     elif output == "config":
-        print(
+        click.echo(
             json.dumps(
                 {
                     "model_name": config.model_name,
@@ -1115,20 +1124,20 @@ def vllm_optimize(model, type, gpu_count, output):
             )
         )
     elif output == "helm":
-        print(f"# Helm values for {type}-optimized vLLM")
-        print("serving:")
-        print("  vllm:")
-        print(f"    gpuMemoryUtilization: {config.gpu_memory_utilization}")
-        print(f"    maxNumBatchedTokens: {config.max_num_batched_tokens}")
-        print(f"    maxNumSeqs: {config.max_num_seqs}")
-        print(f"    enablePrefixCaching: {config.enable_prefix_caching}")
-        print(f"    enableChunkedPrefill: {config.enable_chunked_prefill}")
-        print(f"    tensorParallelSize: {config.tensor_parallel_size}")
-        print("resources:")
-        print("  requests:")
-        print(f'    cpu: "{config.cpu_cores}"')
-        print("  limits:")
-        print(f'    cpu: "{config.cpu_cores + 4}"  # Extra headroom')
+        click.echo(f"# Helm values for {type}-optimized vLLM")
+        click.echo("serving:")
+        click.echo("  vllm:")
+        click.echo(f"    gpuMemoryUtilization: {config.gpu_memory_utilization}")
+        click.echo(f"    maxNumBatchedTokens: {config.max_num_batched_tokens}")
+        click.echo(f"    maxNumSeqs: {config.max_num_seqs}")
+        click.echo(f"    enablePrefixCaching: {config.enable_prefix_caching}")
+        click.echo(f"    enableChunkedPrefill: {config.enable_chunked_prefill}")
+        click.echo(f"    tensorParallelSize: {config.tensor_parallel_size}")
+        click.echo("resources:")
+        click.echo("  requests:")
+        click.echo(f'    cpu: "{config.cpu_cores}"')
+        click.echo("  limits:")
+        click.echo(f'    cpu: "{config.cpu_cores + 4}"  # Extra headroom')
 @vllm.command("auto-optimize")
 @click.option(
     "--endpoint",
@@ -1141,7 +1150,7 @@ def vllm_optimize(model, type, gpu_count, output):
     type=click.Path(exists=True),
     help="JSON file with sample requests",
 )
-@click.option("--gpu-count", "-G", type=int, default=1, help="Number of GPUs available")
+@click.option("--gpu-count", "-G", type=click.IntRange(1, 1000), default=1, help="Number of GPUs available")
 @click.option("--model", "-m", required=True, help="Model name")
 @click.option(
     "--output",
@@ -1190,8 +1199,8 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
             else:
                 # Analyze from samples only
                 if not sample_data:
-                    print("ERROR: Either --endpoint or --samples must be provided")
-                    return
+                    click.echo("ERROR: Either --endpoint or --samples must be provided", err=True)
+                    raise SystemExit(1)
 
                 workload = VLLMConfig.analyze_workload_from_samples(
                     sample_data, gpu_count
@@ -1215,43 +1224,43 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
                 }
 
             if result["status"] != "success":
-                print(f"ERROR: Auto-optimization failed: {result.get('error')}")
-                return
+                click.echo(f"ERROR: Auto-optimization failed: {result.get('error')}", err=True)
+                raise SystemExit(1)
 
             # Display results
-            print(" Workload Analysis Complete")
-            print("=" * 50)
+            click.echo(" Workload Analysis Complete")
+            click.echo("=" * 50)
 
             workload = result.get("workload_profile")
             if workload:
-                print(" Workload Profile:")
-                print(f"   Avg Prompt Tokens: {workload.avg_prompt_length:.0f}")
-                print(f"   Avg Response Tokens: {workload.avg_response_length:.0f}")
-                print(f"   Requests/Second: {workload.requests_per_second:.1f}")
-                print(f"   Concurrent Users: {workload.concurrent_users}")
-                print(f"   Latency Sensitivity: {workload.latency_sensitivity:.2f}")
-                print()
+                click.echo(" Workload Profile:")
+                click.echo(f"   Avg Prompt Tokens: {workload.avg_prompt_length:.0f}")
+                click.echo(f"   Avg Response Tokens: {workload.avg_response_length:.0f}")
+                click.echo(f"   Requests/Second: {workload.requests_per_second:.1f}")
+                click.echo(f"   Concurrent Users: {workload.concurrent_users}")
+                click.echo(f"   Latency Sensitivity: {workload.latency_sensitivity:.2f}")
+                click.echo()
 
-            print(" Optimized Configuration:")
+            click.echo(" Optimized Configuration:")
             optimized = result["optimized_config"]
             for key, value in optimized.items():
-                print(f"   {key}: {value}")
+                click.echo(f"   {key}: {value}")
 
             # Show changes if comparison available
             changes = result.get("changes", [])
             if changes:
-                print(f"\n Recommended Changes ({len(changes)}):")
+                click.echo(f"\n Recommended Changes ({len(changes)}):")
                 for change in changes:
                     direction = "↑" if change["optimized"] > change["current"] else "↓"
-                    print(
+                    click.echo(
                         f"   {change['parameter']}: {change['current']} → {change['optimized']} {direction}"
                     )
-                    print(f"      Impact: {change['impact']}")
+                    click.echo(f"      Impact: {change['impact']}")
 
             # Generate output
             if output == "config":
-                print("\n JSON Configuration:")
-                print(json.dumps(optimized, indent=2))
+                click.echo("\n JSON Configuration:")
+                click.echo(json.dumps(optimized, indent=2))
             elif output == "args":
                 # Generate CLI args from optimized config
                 from terradev_cli.ml_services.vllm_service import VLLMService
@@ -1267,40 +1276,40 @@ def vllm_auto_optimize(endpoint, samples, gpu_count, model, output, apply):
                 )
                 temp_service = VLLMService(temp_config)
                 args = temp_service._build_server_args()
-                print("\n CLI Arguments:")
-                print(" ".join(args))
+                click.echo("\n CLI Arguments:")
+                click.echo(" ".join(args))
             elif output == "helm":
-                print("\n  Helm Values:")
-                print("serving:")
-                print("  vllm:")
-                print(
+                click.echo("\n  Helm Values:")
+                click.echo("serving:")
+                click.echo("  vllm:")
+                click.echo(
                     f"    gpuMemoryUtilization: {optimized['gpu_memory_utilization']}"
                 )
-                print(f"    maxNumBatchedTokens: {optimized['max_num_batched_tokens']}")
-                print(f"    maxNumSeqs: {optimized['max_num_seqs']}")
-                print(f"    enablePrefixCaching: {optimized['enable_prefix_caching']}")
-                print(
+                click.echo(f"    maxNumBatchedTokens: {optimized['max_num_batched_tokens']}")
+                click.echo(f"    maxNumSeqs: {optimized['max_num_seqs']}")
+                click.echo(f"    enablePrefixCaching: {optimized['enable_prefix_caching']}")
+                click.echo(
                     f"    enableChunkedPrefill: {optimized['enable_chunked_prefill']}"
                 )
-                print(
+                click.echo(
                     f"    tensorParallelSize: {optimized.get('tensor_parallel_size', 1)}"
                 )
-                print("resources:")
-                print("  requests:")
-                print(f"    cpu: \"{optimized.get('cpu_cores', '2')}\"")
-                print("  limits:")
-                print(
+                click.echo("resources:")
+                click.echo("  requests:")
+                click.echo(f"    cpu: \"{optimized.get('cpu_cores', '2')}\"")
+                click.echo("  limits:")
+                click.echo(
                     f"    cpu: \"{optimized.get('cpu_cores', 2) + 4}\"  # Extra headroom"
                 )
 
         except Exception as e:  # noqa: BLE001
-            print(f"ERROR: Error during auto-optimization: {e}")
+            click.echo(f"ERROR: Error during auto-optimization: {e}", err=True)
 
-    asyncio.run(run_optimization())
+    _run_with_timeout(run_optimization())
 @vllm.command("analyze")
 @click.option("--endpoint", "-e", required=True, help="vLLM endpoint to analyze")
 @click.option(
-    "--duration", "-d", type=int, default=60, help="Analysis duration in seconds"
+    "--duration", "-d", type=click.IntRange(1, 86400), default=60, help="Analysis duration in seconds"
 )
 def vllm_analyze(endpoint, duration):
     """Analyze current vLLM server workload and provide optimization recommendations.
@@ -1321,63 +1330,63 @@ def vllm_analyze(endpoint, duration):
             config = VLLMConfig(model_name="", host=host, port=port)
 
             async with VLLMService(config) as svc:
-                print(f" Analyzing vLLM server at {endpoint} for {duration}s...")
-                print("=" * 60)
+                click.echo(f" Analyzing vLLM server at {endpoint} for {duration}s...")
+                click.echo("=" * 60)
 
                 result = await svc.analyze_current_workload(duration)
 
                 if result["status"] != "success":
-                    print(f"ERROR: Analysis failed: {result.get('error')}")
-                    return
+                    click.echo(f"ERROR: Analysis failed: {result.get('error')}", err=True)
+                    raise SystemExit(1)
 
                 # Display current workload
                 workload = result["current_workload"]
-                print(" Current Workload:")
-                print(
+                click.echo(" Current Workload:")
+                click.echo(
                     f"   Avg Prompt Tokens: {workload.get('avg_prompt_tokens', 0):.0f}"
                 )
-                print(
+                click.echo(
                     f"   Avg Generation Tokens: {workload.get('avg_generation_tokens', 0):.0f}"
                 )
-                print(
+                click.echo(
                     f"   Requests/Second: {workload.get('requests_per_second', 0):.1f}"
                 )
-                print(f"   Active Requests: {workload.get('active_requests', 0)}")
-                print(f"   Queue Size: {workload.get('queue_size', 0)}")
-                print()
+                click.echo(f"   Active Requests: {workload.get('active_requests', 0)}")
+                click.echo(f"   Queue Size: {workload.get('queue_size', 0)}")
+                click.echo()
 
                 # Display recommendations
                 recommendations = result.get("optimization_recommendations", [])
                 if recommendations:
-                    print(
+                    click.echo(
                         f"Tip: Optimization Recommendations ({len(recommendations)}):"
                     )
                     for i, rec in enumerate(recommendations, 1):
-                        print(f"   {i}. {rec['type'].replace('_', ' ').title()}")
-                        print(
+                        click.echo(f"   {i}. {rec['type'].replace('_', ' ').title()}")
+                        click.echo(
                             f"      Current: {rec['current_value']} → Recommended: {rec['recommended_value']}"
                         )
-                        print(f"      Reason: {rec['reason']}")
-                        print(f"      Impact: {rec['impact']}")
-                        print()
+                        click.echo(f"      Reason: {rec['reason']}")
+                        click.echo(f"      Impact: {rec['impact']}")
+                        click.echo()
                 else:
-                    print(
+                    click.echo(
                         "OK: Configuration appears well-optimized for current workload"
                     )
 
-                print(f" Analysis completed at {result.get('timestamp')}")
+                click.echo(f" Analysis completed at {result.get('timestamp')}")
 
         except Exception as e:  # noqa: BLE001
-            print(f"ERROR: Error during analysis: {e}")
+            click.echo(f"ERROR: Error during analysis: {e}", err=True)
 
-    asyncio.run(run_analysis())
+    _run_with_timeout(run_analysis())
 @vllm.command("benchmark")
 @click.option("--endpoint", "-e", required=True, help="vLLM endpoint to test")
 @click.option("--api-key", help="vLLM API key")
 @click.option(
     "--prompt", default="Explain quantum computing in simple terms.", help="Test prompt"
 )
-@click.option("--concurrent", "-c", type=int, default=1, help="Concurrent requests")
+@click.option("--concurrent", "-c", type=click.IntRange(1, 10000), default=1, help="Concurrent requests")
 def vllm_benchmark(endpoint, api_key, prompt, concurrent):
     """Benchmark vLLM endpoint performance."""
     from terradev_cli.ml_services.vllm_service import VLLMConfig, VLLMService
@@ -1392,10 +1401,10 @@ def vllm_benchmark(endpoint, api_key, prompt, concurrent):
             # Test connection
             health = await svc.test_connection()
             if health["status"] != "connected":
-                print(f"ERROR: Connection failed: {health.get('error')}")
-                return
+                click.echo(f"ERROR: Connection failed: {health.get('error')}", err=True)
+                raise SystemExit(1)
 
-            print(f"OK: Connected to vLLM at {endpoint}")
+            click.echo(f"OK: Connected to vLLM at {endpoint}")
 
             # Run concurrent requests
             start_time = time.time()
@@ -1416,16 +1425,16 @@ def vllm_benchmark(endpoint, api_key, prompt, concurrent):
             total_time = end_time - start_time
             throughput = successful / total_time if total_time > 0 else 0
 
-            print("\n Benchmark Results:")
-            print(f"   Concurrent requests: {concurrent}")
-            print(f"   Successful: {successful}/{concurrent}")
-            print(f"   Total time: {total_time:.2f}s")
-            print(f"   Throughput: {throughput:.2f} req/s")
+            click.echo("\n Benchmark Results:")
+            click.echo(f"   Concurrent requests: {concurrent}")
+            click.echo(f"   Successful: {successful}/{concurrent}")
+            click.echo(f"   Total time: {total_time:.2f}s")
+            click.echo(f"   Throughput: {throughput:.2f} req/s")
 
             if successful < concurrent:
-                print(f"   WARNING:  {concurrent - successful} requests failed")
+                click.echo(f"   WARNING:  {concurrent - successful} requests failed")
 
-    asyncio.run(run_benchmark())
+    _run_with_timeout(run_benchmark())
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1460,20 +1469,20 @@ def vllm_import_adapter(adapter_id, local_name, hf_token, no_register):
                 register=not no_register,
             )
             if result["status"] != "imported":
-                print(f"ERROR: {result.get('error')}")
-                return
+                click.echo(f"ERROR: {result.get('error')}", err=True)
+                raise SystemExit(1)
 
-            print(f"OK: Imported adapter '{result['adapter_id']}'")
-            print(f"   Local path: {result['local_path']}")
-            print(f"   Base model: {result.get('base_model')}")
-            print(f"   Rank: {result.get('rank')}")
+            click.echo(f"OK: Imported adapter '{result['adapter_id']}'")
+            click.echo(f"   Local path: {result['local_path']}")
+            click.echo(f"   Base model: {result.get('base_model')}")
+            click.echo(f"   Rank: {result.get('rank')}")
             if result.get("registered"):
-                print(
+                click.echo(
                     f"   Registered as '{result['adapter_name']}' "
                     f"(version {result['version_id'][:8]}...)"
                 )
 
-    asyncio.run(run_import())
+    _run_with_timeout(run_import())
 
 
 @vllm.command("import-model")
@@ -1505,15 +1514,15 @@ def vllm_import_model(model_id, cache_dir, hf_token):
                 hf_token=hf_token,
             )
             if result["status"] != "imported":
-                print(f"ERROR: {result.get('error')}")
-                return
+                click.echo(f"ERROR: {result.get('error')}", err=True)
+                raise SystemExit(1)
 
-            print(f"OK: Imported model '{result['model_id']}'")
-            print(f"   Local path: {result['local_path']}")
-            print(f"   Serve command:")
-            print(f"   {result['serve_command']}")
+            click.echo(f"OK: Imported model '{result['model_id']}'")
+            click.echo(f"   Local path: {result['local_path']}")
+            click.echo(f"   Serve command:")
+            click.echo(f"   {result['serve_command']}")
 
-    asyncio.run(run_import())
+    _run_with_timeout(run_import())
 
 
 @vllm.group()
@@ -1537,21 +1546,21 @@ def vllm_lora_list(endpoint, api_key):
         async with VLLMService(config) as svc:
             result = await svc.lora_list()
             if result["status"] != "success":
-                print(f"ERROR: {result.get('error')}")
-                return
+                click.echo(f"ERROR: {result.get('error')}", err=True)
+                raise SystemExit(1)
 
-            print(f"Base models ({len(result.get('base_models', []))}):")
+            click.echo(f"Base models ({len(result.get('base_models', []))}):")
             for m in result.get("base_models", []):
-                print(f"  {m.get('id', '?')}")
+                click.echo(f"  {m.get('id', '?')}")
 
-            print(f"LoRA adapters ({len(result.get('lora_adapters', []))}):")
+            click.echo(f"LoRA adapters ({len(result.get('lora_adapters', []))}):")
             if result.get("lora_adapters"):
                 for a in result.get("lora_adapters", []):
-                    print(f"  {a.get('id', '?')}  (parent: {a.get('parent', '-')})")
+                    click.echo(f"  {a.get('id', '?')}  (parent: {a.get('parent', '-')})")
             else:
-                print("  (none)")
+                click.echo("  (none)")
 
-    asyncio.run(run_list())
+    _run_with_timeout(run_list())
 
 
 @lora.command("load")
@@ -1578,8 +1587,8 @@ def vllm_lora_load(endpoint, name, path, api_key, register, base_model, rank):
     version_id = None
     if register:
         if not base_model:
-            print("ERROR: --base-model required when using --register")
-            return
+            click.echo("ERROR: --base-model required when using --register", err=True)
+            raise SystemExit(1)
         from terradev_cli.ml_services.lora_registry import get_lora_registry
 
         registry = get_lora_registry()
@@ -1599,12 +1608,12 @@ def vllm_lora_load(endpoint, name, path, api_key, register, base_model, rank):
                 version_id=version_id,
             )
             if result["status"] == "loaded":
-                print(f"OK: Loaded adapter '{name}' on {endpoint}")
-                print("   Use 'model': '{name}' in API requests")
+                click.echo(f"OK: Loaded adapter '{name}' on {endpoint}")
+                click.echo("   Use 'model': '{name}' in API requests")
             else:
-                print(f"ERROR: {result.get('error')}")
+                click.echo(f"ERROR: {result.get('error')}", err=True)
 
-    asyncio.run(run_load())
+    _run_with_timeout(run_load())
 
 
 @lora.command("unload")
@@ -1623,11 +1632,11 @@ def vllm_lora_unload(endpoint, name, api_key):
         async with VLLMService(config) as svc:
             result = await svc.lora_unload(name)
             if result["status"] == "unloaded":
-                print(f"OK: Unloaded adapter '{name}' from {endpoint}")
+                click.echo(f"OK: Unloaded adapter '{name}' from {endpoint}")
             else:
-                print(f"ERROR: {result.get('error')}")
+                click.echo(f"ERROR: {result.get('error')}", err=True)
 
-    asyncio.run(run_unload())
+    _run_with_timeout(run_unload())
 
 
 @lora.command("link")
@@ -1652,12 +1661,12 @@ def vllm_lora_link(endpoint, name, api_key):
         async with VLLMService(config) as svc:
             result = await svc.lora_load_from_registry(name)
             if result["status"] == "loaded":
-                print(f"OK: Linked and loaded adapter '{name}' from registry to {endpoint}")
-                print("   Use 'model': '{name}' in API requests")
+                click.echo(f"OK: Linked and loaded adapter '{name}' from registry to {endpoint}")
+                click.echo("   Use 'model': '{name}' in API requests")
             else:
-                print(f"ERROR: {result.get('error')}")
+                click.echo(f"ERROR: {result.get('error')}", err=True)
 
-    asyncio.run(run_link())
+    _run_with_timeout(run_link())
 
 
 @lora.command("sync")
@@ -1671,14 +1680,14 @@ def vllm_lora_sync(name, replicas):
     replica_list = []
     for r in replicas.split(","):
         if ":" not in r:
-            print(f"ERROR: invalid replica format '{r}'. Expected host:port")
-            return
+            click.echo(f"ERROR: invalid replica format '{r}'. Expected host:port", err=True)
+            raise SystemExit(1)
         host, port = r.rsplit(":", 1)
         try:
             port = int(port)
         except ValueError:
-            print(f"ERROR: invalid port in replica '{r}'")
-            return
+            click.echo(f"ERROR: invalid port in replica '{r}'", err=True)
+            raise SystemExit(1)
         replica_list.append({"replica_id": r, "host": host, "port": port})
 
     async def run_sync():
@@ -1686,14 +1695,14 @@ def vllm_lora_sync(name, replicas):
         svc = VLLMService(config)
         result = await svc.lora_sync(name, replicas=replica_list)
         if result["status"] == "success":
-            print(f"OK: Synchronized adapter '{name}' across {len(replica_list)} replica(s)")
+            click.echo(f"OK: Synchronized adapter '{name}' across {len(replica_list)} replica(s)")
             final = result.get("final_consistency", {})
-            print(f"   Expected: {len(final.get('expected_replicas', []))}")
-            print(f"   Loaded: {len(final.get('loaded_replicas', []))}")
+            click.echo(f"   Expected: {len(final.get('expected_replicas', []))}")
+            click.echo(f"   Loaded: {len(final.get('loaded_replicas', []))}")
         else:
-            print(f"ERROR: {result.get('error')}")
+            click.echo(f"ERROR: {result.get('error')}", err=True)
 
-    asyncio.run(run_sync())
+    _run_with_timeout(run_sync())
 
 
 @ml.group()
@@ -1711,15 +1720,15 @@ def phoenix_test():
     api = _get_api()
     creds = api._provider_creds("phoenix")
     if not any(creds.values()):
-        print(get_phoenix_setup_instructions())
+        click.echo(get_phoenix_setup_instructions())
         return
     svc = create_phoenix_service_from_credentials(creds)
-    result = asyncio.run(svc.test_connection())
+    result = _run_with_timeout(svc.test_connection())
     if result["status"] == "connected":
-        print(f"OK: Phoenix connected: {result['collector_endpoint']}")
-        print(f"   Projects found: {result['projects_found']}")
+        click.echo(f"OK: Phoenix connected: {result['collector_endpoint']}")
+        click.echo(f"   Projects found: {result['projects_found']}")
     else:
-        print(f"ERROR: Connection failed: {result.get('error')}")
+        click.echo(f"ERROR: Connection failed: {result.get('error')}", err=True)
 @phoenix.command("projects")
 @click.option("--limit", "-l", default=50, help="Max projects to return")
 def phoenix_projects(limit):
@@ -1728,13 +1737,13 @@ def phoenix_projects(limit):
 
     api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
-    data = asyncio.run(svc.list_projects(limit=limit))
+    data = _run_with_timeout(svc.list_projects(limit=limit))
     projects = data.get("data", [])
     if not projects:
-        print("No projects found.")
+        click.echo("No projects found.")
         return
     for p in projects:
-        print(f"   {p.get('name', p.get('id', '?'))}")
+        click.echo(f"   {p.get('name', p.get('id', '?'))}")
 @phoenix.command("spans")
 @click.option("--project", "-p", default=None, help="Project ID or name")
 @click.option(
@@ -1752,12 +1761,12 @@ def phoenix_spans(project, filter_cond, limit):
 
     api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
-    output = asyncio.run(
+    output = _run_with_timeout(
         view_recent_spans(
             svc, project=project, limit=limit, filter_condition=filter_cond
         )
     )
-    print(output)
+    click.echo(output)
 @phoenix.command("trace")
 @click.option("--trace-id", "-t", required=True, help="Trace ID to inspect")
 @click.option("--project", "-p", default=None, help="Project ID or name")
@@ -1768,8 +1777,8 @@ def phoenix_trace(trace_id, project):
 
     api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
-    output = asyncio.run(view_trace(svc, trace_id, project=project))
-    print(output)
+    output = _run_with_timeout(view_trace(svc, trace_id, project=project))
+    click.echo(output)
 @phoenix.command("otel-env")
 @click.option("--project", "-p", default=None, help="Project name")
 def phoenix_otel_env(project):
@@ -1780,7 +1789,7 @@ def phoenix_otel_env(project):
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
     env = svc.generate_otel_env(project_name=project)
     for k, v in env.items():
-        print(f'export {k}="{v}"')
+        click.echo(f'export {k}="{v}"')
 @phoenix.command("snippet")
 @click.option("--project", "-p", default=None, help="Project name")
 def phoenix_snippet(project):
@@ -1789,7 +1798,7 @@ def phoenix_snippet(project):
 
     api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
-    print(svc.generate_instrumentation_snippet(project_name=project))
+    click.echo(svc.generate_instrumentation_snippet(project_name=project))
 @phoenix.command("k8s")
 @click.option("--namespace", "-n", default="observability", help="K8s namespace")
 def phoenix_k8s(namespace):
@@ -1798,7 +1807,7 @@ def phoenix_k8s(namespace):
 
     api = _get_api()
     svc = create_phoenix_service_from_credentials(api._provider_creds("phoenix"))
-    print(svc.generate_k8s_deployment(namespace=namespace))
+    click.echo(svc.generate_k8s_deployment(namespace=namespace))
 @ml.group()
 def guardrails():
     """NeMo Guardrails  LLM output safety, jailbreak detection, PII masking."""
@@ -1814,14 +1823,14 @@ def guardrails_test_cmd():
     api = _get_api()
     creds = api._provider_creds("guardrails")
     if not any(creds.values()):
-        print(get_guardrails_setup_instructions())
+        click.echo(get_guardrails_setup_instructions())
         return
     svc = create_guardrails_service_from_credentials(creds)
-    result = asyncio.run(svc.test_connection())
+    result = _run_with_timeout(svc.test_connection())
     if result["status"] == "connected":
-        print(f"OK: Guardrails connected: {result['server_url']}")
+        click.echo(f"OK: Guardrails connected: {result['server_url']}")
     else:
-        print(f"ERROR: Connection failed: {result.get('error')}")
+        click.echo(f"ERROR: Connection failed: {result.get('error')}", err=True)
 @guardrails.command("chat")
 @click.option(
     "--message", "-m", required=True, help="Message to send through guardrails"
@@ -1835,10 +1844,10 @@ def guardrails_chat(message, config_id):
 
     api = _get_api()
     svc = create_guardrails_service_from_credentials(api._provider_creds("guardrails"))
-    result = asyncio.run(svc.test_rail(message, config_id=config_id))
-    print(f"Input:     {result['input']}")
-    print(f"Config:    {result['config_id']}")
-    print(f"Output:    {json.dumps(result['output'], indent=2)}")
+    result = _run_with_timeout(svc.test_rail(message, config_id=config_id))
+    click.echo(f"Input:     {result['input']}")
+    click.echo(f"Config:    {result['config_id']}")
+    click.echo(f"Output:    {json.dumps(result['output'], indent=2)}")
 @guardrails.command("generate-config")
 @click.option("--config-id", "-c", default=None, help="Config ID name")
 @click.option("--output-dir", "-o", default="./guardrails", help="Output directory")
@@ -1856,8 +1865,8 @@ def guardrails_generate_config(config_id, output_dir):
         fpath = output_path / fname
         fpath.parent.mkdir(parents=True, exist_ok=True)
         fpath.write_text(content)
-        print(f"  OK: {fpath}")
-    print(
+        click.echo(f"  OK: {fpath}")
+    click.echo(
         f"\nSHIELD: Config generated. Start server: nemoguardrails server --config {output_dir}"
     )
 @guardrails.command("k8s")
@@ -1870,7 +1879,7 @@ def guardrails_k8s(namespace):
 
     api = _get_api()
     svc = create_guardrails_service_from_credentials(api._provider_creds("guardrails"))
-    print(svc.generate_k8s_deployment(namespace=namespace))
+    click.echo(svc.generate_k8s_deployment(namespace=namespace))
 @ml.group()
 def qdrant():
     """Qdrant vector database  collections, search, RAG infrastructure."""
@@ -1886,15 +1895,15 @@ def qdrant_test():
     api = _get_api()
     creds = api._provider_creds("qdrant")
     if not any(creds.values()):
-        print(get_qdrant_setup_instructions())
+        click.echo(get_qdrant_setup_instructions())
         return
     svc = create_qdrant_service_from_credentials(creds)
-    result = asyncio.run(svc.test_connection())
+    result = _run_with_timeout(svc.test_connection())
     if result["status"] == "connected":
-        print(f"OK: Qdrant connected: {result['url']}")
-        print(f"   Collections: {', '.join(result['collections']) or 'none'}")
+        click.echo(f"OK: Qdrant connected: {result['url']}")
+        click.echo(f"   Collections: {', '.join(result['collections']) or 'none'}")
     else:
-        print(f"ERROR: Connection failed: {result.get('error')}")
+        click.echo(f"ERROR: Connection failed: {result.get('error')}", err=True)
 @qdrant.command("collections")
 def qdrant_collections():
     """List all collections."""
@@ -1902,12 +1911,12 @@ def qdrant_collections():
 
     api = _get_api()
     svc = create_qdrant_service_from_credentials(api._provider_creds("qdrant"))
-    cols = asyncio.run(svc.list_collections())
+    cols = _run_with_timeout(svc.list_collections())
     if not cols:
-        print("No collections found.")
+        click.echo("No collections found.")
         return
     for c in cols:
-        print(f"    {c}")
+        click.echo(f"    {c}")
 @qdrant.command("create-collection")
 @click.option("--name", "-n", default=None, help="Collection name")
 @click.option(
@@ -1922,12 +1931,12 @@ def qdrant_create_collection(name, embedding_model):
 
     api = _get_api()
     svc = create_qdrant_service_from_credentials(api._provider_creds("qdrant"))
-    result = asyncio.run(
+    result = _run_with_timeout(
         svc.configure_rag_collection(name=name, embedding_model=embedding_model)
     )
-    print(f"OK: Collection created: {result['collection']}")
-    print(f"   Embedding model: {result['embedding_model']}")
-    print(f"   Vector size: {result['vector_size']}")
+    click.echo(f"OK: Collection created: {result['collection']}")
+    click.echo(f"   Embedding model: {result['embedding_model']}")
+    click.echo(f"   Vector size: {result['vector_size']}")
 @qdrant.command("info")
 @click.option("--name", "-n", default=None, help="Collection name")
 def qdrant_info(name):
@@ -1936,8 +1945,8 @@ def qdrant_info(name):
 
     api = _get_api()
     svc = create_qdrant_service_from_credentials(api._provider_creds("qdrant"))
-    info = asyncio.run(svc.get_collection_info(name=name))
-    print(json.dumps(info, indent=2))
+    info = _run_with_timeout(svc.get_collection_info(name=name))
+    click.echo(json.dumps(info, indent=2))
 @qdrant.command("count")
 @click.option("--name", "-n", default=None, help="Collection name")
 def qdrant_count(name):
@@ -1946,8 +1955,8 @@ def qdrant_count(name):
 
     api = _get_api()
     svc = create_qdrant_service_from_credentials(api._provider_creds("qdrant"))
-    count = asyncio.run(svc.count_points(name=name))
-    print(f"Points: {count}")
+    count = _run_with_timeout(svc.count_points(name=name))
+    click.echo(f"Points: {count}")
 @qdrant.command("k8s")
 @click.option("--namespace", "-n", default="vector-db", help="K8s namespace")
 def qdrant_k8s(namespace):
@@ -1956,7 +1965,7 @@ def qdrant_k8s(namespace):
 
     api = _get_api()
     svc = create_qdrant_service_from_credentials(api._provider_creds("qdrant"))
-    print(svc.generate_k8s_deployment(namespace=namespace))
+    click.echo(svc.generate_k8s_deployment(namespace=namespace))
 @ml.group()
 def sglang():
     """SGLang optimization and management with workload-specific auto-tuning"""
@@ -2007,49 +2016,49 @@ def sglang_optimize(model_path, workload_type, user_description, host, port, dry
     # Get optimization summary
     summary = service.get_optimization_summary(config)
 
-    print(" SGLang Optimization Configuration")
-    print(f"Model: {model_path}")
-    print(f"Workload Type: {summary['workload_type']}")
-    print(f"Hardware Detected: {summary['hardware_detected']}")
-    print(f"Schedule Policy: {summary['schedule_policy']}")
-    print(f"Attention Backend: {summary['attention_backend']}")
-    print()
+    click.echo(" SGLang Optimization Configuration")
+    click.echo(f"Model: {model_path}")
+    click.echo(f"Workload Type: {summary['workload_type']}")
+    click.echo(f"Hardware Detected: {summary['hardware_detected']}")
+    click.echo(f"Schedule Policy: {summary['schedule_policy']}")
+    click.echo(f"Attention Backend: {summary['attention_backend']}")
+    click.echo()
 
-    print("Applied Optimizations:")
+    click.echo("Applied Optimizations:")
     for opt in summary["optimizations_applied"]:
-        print(f"  OK: {opt}")
-    print()
+        click.echo(f"  OK: {opt}")
+    click.echo()
 
     if summary["performance_expectations"]:
-        print("Performance Expectations:")
+        click.echo("Performance Expectations:")
         for key, value in summary["performance_expectations"].items():
-            print(f"   {key.replace('_', ' ').title()}: {value}")
-        print()
+            click.echo(f"   {key.replace('_', ' ').title()}: {value}")
+        click.echo()
 
     if summary["hardware_tuned"]:
-        print(" Hardware-specific optimizations applied")
-        print()
+        click.echo(" Hardware-specific optimizations applied")
+        click.echo()
 
     # Validate configuration
     warnings = service.validate_config(config)
     if warnings:
-        print("WARNING:  Configuration Warnings:")
+        click.echo("WARNING:  Configuration Warnings:")
         for warning in warnings:
-            print(f"  WARNING:  {warning}")
-        print()
+            click.echo(f"  WARNING:  {warning}")
+        click.echo()
 
     if dry_run:
-        print(" Dry run - configuration generated but not launched")
+        click.echo(" Dry run - configuration generated but not launched")
         return
 
     # Generate and display launch command
     launch_cmd = service.generate_launch_command(config)
-    print(" Launch Command:")
-    print(launch_cmd)
-    print()
+    click.echo(" Launch Command:")
+    click.echo(launch_cmd)
+    click.echo()
 
-    print("Tip: To start the server, run:")
-    print(f"   {launch_cmd}")
+    click.echo("Tip: To start the server, run:")
+    click.echo(f"   {launch_cmd}")
 @sglang.command()
 @click.argument("model_path")
 @click.option("--dp-size", default=8, help="Data parallel size for multi-replica")
@@ -2087,19 +2096,19 @@ def router(model_path, dp_size, workload_type):
     # Generate router command
     router_cmd = service.generate_multi_replica_command(config, dp_size)
 
-    print(" Cache-Aware Router Configuration")
-    print(f"Model: {model_path}")
-    print(f"DP Size: {dp_size}")
-    print(f"Workload Type: {config.workload_type.value}")
-    print()
-    print(" Router Launch Command:")
-    print(router_cmd)
-    print()
+    click.echo(" Cache-Aware Router Configuration")
+    click.echo(f"Model: {model_path}")
+    click.echo(f"DP Size: {dp_size}")
+    click.echo(f"Workload Type: {config.workload_type.value}")
+    click.echo()
+    click.echo(" Router Launch Command:")
+    click.echo(router_cmd)
+    click.echo()
 
-    print("Tip: This router provides:")
-    print("   Up to 1.9x throughput increase")
-    print("   3.8x higher cache hit rate")
-    print("   Intelligent request routing based on cache predictions")
+    click.echo("Tip: This router provides:")
+    click.echo("   Up to 1.9x throughput increase")
+    click.echo("   3.8x higher cache hit rate")
+    click.echo("   Intelligent request routing based on cache predictions")
 @sglang.command()
 @click.argument("model_path")
 @click.option(
@@ -2127,25 +2136,25 @@ def detect(model_path, workload_type, user_description):
     # Detect workload type
     detected_type = service.detect_workload_type(model_path, user_description)
 
-    print(" Workload Detection Results")
-    print(f"Model: {model_path}")
-    print(f"Detected Workload Type: {detected_type.value}")
+    click.echo(" Workload Detection Results")
+    click.echo(f"Model: {model_path}")
+    click.echo(f"Detected Workload Type: {detected_type.value}")
 
     if workload_type:
         manual_type = WorkloadType(workload_type)
-        print(f"Manual Workload Type: {manual_type.value}")
+        click.echo(f"Manual Workload Type: {manual_type.value}")
         if detected_type != manual_type:
-            print(
+            click.echo(
                 "WARNING:  Manual and detected types differ - using manual specification"
             )
             final_type = manual_type
         else:
-            print("OK: Manual and detected types match")
+            click.echo("OK: Manual and detected types match")
             final_type = detected_type
     else:
         final_type = detected_type
 
-    print()
+    click.echo()
 
     # Show optimization recommendations
     config = service.create_optimized_config(
@@ -2156,18 +2165,18 @@ def detect(model_path, workload_type, user_description):
 
     summary = service.get_optimization_summary(config)
 
-    print(" Optimization Recommendations:")
+    click.echo(" Optimization Recommendations:")
     for opt in summary["optimizations_applied"]:
-        print(f"  OK: {opt}")
-    print()
+        click.echo(f"  OK: {opt}")
+    click.echo()
 
     if summary["performance_expectations"]:
-        print(" Expected Performance:")
+        click.echo(" Expected Performance:")
         for key, value in summary["performance_expectations"].items():
-            print(f"   {key.replace('_', ' ').title()}: {value}")
+            click.echo(f"   {key.replace('_', ' ').title()}: {value}")
 
-    print()
-    print("Tip: Run 'terradev sglang optimize' to generate the full launch command")
+    click.echo()
+    click.echo("Tip: Run 'terradev sglang optimize' to generate the full launch command")
 @sglang.command()
 @click.option("--instance-ip", help="Remote instance IP for installation")
 @click.option("--ssh-user", default="root", help="SSH user for remote installation")
@@ -2180,21 +2189,21 @@ def install(instance_ip, ssh_user, ssh_key):
 
     if instance_ip:
         # Remote installation
-        print(f"PACKAGE: Installing SGLang on {instance_ip}...")
-        result = asyncio.run(
+        click.echo(f"PACKAGE: Installing SGLang on {instance_ip}...")
+        result = _run_with_timeout(
             service.install_on_instance(
                 instance_ip=instance_ip, ssh_user=ssh_user, ssh_key=ssh_key
             )
         )
 
         if result["status"] == "installed":
-            print("OK: SGLang installed successfully")
-            print(f" Output: {result['output']}")
+            click.echo("OK: SGLang installed successfully")
+            click.echo(f" Output: {result['output']}")
         else:
-            print(f"ERROR: Installation failed: {result['error']}")
+            click.echo(f"ERROR: Installation failed: {result['error']}", err=True)
     else:
         # Local installation
-        print("PACKAGE: Installing SGLang locally...")
+        click.echo("PACKAGE: Installing SGLang locally...")
         import subprocess
         import sys
 
@@ -2211,9 +2220,9 @@ def install(instance_ip, ssh_user, ssh_key):
                 ],
                 check=True,
             )
-            print("OK: SGLang installed successfully")
+            click.echo("OK: SGLang installed successfully")
         except subprocess.CalledProcessError as e:
-            print(f"ERROR: Installation failed: {e}")
+            click.echo(f"ERROR: Installation failed: {e}", err=True)
 @sglang.command()
 @click.argument("model_path")
 @click.option("--instance-ip", help="Remote instance IP")
@@ -2252,28 +2261,28 @@ def start(model_path, instance_ip, ssh_user, ssh_key, workload_type, port):
 
     if instance_ip:
         # Remote deployment
-        print(f" Starting SGLang server on {instance_ip}...")
-        result = asyncio.run(
+        click.echo(f" Starting SGLang server on {instance_ip}...")
+        result = _run_with_timeout(
             service.start_server(
                 instance_ip=instance_ip, ssh_user=ssh_user, ssh_key=ssh_key
             )
         )
 
         if result["status"] == "started":
-            print("OK: SGLang server started successfully")
-            print(f" Endpoint: http://{instance_ip}:{port}")
+            click.echo("OK: SGLang server started successfully")
+            click.echo(f" Endpoint: http://{instance_ip}:{port}")
         else:
-            print(f"ERROR: Failed to start server: {result['error']}")
+            click.echo(f"ERROR: Failed to start server: {result['error']}", err=True)
     else:
         # Local launch
         launch_cmd = service.generate_launch_command(config)
-        print(" Starting SGLang server locally...")
-        print(f" Endpoint: http://localhost:{port}")
-        print()
-        print("Tip: Launch command:")
-        print(launch_cmd)
-        print()
-        print("WARNING:  Run the command above to start the server")
+        click.echo(" Starting SGLang server locally...")
+        click.echo(f" Endpoint: http://localhost:{port}")
+        click.echo()
+        click.echo("Tip: Launch command:")
+        click.echo(launch_cmd)
+        click.echo()
+        click.echo("WARNING:  Run the command above to start the server")
 @sglang.command()
 def test():
     """Test SGLang installation and configuration"""
@@ -2281,15 +2290,15 @@ def test():
 
     service = SGLangService()
 
-    print(" Testing SGLang installation...")
-    result = asyncio.run(service.test_connection())
+    click.echo(" Testing SGLang installation...")
+    result = _run_with_timeout(service.test_connection())
 
     if result["status"] == "connected":
-        print("OK: SGLang is installed and available")
-        print(f"PACKAGE: Version: {result['sglang_version']}")
+        click.echo("OK: SGLang is installed and available")
+        click.echo(f"PACKAGE: Version: {result['sglang_version']}")
     else:
-        print(f"ERROR: SGLang test failed: {result['error']}")
-        print("Tip: Run 'terradev sglang install' to install SGLang")
+        click.echo(f"ERROR: SGLang test failed: {result['error']}", err=True)
+        click.echo("Tip: Run 'terradev sglang install' to install SGLang")
 @ml.group()
 def langfuse():
     """Langfuse LLM observability  traces, scores, datasets, prompts."""
@@ -2313,7 +2322,7 @@ def langfuse_configure(public_key, secret_key, host):
             "base_url": host,
         },
     )
-    print(f"\u2705 Langfuse credentials saved (host: {host})")
+    click.echo(f"\u2705 Langfuse credentials saved (host: {host})")
 @langfuse.command("test")
 def langfuse_test():
     """Test Langfuse connectivity."""
@@ -2321,16 +2330,16 @@ def langfuse_test():
 
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
-    result = asyncio.run(svc.test_connection())
+    result = _run_with_timeout(svc.test_connection())
     if result["status"] == "connected":
-        print(f"\u2705 Connected to Langfuse at {result['base_url']}")
-        print(f"\U0001f4c1 Projects: {result['projects']}")
+        click.echo(f"\u2705 Connected to Langfuse at {result['base_url']}")
+        click.echo(f"\U0001f4c1 Projects: {result['projects']}")
         for name in result.get("project_names", []):
-            print(f"   - {name}")
+            click.echo(f"   - {name}")
     else:
-        print(f"\u274c Connection failed: {result.get('error')}")
+        click.echo(f"\u274c Connection failed: {result.get('error')}")
 @langfuse.command("traces")
-@click.option("--limit", "-n", default=20, type=int)
+@click.option("--limit", "-n", default=20, type=click.IntRange(1, 10000))
 @click.option("--name", default=None, help="Filter by trace name")
 @click.option(
     "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
@@ -2341,24 +2350,24 @@ def langfuse_traces(limit, name, fmt):
 
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
-    result = asyncio.run(svc.list_traces(limit=limit, name=name))
+    result = _run_with_timeout(svc.list_traces(limit=limit, name=name))
 
     if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
+        click.echo(json.dumps(result, indent=2, default=str))
     else:
         traces = result.get("data", [])
         if not traces:
-            print("  No traces found.")
+            click.echo("  No traces found.")
             return
-        print(f"\n  {'ID':<40} {'Name':<24} {'Input':<30} {'Tokens'}")
-        print(f"  {'─'*38}  {'─'*22}  {'─'*28}  {'─'*8}")
+        click.echo(f"\n  {'ID':<40} {'Name':<24} {'Input':<30} {'Tokens'}")
+        click.echo(f"  {'─'*38}  {'─'*22}  {'─'*28}  {'─'*8}")
         for t in traces:
             tid = t.get("id", "?")[:38]
             tname = (t.get("name") or "?")[:22]
             inp = str(t.get("input", ""))[:28]
             tokens = t.get("totalTokens") or t.get("usage", {}).get("totalTokens", "?")
-            print(f"  {tid:<40} {tname:<24} {inp:<30} {tokens}")
-        print()
+            click.echo(f"  {tid:<40} {tname:<24} {inp:<30} {tokens}")
+        click.echo()
 @langfuse.command("trace")
 @click.argument("trace_id")
 @click.option(
@@ -2370,28 +2379,28 @@ def langfuse_trace(trace_id, fmt):
 
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
-    result = asyncio.run(svc.get_trace(trace_id))
+    result = _run_with_timeout(svc.get_trace(trace_id))
 
     if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
+        click.echo(json.dumps(result, indent=2, default=str))
     else:
-        print(f"\n  Trace: {result.get('id', '?')}")
-        print(f"  Name:  {result.get('name', '?')}")
-        print(f"  Input: {str(result.get('input', ''))[:100]}")
-        print(f"  Output: {str(result.get('output', ''))[:100]}")
+        click.echo(f"\n  Trace: {result.get('id', '?')}")
+        click.echo(f"  Name:  {result.get('name', '?')}")
+        click.echo(f"  Input: {str(result.get('input', ''))[:100]}")
+        click.echo(f"  Output: {str(result.get('output', ''))[:100]}")
         obs = result.get("observations", [])
         if obs:
-            print(f"\n  Observations ({len(obs)}):")
+            click.echo(f"\n  Observations ({len(obs)}):")
             for o in obs:
-                print(
+                click.echo(
                     f"    [{o.get('type', '?')}] {o.get('name', '?')}  "
                     f"{str(o.get('input', ''))[:60]}"
                 )
-        print()
+        click.echo()
 @langfuse.command("scores")
 @click.option("--trace-id", default=None, help="Filter by trace ID")
 @click.option("--name", default=None, help="Filter by score name")
-@click.option("--limit", "-n", default=50, type=int)
+@click.option("--limit", "-n", default=50, type=click.IntRange(1, 10000))
 @click.option(
     "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
 )
@@ -2401,28 +2410,28 @@ def langfuse_scores(trace_id, name, limit, fmt):
 
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
-    result = asyncio.run(svc.list_scores(trace_id=trace_id, name=name, limit=limit))
+    result = _run_with_timeout(svc.list_scores(trace_id=trace_id, name=name, limit=limit))
 
     if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
+        click.echo(json.dumps(result, indent=2, default=str))
     else:
         scores = result.get("data", [])
         if not scores:
-            print("  No scores found.")
+            click.echo("  No scores found.")
             return
-        print(f"\n  {'Name':<20} {'Value':<10} {'Trace ID':<40} {'Comment'}")
-        print(f"  {'─'*18}  {'─'*8}  {'─'*38}  {'─'*20}")
+        click.echo(f"\n  {'Name':<20} {'Value':<10} {'Trace ID':<40} {'Comment'}")
+        click.echo(f"  {'─'*18}  {'─'*8}  {'─'*38}  {'─'*20}")
         for s in scores:
             sname = (s.get("name") or "?")[:18]
             val = s.get("value", "?")
             tid = (s.get("traceId") or "?")[:38]
             comment = (s.get("comment") or "")[:20]
-            print(f"  {sname:<20} {val:<10} {tid:<40} {comment}")
-        print()
+            click.echo(f"  {sname:<20} {val:<10} {tid:<40} {comment}")
+        click.echo()
 @langfuse.command("score")
 @click.option("--trace-id", required=True, help="Trace to score")
 @click.option("--name", required=True, help="Score name (e.g. accuracy, quality)")
-@click.option("--value", required=True, type=float, help="Score value (numeric)")
+@click.option("--value", required=True, type=click.FloatRange(0.0, 1.0), help="Score value (numeric)")
 @click.option("--observation-id", default=None, help="Specific observation to score")
 @click.option("--comment", default=None, help="Optional comment")
 def langfuse_score(trace_id, name, value, observation_id, comment):
@@ -2431,7 +2440,7 @@ def langfuse_score(trace_id, name, value, observation_id, comment):
 
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
-    asyncio.run(
+    _run_with_timeout(
         svc.create_score(
             trace_id=trace_id,
             name=name,
@@ -2440,9 +2449,9 @@ def langfuse_score(trace_id, name, value, observation_id, comment):
             comment=comment,
         )
     )
-    print(f"\u2705 Score created: {name}={value} on trace {trace_id[:20]}...")
+    click.echo(f"\u2705 Score created: {name}={value} on trace {trace_id[:20]}...")
 @langfuse.command("datasets")
-@click.option("--limit", "-n", default=20, type=int)
+@click.option("--limit", "-n", default=20, type=click.IntRange(1, 10000))
 @click.option(
     "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
 )
@@ -2452,23 +2461,23 @@ def langfuse_datasets(limit, fmt):
 
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
-    result = asyncio.run(svc.list_datasets(limit=limit))
+    result = _run_with_timeout(svc.list_datasets(limit=limit))
 
     if fmt == "json":
-        print(json.dumps(result, indent=2, default=str))
+        click.echo(json.dumps(result, indent=2, default=str))
     else:
         datasets = result.get("data", [])
         if not datasets:
-            print("  No datasets found.")
+            click.echo("  No datasets found.")
             return
         for d in datasets:
-            print(f"  \U0001f4ca {d.get('name', '?')}  {d.get('description', '')[:60]}")
-        print()
+            click.echo(f"  \U0001f4ca {d.get('name', '?')}  {d.get('description', '')[:60]}")
+        click.echo()
 @langfuse.command("export-training-data")
-@click.option("--limit", "-n", default=500, type=int, help="Max pairs to export")
+@click.option("--limit", "-n", default=500, type=click.IntRange(1, 100000), help="Max pairs to export")
 @click.option("--name", default=None, help="Filter traces by name")
 @click.option(
-    "--min-score", default=None, type=float, help="Min quality score (0.0-1.0)"
+    "--min-score", default=None, type=click.FloatRange(0.0, 1.0), help="Min quality score (0.0-1.0)"
 )
 @click.option("--score-name", default="quality", help="Score name to filter on")
 @click.option("--output", "-o", default=None, help="Output file path (default: stdout)")
@@ -2478,26 +2487,26 @@ def langfuse_export_training_data(limit, name, min_score, score_name, output):
 
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
-    pairs = asyncio.run(
+    pairs = _run_with_timeout(
         svc.export_training_data(
             limit=limit, name_filter=name, min_score=min_score, score_name=score_name
         )
     )
 
     if not pairs:
-        print("  No training pairs extracted.")
+        click.echo("  No training pairs extracted.")
         return
 
     data = json.dumps(pairs, indent=2)
     if output:
         with open(output, "w") as f:
             f.write(data)
-        print(f"\u2705 Exported {len(pairs)} pairs to {output}")
+        click.echo(f"\u2705 Exported {len(pairs)} pairs to {output}")
     else:
-        print(data)
+        click.echo(data)
 @langfuse.command("quality")
 @click.option("--score-name", default="quality", help="Score name to aggregate")
-@click.option("--limit", "-n", default=200, type=int)
+@click.option("--limit", "-n", default=200, type=click.IntRange(1, 10000))
 @click.option(
     "--format", "-f", "fmt", type=click.Choice(["json", "text"]), default="text"
 )
@@ -2507,16 +2516,16 @@ def langfuse_quality(score_name, limit, fmt):
 
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
-    result = asyncio.run(svc.get_quality_metrics(score_name=score_name, limit=limit))
+    result = _run_with_timeout(svc.get_quality_metrics(score_name=score_name, limit=limit))
 
     if fmt == "json":
-        print(json.dumps(result, indent=2))
+        click.echo(json.dumps(result, indent=2))
     else:
-        print(f"\n  Quality Metrics ({score_name}):")
-        print(f"  Avg:     {result.get('avg_score', '?')}")
-        print(f"  Min:     {result.get('min_score', '?')}")
-        print(f"  Max:     {result.get('max_score', '?')}")
-        print(f"  Samples: {result.get('samples', 0)}\n")
+        click.echo(f"\n  Quality Metrics ({score_name}):")
+        click.echo(f"  Avg:     {result.get('avg_score', '?')}")
+        click.echo(f"  Min:     {result.get('min_score', '?')}")
+        click.echo(f"  Max:     {result.get('max_score', '?')}")
+        click.echo(f"  Samples: {result.get('samples', 0)}\n")
 @langfuse.command("otel-env")
 @click.option("--project", "-p", default="default", help="Project name")
 def langfuse_otel_env(project):
@@ -2526,10 +2535,10 @@ def langfuse_otel_env(project):
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
     env = svc.generate_otel_env(project_name=project)
-    print()
+    click.echo()
     for k, v in env.items():
-        print(f'export {k}="{v}"')
-    print()
+        click.echo(f'export {k}="{v}"')
+    click.echo()
 @langfuse.command("k8s")
 @click.option("--namespace", "-n", default="observability", help="K8s namespace")
 def langfuse_k8s(namespace):
@@ -2538,7 +2547,7 @@ def langfuse_k8s(namespace):
 
     api = _get_api()
     svc = create_langfuse_service_from_credentials(api._provider_creds("langfuse"))
-    print(svc.generate_k8s_deployment(namespace=namespace))
+    click.echo(svc.generate_k8s_deployment(namespace=namespace))
 
 # ═══════════════════════════════════════════════════════════════════════
 # Ollama Local Model Commands
@@ -2584,7 +2593,7 @@ def _ollama_stream(endpoint: str, path: str, data: Dict, timeout: int = 600):
                 except json.JSONDecodeError:
                     continue
                 if "status" in obj:
-                    print(f"  {obj['status']}")
+                    click.echo(f"  {obj['status']}")
                 if "error" in obj:
                     raise RuntimeError(obj["error"])
     except urllib.error.HTTPError as e:
@@ -2604,26 +2613,26 @@ def ollama_list(endpoint):
         data = _ollama_request(endpoint, "GET", "/api/tags")
         models = data.get("models", [])
         if not models:
-            print("No Ollama models found.")
+            click.echo("No Ollama models found.")
             return
-        print(f"Ollama models on {endpoint}:")
+        click.echo(f"Ollama models on {endpoint}:")
         for m in models:
             size_gb = m.get("size", 0) / (1024**3)
-            print(f"  {m['name']} ({size_gb:.1f}GB)")
+            click.echo(f"  {m['name']} ({size_gb:.1f}GB)")
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
+        click.echo(f"ERROR: {e}", err=True)
 
 @ollama.command("pull")
 @click.argument("model")
 @click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
 def ollama_pull(model, endpoint):
     """Pull an Ollama model onto the local server."""
-    print(f"Pulling {model} from {endpoint}...")
+    click.echo(f"Pulling {model} from {endpoint}...")
     try:
         _ollama_stream(endpoint, "/api/pull", {"name": model, "stream": True})
-        print(f"OK: {model} pulled successfully")
+        click.echo(f"OK: {model} pulled successfully")
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
+        click.echo(f"ERROR: {e}", err=True)
 
 @ollama.command("generate")
 @click.argument("model")
@@ -2635,11 +2644,11 @@ def ollama_generate(model, prompt, endpoint, options):
     try:
         payload = {"model": model, "prompt": prompt, "stream": False}
         if options:
-            payload["options"] = json.loads(options)
+            payload["options"] = _safe_json(options, "--options")
         data = _ollama_request(endpoint, "POST", "/api/generate", payload, timeout=120)
-        print(data.get("response", ""))
+        click.echo(data.get("response", ""))
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
+        click.echo(f"ERROR: {e}", err=True)
 
 @ollama.command("chat")
 @click.argument("model")
@@ -2656,12 +2665,12 @@ def ollama_chat(model, message, system, endpoint, options):
         messages.append({"role": "user", "content": message})
         payload = {"model": model, "messages": messages, "stream": False}
         if options:
-            payload["options"] = json.loads(options)
+            payload["options"] = _safe_json(options, "--options")
         data = _ollama_request(endpoint, "POST", "/api/chat", payload, timeout=120)
         reply = data.get("message", {}).get("content", "")
-        print(reply)
+        click.echo(reply)
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
+        click.echo(f"ERROR: {e}", err=True)
 
 @ollama.command("info")
 @click.argument("model")
@@ -2670,9 +2679,9 @@ def ollama_info(model, endpoint):
     """Show detailed information about an Ollama model."""
     try:
         data = _ollama_request(endpoint, "POST", "/api/show", {"name": model})
-        print(json.dumps(data, indent=2, default=str))
+        click.echo(json.dumps(data, indent=2, default=str))
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
+        click.echo(f"ERROR: {e}", err=True)
 
 @ollama.command("ps")
 @click.option("--endpoint", "-e", default="http://localhost:11434", help="Ollama API endpoint")
@@ -2682,15 +2691,15 @@ def ollama_ps(endpoint):
         data = _ollama_request(endpoint, "GET", "/api/ps")
         models = data.get("models", [])
         if not models:
-            print("No Ollama models are currently running.")
+            click.echo("No Ollama models are currently running.")
             return
-        print(f"Running Ollama models on {endpoint}:")
+        click.echo(f"Running Ollama models on {endpoint}:")
         for m in models:
             size_gb = m.get("size", 0) / (1024**3)
             until = m.get("expires_at", "unknown")
-            print(f"  {m['name']} ({size_gb:.1f}GB, expires {until})")
+            click.echo(f"  {m['name']} ({size_gb:.1f}GB, expires {until})")
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
+        click.echo(f"ERROR: {e}", err=True)
 
 # ═══════════════════════════════════════════════════════════════════════
 # DeepEval LLM Evaluation Commands
@@ -2724,15 +2733,15 @@ def deepeval_install(upgrade):
     if upgrade:
         cmd.append("--upgrade")
     cmd.append("deepeval")
-    print("Installing DeepEval...")
+    click.echo("Installing DeepEval...")
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
-            print("OK: DeepEval installed")
+            click.echo("OK: DeepEval installed")
         else:
-            print(f"ERROR: {result.stderr}")
+            click.echo(f"ERROR: {result.stderr}", err=True)
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
+        click.echo(f"ERROR: {e}", err=True)
 
 @deepeval.command("init")
 @click.option("--output", "-o", default="test_deepeval.py", help="Output test file path")
@@ -2753,10 +2762,10 @@ def test_llm():
 '''
     try:
         Path(output).write_text(sample, encoding="utf-8")
-        print(f"OK: Starter DeepEval test written to {output}")
-        print(f"Run it with: terradev ml deepeval run --file {output}")
+        click.echo(f"OK: Starter DeepEval test written to {output}")
+        click.echo(f"Run it with: terradev ml deepeval run --file {output}")
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
+        click.echo(f"ERROR: {e}", err=True)
 
 @deepeval.command("run")
 @click.option("--file", "-f", default="test_deepeval.py", help="DeepEval test file")
@@ -2769,20 +2778,20 @@ def deepeval_run(file):
             text=True,
         )
         if result.returncode == 0:
-            print(result.stdout)
+            click.echo(result.stdout)
         else:
-            print(f"ERROR:\n{result.stderr}")
+            click.echo(f"ERROR:\n{result.stderr}", err=True)
     except FileNotFoundError:
-        print("ERROR: DeepEval not found. Run 'terradev ml deepeval install' first.")
+        click.echo("ERROR: DeepEval not found. Run 'terradev ml deepeval install' first.", err=True)
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
+        click.echo(f"ERROR: {e}", err=True)
 
 @deepeval.command("metrics")
 def deepeval_metrics():
     """List available DeepEval metrics."""
-    print("Available DeepEval metrics:")
+    click.echo("Available DeepEval metrics:")
     for m in DEEPEVAL_METRICS:
-        print(f"  {m}")
+        click.echo(f"  {m}")
 
 @deepeval.command("evaluate")
 @click.option("--input", "-i", required=True, help="Test input/prompt")
@@ -2797,18 +2806,18 @@ def deepeval_metrics():
 @click.option("--expected-output", "-e", help="Expected output")
 @click.option("--context", "-c", help="Ground-truth context (comma-separated)")
 @click.option("--retrieval-context", "-r", help="Retrieval context (comma-separated)")
-@click.option("--threshold", "-t", default=0.5, type=float, help="Passing threshold")
+@click.option("--threshold", "-t", default=0.5, type=click.FloatRange(0.0, 1.0), help="Passing threshold")
 def deepeval_evaluate(input, actual_output, metric, expected_output, context, retrieval_context, threshold):
     """Evaluate a single LLM output with a DeepEval metric."""
     try:
         from deepeval.test_case import LLMTestCase
     except ImportError:
-        print("ERROR: DeepEval not installed. Run 'terradev ml deepeval install' first.")
-        return
+        click.echo("ERROR: DeepEval not installed. Run 'terradev ml deepeval install' first.", err=True)
+        raise SystemExit(1)
 
     if metric in ("GEval", "DAGMetric"):
-        print(f"ERROR: {metric} requires a custom definition. Use 'deepeval run' with a test file.")
-        return
+        click.echo(f"ERROR: {metric} requires a custom definition. Use 'deepeval run' with a test file.", err=True)
+        raise SystemExit(1)
 
     kwargs: Dict[str, Any] = {"input": input, "actual_output": actual_output}
     if expected_output:
@@ -2825,17 +2834,17 @@ def deepeval_evaluate(input, actual_output, metric, expected_output, context, re
 
         metric_cls = getattr(deepeval_metrics, metric, None)
         if metric_cls is None:
-            print(f"ERROR: Unknown metric {metric}")
-            return
+            click.echo(f"ERROR: Unknown metric {metric}", err=True)
+            raise SystemExit(1)
         metric_obj = metric_cls(threshold=threshold)
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: Failed to load metric: {e}")
-        return
+        click.echo(f"ERROR: Failed to load metric: {e}", err=True)
+        raise SystemExit(1)
 
     try:
         metric_obj.measure(test_case)
-        print(f"Score: {metric_obj.score}")
-        print(f"Reason: {metric_obj.reason}")
-        print(f"Passed: {metric_obj.is_successful()}")
+        click.echo(f"Score: {metric_obj.score}")
+        click.echo(f"Reason: {metric_obj.reason}")
+        click.echo(f"Passed: {metric_obj.is_successful()}")
     except Exception as e:  # noqa: BLE001
-        print(f"ERROR: {e}")
+        click.echo(f"ERROR: {e}", err=True)
