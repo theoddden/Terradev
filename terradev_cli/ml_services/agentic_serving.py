@@ -80,6 +80,16 @@ class AgenticServingConfig:
     gpu_type: str = "nvidia.com/gpu"
     gpu_count: int = 1
 
+    # Mem0 agentic memory integration
+    mem0_enabled: bool = False
+    mem0_api_key: Optional[str] = None
+    mem0_host: Optional[str] = None
+    mem0_user_id: Optional[str] = None
+    mem0_agent_id: Optional[str] = None
+    mem0_app_id: Optional[str] = None
+    mem0_run_id: Optional[str] = None
+    mem0_infer: bool = False  # avoid LLM cost for high-volume tool logs
+
 
 class ToolCallTracker:
     """Tracks per-tool latency history and computes adaptive TTL values.
@@ -88,7 +98,7 @@ class ToolCallTracker:
     a TTL that covers most tool returns without over-pinning GPU memory.
     """
 
-    def __init__(self, config: AgenticServingConfig):
+    def __init__(self, config: AgenticServingConfig, mem0_client: Optional[Any] = None):
         self.config = config
         # tool_name -> EMA of latency
         self._tool_ema: Dict[str, float] = {}
@@ -96,6 +106,31 @@ class ToolCallTracker:
         self._tool_counts: Dict[str, int] = defaultdict(int)
         # program_id -> {turn: int, last_finish_ts: float, last_tool: str}
         self._sessions: Dict[str, Dict[str, Any]] = {}
+        # Optional Mem0 client for persisting tool outputs as episodic memory
+        self._mem0_client: Optional[Any] = mem0_client
+
+    def _mem0(self) -> Optional[Any]:
+        """Lazy-load Mem0 client if enabled but not yet injected."""
+        if self._mem0_client is not None:
+            return self._mem0_client
+        if not self.config.mem0_enabled:
+            return None
+        try:
+            from .mem0_service import Mem0Service, Mem0Config
+
+            cfg = Mem0Config(
+                api_key=self.config.mem0_api_key,
+                host=self.config.mem0_host,
+                default_user_id=self.config.mem0_user_id,
+                default_agent_id=self.config.mem0_agent_id,
+                default_app_id=self.config.mem0_app_id,
+                default_run_id=self.config.mem0_run_id,
+            )
+            self._mem0_client = Mem0Service(cfg)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to initialize Mem0 client: {exc}")
+            self._mem0_client = None
+        return self._mem0_client
 
     def register_session(self, program_id: str) -> Dict[str, Any]:
         """Register or retrieve an agent session."""
@@ -115,9 +150,14 @@ class ToolCallTracker:
         session["last_tool"] = tool_name
         session["turn"] += 1
 
-    def record_tool_return(self, program_id: str) -> Optional[float]:
+    def record_tool_return(
+        self, program_id: str, tool_output: Optional[str] = None
+    ) -> Optional[float]:
         """Record that a tool returned and the next LLM turn is starting.
-        Returns the observed tool latency in seconds, or None if no prior finish."""
+
+        Optionally persists the tool output to Mem0 as episodic memory.
+        Returns the observed tool latency in seconds, or None if no prior finish.
+        """
         session = self._sessions.get(program_id)
         if not session or session["last_finish_ts"] is None:
             return None
@@ -132,6 +172,11 @@ class ToolCallTracker:
             self._tool_ema[tool_name] = latency
         self._tool_counts[tool_name] += 1
         session["last_finish_ts"] = None
+
+        # Persist tool execution to Mem0 if enabled
+        if tool_output:
+            self._save_tool_memory(program_id, tool_name, tool_output, latency)
+
         return latency
 
     def compute_ttl(self, tool_name: str) -> float:
@@ -160,6 +205,79 @@ class ToolCallTracker:
                 for name in self._tool_ema
             },
         }
+
+    def _save_tool_memory(
+        self,
+        program_id: str,
+        tool_name: str,
+        tool_output: str,
+        latency: Optional[float] = None,
+    ) -> None:
+        """Persist a tool result as Mem0 episodic memory."""
+        client = self._mem0()
+        if client is None:
+            return
+        try:
+            messages = [
+                {"role": "assistant", "content": f"Called tool {tool_name}"},
+                {"role": "user", "content": f"Tool {tool_name} returned: {tool_output}"},
+            ]
+            metadata: Dict[str, Any] = {"program_id": program_id, "tool_name": tool_name}
+            if latency is not None:
+                metadata["latency_s"] = round(latency, 3)
+            client.add(
+                messages,
+                user_id=self.config.mem0_user_id,
+                agent_id=self.config.mem0_agent_id,
+                app_id=self.config.mem0_app_id,
+                run_id=program_id if self.config.mem0_run_id is None else self.config.mem0_run_id,
+                metadata=metadata,
+                infer=self.config.mem0_infer,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to save tool memory to Mem0: {exc}")
+
+    def save_memory(
+        self,
+        program_id: str,
+        messages: List[Dict[str, str]],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Save arbitrary messages to Mem0 for a session."""
+        client = self._mem0()
+        if client is None:
+            return
+        try:
+            client.add(
+                messages,
+                user_id=self.config.mem0_user_id,
+                agent_id=self.config.mem0_agent_id,
+                app_id=self.config.mem0_app_id,
+                run_id=program_id if self.config.mem0_run_id is None else self.config.mem0_run_id,
+                metadata=metadata,
+                infer=self.config.mem0_infer,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to save memory to Mem0: {exc}")
+
+    def search_memory(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """Search Mem0 for relevant context for the current session."""
+        client = self._mem0()
+        if client is None:
+            return []
+        try:
+            result = client.search(
+                query,
+                user_id=self.config.mem0_user_id,
+                agent_id=self.config.mem0_agent_id,
+                app_id=self.config.mem0_app_id,
+                run_id=self.config.mem0_run_id,
+                top_k=top_k,
+            )
+            return result.get("results", [])
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Failed to search Mem0 memory: {exc}")
+            return []
 
     def end_session(self, program_id: str) -> None:
         """Clean up a finished agent session."""
@@ -311,12 +429,35 @@ def generate_lmcache_env(config: AgenticServingConfig) -> Dict[str, str]:
     return env
 
 
+def generate_mem0_env(config: AgenticServingConfig) -> Dict[str, str]:
+    """Generate environment variables for Mem0 agentic memory integration."""
+    if not config.mem0_enabled:
+        return {}
+    env: Dict[str, str] = {
+        "TERRADEV_MEM0_ENABLED": "1",
+        "MEM0_API_KEY": config.mem0_api_key or "",
+    }
+    if config.mem0_host:
+        env["TERRADEV_MEM0_HOST"] = config.mem0_host
+    if config.mem0_user_id:
+        env["TERRADEV_MEM0_USER_ID"] = config.mem0_user_id
+    if config.mem0_agent_id:
+        env["TERRADEV_MEM0_AGENT_ID"] = config.mem0_agent_id
+    if config.mem0_app_id:
+        env["TERRADEV_MEM0_APP_ID"] = config.mem0_app_id
+    if config.mem0_run_id:
+        env["TERRADEV_MEM0_RUN_ID"] = config.mem0_run_id
+    env["TERRADEV_MEM0_INFER"] = str(config.mem0_infer).lower()
+    return env
+
+
 def generate_engine_env(config: AgenticServingConfig) -> Dict[str, str]:
     """Generate all env vars for an agentic-optimized inference pod."""
     env: Dict[str, str] = {}
     if config.engine == "vllm":
         env["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
     env.update(generate_lmcache_env(config))
+    env.update(generate_mem0_env(config))
     return env
 
 
@@ -516,6 +657,16 @@ def generate_helm_values(config: AgenticServingConfig) -> Dict[str, Any]:
                 "blockSize": config.block_size,
             },
             "lmcache": generate_lmcache_config(config),
+            "mem0": {
+                "enabled": config.mem0_enabled,
+                "apiKeySecret": "mem0-api-key" if config.mem0_enabled else None,
+                "host": config.mem0_host,
+                "userId": config.mem0_user_id,
+                "agentId": config.mem0_agent_id,
+                "appId": config.mem0_app_id,
+                "runId": config.mem0_run_id,
+                "infer": config.mem0_infer,
+            },
             "priorityScheduling": {"enabled": config.enable_priority_scheduling},
             "disaggregation": {
                 "enabled": config.disaggregation_enabled,
@@ -551,6 +702,14 @@ def create_agentic_serving_from_credentials(
             "disaggregation_enabled", "false"
         ).lower()
         == "true",
+        mem0_enabled=credentials.get("mem0_enabled", "false").lower() == "true",
+        mem0_api_key=credentials.get("mem0_api_key"),
+        mem0_host=credentials.get("mem0_host"),
+        mem0_user_id=credentials.get("mem0_user_id"),
+        mem0_agent_id=credentials.get("mem0_agent_id"),
+        mem0_app_id=credentials.get("mem0_app_id"),
+        mem0_run_id=credentials.get("mem0_run_id"),
+        mem0_infer=credentials.get("mem0_infer", "false").lower() == "true",
     )
     tracker = ToolCallTracker(config)
     return config, tracker

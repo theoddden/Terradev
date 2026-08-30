@@ -23,6 +23,7 @@ from .langfuse_service import LangfuseService
 from .lorax_service import LoRAXService, LoRAXConfig
 from .peft_import_service import PEFTImportService, PEFTAdapterConfig
 from .agentic_serving import AgenticServingConfig, ToolCallTracker
+from .mem0_service import Mem0Service, Mem0Config, create_mem0_service_from_credentials, get_mem0_setup_instructions
 from .model_router import ModelRouter, RouterConfig
 
 __all__ = [
@@ -48,6 +49,10 @@ __all__ = [
     "PEFTAdapterConfig",
     "AgenticServingConfig",
     "ToolCallTracker",
+    "Mem0Service",
+    "Mem0Config",
+    "create_mem0_service_from_credentials",
+    "get_mem0_setup_instructions",
     "ModelRouter",
     "RouterConfig",
 ]

@@ -39,6 +39,15 @@ ARGUMENTS_BY_TOOL = {
     'agent_letta_list': [],
     'agent_letta_remember': [],
     'agent_letta_status': [],
+    'agent_mem0_add': [],
+    'agent_mem0_configure': [],
+    'agent_mem0_delete': [],
+    'agent_mem0_forget': [],
+    'agent_mem0_get': [],
+    'agent_mem0_list': [],
+    'agent_mem0_search': [],
+    'agent_mem0_test': [],
+    'agent_mem0_update': [],
     'agent_list': [],
     'agent_plan': [],
     'agent_scale': [],
@@ -77,6 +86,15 @@ HANDLERS['agent_letta_delete'] = _handle
 HANDLERS['agent_letta_list'] = _handle
 HANDLERS['agent_letta_remember'] = _handle
 HANDLERS['agent_letta_status'] = _handle
+HANDLERS['agent_mem0_add'] = _handle
+HANDLERS['agent_mem0_configure'] = _handle
+HANDLERS['agent_mem0_delete'] = _handle
+HANDLERS['agent_mem0_forget'] = _handle
+HANDLERS['agent_mem0_get'] = _handle
+HANDLERS['agent_mem0_list'] = _handle
+HANDLERS['agent_mem0_search'] = _handle
+HANDLERS['agent_mem0_test'] = _handle
+HANDLERS['agent_mem0_update'] = _handle
 HANDLERS['agent_list'] = _handle
 HANDLERS['agent_plan'] = _handle
 HANDLERS['agent_scale'] = _handle

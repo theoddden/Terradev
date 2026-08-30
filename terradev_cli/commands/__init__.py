@@ -83,6 +83,7 @@ from . import database   # noqa: F401,E402
 from . import weaviate   # noqa: F401,E402
 from . import vault      # noqa: F401,E402
 from . import letta   # noqa: F401,E402
+from . import mem0    # noqa: F401,E402
 from . import agent_infra  # noqa: F401,E402
 from . import login      # noqa: F401,E402
 # SSO commands are provided by platform.py to avoid duplicate group registration
@@ -95,6 +96,7 @@ platform.agent.add_command(mlops.agentic_serving)
 training.train.add_command(unsloth.unsloth)
 database.database.add_command(weaviate.weaviate)
 platform.agent.add_command(letta.letta)
+platform.agent.add_command(mem0.mem0)
 
 # Agent-oriented workflow / graph frameworks
 platform.agent.add_command(ml.langchain)
