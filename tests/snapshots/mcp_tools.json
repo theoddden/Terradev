@@ -1,5 +1,5 @@
 {
-  "tool_count": 252,
+  "tool_count": 261,
   "tool_names": [
     "active_context",
     "agent_agentic_serving_configure",
@@ -25,6 +25,15 @@
     "agent_letta_remember",
     "agent_letta_status",
     "agent_list",
+    "agent_mem0_add",
+    "agent_mem0_configure",
+    "agent_mem0_delete",
+    "agent_mem0_forget",
+    "agent_mem0_get",
+    "agent_mem0_list",
+    "agent_mem0_search",
+    "agent_mem0_test",
+    "agent_mem0_update",
     "agent_plan",
     "agent_scale",
     "agent_skill_attach",
