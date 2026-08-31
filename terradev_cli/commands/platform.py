@@ -188,7 +188,7 @@ def sso_test(provider):
             else:
                 click.echo(f'WARNING: {p} configuration test failed', err=True)
 @cli.command("mcp")
-@click.argument("action", type=click.Choice(["serve", "install", "list-tools"]))
+@click.argument("action", type=click.Choice(["serve", "install", "list-tools", "check"]))
 @click.option(
     "--client",
     type=click.Choice(["claude-desktop", "cursor", "windsurf", "continue", "cline"]),
@@ -209,7 +209,75 @@ def mcp(action, client, transport):
       serve: Start MCP server (default: stdio transport)
       install: Install MCP config for a specific client
       list-tools: List all available MCP tools
+      check: Validate credentials and show which providers are configured
     """
+    if action == "check":
+        import os
+        from pathlib import Path as _Path
+        from terradev_cli.core.vault_adapter import VaultAdapter
+
+        PROVIDER_ENVS = [
+            ("runpod",       ["RUNPOD_API_KEY"]),
+            ("vastai",       ["VAST_API_KEY"]),
+            ("lambda",       ["LAMBDA_API_KEY"]),
+            ("tensordock",   ["TENSORDOCK_TOKEN"]),
+            ("crusoe",       ["CRUSOE_API_KEY", "CRUSOE_API_SECRET"]),
+            ("baseten",      ["BASETEN_API_KEY"]),
+            ("siliconflow",  ["SILICONFLOW_API_KEY"]),
+            ("hyperstack",   ["HYPERSTACK_API_KEY"]),
+            ("digitalocean", ["DIGITALOCEAN_TOKEN"]),
+            ("inferx",       ["INFERX_API_KEY"]),
+            ("e2enetworks",  ["E2E_API_KEY"]),
+            ("latitude",     ["LATITUDE_API_KEY"]),
+            ("yottalabs",    ["YOTTALABS_API_KEY"]),
+            ("gcore",        ["GCORE_API_TOKEN"]),
+            ("huggingface",  ["HF_TOKEN"]),
+            ("aws",          ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]),
+            ("gcp",          ["GOOGLE_APPLICATION_CREDENTIALS"]),
+            ("azure",        ["AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET",
+                              "AZURE_TENANT_ID", "AZURE_SUBSCRIPTION_ID"]),
+            ("oracle",       ["OCI_CONFIG_FILE"]),
+        ]
+
+        vault = VaultAdapter(_Path.home() / ".terradev")
+        vault_configured = set(vault.verify()["configured"])
+
+        ready = []
+        unconfigured = []
+        for provider, env_vars in PROVIDER_ENVS:
+            if all(os.environ.get(v) for v in env_vars):
+                ready.append((provider, "env"))
+            elif provider in vault_configured:
+                ready.append((provider, "vault"))
+            else:
+                unconfigured.append((provider, env_vars))
+
+        click.echo("\nTerradev Credential Check")
+        click.echo("\u2500" * 52)
+
+        if ready:
+            click.echo(f"\n  Configured ({len(ready)}):")
+            for provider, source in ready:
+                click.echo(f"    OK  {provider:<16}  via {source}")
+
+        if unconfigured:
+            click.echo(f"\n  Not configured ({len(unconfigured)}):")
+            for provider, env_vars in unconfigured:
+                click.echo(f"    --  {provider:<16}  export {env_vars[0]}=<key>")
+
+        click.echo()
+        if ready:
+            click.echo(f"  {len(ready)} provider(s) ready.")
+            click.echo("  Run: terradev mcp serve")
+            click.echo("  Or get a price quote: terradev quote --gpu-type a100")
+        else:
+            click.echo("  No providers configured. Quickest start:")
+            click.echo("    1. Get a RunPod API key: https://runpod.io/console/settings/api-keys")
+            click.echo("    2. export RUNPOD_API_KEY=<your_key>")
+            click.echo("    3. terradev mcp serve")
+            raise SystemExit(1)
+        return
+
     try:
         from terradev_cli.mcp import run_server, install_config, list_tools
     except ImportError:

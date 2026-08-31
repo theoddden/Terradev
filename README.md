@@ -1,6 +1,6 @@
-# Terradev-cli 6.2.8
+# Terradev-cli 6.2.9
 
-**Imperative Command Line Interface for AI Workload Orchestration across 17 GPU cloud providers.**
+**Cross-cloud GPU orchestration CLI. Set provider API keys as environment variables (RUNPOD_API_KEY, LAMBDA_API_KEY, etc). 261 MCP tools covering provisioning, inference, training, and observability across 17 verified providers.**
 
 ![Terradev Demo](https://raw.githubusercontent.com/theoddden/Terradev/main/demo/terradev-demo.gif)
 
