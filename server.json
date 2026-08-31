@@ -7,13 +7,13 @@
     "url": "https://github.com/theoddden/Terradev",
     "source": "github"
   },
-  "version": "6.2.9",
+  "version": "6.2.10",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "terradev-cli",
-      "version": "6.2.9",
+      "version": "6.2.10",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
@@ -30,22 +30,52 @@
       ],
       "environmentVariables": [
         {
-          "name": "TERRADEV_API_KEY",
-          "description": "Terradev API key for GPU cloud providers",
+          "name": "RUNPOD_API_KEY",
+          "description": "RunPod API key — get at runpod.io/console/settings/api-keys",
           "isRequired": false,
           "isSecret": true
         },
         {
-          "name": "TERRADEV_CREDENTIALS_FILE",
-          "description": "Path to Terradev credentials file",
+          "name": "VAST_API_KEY",
+          "description": "Vast.ai API key — get at console.vast.ai/api-keys",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "LAMBDA_API_KEY",
+          "description": "Lambda Labs API key — get at cloud.lambdalabs.com/api-keys",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "HF_TOKEN",
+          "description": "HuggingFace API token — get at huggingface.co/settings/tokens",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "AWS_ACCESS_KEY_ID",
+          "description": "AWS access key ID (pair with AWS_SECRET_ACCESS_KEY)",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "AWS_SECRET_ACCESS_KEY",
+          "description": "AWS secret access key",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "GOOGLE_APPLICATION_CREDENTIALS",
+          "description": "Path to GCP service account JSON key file",
           "isRequired": false,
           "isSecret": false
         },
         {
-          "name": "TERRADEV_PROVIDER",
-          "description": "Default GPU cloud provider",
+          "name": "TERRADEV_MCP_BEARER_TOKEN",
+          "description": "Bearer token for SSE/remote transport mode (stdio mode does not require this)",
           "isRequired": false,
-          "isSecret": false
+          "isSecret": true
         }
       ]
     }

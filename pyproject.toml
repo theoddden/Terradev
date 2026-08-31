@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terradev-cli"
-version = "6.2.9"
-description = "Cross-cloud GPU orchestration CLI. Set provider API keys as environment variables (RUNPOD_API_KEY, LAMBDA_API_KEY, etc). 261 MCP tools covering provisioning, inference, training, and observability across 17 verified providers."
+version = "6.2.10"
+description = "Cross-cloud GPU orchestration CLI."
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
