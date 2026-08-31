@@ -281,3 +281,27 @@ async def _handle_datadog_metric_catalog(arguments, cmd_args, tool_name, execute
     return cmd_args
 
 HANDLERS['datadog_metric_catalog'] = _handle_datadog_metric_catalog
+
+async def _handle_kv_cache_efficiency(arguments, cmd_args, tool_name, execute_terradev_command):
+    try:
+        from terradev_cli.core.inference_router import InferenceRouter
+
+        router = InferenceRouter()
+        endpoint_id = arguments.get("endpoint_id")
+        if endpoint_id:
+            result = router.get_kv_cache_stats(endpoint_id)
+        else:
+            result = router.get_kv_cache_summary()
+        output_text = "📦 **KV Cache Efficiency**\n\n"
+        output_text += (
+            "Avoided tokens = total prompt tokens - cached tokens. "
+            "This is the non-gameable cache-efficiency metric.\n\n"
+        )
+        output_text += f"```json\n{json.dumps(result, indent=2)}\n```"
+        return CallToolResult(content=[TextContent(type="text", text=output_text)])
+    except Exception as e:  # noqa: BLE001
+        return CallToolResult(
+            content=[TextContent(type="text", text=f"❌ {e}")], isError=True
+        )
+
+HANDLERS['kv_cache_efficiency'] = _handle_kv_cache_efficiency

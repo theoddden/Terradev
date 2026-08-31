@@ -52,6 +52,11 @@ class LMCacheConfig:
     enable_pipelined_backend: bool = False
     enable_debug: bool = False
 
+    # Engine / model properties for comparable KV cache metrics
+    engine: str = "vllm"  # vllm, sglang, or other
+    block_size: int = 256  # KV block size in tokens; model-dependent
+    prompt_tokens_key: str = "prompt_tokens"  # counter key to read from engine
+
 
 class LMCacheService:
     """LMCache integration service for Terradev vLLM deployments"""
@@ -72,8 +77,12 @@ class LMCacheService:
                 f"--lmcache-backend={self.config.backend}",
                 f"--lmcache-chunk-size={self.config.chunk_size}",
                 f"--lmcache-remote-serde={self.config.serde}",
+                f"--lmcache-block-size={self.config.block_size}",
             ]
         )
+
+        # Engine tag for cache metrics normalization
+        args.append(f"--engine={self.config.engine}")
 
         # Backend-specific configuration
         if self.config.backend == "redis":

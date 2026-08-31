@@ -33,21 +33,26 @@ class PrefixCacheIndex:
     """
     Tracks which endpoints hold warm KV caches for specific prompt prefixes.
 
-    Inspired by llm-d's KV cache-aware routing (Red Hat/IBM/Google, Oct 2025).
-    Routes requests to the pod most likely to have the prefix cached in GPU
-    memory, avoiding redundant prefill computation.
+    Also accounts for *uncached tokens* — the residual prefill work that a
+    request still requires. Unlike cache hit rate, this cannot be gamed by
+    an optimizer that re-requests hot prefixes to inflate hits: a re-request
+    that is fully cached adds the same number to `total` and `cached`, so
+    `total - cached` stays the same.
 
-    Performance:
-      - O(1) hash lookup per route decision
-      - LRU eviction keeps memory bounded
-      - Prefix hashing uses first N tokens for fast comparison
+    Per-engine `block_size` is stored and enforced so vLLM and SGLang metrics
+    can be compared fairly: a prefix shorter than one KV block cannot be hit.
     """
 
     def __init__(self, max_entries: int = 10_000, prefix_tokens: int = 64):
         self._max_entries = max_entries
         self._prefix_tokens = prefix_tokens
-        # prefix_hash -> {endpoint_id: last_seen_timestamp}
-        self._index: OrderedDict[str, Dict[str, float]] = OrderedDict()
+        # prefix_hash -> {endpoint_id: (last_seen_timestamp, cached_token_count)}
+        self._index: OrderedDict[str, Dict[str, Tuple[float, int]]] = OrderedDict()
+        # endpoint_id -> {
+        #   total_prompt_tokens, cached_prompt_tokens, total_lookups,
+        #   total_hits, engine, block_size
+        # }
+        self._stats: Dict[str, Dict[str, Any]] = {}
 
     def _hash_prefix(self, text: str) -> str:
         """Hash the first N whitespace-delimited tokens of a prompt."""
@@ -55,24 +60,89 @@ class PrefixCacheIndex:
         prefix = " ".join(tokens)
         return hashlib.blake2b(prefix.encode(), digest_size=16).hexdigest()
 
-    def record(self, text: str, endpoint_id: str):
-        """Record that an endpoint processed (and cached) this prefix."""
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        """Best-effort token count from whitespace-delimited words."""
+        if not text:
+            return 0
+        # A very rough rule: 0.75 tokens per word for English text.
+        return max(1, int(len(text.split()) * 0.75))
+
+    def record(
+        self,
+        text: str,
+        endpoint_id: str,
+        token_count: Optional[int] = None,
+        cached_token_count: Optional[int] = None,
+        engine: Optional[str] = None,
+        block_size: Optional[int] = None,
+    ):
+        """Record that an endpoint processed this prefix.
+
+        Args:
+            token_count: Total prompt tokens in the request.
+            cached_token_count: How many of those tokens were served from cache.
+                For a cache miss/prime this is 0. For a full cache hit it equals
+                token_count. For a partial hit it is the matched prefix length.
+        """
         h = self._hash_prefix(text)
+        total = token_count if token_count is not None else self._estimate_tokens(text)
+        cached = cached_token_count if cached_token_count is not None else 0
+
+        # How many tokens of this prefix are actually stashed in the endpoint's
+        # KV cache? For a hit/partial hit it is the matched portion. For a miss
+        # that primes the cache it is the whole prompt, but only if the prompt
+        # is at least one KV block (otherwise the engine can not store it).
+        block_size_for_record = block_size or 0
+        if cached > 0:
+            available = cached
+        elif block_size_for_record == 0 or total >= block_size_for_record:
+            available = total
+        else:
+            available = 0
+
         if h in self._index:
             self._index.move_to_end(h)
-            self._index[h][endpoint_id] = time.monotonic()
+            prev = self._index[h].get(endpoint_id, (0.0, 0))[1]
+            self._index[h][endpoint_id] = (time.monotonic(), max(available, prev))
         else:
-            self._index[h] = {endpoint_id: time.monotonic()}
+            self._index[h] = {endpoint_id: (time.monotonic(), available)}
+
         # LRU eviction
         while len(self._index) > self._max_entries:
             self._index.popitem(last=False)
 
-    def lookup(self, text: str, max_age_s: float = 300.0) -> List[Tuple[str, float]]:
+        # Per-endpoint stats
+        stats = self._stats.setdefault(
+            endpoint_id,
+            {
+                "total_prompt_tokens": 0,
+                "cached_prompt_tokens": 0,
+                "total_lookups": 0,
+                "total_hits": 0,
+                "engine": engine or "unknown",
+                "block_size": block_size or 0,
+            },
+        )
+        if engine:
+            stats["engine"] = engine
+        if block_size:
+            stats["block_size"] = block_size
+        stats["total_prompt_tokens"] += total
+        stats["cached_prompt_tokens"] += min(cached, total)
+
+    def lookup(
+        self,
+        text: str,
+        max_age_s: float = 300.0,
+        token_count: Optional[int] = None,
+    ) -> List[Tuple[str, float, int]]:
         """
         Find endpoints that likely have this prefix cached.
 
-        Returns list of (endpoint_id, freshness_score) sorted by freshness.
+        Returns list of (endpoint_id, freshness_score, cached_tokens) sorted by freshness.
         freshness_score: 1.0 = just seen, 0.0 = about to expire.
+        cached_tokens: number of tokens in the matched prefix that can be reused.
         """
         h = self._hash_prefix(text)
         entry = self._index.get(h)
@@ -81,11 +151,33 @@ class PrefixCacheIndex:
 
         now = time.monotonic()
         results = []
-        for eid, ts in entry.items():
+        prompt_tokens = token_count if token_count is not None else self._estimate_tokens(text)
+
+        for eid, (ts, stored_cached) in entry.items():
             age = now - ts
-            if age <= max_age_s:
-                freshness = 1.0 - (age / max_age_s)
-                results.append((eid, freshness))
+            if age > max_age_s:
+                continue
+
+            stats = self._stats.get(eid)
+            block_size = stats.get("block_size", 0) if stats else 0
+
+            # A prefix cache cannot reuse a prefix shorter than one KV block.
+            if block_size > 0 and prompt_tokens < block_size:
+                continue
+
+            # Reusable tokens are the overlap between the stored cached prefix
+            # and the current prompt, capped by the current prompt length.
+            freshness = 1.0 - (age / max_age_s)
+            cached_tokens = min(stored_cached, prompt_tokens)
+            if cached_tokens <= 0:
+                continue
+
+            results.append((eid, freshness, cached_tokens))
+            if stats:
+                stats["total_lookups"] += 1
+                stats["total_hits"] += 1
+                stats["total_prompt_tokens"] += prompt_tokens
+                stats["cached_prompt_tokens"] += cached_tokens
 
         results.sort(key=lambda x: x[1], reverse=True)
         return results
@@ -96,10 +188,85 @@ class PrefixCacheIndex:
             self._index[h].pop(endpoint_id, None)
             if not self._index[h]:
                 del self._index[h]
+        self._stats.pop(endpoint_id, None)
+
+    def get_stats(self, endpoint_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get per-endpoint cache stats, including uncached (residual) tokens."""
+        if endpoint_id:
+            s = self._stats.get(endpoint_id)
+            if not s:
+                return {}
+            total = s["total_prompt_tokens"]
+            cached = s["cached_prompt_tokens"]
+            uncached = max(0, total - cached)
+            return {
+                "endpoint_id": endpoint_id,
+                "engine": s["engine"],
+                "block_size": s["block_size"],
+                "total_prompt_tokens": total,
+                "cached_prompt_tokens": cached,
+                "uncached_tokens": uncached,
+                "uncached_ratio": uncached / total if total > 0 else 0.0,
+                "lookup_count": s["total_lookups"],
+                "hit_count": s["total_hits"],
+            }
+
+        summary = {}
+        for eid, s in self._stats.items():
+            summary[eid] = self.get_stats(eid)
+        return summary
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Get aggregate stats across all endpoints."""
+        total_prompt = 0
+        total_cached = 0
+        by_engine: Dict[str, Dict[str, int]] = {}
+
+        for eid, s in self._stats.items():
+            total = s["total_prompt_tokens"]
+            cached = s["cached_prompt_tokens"]
+            uncached = max(0, total - cached)
+            total_prompt += total
+            total_cached += cached
+
+            engine = s["engine"]
+            engine_stats = by_engine.setdefault(
+                engine, {"total_prompt_tokens": 0, "cached_prompt_tokens": 0, "endpoints": 0}
+            )
+            engine_stats["total_prompt_tokens"] += total
+            engine_stats["cached_prompt_tokens"] += cached
+            engine_stats["endpoints"] += 1
+
+        uncached = max(0, total_prompt - total_cached)
+        return {
+            "total_prompt_tokens": total_prompt,
+            "cached_prompt_tokens": total_cached,
+            "uncached_tokens": uncached,
+            "uncached_ratio": uncached / total_prompt if total_prompt > 0 else 0.0,
+            "endpoints_tracked": len(self._stats),
+            "by_engine": {
+                engine: {
+                    "total_prompt_tokens": stats["total_prompt_tokens"],
+                    "cached_prompt_tokens": stats["cached_prompt_tokens"],
+                    "uncached_tokens": max(0, stats["total_prompt_tokens"] - stats["cached_prompt_tokens"]),
+                    "endpoints": stats["endpoints"],
+                }
+                for engine, stats in by_engine.items()
+            },
+        }
+
+    def reset_stats(self):
+        """Reset all cache accounting while keeping the prefix index."""
+        for s in self._stats.values():
+            s["total_prompt_tokens"] = 0
+            s["cached_prompt_tokens"] = 0
+            s["total_lookups"] = 0
+            s["total_hits"] = 0
 
     @property
     def size(self) -> int:
         return len(self._index)
+
 
 
 class EndpointHealth(Enum):
@@ -463,6 +630,9 @@ class InferenceRouter:
 
         # KV prefix cache index — routes to pods with warm caches
         self._prefix_cache = PrefixCacheIndex()
+
+        # Metrics collector for avoided-token accounting (lazy init)
+        self._metrics_collector: Optional[Any] = None
 
         # Disaggregated prefill/decode handoff tracker
         self._pd_tracker = PrefillDecodeTracker()
@@ -946,10 +1116,13 @@ class InferenceRouter:
 
         # Check prefix cache for a warm-cache boost
         cache_boost: Dict[str, float] = {}
+        cached_by_endpoint: Dict[str, int] = {}
         if query_text:
-            hits = self._prefix_cache.lookup(query_text)
-            for eid, freshness in hits:
+            token_count = query.get("prompt_tokens") or PrefixCacheIndex._estimate_tokens(query_text)
+            hits = self._prefix_cache.lookup(query_text, token_count=token_count)
+            for eid, freshness, cached_tokens in hits:
                 cache_boost[eid] = freshness
+                cached_by_endpoint[eid] = cached_tokens
 
         if strategy == "latency":
             candidates.sort(
@@ -982,7 +1155,19 @@ class InferenceRouter:
         best = candidates[0]
         # Record prefix for future lookups
         if query_text:
-            self._prefix_cache.record(query_text, best.endpoint_id)
+            token_count = query.get("prompt_tokens") or PrefixCacheIndex._estimate_tokens(query_text)
+            ep = self.endpoints.get(best.endpoint_id)
+            engine = ep.provider if ep else "unknown"
+            block_size = query.get("block_size") or 0
+            cached = cached_by_endpoint.get(best.endpoint_id, 0)
+            self._prefix_cache.record(
+                query_text,
+                best.endpoint_id,
+                token_count=token_count,
+                cached_token_count=cached,
+                engine=engine,
+                block_size=block_size,
+            )
         return best
 
     def _route_with_signals(self, query: Dict) -> Optional[InferenceEndpoint]:
@@ -1104,7 +1289,8 @@ class InferenceRouter:
         if query:
             text = query.get("content") or query.get("prompt") or ""
             if text:
-                for eid, freshness in self._prefix_cache.lookup(text):
+                token_count = query.get("prompt_tokens") or PrefixCacheIndex._estimate_tokens(text)
+                for eid, freshness, _cached in self._prefix_cache.lookup(text, token_count=token_count):
                     cache_boost[eid] = freshness
 
         candidates.sort(
@@ -1232,7 +1418,18 @@ class InferenceRouter:
         if prefill_ep and query:
             text = query.get("content") or query.get("prompt") or ""
             if text:
-                self._prefix_cache.record(text, prefill_ep.endpoint_id)
+                token_count = query.get("prompt_tokens") or PrefixCacheIndex._estimate_tokens(text)
+                ep = self.endpoints.get(prefill_ep.endpoint_id)
+                engine = ep.provider if ep else "unknown"
+                block_size = query.get("block_size") or 0
+                self._prefix_cache.record(
+                    text,
+                    prefill_ep.endpoint_id,
+                    token_count=token_count,
+                    cached_token_count=0,
+                    engine=engine,
+                    block_size=block_size,
+                )
 
         return (prefill_ep, decode_ep)
 
@@ -1401,3 +1598,38 @@ class InferenceRouter:
             "unhealthy": total - healthy,
             "endpoints": endpoints,
         }
+
+    def record_kv_cache(
+        self,
+        endpoint_id: str,
+        total_prompt_tokens: int,
+        cached_prompt_tokens: int,
+        engine: Optional[str] = None,
+        block_size: Optional[int] = None,
+    ):
+        """Record explicit KV cache counters from an engine."""
+        stats = self._prefix_cache._stats.setdefault(
+            endpoint_id,
+            {
+                "total_prompt_tokens": 0,
+                "cached_prompt_tokens": 0,
+                "total_lookups": 0,
+                "total_hits": 0,
+                "engine": engine or "unknown",
+                "block_size": block_size or 0,
+            },
+        )
+        if engine:
+            stats["engine"] = engine
+        if block_size:
+            stats["block_size"] = block_size
+        stats["total_prompt_tokens"] += total_prompt_tokens
+        stats["cached_prompt_tokens"] += min(cached_prompt_tokens, total_prompt_tokens)
+
+    def get_kv_cache_summary(self) -> Dict[str, Any]:
+        """Return avoided-token summary for all tracked endpoints."""
+        return self._prefix_cache.get_summary()
+
+    def get_kv_cache_stats(self, endpoint_id: Optional[str] = None) -> Dict[str, Any]:
+        """Return per-endpoint avoided-token stats."""
+        return self._prefix_cache.get_stats(endpoint_id)
