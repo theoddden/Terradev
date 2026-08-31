@@ -1,4 +1,4 @@
-# Terradev-cli 6.2.11
+# Terradev-cli 6.2.12
 
 **Cross-cloud GPU orchestration CLI.**
 

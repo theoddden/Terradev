@@ -7,13 +7,13 @@
     "url": "https://github.com/theoddden/Terradev",
     "source": "github"
   },
-  "version": "6.2.11",
+  "version": "6.2.12",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "terradev-cli",
-      "version": "6.2.11",
+      "version": "6.2.12",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
@@ -31,25 +31,25 @@
       "environmentVariables": [
         {
           "name": "RUNPOD_API_KEY",
-          "description": "RunPod API key — get at runpod.io/console/settings/api-keys",
+          "description": "RunPod API key \u2014 get at runpod.io/console/settings/api-keys",
           "isRequired": false,
           "isSecret": true
         },
         {
           "name": "VAST_API_KEY",
-          "description": "Vast.ai API key — get at console.vast.ai/api-keys",
+          "description": "Vast.ai API key \u2014 get at console.vast.ai/api-keys",
           "isRequired": false,
           "isSecret": true
         },
         {
           "name": "LAMBDA_API_KEY",
-          "description": "Lambda Labs API key — get at cloud.lambdalabs.com/api-keys",
+          "description": "Lambda Labs API key \u2014 get at cloud.lambdalabs.com/api-keys",
           "isRequired": false,
           "isSecret": true
         },
         {
           "name": "HF_TOKEN",
-          "description": "HuggingFace API token — get at huggingface.co/settings/tokens",
+          "description": "HuggingFace API token \u2014 get at huggingface.co/settings/tokens",
           "isRequired": false,
           "isSecret": true
         },
