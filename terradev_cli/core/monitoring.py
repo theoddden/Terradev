@@ -24,6 +24,36 @@ class MetricsCollector:
     def increment(self, name: str, tags: Optional[Dict[str, str]] = None) -> None:
         self.record(name, 1.0, tags)
 
+
+    def record_kv_cache(
+        self,
+        endpoint_id: str,
+        engine: str,
+        block_size: int,
+        total_prompt_tokens: int,
+        cached_prompt_tokens: int,
+    ) -> None:
+        """Record KV cache avoided-token metrics.
+
+        Avoided tokens = total - cached. Unlike hit rate, this cannot be
+        gamed by an optimizer that re-requests hot prefixes to inflate hits.
+        """
+        uncached = max(0, total_prompt_tokens - cached_prompt_tokens)
+        tags = {
+            "endpoint_id": endpoint_id,
+            "engine": engine,
+            "block_size": str(block_size),
+        }
+        self.record("kv.prompt_tokens.total", float(total_prompt_tokens), tags)
+        self.record("kv.prompt_tokens.cached", float(cached_prompt_tokens), tags)
+        self.record("kv.prompt_tokens.uncached", float(uncached), tags)
+        if total_prompt_tokens > 0:
+            self.record(
+                "kv.cache.uncached_ratio",
+                uncached / total_prompt_tokens,
+                tags,
+            )
+
     def get_metrics(self) -> List[Dict[str, Any]]:
         return list(self._metrics)
 

@@ -1833,3 +1833,55 @@ def _kubectl_apply(manifest_dict: Dict[str, Any], dry_run: bool = False) -> bool
         finally:
             os.unlink(f.name)
 
+
+
+@orchestrator.command("cache-metrics")
+@click.option("--endpoint-id", help="Filter to a specific endpoint")
+@click.option("--reset/--no-reset", default=False, help="Reset accounting after report")
+def orchestrator_cache_metrics(endpoint_id, reset):
+    """Show KV cache avoided-token metrics.
+
+    Reports total prompt tokens, cached tokens, and avoided tokens (the
+    work actually saved). Avoided tokens is the preferred cache-efficiency
+    metric because it cannot be gamed by self-warming optimizers.
+    """
+    from terradev_cli.core.inference_router import InferenceRouter
+
+    router = InferenceRouter()
+    if endpoint_id:
+        stats = router.get_kv_cache_stats(endpoint_id)
+        rows = [stats] if stats else []
+    else:
+        stats = router.get_kv_cache_summary()
+        rows = list(router.get_kv_cache_stats().values())
+
+    click.echo("\nKV Cache Efficiency")
+    click.echo("-" * 70)
+    click.echo(f"{'Endpoint':<24} {'Engine':<10} {'Block':<8} {'Total':>10} {'Cached':>10} {'Uncached':>10} {'Rate':>7}")
+    click.echo("-" * 70)
+    for r in rows:
+        if not r:
+            continue
+        rate = r.get("uncached_ratio", 0.0)
+        click.echo(
+            f"{r.get('endpoint_id', '-'):<24} "
+            f"{r.get('engine', '-'):<10} "
+            f"{r.get('block_size', 0):<8} "
+            f"{r.get('total_prompt_tokens', 0):>10} "
+            f"{r.get('cached_prompt_tokens', 0):>10} "
+            f"{r.get('uncached_tokens', 0):>10} "
+            f"{rate:>6.1%}"
+        )
+
+    if not rows:
+        click.echo("  No cache data yet. Run inference through the orchestrator first.")
+    else:
+        click.echo("-" * 70)
+        click.echo(
+            f"Total uncached (residual work) tokens: {stats.get('uncached_tokens', 0):,} "
+            f"({stats.get('uncached_ratio', 0.0):.1%} uncached ratio)"
+        )
+
+    if reset:
+        router._prefix_cache.reset_stats()
+        click.echo("\nCache accounting reset.")
