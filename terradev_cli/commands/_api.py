@@ -1031,12 +1031,6 @@ def run_interactive_onboarding(api: TerradevAPI):
         click.echo("   2. Then try: terradev quote -g A100")
 
     click.echo()
-    click.echo("NEED HELP?")
-    click.echo("   Documentation: https://github.com/theoddden/terradev")
-    click.echo("   Support: team@terradev.com")
-    click.echo("   Quick start guide: https://github.com/theoddden/terradev#quick-start")
-
-    click.echo()
     click.echo("WELCOME TO TERRADEV! Happy GPU hunting!")
     click.echo("=" * 70)
     click.echo()
