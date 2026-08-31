@@ -239,19 +239,19 @@ async def _ensure_tools_loaded():
         logger.info(f"Loaded {len(_ALL_TOOLS)} tools successfully")
 
 
-# Import Rust-based optimizer for tool compression and parallel dispatch
+# Import compiled MCP optimizer for tool compression and parallel dispatch
 try:
-    from terradev_mcp_optimizer import MCPOptimizer as RustMCPOptimizer
+    from terradev_mcp_optimizer import MCPOptimizer
 
-    optimizer = RustMCPOptimizer(
+    optimizer = MCPOptimizer(
         enable_compression=True, strip_optional=True, enable_parallel=True
     )
-    logger.info("Using Rust-based MCPOptimizer for 10-50x faster tool compression")
+    logger.info("Using MCPOptimizer for 10-50x faster tool compression")
 except ImportError:
     # Python fallback implementation
     optimizer = None
     logger.warning(
-        "Rust MCPOptimizer not available, using Python fallback (install Rust and build for 10-50x speedup)"
+        "MCPOptimizer not available, using Python fallback"
     )
 
 # ── Pre-compiled Tool Schemas (built once at module load) ────────────────────

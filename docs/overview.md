@@ -78,7 +78,7 @@ Multi-tenant serving uses LoRA adapters — multiple fine-tuned variants loaded 
 Terradev can create and destroy topology-optimized Kubernetes clusters with Karpenter for GPU node auto-provisioning. The Karpenter NodePools are pre-configured with NUMA-aware kubelet Topology Manager settings so every node that spins up gets the same correct configuration as a manually provisioned instance.
 
 ### MCP Server
-Terradev runs an MCP (Model Context Protocol) server that exposes all of its capabilities as tools to language models. Claude, Cursor, and Windsurf can call `terradev mcp serve` and then autonomously provision GPUs, launch training jobs, deploy inference endpoints, and manage infrastructure through a conversation. The MCP server is written in Rust for low-overhead tool call routing.
+Terradev runs an MCP (Model Context Protocol) server that exposes all of its capabilities as tools to language models. Claude, Cursor, and Windsurf can call `terradev mcp serve` and then autonomously provision GPUs, launch training jobs, deploy inference endpoints, and manage infrastructure through a conversation. The MCP server provides low-overhead tool call routing.
 
 ### ML Platform Integrations
 Terradev has native integrations for: Weights & Biases, MLflow, LangSmith, Langfuse, Arize Phoenix, Databricks, and HuggingFace Spaces. These surface as CLI command groups (`terradev wandb`, `terradev langfuse`, etc.) and as MCP tools.
@@ -96,7 +96,7 @@ All three deploy onto Kubernetes via the same `k8s` subcommand pattern.
 
 ## What "3–5x Faster" Means
 
-The headline refers to provisioning speed, not inference speed. Terradev provisions all nodes in parallel using a Rust DAG orchestrator. Sequential provisioning (the default when you use cloud UIs or most CLIs) starts node 2 after node 1 is ready. Parallel provisioning starts all nodes simultaneously. For a 4-node cluster, that's roughly 4x the wall-clock time saved.
+The headline refers to provisioning speed, not inference speed. Terradev provisions all nodes in parallel using a DAG orchestrator. Sequential provisioning (the default when you use cloud UIs or most CLIs) starts node 2 after node 1 is ready. Parallel provisioning starts all nodes simultaneously. For a 4-node cluster, that's roughly 4x the wall-clock time saved.
 
 The DAG enforces correct sequencing for operations that have actual dependencies (e.g., dataset staging must complete before training launches) while parallelizing everything else.
 
@@ -115,7 +115,7 @@ The DAG enforces correct sequencing for operations that have actual dependencies
 
 - Apache 2.0 license — free for commercial and personal use
 - Paywall removed in v5.0.0; tier system deprecated
-- Rust acceleration introduced in v5.0.0 for DAG orchestration, local GPU scanning, and MCP server
+- DAG orchestration, local GPU scanning, and MCP server introduced in v5.0.0
 - FlashOptim auto-injection added in v5.1.x
 - 19 providers at v4.x; expanded to 21 in v5.x
 

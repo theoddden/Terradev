@@ -2,7 +2,7 @@
 
 ## Overview
 
-Terradev is an imperative CLI for AI workload orchestration. It provisions topology-optimized GPU instances across 21+ cloud providers, launches distributed training jobs with automatic FlashOptim injection, and deploys inference stacks (vLLM, MoE templates, disaggregated prefill/decode, RAG) — all orchestrated via a Rust-based MCP server with 217 tools for Claude Code and other AI agents.
+Terradev is an imperative CLI for AI workload orchestration. It provisions topology-optimized GPU instances across 21+ cloud providers, launches distributed training jobs with automatic FlashOptim injection, and deploys inference stacks (vLLM, MoE templates, disaggregated prefill/decode, RAG) — all orchestrated via an MCP server with 217 tools for Claude Code and other AI agents.
 
 ## System Layers
 
@@ -12,7 +12,7 @@ Terradev is an imperative CLI for AI workload orchestration. It provisions topol
 └──────────────────────┬──────────────────────────────┘
                        │ MCP protocol (JSON-RPC 2.0)
 ┌──────────────────────▼──────────────────────────────┐
-│  Rust MCP Orchestrator  (terradev-mcp)               │
+│  MCP Orchestrator       (terradev-mcp)               │
 │  217 tools · DAG sequencing · idempotency guarantees │
 └──────────────────────┬──────────────────────────────┘
                        │ Python interop / subprocess
@@ -33,7 +33,7 @@ Terradev is an imperative CLI for AI workload orchestration. It provisions topol
 
 ## Core Components
 
-### 1. Rust MCP Orchestrator (`terradev-mcp`)
+### 1. MCP Orchestrator (`terradev-mcp`)
 
 - **Protocol**: JSON-RPC 2.0 over stdio (MCP spec)
 - **Tools**: 168 Tool() definitions with full JSON Schema validation
@@ -123,7 +123,7 @@ terradev provision --task clusters/moe-template/task.yaml
 ### MCP Tool Call
 ```
 Agent: tool_call("provision_gpu", {...})
-  → Rust MCP router
+  → MCP router
   → command_map["provision_gpu"]
   → Python CLI handler (async)
   → BaseProvider.provision() + NUMA topology
@@ -161,7 +161,7 @@ Terradev/
 │   ├── moe-template/               — MoE deployment (all opts auto-applied)
 │   ├── rag-template/               — Qdrant + Phoenix + Guardrails
 │   └── glm-5/
-├── rust/                           — Rust accelerators + NVML bindings
+├── rust/                           — accelerators + NVML bindings
 ├── terradev-mcp/
 │   └── terradev_mcp.py             — 217-tool MCP server
 └── docs/

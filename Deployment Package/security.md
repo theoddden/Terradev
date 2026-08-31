@@ -156,7 +156,7 @@ The MCP server (`terradev mcp serve`) runs as a local subprocess communicating o
 
 **Scope of access:** The MCP server has full access to all Terradev capabilities — provisioning, termination, data staging, training launch. Treat it with the same trust level as direct CLI access.
 
-**Agent guardrails:** The Rust DAG orchestrator enforces idempotency and correct sequencing, but does not apply policy controls on what an agent can do. If you're running agents autonomously:
+**Agent guardrails:** The DAG orchestrator enforces idempotency and correct sequencing, but does not apply policy controls on what an agent can do. If you're running agents autonomously:
 
 - Use read-only credentials where possible for initial exploration
 - Set `--max-price` ceilings on provision operations

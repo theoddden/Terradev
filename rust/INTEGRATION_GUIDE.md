@@ -10,35 +10,6 @@ The Rust modules are designed to be drop-in replacements for existing Python imp
 
 ### Compute-Intensive Modules
 
-#### 1. DAG Executor (terradev-dag-executor)
-**Purpose**: High-performance directed acyclic graph execution with topological wave parallelism
-
-**File**: `terradev_cli/core/dag_executor.py`
-
-```python
-# Add at top
-try:
-    from terradev_dag_executor import DAGExecutor as RustDAGExecutor
-    USE_RUST_DAG = True
-except ImportError:
-    USE_RUST_DAG = False
-
-# Usage
-if USE_RUST_DAG:
-    dag = RustDAGExecutor(name="signal_extraction", max_workers=6)
-else:
-    dag = DAGExecutor(max_workers=6, name="signal_extraction")
-
-# Add nodes
-dag.add_node("gpu_enum", enumerate_gpus_fn)
-dag.add_node("nic_enum", enumerate_nics_fn)
-
-# Execute
-result = dag.apply(initial_context={"config": config})
-```
-
-**Performance**: 5-10x faster for large DAGs (100+ nodes)
-
 #### 2. Price Intelligence (terradev-price-intelligence)
 **Purpose**: Vectorized price statistics and trend analysis
 

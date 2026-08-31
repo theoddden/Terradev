@@ -12,7 +12,7 @@ https://terradev.cloud/
 
 Terradev is a cross-cloud compute control plane for AI workloads, not just a provisioning wrapper. 
 
-Combines quoting, provisioning, topology optimization, training orchestration, inference tuning, and cost analytics in one CLI, with a Rust-accelerated idempotent runtime underneath.
+Combines quoting, provisioning, topology optimization, training orchestration, inference tuning, and cost analytics in one CLI, with an accelerated idempotent runtime underneath.
 
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
@@ -148,11 +148,11 @@ terradev configure --provider e2enetworks
 
 **NOTES ON 5.0.0**
 
-We removed the paywall, open-sourced Terradev, and added Rust accelerators for safe and snappy delivery...
+We removed the paywall, open-sourced Terradev, and added accelerators for safe and snappy delivery...
 
-With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. You or the agent can issue commands freely... the orchestrator ensures they're safe to execute.
+With the DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. You or the agent can issue commands freely... the orchestrator ensures they're safe to execute.
 
-217 tools not including subcommand/flags require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 17 cloud providers, that compounds across every tool call in the chain.
+217 tools not including subcommand/flags require heavy context. The MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 17 cloud providers, that compounds across every tool call in the chain.
 
 ## BYOAPI Configuration
 

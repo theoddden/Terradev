@@ -14,7 +14,7 @@
               │                         │
               ▼                         ▼
 ┌─────────────────────┐   ┌────────────────────────────────────┐
-│  Python CLI         │   │  Rust MCP Orchestrator             │
+│  Python CLI         │   │  MCP Orchestrator                  │
 │  (terradev_cli/     │   │  (terradev-mcp/terradev_mcp.py)    │
 │   cli.py)           │   │                                    │
 │  Click command tree │   │  217 tools · JSON-RPC 2.0 stdio   │
@@ -63,14 +63,14 @@
 
 ## Component Detail
 
-### Rust MCP Orchestrator
+### MCP Orchestrator
 
 The MCP server is the interface for AI agents. It runs as a subprocess that Claude/Cursor/Windsurf connect to via the MCP protocol (JSON-RPC 2.0 over stdio).
 
 - **217 tools** — every Terradev capability exposed as a structured tool with JSON Schema parameter validation
 - **DAG execution** — the orchestrator builds a dependency graph for multi-step workflows and enforces correct sequencing. An agent can issue `provision_gpu` and `launch_training` simultaneously; the orchestrator ensures training doesn't start until provisioning completes
 - **Idempotency** — duplicate tool calls for the same resource are detected and short-circuited
-- **Performance** — Rust deserialization/routing adds <1ms overhead per call vs ~50ms for Python MCP servers. Across a 50-step agent workflow this is the difference between 50ms and 2,500ms of pure overhead
+- **Performance** — deserialization/routing adds <1ms overhead per call vs ~50ms for Python MCP servers. Across a 50-step agent workflow this is the difference between 50ms and 2,500ms of pure overhead
 
 ### Provider Layer
 
@@ -397,7 +397,7 @@ terradev provision --gpu a100 --count 1
 ```
 terradev local scan
        │
-       ├── Rust NVML bindings (primary, 5-10x faster than nvidia-smi)
+       ├── NVML bindings (primary, 5-10x faster than nvidia-smi)
        │     ├── GPU model, VRAM, PCIe bus ID, NUMA affinity
        │     ├── Utilization, temperature, power draw
        │     ├── Driver version, CUDA version, compute capability
@@ -530,7 +530,7 @@ terradev_cli/
     cost_tracker.py             Spend tracking
     price_intelligence.py       Spot market analytics + ML
     trace_viewer.py             Phoenix span tree renderer
-    dag_executor.py             Wave-parallel DAG execution (Rust-backed)
+    dag_executor.py             Wave-parallel DAG execution (Python)
     parallel_provisioner.py     Multi-cloud parallel provisioning
     warm_pool_manager.py        Pre-warming strategies for bursty workloads
     inference_router.py         KV prefix-aware routing + auto-failover
@@ -554,7 +554,7 @@ clusters/
   moe-template/                 MoE K8s + Helm (all opts auto-applied)
   rag-template/                 Qdrant + Phoenix + Guardrails
   glm-5/                        GLM-5 production templates
-rust/                           NVML bindings, DAG orchestrator, MCP codec
+rust/                           NVML bindings and MCP codec
 terradev-mcp/
   terradev_mcp.py               304-tool MCP server (~8,700 lines)
 ```

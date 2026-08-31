@@ -11,7 +11,7 @@ https://terradev.cloud/
 
 Terradev is a cross-cloud compute control plane for AI workloads, not just a provisioning wrapper. 
 
-Combines quoting, provisioning, topology optimization, training orchestration, inference tuning, and cost analytics in one CLI, with a Rust-accelerated idempotent runtime underneath.
+Combines quoting, provisioning, topology optimization, training orchestration, inference tuning, and cost analytics in one CLI, with an accelerated idempotent runtime underneath.
 
 Continued focus on lower cost, faster provisioning, and topology-aware execution with local credential storage.
 
@@ -50,7 +50,7 @@ Model agnostic. Dataset agnostic. GPU agnostic. Provider agnostic. The only thin
   - `terradev train dpo --base-checkpoint <sft-ckpt> --data <pairs> --algorithm <dpo|simpo|kto|orpo>`
   - `terradev train grpo --base-checkpoint <dpo-ckpt> --data <prompts> --framework <unsloth|openrlhf|trl>`
   - `terradev train pipeline --config examples/training_pipeline.yaml`
-- `terradev_cli/core/training_stages.py` and `terradev_cli/core/training_pipeline.py` provide declarative SFT / DPO / GRPO stage configs, provider-aware quote selection, auto-provisioning, checkpoint handoff, and DAG sequencing via the Rust/Py `DAGExecutor`.
+- `terradev_cli/core/training_stages.py` and `terradev_cli/core/training_pipeline.py` provide declarative SFT / DPO / GRPO stage configs, provider-aware quote selection, auto-provisioning, checkpoint handoff, and DAG sequencing via the Python `DAGExecutor`.
 - `TrainingOrchestrator` now supports multi-node remote SSH launch and end-to-end completion tracking. Training scripts and embedded configs are staged to every node and the master process is polled until the job finishes.
 - Unsloth GRPO uses the native `unsloth.GRPOTrainer` with a default rule-based reward instead of a TRL fallback.
 - CLI-style frameworks (`axolotl`, `llama-factory`, `ms-swift`, `trl`, `openrlhf`) are wrapped in self-contained Python scripts that write their embedded config files at runtime, so they are safe to copy to remote nodes.
@@ -204,11 +204,11 @@ terradev configure --provider e2enetworks
 
 **NOTES ON 5.0.0**
 
-We removed the paywall, open-sourced Terradev, and added Rust accelerators for safe and snappy delivery...
+We removed the paywall, open-sourced Terradev, and added accelerators for safe and snappy delivery...
 
-With the Rust DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. You or the agent can issue commands freely... the orchestrator ensures they're safe to execute.
+With the DAG orchestrator, the execution graph enforces correct sequencing and idempotency at the runtime level. You or the agent can issue commands freely... the orchestrator ensures they're safe to execute.
 
-217 tools not including subcommand/flags require heavy context. The Rust MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 17 cloud providers, that compounds across every tool call in the chain.
+217 tools not including subcommand/flags require heavy context. The MCP orchestrator processes tool calls with minimal overhead: deserializing, routing, executing, and responding faster than pure-Python-based MCP servers by an order of magnitude. For an agent running a complex provisioning workflow across 17 cloud providers, that compounds across every tool call in the chain.
 
 ## BYOAPI Configuration
 

@@ -105,7 +105,7 @@ jobs:
       run: bash scripts/build_rust.sh --dev
 
     - name: Verify imports
-      run: python -c "import terradev_dag_executor; import terradev_credential_vault; import terradev_gpu_topology; import terradev_semantic_router; print('All Rust extensions imported successfully')"
+      run: python -c "import terradev_credential_vault; import terradev_gpu_topology; import terradev_semantic_router; print('All Rust extensions imported successfully')"
 
   # === Unit Tests (Linux) ===
   test-linux:

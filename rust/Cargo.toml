@@ -21,7 +21,6 @@ members = [
     "terradev-mcp-optimizer",
     "terradev-command-executor",
     "terradev-gpu-discovery",
-    "terradev-dag-executor",
     "terradev-price-intelligence",
     "terradev-cost-scaler",
     "terradev-semantic-router",

@@ -76,7 +76,7 @@ Multi-tenant serving uses LoRA adapters — multiple fine-tuned variants loaded 
 Terradev creates and destroys topology-optimized Kubernetes clusters with Karpenter for GPU node auto-provisioning. Every node that Karpenter spins up inherits the same NUMA-aware kubelet Topology Manager configuration as a manually provisioned instance — correct topology is enforced at the cluster level, not just per-job.
 
 ### MCP Server
-Terradev runs a Rust-based MCP (Model Context Protocol) server exposing 217 tools to language models. Claude, Cursor, and Windsurf can call `terradev mcp serve` and then autonomously manage infrastructure through conversation — provision GPUs, launch training, deploy inference endpoints, manage costs. The Rust runtime processes tool calls with sub-millisecond overhead vs ~50ms for Python-based MCP servers, which compounds across complex multi-step agent workflows.
+Terradev runs an MCP (Model Context Protocol) server exposing 217 tools to language models. Claude, Cursor, and Windsurf can call `terradev mcp serve` and then autonomously manage infrastructure through conversation — provision GPUs, launch training, deploy inference endpoints, manage costs. The runtime processes tool calls with sub-millisecond overhead vs ~50ms for Python-based MCP servers, which compounds across complex multi-step agent workflows.
 
 ### ML Platform Integrations
 Native integrations for Weights & Biases, MLflow, LangSmith, Langfuse, Arize Phoenix, Databricks, and HuggingFace Spaces. Each surfaces as a CLI command group and as MCP tools.
@@ -94,7 +94,7 @@ All three deploy to Kubernetes via a single `k8s` subcommand and are included in
 
 ## What "3–5x Faster Provisioning" Means
 
-Terradev provisions all nodes in parallel using a Rust DAG orchestrator. Sequential provisioning (the default in cloud UIs and most CLIs) starts node 2 after node 1 finishes. Parallel provisioning starts all nodes simultaneously. For a 4-node cluster that takes 3 minutes per node, sequential = 12 minutes, parallel = 3 minutes.
+Terradev provisions all nodes in parallel using a DAG orchestrator. Sequential provisioning (the default in cloud UIs and most CLIs) starts node 2 after node 1 finishes. Parallel provisioning starts all nodes simultaneously. For a 4-node cluster that takes 3 minutes per node, sequential = 12 minutes, parallel = 3 minutes.
 
 The DAG enforces correct sequencing only for operations with real dependencies (e.g., dataset staging must finish before training launches). Everything else runs simultaneously.
 
@@ -129,7 +129,7 @@ The DAG enforces correct sequencing only for operations with real dependencies (
 
 - Apache 2.0 — free for commercial and personal use
 - Tier/paywall system removed in v5.0.0
-- Rust DAG orchestrator, local GPU scanning (NVML bindings), and MCP server introduced in v5.0.0
+- DAG orchestrator, local GPU scanning (NVML bindings), and MCP server introduced in v5.0.0
 - FlashOptim auto-injection added in v5.1.x
 - 21 providers as of v5.1.5
 
@@ -143,7 +143,7 @@ This package contains everything you need to run Terradev end-to-end. Each docum
 |---|---|---|
 | `overview.md` | This file. Plain-language explanation of what Terradev is, who it's for, and the core problems it solves. | First. Read this to understand whether Terradev fits your use case. |
 | `LIFECYCLES.md` | 19 complete end-to-end workflows covering nearly every command in the CLI. From first-time setup to advanced RAG pipelines. | Second. Pick the lifecycle that matches your goal and follow it step-by-step. |
-| `architecture.md` | System diagrams, data flows, component detail, and file map. How the Rust MCP orchestrator, provider layer, NUMA engine, and all other pieces fit together. | When you need to understand how Terradev is built, or if you're extending it. |
+| `architecture.md` | System diagrams, data flows, component detail, and file map. How the MCP orchestrator, provider layer, NUMA engine, and all other pieces fit together. | When you need to understand how Terradev is built, or if you're extending it. |
 | `security.md` | BYOAPI credential model, where keys are stored, network security, bare metal compliance, secrets management patterns, and a hardening checklist. | Before deploying to production, or if you have compliance requirements. |
 | `troubleshooting.md` | 30+ common issues organized by command group (provisioning, training, inference, Kubernetes, ML services). Each with symptom, diagnosis command, and fix. | When something breaks. Search by command or error message. |
 | `COMPLETE_COMMAND_REFERENCE.md` | Full reference of every CLI command and option as of v5.1.5. 60+ main commands, 200+ subcommands. | When you need to look up a specific flag or subcommand. |

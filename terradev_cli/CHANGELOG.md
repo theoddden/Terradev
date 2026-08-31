@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🚀 Multi-stage LLM training pipeline (`terradev train`)
 - Added `terradev train sft`, `terradev train dpo`, `terradev train grpo`, and `terradev train pipeline` commands.
 - Added `terradev_cli/core/training_stages.py` with declarative `StageConfig` / `PipelineConfig` and command builders for `unsloth`, `trl`, `openrlhf`, `axolotl`, `llama-factory`, and `ms-swift`.
-- Added `terradev_cli/core/training_pipeline.py` with DAG-based orchestration using the existing Rust/Py `DAGExecutor`, provider-aware quote selection, auto-provisioning via `ParallelProvisioner`, checkpoint handoff, and optional teardown.
+- Added `terradev_cli/core/training_pipeline.py` with DAG-based orchestration using the existing Python `DAGExecutor`, provider-aware quote selection, auto-provisioning via `ParallelProvisioner`, checkpoint handoff, and optional teardown.
 - Added `examples/training_pipeline.yaml` sample pipeline covering SFT → DPO → GRPO with provider-agnostic resource selection.
 - Wrapped CLI-style training frameworks (`trl`, `openrlhf`, `axolotl`, `llama-factory`, `ms-swift`) in throw-away Python scripts so the existing `TrainingOrchestrator` can launch them with `torchrun`/`deepspeed`/`accelerate`.
 
@@ -131,7 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UI audit: corrected all version references across docs, landing page, and READMEs
 - `docs/index.html`: v3.4.0 → v5.1.5, BUSL 1.1 → Apache 2.0, 15 → 21+ providers, modernized feature tiles with stat row
 - `docs/USER_GUIDE.md`: full rewrite — replaced dead SaaS web app guide with current CLI reference
-- `docs/architecture.md`: full rewrite — replaced pre-v5 architecture with Rust MCP + CLI layer diagram
+- `docs/architecture.md`: full rewrite — replaced pre-v5 architecture with MCP + CLI layer diagram
 - `docs/sitemap.xml`: removed version-pinned PyPI URL, updated all lastmod dates
 - `terradev_cli/README.md`: version sync to v5.1.5, 104 → 218 tools
 - `demo/generate_gif.py`: "15 clouds" → "21+" in closing tagline
@@ -188,7 +188,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎉 **Open Source Release**
 - **Removed paywall** — fully open source under Apache 2.0
-- **Rust MCP Orchestrator**: DAG sequencing, idempotency guarantees, sub-ms tool routing
+- **MCP Orchestrator**: DAG sequencing, idempotency guarantees, sub-ms tool routing
 - **MCP Server expanded to 218 tools** (55 new in v5.0.0, further expanded in v5.1.x+):
   - HuggingFace Hub (8): list models, datasets, create/manage endpoints, inference
   - HF Smart Templates (3): hardware recommendation, comparison
@@ -206,7 +206,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sleep mode (`--enable-sleep-mode`) — 18–200x faster than cold restart
   - Multi-LoRA (`terradev lora add/list/remove`)
   - vLLM Router opt-in for P/D disaggregation
-- **Local GPU discovery**: NVML Rust bindings, hybrid local+cloud compute pools
+- **Local GPU discovery**: NVML bindings, hybrid local+cloud compute pools
 - **Disaggregated prefill/decode**: NIXL zero-copy RDMA, sticky routing
 - License changed from BUSL 1.1 → **Apache 2.0**
 
