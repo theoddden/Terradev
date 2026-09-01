@@ -28,7 +28,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e "." requests pyyaml
 
-      - name: Run drift monitor
+      - name: Check credential env presence
         env:
           TERRADEV_RUNPOD_KEY: ${{ secrets.TERRADEV_RUNPOD_KEY }}
           TERRADEV_LAMBDA_KEY: ${{ secrets.TERRADEV_LAMBDA_KEY }}
@@ -50,6 +50,22 @@ jobs:
               echo "$v is NOT set"
             fi
           done
+
+      - name: Run drift monitor
+        env:
+          TERRADEV_RUNPOD_KEY: ${{ secrets.TERRADEV_RUNPOD_KEY }}
+          TERRADEV_LAMBDA_KEY: ${{ secrets.TERRADEV_LAMBDA_KEY }}
+          TERRADEV_VAST_KEY: ${{ secrets.TERRADEV_VAST_KEY }}
+          TERRADEV_COREWEAVE_KEY: ${{ secrets.TERRADEV_COREWEAVE_KEY }}
+          TERRADEV_HYPERSTACK_KEY: ${{ secrets.TERRADEV_HYPERSTACK_KEY }}
+          TERRADEV_GCORE_KEY: ${{ secrets.TERRADEV_GCORE_KEY }}
+          TERRADEV_MODAL_KEY: ${{ secrets.TERRADEV_MODAL_KEY }}
+          TERRADEV_MODAL_TOKEN_ID: ${{ secrets.TERRADEV_MODAL_TOKEN_ID }}
+          TERRADEV_MODAL_TOKEN_SECRET: ${{ secrets.TERRADEV_MODAL_TOKEN_SECRET }}
+          TERRADEV_PACKET_KEY: ${{ secrets.TERRADEV_PACKET_KEY }}
+          TERRADEV_PACKET_API_KEY: ${{ secrets.TERRADEV_PACKET_API_KEY }}
+          TERRADEV_SKIP_ONBOARDING: '1'
+        run: |
           terradev canary drift --all --format json > drift_report.json
 
       - name: Check for drift
