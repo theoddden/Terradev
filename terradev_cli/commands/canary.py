@@ -328,6 +328,36 @@ def _load_drift_env_key(provider: str) -> Optional[Union[str, Dict[str, Any]]]:
         if subscription_id and tenant_id and client_id and client_secret:
             return _load_drift_env_extras("azure", "")
 
+    # Modal can also be supplied as separate token id / token secret.
+    if provider == "modal":
+        for id_env in (
+            "TERRADEV_MODAL_TOKEN_ID",
+            "MODAL_TOKEN_ID",
+        ):
+            token_id = (os.environ.get(id_env) or "").strip()
+            if not token_id:
+                continue
+            for secret_env in (
+                "TERRADEV_MODAL_TOKEN_SECRET",
+                "MODAL_TOKEN_SECRET",
+            ):
+                token_secret = (os.environ.get(secret_env) or "").strip()
+                if token_secret:
+                    return _load_drift_env_extras("modal", f"{token_id}.{token_secret}")
+
+    # Packet.ai can also be supplied under alternate env names.
+    if provider == "packet":
+        for env in (
+            "TERRADEV_PACKET_API_KEY",
+            "TERRADEV_PACKET_KEY",
+            "CANARY_PACKET_KEY",
+            "PACKET_API_KEY",
+            "PACKET_KEY",
+        ):
+            value = os.environ.get(env)
+            if value:
+                return _load_drift_env_extras("packet", value)
+
     return None
 
 

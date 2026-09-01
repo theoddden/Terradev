@@ -1,6 +1,7 @@
 provider: modal
 base_url: https://api.modal.com/v1
 auth_header: Authorization
+auth_type: bearer
 auth_required: true
 last_verified: '2026-08-24'
 notes: >
