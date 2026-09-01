@@ -36,6 +36,8 @@ jobs:
           TERRADEV_COREWEAVE_KEY: ${{ secrets.TERRADEV_COREWEAVE_KEY }}
           TERRADEV_HYPERSTACK_KEY: ${{ secrets.TERRADEV_HYPERSTACK_KEY }}
           TERRADEV_GCORE_KEY: ${{ secrets.TERRADEV_GCORE_KEY }}
+          TERRADEV_MODAL_KEY: ${{ secrets.TERRADEV_MODAL_KEY }}
+          TERRADEV_PACKET_KEY: ${{ secrets.TERRADEV_PACKET_KEY }}
           TERRADEV_SKIP_ONBOARDING: '1'
         run: |
           terradev canary drift --all --format json > drift_report.json
