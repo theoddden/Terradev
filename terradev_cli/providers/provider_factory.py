@@ -48,6 +48,8 @@ _PROVIDER_LOADERS = {
     "yottalabs": _lazy_import(".yottalabs_provider.YottaLabsProvider"),
     "e2enetworks": _lazy_import(".e2e_networks_provider.E2ENetworksProvider"),
     "gcore": _lazy_import(".gcore_provider.GcoreProvider"),
+    "modal": _lazy_import(".modal_provider.ModalProvider"),
+    "packet": _lazy_import(".packet_provider.PacketProvider"),
 }
 
 

@@ -1,0 +1,12 @@
+{
+  "method": "POST",
+  "url": "https://api.packet.ai/v1/instances",
+  "headers": {},
+  "json": {
+    "gpu_type": "h100",
+    "region": "us-east",
+    "tier": "dedicated",
+    "image": "ubuntu-22.04-cuda",
+    "ssh_public_key": "ssh-rsa test"
+  }
+}

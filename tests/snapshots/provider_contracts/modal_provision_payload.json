@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "url": "https://api.modal.com/v1/apps",
+  "headers": {},
+  "json": {
+    "name": "terradev-h100-<TIMESTAMP>",
+    "image": "modalai/pytorch:2.6.0-py3.11-cuda12.8.1-cudnn9-devel-ubuntu22.04",
+    "gpu": "H100",
+    "region": "us-east",
+    "environment": {
+      "PROVIDER": "modal",
+      "PYTHONUNBUFFERED": "1"
+    },
+    "ssh_public_key": "ssh-rsa test"
+  }
+}
