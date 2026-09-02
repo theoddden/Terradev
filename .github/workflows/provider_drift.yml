@@ -60,11 +60,6 @@ jobs:
       TERRADEV_SILICONFLOW_API_KEY: ${{ secrets.TERRADEV_SILICONFLOW_API_KEY }}
       TERRADEV_YOTTALABS_KEY: ${{ secrets.TERRADEV_YOTTALABS_KEY }}
       TERRADEV_YOTTALABS_API_KEY: ${{ secrets.TERRADEV_YOTTALABS_API_KEY }}
-      TERRADEV_MODAL_KEY: ${{ secrets.TERRADEV_MODAL_KEY }}
-      TERRADEV_MODAL_TOKEN_ID: ${{ secrets.TERRADEV_MODAL_TOKEN_ID }}
-      TERRADEV_MODAL_TOKEN_SECRET: ${{ secrets.TERRADEV_MODAL_TOKEN_SECRET }}
-      TERRADEV_PACKET_KEY: ${{ secrets.TERRADEV_PACKET_KEY }}
-      TERRADEV_PACKET_API_KEY: ${{ secrets.TERRADEV_PACKET_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,16 +74,6 @@ jobs:
           python -m pip install --upgrade pip
           pip uninstall -y terradev terradev-cli 2>/dev/null || true
           pip install -e "." requests pyyaml
-
-      - name: Check credential env presence
-        run: |
-          for v in TERRADEV_MODAL_KEY TERRADEV_MODAL_TOKEN_ID TERRADEV_MODAL_TOKEN_SECRET TERRADEV_PACKET_KEY TERRADEV_PACKET_API_KEY; do
-            if [ -n "${!v}" ]; then
-              echo "$v is set"
-            else
-              echo "$v is NOT set"
-            fi
-          done
 
       - name: Debug canary module and loader
         run: |
@@ -107,8 +92,6 @@ jobs:
           creds = _load_drift_credentials(providers)
           print('credential keys:', list(creds.keys()))
           print('missing:', sorted(set(providers) - set(creds)))
-          for p in ('modal', 'packet'):
-              print(p, 'in creds:', p in creds, 'type:', type(creds.get(p)).__name__)
           "
 
       - name: Run drift monitor

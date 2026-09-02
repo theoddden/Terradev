@@ -43,8 +43,6 @@ from .gpu_catalog import (
 from .e2e_networks_provider import E2ENetworksProvider
 from .runpod_provider import RunPodProvider
 from .yottalabs_provider import YottaLabsProvider
-from .modal_provider import ModalProvider
-from .packet_provider import PacketProvider
 
 __all__ = [
     # Types
@@ -70,8 +68,6 @@ __all__ = [
     "E2ENetworksProvider",
     "RunPodProvider",
     "YottaLabsProvider",
-    "ModalProvider",
-    "PacketProvider",
     # GPU catalog functions
     "normalize",
     "get_canonical_name",

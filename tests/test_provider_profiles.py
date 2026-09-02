@@ -89,13 +89,11 @@ class TestListAllProfiles:
         assert "gcp" in profiles
         assert "azure" in profiles
         assert "runpod" in profiles
-        assert "modal" in profiles
-        assert "packet" in profiles
 
     def test_list_all_profiles_count(self):
         """List contains expected number of providers"""
         profiles = list_all_profiles()
-        assert len(profiles) == 19
+        assert len(profiles) == 17
 
     def test_list_all_profiles_returns_copy(self):
         """List returns a copy, not the original"""
