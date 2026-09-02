@@ -708,6 +708,10 @@ class DriftMonitor:
         headers: Dict[str, str] = {}
         payload: Dict[str, Any] = {}
 
+        # Request the expected response format (default to JSON).
+        accept = endpoint.get("content_type") or contract.get("content_type") or "application/json"
+        headers["Accept"] = accept
+
         # Normalize credentials: may be a raw key string or a dict with extras.
         if isinstance(api_key, dict):
             creds: Dict[str, Any] = api_key
