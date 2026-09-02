@@ -12,7 +12,7 @@ endpoints:
 - name: list_gpu_types
   method: GET
   path: gpu-types
-  enabled: false
+  enabled: true
   expected_status: 200
   expected_response_fields:
   - data
@@ -29,7 +29,7 @@ endpoints:
 - name: list_apps
   method: GET
   path: apps
-  enabled: true
+  enabled: false
   expected_status: 200
   expected_response_fields:
   - data
