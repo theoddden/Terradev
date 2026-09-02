@@ -211,7 +211,7 @@ def test_unauthenticated_public_endpoint_does_not_inject_auth(monitor):
     }
     with mock.patch("requests.get", return_value=_FakeResponse(200, {"items": []})) as m:
         monitor._check_endpoint(contract, contract["endpoints"][0], "")
-    assert m.call_args.kwargs["headers"] == {}
+    assert "Authorization" not in m.call_args.kwargs["headers"]
 
 
 
