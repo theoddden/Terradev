@@ -94,7 +94,7 @@ jobs:
           TERRADEV_PACKET_API_KEY: ${{ secrets.TERRADEV_PACKET_API_KEY }}
           TERRADEV_SKIP_ONBOARDING: '1'
         run: |
-          terradev canary drift --all --format json > drift_report.json
+          python -m terradev_cli.cli canary drift --all --format json > drift_report.json
 
       - name: Check for drift
         run: |
