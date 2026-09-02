@@ -93,11 +93,20 @@ jobs:
       - name: Debug canary module and loader
         run: |
           python3 -c "
+          from pathlib import Path
           import terradev_cli.commands.canary as c
-          from terradev_cli.commands.canary import _load_drift_credentials
+          from terradev_cli.commands.canary import _load_drift_credentials, _default_contracts_dir
+          import yaml
           print('canary module:', c.__file__)
-          creds = _load_drift_credentials(['modal', 'packet'])
+          contracts = sorted(Path(_default_contracts_dir()).glob('*.yaml'))
+          providers = []
+          for p in contracts:
+              with open(p) as f:
+                  contract = yaml.safe_load(f) or {}
+              providers.append(contract.get('provider') or p.stem)
+          creds = _load_drift_credentials(providers)
           print('credential keys:', list(creds.keys()))
+          print('missing:', sorted(set(providers) - set(creds)))
           for p in ('modal', 'packet'):
               print(p, 'in creds:', p in creds, 'type:', type(creds.get(p)).__name__)
           "
