@@ -10,9 +10,11 @@ Core functionality:
 """
 
 import json
+import time
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 from .job_state_manager import JobStateManager, JobStatus
 from .egress_optimizer import estimate_egress_cost, find_cheapest_multihop
@@ -354,3 +356,105 @@ class MigrationOrchestrator:
             confidence -= 0.1
 
         return min(confidence, 1.0)
+
+def execute_migration(
+    self,
+    plan: MigrationPlan,
+    api: Any,
+    run_func: Any,
+    dry_run: bool = True,
+) -> Dict[str, Any]:
+    """Execute a migration plan by provisioning a target instance.
+
+    Performs a lightweight live migration: provisions the target, updates
+    the usage registry, and returns source/target details so the user can
+    complete the actual data transfer safely.
+    """
+    if dry_run:
+        return {
+            "status": "dry_run",
+            "source_id": None,
+            "target_id": None,
+        }
+
+    source_id = plan.source.get("instance_id") or ""
+    if not source_id or source_id == "auto-detected":
+        for inst in api.usage.get("instances_created", []):
+            if (
+                inst.get("provider", "").lower()
+                == plan.source.get("provider", "").lower()
+                and inst.get("gpu_type", "")
+                == plan.source.get("gpu_type", "")
+            ):
+                source_id = inst["id"]
+                break
+
+    if not source_id or source_id == "auto-detected":
+        raise ValueError("Could not find a source instance to migrate")
+
+    target_provider = plan.target.get("provider", "").lower().replace(" ", "_")
+    target_gpu = plan.target.get("gpu_type", "A100")
+    region = plan.target.get("region") or plan.source.get("region", "us-east-1")
+
+    quote_method = getattr(api, f"get_{target_provider}_quotes", None)
+    if not quote_method:
+        raise ValueError(f"Provider {target_provider} does not support live quotes")
+
+    quotes = run_func(quote_method(target_gpu), timeout=120)
+    if not quotes:
+        raise ValueError(f"No quotes for {target_gpu} on {target_provider}")
+
+    best = min(quotes, key=lambda q: q.get("price", float("inf")))
+    target_price = float(best.get("price", 0.0))
+
+    from terradev_cli.providers.provider_factory import ProviderFactory
+
+    factory = ProviderFactory()
+    creds = api._provider_creds(target_provider)
+    provider = factory.create_provider(target_provider, creds)
+
+    itype = best.get("instance_type") or f"{target_provider}-ondemand-{target_gpu.lower()}"
+    region = best.get("region") or region
+    prov_result = run_func(provider.provision_instance(itype, region, target_gpu), timeout=300)
+
+    target_id = prov_result.get(
+        "instance_id",
+        f"{target_provider}_{int(time.time())}_{uuid4().hex[:6]}",
+    )
+
+    api.usage["instances_created"].append(
+        {
+            "id": target_id,
+            "provider": plan.target.get("provider", target_provider),
+            "gpu_type": target_gpu,
+            "price": target_price,
+            "region": region,
+            "spot": best.get("availability") == "spot",
+            "parallel_group": f"migrate_{int(time.time())}",
+            "type": "migrated",
+            "source_id": source_id,
+            "created_at": datetime.now().isoformat(),
+        }
+    )
+    api.save_usage()
+
+    # Mark source job as checkpointing if we can find it
+    try:
+        workload_id = plan.source.get("workload_id")
+        for job in self.job_manager.list_jobs():
+            if job.id == workload_id or source_id in (job.id, str(job.id)):
+                self.job_manager.update_job_status(job.id, JobStatus.CHECKPOINTING)
+                break
+    except Exception:  # noqa: BLE001
+        pass
+
+    return {
+        "status": "migrated",
+        "source_id": source_id,
+        "target_id": target_id,
+        "target_provider": target_provider,
+        "target_gpu": target_gpu,
+        "target_hourly": target_price,
+        "region": region,
+    }
+

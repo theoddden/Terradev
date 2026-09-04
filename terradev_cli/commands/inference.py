@@ -729,37 +729,67 @@ def inferx_quote(gpu_type, region):
 def inferx_optimize(cluster_config, usage_metrics, tier, output, implement):
     """Analyze and optimize InferX costs with AI-powered recommendations"""
     import json
-    from terradev_cli.k8s.t_optimizer import InferXCostOptimizer, CostTier
+    from terradev_cli.cost_optimizer import InferXCostOptimizer, CostTier
 
     optimizer = InferXCostOptimizer()
     target_tier = CostTier(tier)
 
-    # Load configuration (mock data for demo)
-    cluster_config_data = {
-        "nodes": [
-            {"gpu_type": "A100", "gpu_count": 2, "spot": True},
-            {"gpu_type": "A10G", "gpu_count": 1, "spot": True},
-        ],
-        "storage_gb": 200,
-        "snapshot_gb": 500,
-    }
+    # Try to load InferX credentials so we can build defaults from live data
+    inferx_config_file = Path.home() / ".terradev" / "inferx_config.json"
+    if not cluster_config or not usage_metrics:
+        if not inferx_config_file.exists():
+            click.echo(
+                "ERROR: InferX not configured. Run 'terradev inferx configure' first "
+                "or provide --cluster-config and --usage-metrics.",
+                err=True,
+            )
+            raise SystemExit(1)
+        with open(inferx_config_file) as f:
+            inferx_config = json.load(f)
+        from terradev_cli.providers.inferx_provider import InferXProvider
 
-    usage_metrics_data = {
-        "gpu_utilization": 65.0,
-        "memory_utilization": 70.0,
-        "cpu_utilization": 45.0,
-        "models_deployed": 25,
-        "cold_start_time": 2.2,
-        "requests_per_hour": 150,
-    }
+        provider = InferXProvider(inferx_config)
 
     if cluster_config:
         with open(cluster_config) as f:
             cluster_config_data = json.load(f)
+    else:
+        # Build a default cluster from the cheapest InferX quote available.
+        quotes = _run_with_timeout(provider.get_instance_quotes("A100"))
+        if not quotes:
+            click.echo("ERROR: No InferX quotes available", err=True)
+            raise SystemExit(1)
+        quote = quotes[0]
+        cluster_config_data = {
+            "nodes": [
+                {
+                    "gpu_type": quote.get("gpu_type", "A100"),
+                    "gpu_count": 1,
+                    "spot": quote.get("availability") != "on_demand",
+                }
+            ],
+            "storage_gb": 200,
+            "snapshot_gb": 500,
+        }
 
     if usage_metrics:
         with open(usage_metrics) as f:
             usage_metrics_data = json.load(f)
+    else:
+        # Pull real usage statistics from InferX when no file is supplied.
+        stats = _run_with_timeout(provider.get_usage_stats())
+        models = _run_with_timeout(provider.list_models())
+        requests_per_hour = 0.0
+        if stats.get("gpu_hours"):
+            requests_per_hour = stats.get("total_requests", 0) / max(stats["gpu_hours"], 1.0)
+        usage_metrics_data = {
+            "gpu_utilization": stats.get("gpu_utilization", 0.0),
+            "memory_utilization": 70.0,
+            "cpu_utilization": 50.0,
+            "models_deployed": len(models) or stats.get("active_models", 0),
+            "cold_start_time": 2.2,
+            "requests_per_hour": requests_per_hour,
+        }
 
     click.echo(f" Analyzing InferX costs for {tier} tier...")
 

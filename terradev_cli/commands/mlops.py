@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 from . import cli
-from terradev_cli.commands._base import get_api as _get_api
+from terradev_cli.commands._base import get_api as _get_api, run_with_timeout as _run_with_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -454,16 +454,27 @@ def migration(from_provider, to_provider, instance_id, workload, dry_run):
                 "\nOK: Dry run complete. Use without --dry-run to execute migration."
             )
         else:
-            # In lightweight version, just show plan and exit
-            click.echo(
-                "\n Full migration execution not implemented in lightweight version."
-            )
-            click.echo("   This would involve:")
-            click.echo("    Checkpointing current job")
-            click.echo("    Transferring data via optimized route")
-            click.echo("    Provisioning target instance")
-            click.echo("    Restoring from checkpoint")
-            click.echo("    Validating migration success")
+            click.echo("\n Executing migration...")
+            try:
+                api = _get_api()
+                result = orchestrator.execute_migration(
+                    plan, api, _run_with_timeout, dry_run=False
+                )
+                click.echo("OK: Migration initiated")
+                click.echo(f"   Source: {result['source_id']}")
+                click.echo(f"   Target: {result['target_id']}")
+                click.echo(f"   Target provider: {result['target_provider']}")
+                click.echo(f"   Target GPU: {result['target_gpu']}")
+                click.echo(f"   Cost: ${result['target_hourly']:.2f}/hr")
+                click.echo("\n Next steps:")
+                click.echo(f"   - Transfer data from {result['source_id']} to {result['target_id']}")
+                click.echo("   - Verify workload on target: terradev status --live")
+                click.echo(
+                    f"   - Terminate source when ready: terradev manage -i {result['source_id']} -a terminate"
+                )
+            except Exception as exec_err:  # noqa: BLE001
+                click.echo(f"ERROR: Migration execution failed: {exec_err}", err=True)
+                raise SystemExit(1)
 
     except Exception as e:  # noqa: BLE001
         click.echo(f"ERROR: Migration planning failed: {e}", err=True)

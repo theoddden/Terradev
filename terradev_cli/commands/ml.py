@@ -191,15 +191,32 @@ def wandb_create_report():
 
         service = create_enhanced_wandb_service_from_credentials(creds)
         click.echo("Plan Generating infrastructure report...")
-        # Mock metrics data for demonstration
+        # Build metrics from live Terradev usage
+        instances = api.usage.get("instances_created", []) + api.usage.get("inference_endpoints", [])
+        provider_stats = {}
+        total_cost = 0.0
+        avg_util = 0.0
+        util_count = 0
+        for inst in instances:
+            p = inst.get("provider", "unknown")
+            if p not in provider_stats:
+                provider_stats[p] = {"instances": 0, "cost": 0.0}
+            provider_stats[p]["instances"] += 1
+            price = float(inst.get("price", 0) or 0)
+            provider_stats[p]["cost"] += price
+            total_cost += price
+            u = inst.get("gpu_utilization")
+            if isinstance(u, (int, float)):
+                avg_util += float(u)
+                util_count += 1
+        for p in provider_stats:
+            provider_stats[p]["cost"] = round(provider_stats[p]["cost"], 2)
+            provider_stats[p]["avg_gpu_util"] = round(avg_util / max(util_count, 1), 1)
         metrics_data = {
-            "total_instances": 10,
-            "total_cost": 150.75,
-            "avg_gpu_utilization": 78.5,
-            "providers": {
-                "aws": {"instances": 6, "cost": 120.50, "avg_gpu_util": 82.1},
-                "gcp": {"instances": 4, "cost": 30.25, "avg_gpu_util": 71.2},
-            },
+            "total_instances": len(instances),
+            "total_cost": round(total_cost, 2),
+            "avg_gpu_utilization": round(avg_util / max(util_count, 1), 1),
+            "providers": provider_stats,
         }
 
         result = _run_with_timeout(service.create_terradev_report(metrics_data))
@@ -536,10 +553,12 @@ def langgraph_deploy(workflow_name):
 
         service = create_langgraph_service_from_credentials(creds)
         click.echo(f"Deploying workflow: {workflow_name}")
-        raise click.ClickException(
-            "'langgraph deploy' is not yet implemented. "
-            "Use the LangGraph Cloud CLI or LangSmith UI to deploy workflows."
-        )
+        result = _run_with_timeout(service.deploy_workflow(workflow_name))
+
+        click.echo(f"OK: Deployment payload created: {result['deployment_id']}")
+        click.echo(f"   Project: {result.get('project', 'terradev')}")
+        click.echo(f"   Environment: {result.get('environment', 'development')}")
+        click.echo(f"   Instructions: {result.get('instructions', '')}")
     except ImportError:
         click.echo("ERROR: Enhanced LangGraph service not available.", err=True)
 @ml.group()

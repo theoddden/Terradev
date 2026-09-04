@@ -504,6 +504,52 @@ class TerradevAPI:
             creds["integration_enabled"] = self.credentials.get(
                 "wandb_integration_enabled", "false"
             )
+        elif provider_name == "langchain":
+            # Core API keys / LangSmith configuration
+            creds["api_key"] = self.credentials.get("langchain_api_key", "")
+            creds["langsmith_api_key"] = self.credentials.get(
+                "langsmith_api_key", ""
+            ) or self.credentials.get("langchain_api_key", "")
+            creds["langsmith_endpoint"] = self.credentials.get(
+                "langsmith_endpoint", "https://api.smith.langchain.com"
+            )
+            creds["workspace_id"] = self.credentials.get(
+                "workspace_id", self.credentials.get("langchain_workspace_id", "")
+            )
+            creds["project_name"] = self.credentials.get(
+                "project_name",
+                self.credentials.get("langchain_project_name", "terradev"),
+            )
+            creds["environment"] = self.credentials.get(
+                "environment",
+                self.credentials.get("langchain_environment", "development"),
+            )
+
+            # Feature toggles (flat naming used by `terradev configure` wizard)
+            creds["dashboard_enabled"] = self.credentials.get(
+                "langchain_dashboard_enabled", "false"
+            )
+            creds["tracing_enabled"] = self.credentials.get(
+                "langchain_tracing_enabled", "false"
+            )
+            creds["evaluation_enabled"] = self.credentials.get(
+                "langchain_evaluation_enabled", "false"
+            )
+            creds["workflow_enabled"] = self.credentials.get(
+                "langchain_workflow_enabled", "false"
+            )
+            creds["deployment_enabled"] = self.credentials.get(
+                "langchain_deployment_enabled", "false"
+            )
+            creds["observability_enabled"] = self.credentials.get(
+                "langchain_observability_enabled", "false"
+            )
+
+            # Optional OpenAI-compatible model key, used for executing LLM nodes
+            creds["openai_api_key"] = self.credentials.get(
+                "openai_api_key",
+                self.credentials.get("OPENAI_API_KEY", ""),
+            )
 
         return creds
 

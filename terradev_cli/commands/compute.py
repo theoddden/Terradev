@@ -1963,19 +1963,18 @@ def cleanup():
 @cli.command("job")
 @click.argument("job_file", type=click.Path(exists=True))
 @click.option("--optimize", help="Optimization criteria (cost, latency, balanced)")
-def job(job_file, optimize):
-    """Run Terradev job from YAML configuration"""
-    click.echo(f"Running job: {job_file}")
-
-    if optimize:
-        click.echo(f"Optimization: {optimize}")
-
-    # Load job configuration
+@click.pass_context
+def job(ctx, job_file, optimize):
+    """Run Terradev job from YAML configuration."""
     try:
         import yaml
 
         with open(job_file, "r") as f:
             job_config = yaml.safe_load(f)
+
+        click.echo(f"Running job: {job_file}")
+        if optimize:
+            click.echo(f"Optimization: {optimize}")
 
         click.echo("Job Configuration:")
         click.echo(f"   Name: {job_config.get('name', 'Unknown')}")
@@ -1983,14 +1982,51 @@ def job(job_file, optimize):
         click.echo(f"   Count: {job_config.get('count', 1)}")
         click.echo(f"   Max Price: ${job_config.get('max_price', 0):.2f}")
 
-        # Execute job (mock)
-        click.echo("\nExecuting job...")
+        gpu_type = job_config.get("gpu_type", "A100")
+        image = job_config.get("image")
+        if not image:
+            click.echo("ERROR: 'image' is required in job file", err=True)
+            raise SystemExit(1)
 
-        # This would integrate with the provision command
-        click.echo("OK: Job completed successfully!")
+        env = job_config.get("env", [])
+        if isinstance(env, dict):
+            env = [f"{k}={v}" for k, v in env.items()]
 
+        run_args = {
+            "gpu": gpu_type,
+            "image": image,
+            "cmd": job_config.get("cmd"),
+            "model": job_config.get("model", "meta-llama/Llama-3.1-8B"),
+            "mount": tuple(job_config.get("mounts", [])),
+            "port": tuple(job_config.get("ports", [])),
+            "env": tuple(env),
+            "max_price": job_config.get("max_price"),
+            "providers": tuple(job_config.get("providers", [])),
+            "keep_alive": bool(job_config.get("keep_alive", False)),
+            "dry_run": bool(job_config.get("dry_run", False)),
+        }
+
+        count = int(job_config.get("count", 1))
+        if count <= 0:
+            click.echo("ERROR: 'count' must be >= 1", err=True)
+            raise SystemExit(1)
+
+        if run_args["dry_run"]:
+            click.echo("\nDRY RUN - showing plan for one instance")
+            ctx.invoke(run, **run_args)
+        else:
+            click.echo("\nExecuting job...")
+            for i in range(count):
+                click.echo(f"\n--- Job instance {i + 1} of {count} ---")
+                ctx.invoke(run, **run_args)
+
+        click.echo("\nOK: Job completed")
+
+    except yaml.YAMLError as e:
+        click.echo(f"ERROR: Invalid YAML in job file: {e}", err=True)
+        raise SystemExit(1)
     except Exception as e:  # noqa: BLE001
-        click.echo(f"ERROR: Error loading job file: {e}", err=True)
+        click.echo(f"ERROR: Error running job: {e}", err=True)
 
 
 
