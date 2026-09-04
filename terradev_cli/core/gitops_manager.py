@@ -731,3 +731,196 @@ def get_gitops_manager(config: GitOpsConfig) -> GitOpsManager:
     if _gitops_manager is None:
         _gitops_manager = GitOpsManager(config)
     return _gitops_manager
+
+
+# ── knr-ops node bridge ───────────────────────────────────────────────────────
+
+_KNROPS_NODES_DIR = Path("mgmt/gpu-remote/clusters/gpu-workers")
+
+# Annotation keys written by generate_manifests() and read back by read_nodes().
+# Both methods reference these constants so a rename can never silently diverge.
+_ANN_PROVIDER = "terradev.io/provider"
+_ANN_GPU_TYPE = "terradev.io/gpu-type"
+_ANN_INSTANCE_ID = "terradev.io/instance-id"
+_ANN_PROVISIONED_AT = "terradev.io/provisioned-at"
+
+
+class KnrOpsNodeBridge:
+    """Bridge between Terradev provider backends and a knr-ops GitOps repository.
+
+    Generates k0smotron RemoteMachine / Machine / K0sWorkerConfig manifests for
+    each GPU node provisioned by Terradev and commits them to the user's fork so
+    Flux can join the node automatically.
+    """
+
+    def __init__(self, repo_path: Path):
+        self.repo = repo_path.resolve()
+        self.nodes_dir = self.repo / _KNROPS_NODES_DIR
+
+    # ── Manifest generation ───────────────────────────────────────────────
+
+    def generate_manifests(
+        self,
+        node_id: str,
+        address: str,
+        provider: str,
+        gpu_type: str,
+        ssh_key_secret: str,
+        instance_id: str = "",
+        k0s_version: str = "v1.33.0+k0s.0",
+    ) -> str:
+        """Return a multi-document YAML string for a single GPU node."""
+        import datetime as _dt
+        annotations: Dict[str, str] = {
+            _ANN_PROVIDER: provider,
+            _ANN_GPU_TYPE: gpu_type,
+            _ANN_PROVISIONED_AT: _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        }
+        if instance_id:
+            annotations[_ANN_INSTANCE_ID] = instance_id
+        remote_machine = {
+            "apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
+            "kind": "RemoteMachine",
+            "metadata": {
+                "name": node_id,
+                "namespace": "default",
+                "annotations": annotations,
+            },
+            "spec": {
+                "address": address,
+                "port": 22,
+                "user": "ubuntu",
+                "sshKeyRef": {"name": ssh_key_secret, "namespace": "default"},
+            },
+        }
+        worker_config = {
+            "apiVersion": "bootstrap.cluster.x-k8s.io/v1beta1",
+            "kind": "K0sWorkerConfig",
+            "metadata": {"name": f"{node_id}-config", "namespace": "default"},
+            "spec": {
+                "version": k0s_version,
+                "args": [
+                    f"--labels=node.kubernetes.io/instance-type=gpu,accelerator=nvidia,"
+                    f"terradev.io/provider={provider},terradev.io/gpu-type={gpu_type}"
+                ],
+            },
+        }
+        machine = {
+            "apiVersion": "cluster.x-k8s.io/v1beta1",
+            "kind": "Machine",
+            "metadata": {
+                "name": node_id,
+                "namespace": "default",
+                "labels": {"cluster.x-k8s.io/cluster-name": "gpu-workers"},
+            },
+            "spec": {
+                "clusterName": "gpu-workers",
+                "bootstrap": {
+                    "configRef": {
+                        "apiVersion": "bootstrap.cluster.x-k8s.io/v1beta1",
+                        "kind": "K0sWorkerConfig",
+                        "name": f"{node_id}-config",
+                    }
+                },
+                "infrastructureRef": {
+                    "apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
+                    "kind": "RemoteMachine",
+                    "name": node_id,
+                },
+            },
+        }
+        docs = [
+            yaml.dump(remote_machine, default_flow_style=False, sort_keys=False),
+            yaml.dump(worker_config, default_flow_style=False, sort_keys=False),
+            yaml.dump(machine, default_flow_style=False, sort_keys=False),
+        ]
+        return "---\n" + "\n---\n".join(docs)
+
+    # ── Git operations ────────────────────────────────────────────────────
+
+    def commit_node(self, node_id: str, manifest_yaml: str) -> None:
+        """Write the node manifest, update kustomization, and git commit."""
+        self.nodes_dir.mkdir(parents=True, exist_ok=True)
+        node_file = self.nodes_dir / f"{node_id}.yaml"
+        node_file.write_text(manifest_yaml)
+        self._update_kustomization(add=node_id)
+        subprocess.run(
+            ["git", "add", str(node_file), str(self.nodes_dir / "kustomization.yaml")],
+            cwd=self.repo, check=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", f"feat(gpu-remote): add node {node_id} via Terradev"],
+            cwd=self.repo, check=True,
+        )
+
+    def remove_node_files(self, node_id: str) -> None:
+        """Remove the node manifest, update kustomization, and git commit."""
+        node_file = self.nodes_dir / f"{node_id}.yaml"
+        if node_file.exists():
+            node_file.unlink()
+        self._update_kustomization(remove=node_id)
+        subprocess.run(["git", "add", "-A", str(self.nodes_dir)], cwd=self.repo, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", f"feat(gpu-remote): remove node {node_id}"],
+            cwd=self.repo, check=True,
+        )
+
+    def _update_kustomization(self, add: Optional[str] = None, remove: Optional[str] = None) -> None:
+        kust_file = self.nodes_dir / "kustomization.yaml"
+        if kust_file.exists():
+            with open(kust_file) as f:
+                kust: Dict[str, Any] = yaml.safe_load(f) or {}
+        else:
+            kust = {
+                "apiVersion": "kustomize.config.k8s.io/v1beta1",
+                "kind": "Kustomization",
+            }
+        resources: List[str] = kust.get("resources", [])
+        if add:
+            entry = f"./{add}.yaml"
+            if entry not in resources:
+                resources.append(entry)
+        if remove:
+            entry = f"./{remove}.yaml"
+            resources = [r for r in resources if r != entry]
+        kust["resources"] = sorted(resources)
+        with open(kust_file, "w") as f:
+            yaml.dump(kust, f, default_flow_style=False)
+
+    # ── Repo-derived state ────────────────────────────────────────────────
+
+    @classmethod
+    def read_nodes(cls, repo_path: Path) -> List[Dict[str, Any]]:
+        """Scan the nodes directory in the repo and return node dicts derived
+        from RemoteMachine annotation fields — no external state file needed."""
+        nodes_dir = repo_path.resolve() / _KNROPS_NODES_DIR
+        if not nodes_dir.exists():
+            return []
+        results = []
+        for f in sorted(nodes_dir.glob("*.yaml")):
+            if f.name == "kustomization.yaml":
+                continue
+            try:
+                docs = list(yaml.safe_load_all(f.read_text()))
+                rm = next(
+                    (
+                        d for d in docs
+                        if isinstance(d, dict) and d.get("kind") == "RemoteMachine"
+                    ),
+                    None,
+                )
+                if rm:
+                    meta = rm.get("metadata") or {}
+                    ann = meta.get("annotations") or {}
+                    spec = rm.get("spec") or {}
+                    results.append({
+                        "id": meta.get("name"),
+                        "provider": ann.get(_ANN_PROVIDER),
+                        "gpu_type": ann.get(_ANN_GPU_TYPE),
+                        "instance_id": ann.get(_ANN_INSTANCE_ID, ""),
+                        "address": spec.get("address", ""),
+                        "provisioned_at": ann.get(_ANN_PROVISIONED_AT, ""),
+                    })
+            except Exception:  # noqa: BLE001 — skip malformed/partial files
+                continue
+        return results

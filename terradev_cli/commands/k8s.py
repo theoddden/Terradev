@@ -3,6 +3,8 @@
 
 import asyncio
 import sys
+import uuid
+from pathlib import Path
 
 import click
 from . import cli
@@ -10,6 +12,12 @@ from . import _api
 
 TerraformWrapper = _api.TerraformWrapper
 _telemetry = _api._telemetry
+
+_KNROPS_PROVIDERS = [
+    "aws", "azure", "baseten", "crusoe", "digitalocean", "e2enetworks",
+    "gcore", "gcp", "huggingface", "hyperstack", "inferx", "latitude",
+    "runpod", "siliconflow", "tensordock", "vastai", "yottalabs",
+]
 
 @click.group()
 def k8s():
@@ -231,30 +239,276 @@ def k8s_info(cluster_name):
     else:
         click.echo("ERROR: No detailed information available", err=True)
 
-
-
-
-
-
-
-
-
-# Price Percentiles Command
+# ═══════════════════════════════════════════════════════════════════════
+# k8s node — knr-ops GitOps bridge
 # ═══════════════════════════════════════════════════════════════════════
 
+@k8s.group("node")
+def node():
+    """Provision GPU nodes via Terradev providers and register them in a knr-ops repository.
+
+    Each subcommand interacts with the GitOps repository at --repo. Committed
+    manifests are picked up by Flux automatically; k0smotron SSHes into the
+    provisioned VM and joins it to the gpu-workers CAPI cluster.
+
+    \b
+    Typical workflow:
+      1. terradev k8s node add --provider runpod --gpu H100 --repo ./knr-ops
+      2. git -C ./knr-ops push origin main          # Flux reconciles within ~60s
+      3. kubectl get machines -n default             # watch the node join
+      4. terradev k8s node list                      # show the fleet
+      5. terradev k8s node rm gpu-runpod-a1b2c3 --repo ./knr-ops
+    """
+    pass
 
 
+@node.command("add")
+@click.option(
+    "--provider", "-p", required=True,
+    type=click.Choice(_KNROPS_PROVIDERS, case_sensitive=False),
+    help="Terradev provider to provision the GPU VM from",
+)
+@click.option("--gpu", "-g", required=True, help="GPU type (H100, A100, RTX4090, ...)")
+@click.option(
+    "--repo", "-r", required=True,
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    help="Path to knr-ops Git repository",
+)
+@click.option("--region", default=None, help="Provider region (provider default if omitted)")
+@click.option("--spot", is_flag=True, help="Request a spot/interruptible instance")
+@click.option(
+    "--ssh-key-secret", default="gpu-ssh-key", show_default=True,
+    help="Name of the Kubernetes Secret holding the SSH private key for k0smotron",
+)
+@click.option(
+    "--k0s-version", default="v1.33.0+k0s.0", show_default=True,
+    help="k0s version string to install on the worker node",
+)
+@click.option(
+    "--ssh-public-key", default="",
+    help="SSH public key to inject at provision time (provider-dependent)",
+)
+@click.pass_context
+def node_add(ctx, provider, gpu, repo, region, spot, ssh_key_secret, k0s_version, ssh_public_key):
+    """Provision a GPU VM via a Terradev provider and commit it to knr-ops.
 
-# ═══════════════════════════════════════════════════════════════════════
-# Availability Command
-# ═══════════════════════════════════════════════════════════════════════
+    Calls the provider's API to create the instance, waits up to 60 s for an
+    IP address, then writes RemoteMachine / K0sWorkerConfig / Machine manifests
+    and commits them to the GitOps repo. Push the repo to trigger Flux.
+
+    \b
+    Examples:
+      terradev k8s node add --provider runpod --gpu H100 --repo ~/knr-ops
+      terradev k8s node add --provider vastai --gpu A100 --repo ~/knr-ops --spot
+    """
+    from terradev_cli.core.gitops_manager import KnrOpsNodeBridge
+    from terradev_cli.providers.provider_factory import ProviderFactory
+
+    api = ctx.obj["api"]
+    creds = api.credentials.get(provider, {})
+    if not creds:
+        click.echo(
+            f"ERROR: No credentials configured for '{provider}'.\n"
+            f"  Run: terradev configure --provider {provider}",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    node_id = f"gpu-{provider}-{uuid.uuid4().hex[:6]}"
+    repo_path = Path(repo)
+
+    click.echo(f"Provisioning {gpu} node via {provider}...")
+
+    async def _provision():
+        factory = ProviderFactory()
+        p = factory.create_provider(provider, creds)
+        try:
+            result = await p.provision_instance(
+                instance_type=gpu,
+                region=region or "us-east-1",
+                gpu_type=gpu,
+                ssh_public_key=ssh_public_key,
+            )
+            instance_id = result.get(
+                "instance_id", f"{provider}_{uuid.uuid4().hex[:8]}"
+            )
+            address = (
+                result.get("ip_address")
+                or result.get("public_ip")
+                or result.get("address")
+                or result.get("host")
+            )
+            if not address:
+                click.echo("  Waiting for instance IP address (up to 60 s)...")
+                for _ in range(12):
+                    await asyncio.sleep(5)
+                    status = await p.get_instance_status(instance_id)
+                    address = (
+                        status.get("ip_address")
+                        or status.get("public_ip")
+                        or status.get("address")
+                        or status.get("host")
+                    )
+                    if address:
+                        break
+            return instance_id, address
+        finally:
+            await p.aclose()
+
+    try:
+        instance_id, address = asyncio.run(_provision())
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"ERROR: Provisioning failed: {exc}", err=True)
+        raise SystemExit(1)
+
+    click.echo(f"  Instance: {instance_id}")
+
+    if not address:
+        click.echo("WARNING: Instance provisioned but IP not yet available.")
+        click.echo("  Once the instance is ready, run:")
+        click.echo(
+            f"    terradev k8s node ready {node_id} --address <IP> "
+            f"--provider {provider} --gpu {gpu} --instance-id {instance_id} --repo {repo}"
+        )
+        return
+
+    click.echo(f"  Address:  {address}")
+
+    bridge = KnrOpsNodeBridge(repo_path)
+    manifests = bridge.generate_manifests(
+        node_id, address, provider, gpu, ssh_key_secret, instance_id, k0s_version
+    )
+    bridge.commit_node(node_id, manifests)
+
+    click.echo(f"OK: Node {node_id} committed to {repo}")
+    click.echo("  Push the repo to trigger Flux reconciliation:")
+    click.echo(f"    git -C {repo} push origin main")
+    click.echo("  Then watch: kubectl get machines -n default")
 
 
+@node.command("ready")
+@click.argument("node_id")
+@click.option("--address", required=True, help="Public IP address of the provisioned instance")
+@click.option("--provider", "-p", required=True,
+              type=click.Choice(_KNROPS_PROVIDERS, case_sensitive=False))
+@click.option("--gpu", "-g", required=True, help="GPU type (H100, A100, ...)")
+@click.option("--instance-id", default="", help="Provider instance ID (for later termination)")
+@click.option(
+    "--repo", "-r", required=True,
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    help="Path to knr-ops Git repository",
+)
+@click.option("--ssh-key-secret", default="gpu-ssh-key", show_default=True)
+@click.option("--k0s-version", default="v1.33.0+k0s.0", show_default=True)
+def node_ready(node_id, address, provider, gpu, instance_id, repo, ssh_key_secret, k0s_version):
+    """Complete registration of a pending node once its IP address is known.
+
+    Use this when 'node add' exited without committing because the provider
+    had not yet assigned an IP to the instance.
+    """
+    from terradev_cli.core.gitops_manager import KnrOpsNodeBridge
+
+    repo_path = Path(repo)
+    bridge = KnrOpsNodeBridge(repo_path)
+    manifests = bridge.generate_manifests(
+        node_id, address, provider, gpu, ssh_key_secret, instance_id, k0s_version
+    )
+    bridge.commit_node(node_id, manifests)
+
+    click.echo(f"OK: Node {node_id} ({address}) committed to {repo}")
+    click.echo(f"  Push to trigger Flux: git -C {repo} push origin main")
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# Provider Reliability Command
-# ═══════════════════════════════════════════════════════════════════════
+@node.command("list")
+@click.option(
+    "--repo", "-r", required=True,
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    help="Path to knr-ops Git repository",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def node_list(repo, as_json):
+    """List GPU nodes currently committed to the knr-ops repository."""
+    import json as _json
+    from terradev_cli.core.gitops_manager import KnrOpsNodeBridge
+
+    nodes = KnrOpsNodeBridge.read_nodes(Path(repo))
+    if not nodes:
+        click.echo(f"No nodes found in {repo}. Run: terradev k8s node add ...")
+        return
+
+    if as_json:
+        click.echo(_json.dumps(nodes, indent=2))
+        return
+
+    header = f"{'NODE ID':<30} {'PROVIDER':<14} {'GPU':<10} {'ADDRESS':<18} {'PROVISIONED'}"
+    click.echo(header)
+    click.echo("-" * 90)
+    for n in nodes:
+        click.echo(
+            f"{n['id']:<30} {n['provider'] or '':<14} {n['gpu_type'] or '':<10} "
+            f"{n.get('address', '') or '(pending)':<18} {n.get('provisioned_at', '')[:19]}"
+        )
+
+
+@node.command("rm")
+@click.argument("node_id")
+@click.option(
+    "--repo", "-r", required=True,
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    help="Path to knr-ops Git repository",
+)
+@click.option("--keep-instance", is_flag=True, help="Remove from GitOps only; do not terminate the VM")
+@click.pass_context
+def node_rm(ctx, node_id, repo, keep_instance):
+    """Remove a GPU node from knr-ops and optionally terminate the VM.
+
+    Commits a deletion to the GitOps repo; Flux removes the Machine and
+    k0smotron drains the node. The VM is terminated unless --keep-instance
+    is set.
+
+    \b
+    Example:
+      terradev k8s node rm gpu-runpod-a1b2c3 --repo ~/knr-ops
+    """
+    from terradev_cli.core.gitops_manager import KnrOpsNodeBridge
+    from terradev_cli.providers.provider_factory import ProviderFactory
+
+    repo_path = Path(repo)
+    nodes = KnrOpsNodeBridge.read_nodes(repo_path)
+    record = next((n for n in nodes if n["id"] == node_id), None)
+    if not record:
+        click.echo(f"ERROR: Node '{node_id}' not found in {repo}.", err=True)
+        raise SystemExit(1)
+
+    bridge = KnrOpsNodeBridge(repo_path)
+    bridge.remove_node_files(node_id)
+    click.echo(f"  Removed manifests for {node_id} from {repo}")
+
+    if not keep_instance and record.get("instance_id"):
+        api = ctx.obj["api"]
+        creds = api.credentials.get(record["provider"], {})
+        if creds:
+            async def _terminate():
+                factory = ProviderFactory()
+                p = factory.create_provider(record["provider"], creds)
+                try:
+                    await p.terminate_instance(record["instance_id"])
+                finally:
+                    await p.aclose()
+
+            try:
+                asyncio.run(_terminate())
+                click.echo(f"  Terminated instance {record['instance_id']} on {record['provider']}")
+            except Exception as exc:  # noqa: BLE001
+                click.echo(f"WARNING: Could not terminate instance: {exc}", err=True)
+        else:
+            click.echo(
+                f"WARNING: No credentials for '{record['provider']}'; instance not terminated.",
+                err=True,
+            )
+
+    click.echo(f"OK: Node {node_id} removed")
+    click.echo(f"  Push to trigger Flux: git -C {repo} push origin main")
 
 
 
