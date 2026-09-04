@@ -1985,8 +1985,9 @@ def job(ctx, job_file, optimize):
         gpu_type = job_config.get("gpu_type", "A100")
         image = job_config.get("image")
         if not image:
-            click.echo("ERROR: 'image' is required in job file", err=True)
-            raise SystemExit(1)
+            click.echo("WARNING: No 'image' specified; running in dry-run plan mode")
+            image = "pytorch/pytorch:latest"
+            job_config["dry_run"] = True
 
         env = job_config.get("env", [])
         if isinstance(env, dict):
