@@ -540,6 +540,10 @@ async def handle_get_prompt(request: GetPromptRequest) -> GetPromptResult:
 
 TERRADEV_MCP_BEARER_TOKEN = os.getenv("TERRADEV_MCP_BEARER_TOKEN", "")
 
+# Canonical public base URL for OAuth metadata (e.g. "https://terradev-mcp.terradev.cloud").
+# Needed behind a TLS-terminating proxy — request.base_url would otherwise be http://internal.
+TERRADEV_MCP_PUBLIC_URL = os.getenv("TERRADEV_MCP_PUBLIC_URL", "")
+
 # Comma-separated list of exact allowed redirect URIs for OAuth.
 # Example: "https://claude.ai/oauth/callback,http://localhost:3000/callback"
 # If unset, only localhost/127.0.0.1 URIs are permitted (safe local-dev default).
@@ -587,9 +591,40 @@ def _cleanup_expired():
 # ---------------------------------------------------------------------------
 
 
+def _public_base_url(request: Request) -> str:
+    """External base URL for OAuth metadata.
+
+    Order: TERRADEV_MCP_PUBLIC_URL env override, then X-Forwarded-Proto/Host
+    (set by Caddy and other reverse proxies), then request.base_url.
+    """
+    if TERRADEV_MCP_PUBLIC_URL:
+        return TERRADEV_MCP_PUBLIC_URL.rstrip("/")
+    proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+    host = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+    if proto and host:
+        return f"{proto}://{host}"
+    return str(request.base_url).rstrip("/")
+
+
+def _public_base_from_scope(scope) -> str:
+    """Same as _public_base_url but for a raw ASGI scope (middleware)."""
+    if TERRADEV_MCP_PUBLIC_URL:
+        return TERRADEV_MCP_PUBLIC_URL.rstrip("/")
+    headers = {k.decode(): v.decode() for k, v in scope.get("headers", [])}
+    proto = (
+        headers.get("x-forwarded-proto", "").split(",")[0].strip()
+        or scope.get("scheme", "http")
+    )
+    host = (
+        headers.get("x-forwarded-host", "").split(",")[0].strip()
+        or headers.get("host", "localhost")
+    )
+    return f"{proto}://{host}"
+
+
 async def oauth_authorization_server_metadata(request: Request) -> JSONResponse:
     """RFC 8414 — OAuth Authorization Server Metadata."""
-    base = str(request.base_url).rstrip("/")
+    base = _public_base_url(request)
     return JSONResponse(
         {
             "issuer": base,
@@ -604,11 +639,18 @@ async def oauth_authorization_server_metadata(request: Request) -> JSONResponse:
 
 
 async def oauth_protected_resource(request: Request) -> JSONResponse:
-    """RFC 9728 — OAuth Protected Resource Metadata."""
-    base = str(request.base_url).rstrip("/")
+    """RFC 9728 — OAuth Protected Resource Metadata.
+
+    The resource identifier is derived from the well-known path suffix:
+    /.well-known/oauth-protected-resource/mcp -> <base>/mcp. The bare
+    endpoint defaults to /mcp, the canonical MCP transport.
+    """
+    base = _public_base_url(request)
+    suffix = (request.path_params.get("resource_path") or "mcp").lstrip("/")
+    resource = f"{base}/{suffix}"
     return JSONResponse(
         {
-            "resource": base,
+            "resource": resource,
             "authorization_servers": [base],
             "bearer_methods_supported": ["header"],
         }
@@ -747,6 +789,18 @@ _PUBLIC_PATHS = frozenset(
 )
 
 
+def _unauthorized(scope, path: str) -> JSONResponse:
+    """401 with an RFC 9728 resource_metadata pointer for OAuth discovery."""
+    base = _public_base_from_scope(scope)
+    suffix = "" if path in ("", "/") else path
+    metadata_url = f"{base}/.well-known/oauth-protected-resource{suffix}"
+    return JSONResponse(
+        {"error": "unauthorized"},
+        status_code=401,
+        headers={"WWW-Authenticate": f'Bearer resource_metadata="{metadata_url}"'},
+    )
+
+
 class OAuthBearerMiddleware:
     """Pure ASGI middleware — validates OAuth Bearer tokens on protected routes."""
 
@@ -761,8 +815,8 @@ class OAuthBearerMiddleware:
         path = scope.get("path", "")
         method = scope.get("method", "?")
 
-        # Public routes pass through
-        if path in _PUBLIC_PATHS:
+        # Public routes pass through (all /.well-known/ discovery docs are public)
+        if path in _PUBLIC_PATHS or path.startswith("/.well-known/"):
             await self.app(scope, receive, send)
             return
 
@@ -781,7 +835,7 @@ class OAuthBearerMiddleware:
 
         if not auth.startswith("Bearer "):
             logger.warning("Auth rejected for %s %s (no Bearer token)", method, path)
-            response = JSONResponse({"error": "unauthorized"}, status_code=401)
+            response = _unauthorized(scope, path)
             await response(scope, receive, send)
             return
 
@@ -798,7 +852,7 @@ class OAuthBearerMiddleware:
             return
 
         logger.warning("Auth rejected for %s %s (invalid token)", method, path)
-        response = JSONResponse({"error": "unauthorized"}, status_code=401)
+        response = _unauthorized(scope, path)
         await response(scope, receive, send)
 
 
@@ -937,7 +991,7 @@ def create_sse_app() -> "Starlette":
                 endpoint=oauth_protected_resource,
             ),
             Route(
-                "/.well-known/oauth-protected-resource/sse",
+                "/.well-known/oauth-protected-resource/{resource_path:path}",
                 endpoint=oauth_protected_resource,
             ),
             Route("/authorize", endpoint=oauth_authorize),
