@@ -14,6 +14,7 @@ Enterprise SSO, E2E Networks, Yotta Labs, Latitude.sh, and parallel provisioning
 import argparse
 import asyncio
 import base64
+import contextlib
 import hashlib
 import json
 import logging
@@ -116,6 +117,13 @@ except ImportError:
     TextContent = None
     TextResourceContents = None
     Tool = None
+
+# Streamable HTTP transport (MCP spec 2025-03-26+) — guarded separately so an
+# older mcp SDK only disables the /mcp endpoint instead of breaking stdio/SSE.
+try:
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+except ImportError:
+    StreamableHTTPSessionManager = None  # type: ignore[assignment]
 
 try:
     from starlette.applications import Starlette
@@ -824,8 +832,54 @@ def create_sse_app() -> "Starlette":
     )
     sse_transport = SseServerTransport("/messages", security_settings=security_settings)
 
+    # Streamable HTTP transport (MCP spec 2025-03-26+) — required by modern
+    # registries (e.g. Smithery) and remote clients. Served at /mcp alongside
+    # the legacy /sse endpoint.
+    streamable_manager = None
+    if StreamableHTTPSessionManager is not None:
+        try:
+            streamable_manager = StreamableHTTPSessionManager(
+                app=server,
+                event_store=None,
+                json_response=False,
+                stateless=False,
+                security_settings=security_settings,
+            )
+        except TypeError:
+            # Older SDK without security_settings support
+            streamable_manager = StreamableHTTPSessionManager(
+                app=server,
+                event_store=None,
+                json_response=False,
+                stateless=False,
+            )
+    else:
+        logger.warning(
+            "StreamableHTTPSessionManager unavailable (mcp SDK too old) — "
+            "/mcp endpoint disabled; /sse still served"
+        )
+
+    @contextlib.asynccontextmanager
+    async def _lifespan(_app):
+        # The session manager's task group must run for the app's lifetime.
+        if streamable_manager is not None:
+            async with streamable_manager.run():
+                yield
+        else:
+            yield
+
     async def handle_messages(request: Request) -> None:
         await sse_transport.handle_post_message(
+            request.scope, request.receive, request._send
+        )
+
+    async def handle_mcp(request: Request):
+        """Streamable HTTP endpoint — single URL for GET/POST/DELETE."""
+        if streamable_manager is None:
+            return JSONResponse(
+                {"error": "streamable HTTP transport unavailable"}, status_code=503
+            )
+        await streamable_manager.handle_request(
             request.scope, request.receive, request._send
         )
 
@@ -891,9 +945,15 @@ def create_sse_app() -> "Starlette":
             # MCP endpoints
             Route("/health", endpoint=health),
             Route("/sse", endpoint=sse_handler),
+            Route(
+                "/mcp",
+                endpoint=handle_mcp,
+                methods=["GET", "POST", "DELETE"],
+            ),
             Route("/messages/{path:path}", endpoint=handle_messages, methods=["POST"]),
             Route("/messages", endpoint=handle_messages, methods=["POST"]),
         ],
+        lifespan=_lifespan,
     )
 
     app = OAuthBearerMiddleware(inner_app)
@@ -933,13 +993,20 @@ def main():
     parser = argparse.ArgumentParser(description="Terradev MCP Server")
     parser.add_argument(
         "--transport",
-        choices=["stdio", "sse"],
+        choices=["stdio", "sse", "http"],
         default="stdio",
-        help="Transport mode: stdio (default, for Claude Code) or sse (remote, for Claude.ai Connectors)",
+        help="Transport mode: stdio (default, for Claude Code) or sse/http "
+        "(remote — serves both /sse and /mcp endpoints)",
     )
-    parser.add_argument("--host", default="0.0.0.0", help="SSE host (default: 0.0.0.0)")
+    parser.add_argument("--host", default="0.0.0.0", help="Remote host (default: 0.0.0.0)")
     parser.add_argument(
-        "--port", type=int, default=8080, help="SSE port (default: 8080)"
+        "--port", type=int, default=8080, help="Remote port (default: 8080)"
+    )
+    parser.add_argument(
+        "--allow-unauthenticated",
+        action="store_true",
+        help="Allow remote transports without TERRADEV_MCP_BEARER_TOKEN "
+        "(local development only — INSECURE, any client can self-authorize)",
     )
     args = parser.parse_args()
 
@@ -962,17 +1029,34 @@ def main():
     if args.transport == "stdio":
         asyncio.run(run_stdio())
     else:
+        if not TERRADEV_MCP_BEARER_TOKEN and not args.allow_unauthenticated:
+            logger.error(
+                "TERRADEV_MCP_BEARER_TOKEN is not set — refusing to start a "
+                "remote transport without authentication. Set the env var, or "
+                "pass --allow-unauthenticated for local development only."
+            )
+            sys.exit(1)
         if not TERRADEV_MCP_BEARER_TOKEN:
             logger.warning(
-                "TERRADEV_MCP_BEARER_TOKEN is not set — SSE endpoint is UNAUTHENTICATED. "
-                "Set this env var in production."
+                "TERRADEV_MCP_BEARER_TOKEN is not set and --allow-unauthenticated "
+                "was passed — endpoint is effectively PUBLIC (any client can "
+                "self-authorize via /authorize). Do not expose this port."
             )
         app = create_sse_app()
-        logger.info("Starting Terradev MCP SSE server on %s:%s", args.host, args.port)
+        logger.info(
+            "Starting Terradev MCP server on %s:%s (endpoints: /sse, /mcp)",
+            args.host,
+            args.port,
+        )
         uvicorn.run(app, host=args.host, port=args.port)
 
 
-def run_server(transport: str = "stdio", host: Optional[str] = None, port: Optional[int] = None):
+def run_server(
+    transport: str = "stdio",
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    allow_unauthenticated: bool = False,
+):
     """Start the Terradev MCP server (used by `terradev mcp serve`)."""
     if not MCP_AVAILABLE:
         print(
@@ -988,6 +1072,8 @@ def run_server(transport: str = "stdio", host: Optional[str] = None, port: Optio
         argv.extend(["--host", host])
     if port is not None:
         argv.extend(["--port", str(port)])
+    if allow_unauthenticated:
+        argv.append("--allow-unauthenticated")
 
     old_argv = sys.argv
     sys.argv = argv

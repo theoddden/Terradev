@@ -196,11 +196,17 @@ def sso_test(provider):
 )
 @click.option(
     "--transport",
-    type=click.Choice(["stdio", "sse"]),
+    type=click.Choice(["stdio", "sse", "http"]),
     default="stdio",
-    help="MCP transport protocol",
+    help="MCP transport protocol (sse/http both serve /sse and /mcp endpoints)",
 )
-def mcp(action, client, transport):
+@click.option(
+    "--allow-unauthenticated",
+    is_flag=True,
+    default=False,
+    help="Allow remote transports without TERRADEV_MCP_BEARER_TOKEN (dev only — INSECURE)",
+)
+def mcp(action, client, transport, allow_unauthenticated):
     """Run Terradev as an MCP server for agent integration.
 
     Makes Terradev callable from AI agents (Claude Desktop, Cursor, Windsurf, Continue, Cline).
@@ -287,7 +293,7 @@ def mcp(action, client, transport):
         raise SystemExit(1)
 
     if action == "serve":
-        run_server(transport=transport)
+        run_server(transport=transport, allow_unauthenticated=allow_unauthenticated)
     elif action == "install":
         if not client:
             click.echo("Error: --client is required for install action", err=True)
