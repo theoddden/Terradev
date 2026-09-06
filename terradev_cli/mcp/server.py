@@ -575,6 +575,7 @@ _auth_codes: Dict[str, Dict[str, Any]] = (
     {}
 )  # code -> {client_id, code_challenge, redirect_uri, expires}
 _access_tokens: Dict[str, Dict[str, Any]] = {}  # token -> {client_id, expires}
+_registered_clients: Dict[str, Dict[str, Any]] = {}  # client_id -> {redirect_uris, ...}
 
 
 def _cleanup_expired():
@@ -634,6 +635,7 @@ async def oauth_authorization_server_metadata(request: Request) -> JSONResponse:
             "grant_types_supported": ["authorization_code"],
             "code_challenge_methods_supported": ["S256"],
             "token_endpoint_auth_methods_supported": ["none"],
+            "registration_endpoint": base + "/register",
         }
     )
 
@@ -657,39 +659,165 @@ async def oauth_protected_resource(request: Request) -> JSONResponse:
     )
 
 
+async def oauth_register(request: Request) -> JSONResponse:
+    """RFC 7591 — Dynamic Client Registration.
+
+    Open registration: a client_id alone grants nothing — /authorize still
+    requires the bearer token via the interstitial. Satisfies OAuth discovery
+    (Smithery) without reopening the self-serve hole.
+    """
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"error": "invalid_client_metadata"}, status_code=400)
+
+    redirect_uris = body.get("redirect_uris") or []
+    if not isinstance(redirect_uris, list) or not redirect_uris:
+        return JSONResponse(
+            {
+                "error": "invalid_client_metadata",
+                "error_description": "redirect_uris is required",
+            },
+            status_code=400,
+        )
+
+    if len(_registered_clients) >= 10_000:
+        _registered_clients.clear()  # crude bound — single-instance, in-memory
+
+    client_id = secrets.token_urlsafe(24)
+    _registered_clients[client_id] = {
+        "redirect_uris": [str(u) for u in redirect_uris],
+        "client_name": str(body.get("client_name", "")),
+        "grant_types": body.get("grant_types", ["authorization_code"]),
+        "response_types": body.get("response_types", ["code"]),
+        "issued_at": time.time(),
+    }
+    logger.info("OAuth register: issued client_id=%s...", client_id[:12])
+    return JSONResponse(
+        {
+            "client_id": client_id,
+            "client_id_issued_at": int(time.time()),
+            "redirect_uris": _registered_clients[client_id]["redirect_uris"],
+            "grant_types": _registered_clients[client_id]["grant_types"],
+            "response_types": _registered_clients[client_id]["response_types"],
+            "token_endpoint_auth_method": "none",
+            "client_name": _registered_clients[client_id]["client_name"],
+        },
+        status_code=201,
+    )
+
+
+def _authorize_form(
+    client_id: str,
+    redirect_uri: str,
+    code_challenge: str,
+    code_challenge_method: str,
+    state: str,
+) -> Response:
+    """Interstitial for DCR-registered clients — the bearer token is the credential."""
+    from html import escape
+
+    from starlette.responses import HTMLResponse
+
+    hidden = "".join(
+        f'<input type="hidden" name="{k}" value="{escape(v, quote=True)}">'
+        for k, v in {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "code_challenge": code_challenge,
+            "code_challenge_method": code_challenge_method,
+            "state": state,
+        }.items()
+    )
+    return HTMLResponse(
+        "<!doctype html><html><head><title>Terradev MCP — Authorize</title></head>"
+        "<body style='font-family:system-ui;max-width:26rem;margin:4rem auto'>"
+        "<h2>Authorize Terradev MCP</h2>"
+        "<p>Enter your access token to continue.</p>"
+        f'<form method="post" action="/authorize">{hidden}'
+        '<input type="password" name="access_token" placeholder="Access token" '
+        "style='width:100%;padding:.5rem;margin:.5rem 0' autofocus>"
+        '<button type="submit" style="padding:.5rem 1rem">Authorize</button>'
+        "</form></body></html>"
+    )
+
+
 async def oauth_authorize(request: Request) -> Response:
-    """OAuth 2.0 Authorization Endpoint — auto-approves if client_id matches our token."""
-    from starlette.responses import RedirectResponse
+    """OAuth 2.0 Authorization Endpoint.
+
+    client_id may be the configured bearer token directly (auto-approve) or a
+    DCR-registered client_id, in which case the user must present the token.
+    """
+    from starlette.responses import HTMLResponse, RedirectResponse
 
     params = dict(request.query_params)
+    if request.method == "POST":
+        try:
+            params.update(dict(await request.form()))
+        except Exception:  # noqa: BLE001
+            pass
+
     client_id = params.get("client_id", "")
     redirect_uri = params.get("redirect_uri", "")
     code_challenge = params.get("code_challenge", "")
     code_challenge_method = params.get("code_challenge_method", "")
     state = params.get("state", "")
+    access_token = params.get("access_token", "")
 
     logger.info(
         "OAuth authorize: client_id=%s... redirect=%s", client_id[:16], redirect_uri
     )
 
-    # Validate redirect_uri against allowlist before doing anything else (open-redirect prevention)
-    if not _is_redirect_uri_allowed(redirect_uri):
-        logger.warning("OAuth authorize rejected: redirect_uri not in allowlist: %s", redirect_uri)
+    registered = _registered_clients.get(client_id)
+
+    # client_id must be the configured token or a DCR-registered client
+    if (
+        TERRADEV_MCP_BEARER_TOKEN
+        and client_id != TERRADEV_MCP_BEARER_TOKEN
+        and not registered
+    ):
+        logger.warning("OAuth authorize rejected: bad client_id")
+        return JSONResponse({"error": "invalid_client"}, status_code=401)
+
+    # redirect_uri: registered clients use their registered URIs; the direct
+    # token path uses the static allowlist (open-redirect prevention)
+    if registered:
+        if redirect_uri not in registered["redirect_uris"]:
+            logger.warning(
+                "OAuth authorize rejected: unregistered redirect_uri %s", redirect_uri
+            )
+            return JSONResponse(
+                {
+                    "error": "invalid_request",
+                    "error_description": "redirect_uri not registered",
+                },
+                status_code=400,
+            )
+    elif not _is_redirect_uri_allowed(redirect_uri):
+        logger.warning(
+            "OAuth authorize rejected: redirect_uri not in allowlist: %s", redirect_uri
+        )
         return JSONResponse(
             {"error": "invalid_request", "error_description": "redirect_uri not allowed"},
             status_code=400,
         )
-
-    # Validate client_id matches our configured token
-    if TERRADEV_MCP_BEARER_TOKEN and client_id != TERRADEV_MCP_BEARER_TOKEN:
-        logger.warning("OAuth authorize rejected: bad client_id")
-        return JSONResponse({"error": "invalid_client"}, status_code=401)
 
     if code_challenge_method and code_challenge_method != "S256":
         return JSONResponse(
             {"error": "invalid_request", "error_description": "Only S256 supported"},
             status_code=400,
         )
+
+    # The bearer token is the user credential. Direct path: client_id IS the
+    # token. Registered-client path: present the token via the interstitial.
+    if client_id != TERRADEV_MCP_BEARER_TOKEN:
+        if not access_token:
+            return _authorize_form(
+                client_id, redirect_uri, code_challenge, code_challenge_method, state
+            )
+        if access_token != TERRADEV_MCP_BEARER_TOKEN:
+            logger.warning("OAuth authorize rejected: bad access token")
+            return HTMLResponse("Invalid access token", status_code=401)
 
     # Generate authorization code
     _cleanup_expired()
@@ -701,7 +829,7 @@ async def oauth_authorize(request: Request) -> Response:
         "expires": time.time() + 300,  # 5 min
     }
 
-    # Redirect back to Claude.ai with the code
+    # Redirect back to the client with the code
     sep = "&" if "?" in redirect_uri else "?"
     redirect = redirect_uri + sep + urlencode({"code": code, "state": state})
     logger.info("OAuth authorize: issuing code, redirecting to %s", redirect_uri)
@@ -785,6 +913,7 @@ _PUBLIC_PATHS = frozenset(
         "/.well-known/oauth-protected-resource/sse",
         "/authorize",
         "/token",
+        "/register",
     ]
 )
 
@@ -994,7 +1123,12 @@ def create_sse_app() -> "Starlette":
                 "/.well-known/oauth-protected-resource/{resource_path:path}",
                 endpoint=oauth_protected_resource,
             ),
-            Route("/authorize", endpoint=oauth_authorize),
+            Route(
+                "/authorize",
+                endpoint=oauth_authorize,
+                methods=["GET", "POST"],
+            ),
+            Route("/register", endpoint=oauth_register, methods=["POST"]),
             Route("/token", endpoint=oauth_token, methods=["POST"]),
             # MCP endpoints
             Route("/health", endpoint=health),
