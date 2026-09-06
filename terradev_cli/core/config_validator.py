@@ -15,15 +15,7 @@ from typing import Dict
 
 logger = logging.getLogger(__name__)
 
-# Rust config validator integration
-try:
-    from terradev_config_validator import PyConfigValidator
-
-    USE_RUST_VALIDATOR = True
-    logger.info("Using Rust config validator for compile-time validation")
-except ImportError:
-    USE_RUST_VALIDATOR = False
-    logger.info("Rust config validator not available, using Python fallback")
+USE_RUST_VALIDATOR = False
 
 
 class ConfigValidator:

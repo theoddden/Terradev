@@ -34,27 +34,6 @@ from .dag_executor import DAGExecutor
 
 logger = logging.getLogger(__name__)
 
-# Rust snapshot manager integration
-try:
-    from terradev_snapshot_manager import PySnapshotManager, PyModelState
-
-    USE_RUST_SNAPSHOT = True
-    logger.info("Using Rust snapshot manager for 5-10x faster checkpoint saves")
-except ImportError:
-    USE_RUST_SNAPSHOT = False
-    logger.info("Rust snapshot manager not available, using Python fallback")
-
-# Rust artifact verification integration
-try:
-    from terradev_artifact_verification import PyArtifactVerifier
-
-    USE_RUST_VERIFICATION = True
-    logger.info("Using Rust artifact verification for integrity checks")
-except ImportError:
-    USE_RUST_VERIFICATION = False
-    logger.info("Rust artifact verification not available, using Python fallback")
-
-
 # ---------------------------------------------------------------------------
 # Storage backend protocol (local default, S3/GCS optional)
 # ---------------------------------------------------------------------------

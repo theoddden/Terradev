@@ -6,9 +6,10 @@ kernel, the CLI, the MCP server, CI runners, and any future agent protocol.
 The schema is intentionally minimal and stable: a result is either a success
 with a payload, or a failure with one or more machine-readable errors.
 
-Versioning note: the top-level envelope (``version``) is "2025.1" today and
-will only change when a backwards-incompatible field is removed or retyped.
-New fields may be added at any time without a version bump.
+Versioning note: the top-level envelope (``version``) follows a
+``YYYY.N`` scheme and is bumped only when a backwards-incompatible change
+is made (field removed, renamed, or retyped).  New fields may be added
+without a version bump.  Last bumped: 2026.1 (schema stabilised post-v6).
 """
 
 from __future__ import annotations
@@ -135,7 +136,7 @@ class TerradevResult:
     etc.).
     """
 
-    version: str = "2025.1"
+    version: str = "2026.1"
     success: bool = True
     result: Dict[str, Any] = field(default_factory=dict)
     errors: List[TerradevError] = field(default_factory=list)

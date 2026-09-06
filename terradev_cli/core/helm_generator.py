@@ -13,14 +13,6 @@ from typing import Dict, List, Any, Optional
 from pathlib import Path
 from dataclasses import dataclass, field
 
-# Rust helm generator integration
-try:
-    from terradev_helm_generator import HelmGenerator
-
-    USE_RUST_HELM = True
-except ImportError:
-    USE_RUST_HELM = False
-
 # GPU product labels used by the NVIDIA GPU Operator / device plugin.
 GPU_NODE_LABELS: Dict[str, str] = {
     "A100": "NVIDIA-A100-SXM4-80GB",

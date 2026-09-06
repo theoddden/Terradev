@@ -18,15 +18,7 @@ from .telemetry import get_telemetry
 
 logger = logging.getLogger(__name__)
 
-# Rust command executor integration
-try:
-    from terradev_command_executor import CommandExecutor
-
-    USE_RUST_EXECUTOR = True
-    logger.info("Using Rust command executor for 100x concurrency")
-except ImportError:
-    USE_RUST_EXECUTOR = False
-    logger.info("Rust command executor not available, using Python fallback")
+USE_RUST_EXECUTOR = False
 
 
 async def execute_command(

@@ -14,15 +14,7 @@ from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-# Rust quota manager integration
-try:
-    from terradev_quota_manager import PyQuotaManager
-
-    USE_RUST_QUOTA = True
-    logger.info("Using Rust quota manager for lock-free enforcement")
-except ImportError:
-    USE_RUST_QUOTA = False
-    logger.info("Rust quota manager not available, using Python fallback")
+USE_RUST_QUOTA = False
 
 
 class QuotaManager:

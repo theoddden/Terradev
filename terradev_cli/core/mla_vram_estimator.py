@@ -19,16 +19,6 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-# Rust VRAM estimator integration
-try:
-    from terradev_vram_estimator import PyVRAMEstimator, PyModelArchitecture
-
-    USE_RUST_VRAM = True
-    logger.info("Using Rust VRAM estimator for 10x faster calculations")
-except ImportError:
-    USE_RUST_VRAM = False
-    logger.info("Rust VRAM estimator not available, using Python fallback")
-
 
 class AttentionType(Enum):
     """Attention architecture types"""

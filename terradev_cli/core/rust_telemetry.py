@@ -14,15 +14,7 @@ from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Rust telemetry integration
-try:
-    from terradev_telemetry import PyTelemetryPipeline
-
-    USE_RUST_TELEMETRY = True
-    logger.info("Using Rust telemetry for 10x metrics throughput")
-except ImportError:
-    USE_RUST_TELEMETRY = False
-    logger.info("Rust telemetry not available, using Python fallback")
+USE_RUST_TELEMETRY = False
 
 
 class RustTelemetryBackend:

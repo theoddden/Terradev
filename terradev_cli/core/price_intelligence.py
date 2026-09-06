@@ -32,19 +32,6 @@ from typing import Dict, List, Any, Optional
 
 DB_PATH = Path.home() / ".terradev" / "cost_tracking.db"
 
-# Rust price intelligence integration
-try:
-    from terradev_price_intelligence import PriceIntelligence
-
-    USE_RUST_PRICE_INTEL = True
-    logging.getLogger(__name__).info(
-        "Using Rust price intelligence for 10-20x faster statistics"
-    )
-except ImportError:
-    USE_RUST_PRICE_INTEL = False
-    logging.getLogger(__name__).info(
-        "Rust price intelligence not available, using Python fallback"
-    )
 
 
 # ═══════════════════════════════════════════════════════════════════════

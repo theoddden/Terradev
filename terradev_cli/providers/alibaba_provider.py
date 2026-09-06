@@ -24,16 +24,6 @@ from .base_provider import BaseProvider
 
 logger = logging.getLogger(__name__)
 
-# Rust authentication integration
-try:
-    from terradev_authentication import PyAlibabaSigner, PyAlibabaCredentials
-
-    USE_RUST_AUTH = True
-    logger.info("Using Rust authentication for 10x faster signature generation")
-except ImportError:
-    USE_RUST_AUTH = False
-    logger.info("Rust authentication not available, using Python fallback")
-
 
 class AlibabaProvider(BaseProvider):
     """Alibaba Cloud ECS provider for GPU instances"""

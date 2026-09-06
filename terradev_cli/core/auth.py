@@ -5,6 +5,7 @@ Handles secure credential storage and management
 """
 
 import json
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -12,6 +13,8 @@ from typing import Dict, Optional
 from cryptography.fernet import Fernet
 import base64
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class AuthManager:
@@ -59,8 +62,13 @@ class AuthManager:
                             decrypted[key] = auth_manager.fernet.decrypt(
                                 value.encode()
                             ).decode()
-                        except Exception:  # noqa: BLE001
-                            decrypted[key] = value
+                        except Exception as exc:  # noqa: BLE001
+                            logger.warning(
+                                "Credential decryption failed for provider=%r field=%r: %s — "
+                                "field will be omitted. Re-run `terradev configure --provider %s` "
+                                "to restore it.",
+                                provider, key, exc, provider,
+                            )
                     auth_manager.credentials[provider] = decrypted
                 else:
                     auth_manager.credentials[provider] = cred_data
@@ -272,8 +280,12 @@ class AuthManager:
                 for key, value in cred_data.items():
                     try:
                         decrypted[key] = self.fernet.decrypt(value.encode()).decode()
-                    except Exception:  # noqa: BLE001
-                        decrypted[key] = value
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Backup decryption failed for provider=%r field=%r: %s — "
+                            "field will be omitted from the restored credentials.",
+                            provider, key, exc,
+                        )
                 decrypted_credentials[provider] = decrypted
 
             self.credentials = decrypted_credentials

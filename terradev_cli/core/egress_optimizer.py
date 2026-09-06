@@ -24,15 +24,6 @@ from typing import Dict, List, Any, Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
-# Rust egress optimizer integration
-try:
-    from terradev_egress_optimizer import PyEgressGraph, PyRegion, PyEgressEdge
-
-    USE_RUST_EGRESS = True
-    logger.info("Using Rust egress optimizer for 25x faster route calculation")
-except ImportError:
-    USE_RUST_EGRESS = False
-    logger.info("Rust egress optimizer not available, using Python fallback")
 
 DB_PATH = Path.home() / ".terradev" / "cost_tracking.db"
 

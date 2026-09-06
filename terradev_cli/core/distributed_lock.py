@@ -17,15 +17,7 @@ from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Rust distributed lock integration
-try:
-    from terradev_distributed_lock import PyDistributedLock
-
-    USE_RUST_LOCK = True
-    logger.info("Using Rust distributed lock for guaranteed consistency")
-except ImportError:
-    USE_RUST_LOCK = False
-    logger.info("Rust distributed lock not available, using Python fallback")
+USE_RUST_LOCK = False
 
 
 class DistributedLockManager:

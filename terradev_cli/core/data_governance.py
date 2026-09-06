@@ -28,16 +28,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Rust governance integration
-try:
-    from terradev_governance import GovernanceEngine
-
-    USE_RUST_GOVERNANCE = True
-    logger.info("Using Rust governance for 5-10x faster policy evaluation")
-except ImportError:
-    USE_RUST_GOVERNANCE = False
-    logger.info("Rust governance not available, using Python fallback")
-
 
 class ConsentType(Enum):
     """Types of user consent for data operations"""

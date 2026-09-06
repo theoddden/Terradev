@@ -19,30 +19,6 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Rust resource pool integration
-try:
-    from terradev_resource_pool import (
-        PyResourcePool,
-        PyPooledResource,
-        PyEvictionPolicy,
-    )
-
-    USE_RUST_RESOURCE_POOL = True
-    logger.info("Using Rust resource pool for 2.6x faster operations")
-except ImportError:
-    USE_RUST_RESOURCE_POOL = False
-    logger.info("Rust resource pool not available, using Python fallback")
-
-# Rust warm pool integration
-try:
-    from terradev_warm_pool import WarmPoolManager as RustWarmPoolManager
-
-    USE_RUST_WARM_POOL = True
-    logger.info("Using Rust warm pool for 3-5x faster eviction")
-except ImportError:
-    USE_RUST_WARM_POOL = False
-    logger.info("Rust warm pool not available, using Python fallback")
-
 
 class WarmStrategy(Enum):
     """Warm pool management strategies"""

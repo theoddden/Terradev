@@ -14,15 +14,7 @@ from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-# Rust credential vault integration
-try:
-    from terradev_credential_vault import PyCredentialVault
-
-    USE_RUST_VAULT = True
-    logger.info("Using Rust credential vault for memory-safe secret handling")
-except ImportError:
-    USE_RUST_VAULT = False
-    logger.info("Rust credential vault not available, using Python fallback")
+USE_RUST_VAULT = False
 
 
 class CredentialVault:

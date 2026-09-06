@@ -14,15 +14,7 @@ from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-# Rust GPU discovery integration
-try:
-    from terradev_gpu_discovery import GPUDiscovery
-
-    USE_RUST_GPU_DISCOVERY = True
-    logger.info("Using Rust GPU discovery for 5-10x faster introspection")
-except ImportError:
-    USE_RUST_GPU_DISCOVERY = False
-    logger.info("Rust GPU discovery not available, using Python fallback")
+USE_RUST_GPU_DISCOVERY = False
 
 
 class GPUDiscoveryWrapper:

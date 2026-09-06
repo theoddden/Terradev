@@ -16,15 +16,7 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-# Rust cache eviction integration
-try:
-    from terradev_cache_eviction import PyCacheEngine, PyCacheEntry, PyEvictionPolicy
-
-    USE_RUST_CACHE = True
-    logger.info("Using Rust cache engine for 40% better hit rates")
-except ImportError:
-    USE_RUST_CACHE = False
-    logger.info("Rust cache engine not available, using Python fallback")
+USE_RUST_CACHE = False
 
 
 class CacheManager:

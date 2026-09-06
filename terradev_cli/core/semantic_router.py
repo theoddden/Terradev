@@ -34,17 +34,6 @@ from .semantic_signals import SignalOrchestrator
 
 logger = logging.getLogger(__name__)
 
-# Rust semantic router integration
-try:
-    from terradev_semantic_router import SemanticRouter
-
-    USE_RUST_ROUTER = True
-    logger.info("Using Rust semantic router for 5-15x faster routing")
-except ImportError:
-    USE_RUST_ROUTER = False
-    logger.info("Rust semantic router not available, using Python fallback")
-
-
 # ── Policy Data Structures ──────────────────────────────────────────────────
 
 
