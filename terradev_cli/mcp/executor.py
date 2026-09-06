@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import base64
+import contextvars
 import hashlib
 import json
 import logging
@@ -18,6 +19,74 @@ import platform
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("terradev-mcp")
+
+
+# Per-request BYOAPI credentials. The MCP layer sets this for the duration of a
+# single tool call; the value is injected into the subprocess environment so the
+# terradev CLI / terraform / provider SDKs use the *caller's* own provider keys.
+# Nothing is persisted — TERRADEV_NO_PERSIST is forced on for every subprocess.
+_request_creds: "contextvars.ContextVar[Optional[dict]]" = contextvars.ContextVar(
+    "terradev_request_creds", default=None
+)
+
+# Names that must never be caller-injectable: they can hijack the subprocess
+# (library preload, PATH, interpreter hooks, git/ssh helpers, etc.).
+_ENV_DENY_EXACT = frozenset({
+    "PATH", "HOME", "IFS", "ENV", "CDPATH", "SHELL", "SHELLOPTS", "BASHOPTS",
+    "GLOBIGNORE", "PROMPT_COMMAND", "PS1", "PS2", "PS3", "PS4", "TMPDIR", "TERM",
+    "LOGNAME", "PWD", "OLDPWD", "EDITOR", "VISUAL", "PAGER", "LANG", "LC_ALL",
+    "DISPLAY", "XAUTHORITY", "DBUS_SESSION_BUS_ADDRESS", "USER", "USERNAME",
+})
+_ENV_DENY_PREFIXES = (
+    "LD_", "DYLD_", "PYTHON", "GIT_", "SSH_", "BASH", "NODE_", "PERL", "RUBY",
+    "JAVA", "_JAVA", "TERRADEV_MCP_", "TERRADEV_NO_PERSIST", "TERRADEV_DIR",
+    "TERRADEV_OUTPUT", "TERRADEV_TELEMETRY", "TERRADEV_COMMAND_MAP",
+)
+# A name is only honoured if it looks credential/config-ish.
+_CRED_KEYWORDS = (
+    "KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "CREDS",
+    "API", "AUTH", "REGION", "PROJECT", "NAMESPACE", "TENANCY", "OCID",
+    "WORKSPACE", "ACCOUNT", "CLIENT", "SUBSCRIPTION", "ENDPOINT", "HOST",
+    "URL", "CERT", "PRIVATE",
+)
+_ENV_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]{0,127}$")
+
+
+def _creds_to_env(creds: Any) -> Dict[str, str]:
+    """Convert a caller-supplied ``credentials`` mapping into subprocess env vars.
+
+    Accepts ``{"ENV_NAME": "value"}`` — e.g. ``{"RUNPOD_API_KEY": "…",
+    "AWS_ACCESS_KEY_ID": "…", "AWS_SECRET_ACCESS_KEY": "…"}`` or the
+    ``TERRADEV_<PROVIDER>_<KEY>`` vault form. Only credential-shaped names are
+    honoured; anything that could hijack the subprocess is dropped.
+    """
+    env: Dict[str, str] = {}
+    if not isinstance(creds, dict):
+        return env
+    for name, value in creds.items():
+        if not isinstance(name, str) or value is None:
+            continue
+        name = name.strip().upper()
+        if not _ENV_NAME_RE.match(name):
+            continue
+        if name in _ENV_DENY_EXACT or name.startswith(_ENV_DENY_PREFIXES):
+            continue
+        if not any(k in name for k in _CRED_KEYWORDS):
+            continue
+        env[name] = str(value)
+    return env
+
+
+def _subprocess_env() -> Dict[str, str]:
+    """Base subprocess env plus the current call's BYOAPI credentials.
+
+    ``TERRADEV_NO_PERSIST`` is always forced on so a caller's keys are never
+    written to the shared on-disk vault.
+    """
+    env = os.environ.copy()
+    env["TERRADEV_NO_PERSIST"] = "1"
+    env.update(_creds_to_env(_request_creds.get()))
+    return env
 
 
 def check_terradev_installation():
@@ -251,7 +320,7 @@ async def execute_terradev_command(args: List[str]) -> Dict[str, Any]:
         cmd = _terradev_command() + args
 
         # Apply bug fixes for known issues
-        env = os.environ.copy()
+        env = _subprocess_env()
 
         # Fix 3: Ensure proxy settings are respected
         env["TRUST_ENV"] = "true"
@@ -315,6 +384,7 @@ async def _UNSAFE_execute_shell_command(
             cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=_subprocess_env(),
         )
         stdout, stderr_bytes = await asyncio.wait_for(
             process.communicate(), timeout=timeout
@@ -345,6 +415,7 @@ async def execute_safe_command(args: List[str], timeout: int = 120) -> Dict[str,
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=_subprocess_env(),
         )
         stdout, stderr_bytes = await asyncio.wait_for(
             process.communicate(), timeout=timeout
@@ -425,6 +496,7 @@ async def execute_terraform_command(cmd: List[str], cwd: str) -> Dict[str, Any]:
             cwd=cwd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=_subprocess_env(),
         )
 
         stdout, stderr = await process.communicate()
@@ -469,6 +541,7 @@ async def execute_terraform_parallel(
             cwd=ws_dir,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=_subprocess_env(),
         )
         init_stdout, init_stderr = await init_result.communicate()
 
@@ -488,6 +561,7 @@ async def execute_terraform_parallel(
             cwd=ws_dir,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=_subprocess_env(),
         )
         plan_stdout, plan_stderr = await plan_result.communicate()
 
@@ -508,6 +582,7 @@ async def execute_terraform_parallel(
             cwd=ws_dir,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=_subprocess_env(),
         )
         apply_stdout, apply_stderr = await apply_result.communicate()
 
@@ -519,6 +594,7 @@ async def execute_terraform_parallel(
             cwd=ws_dir,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=_subprocess_env(),
         )
         output_stdout, output_stderr = await output_result.communicate()
 

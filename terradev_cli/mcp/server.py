@@ -51,6 +51,7 @@ from .executor import (
     _get_tf_workspace,
     _list_tf_workspaces,
     _load_datadog_creds,
+    _request_creds,
     _terradev_command,
     _validate_config_dir,
     check_terradev_installation,
@@ -287,21 +288,38 @@ def _get_compressed_tools():
     if _ALL_TOOLS is None:
         _build_all_tools()
     if optimizer and MCP_AVAILABLE:
-        _COMPRESSED_TOOLS = optimizer.compress_tools(_ALL_TOOLS)
-        return _COMPRESSED_TOOLS
-    # Python fallback: strip optional fields
-    def strip_optional_fields(tool):
-        if isinstance(tool.inputSchema, dict):
-            props = tool.inputSchema.get("properties", {})
-            required = tool.inputSchema.get("required", [])
-            if isinstance(props, dict) and isinstance(required, list):
-                required_set = set(required)
-                tool.inputSchema["properties"] = {
-                    k: v for k, v in props.items() if k in required_set
-                }
-        return tool
+        tools = optimizer.compress_tools(_ALL_TOOLS)
+    else:
+        # Python fallback: strip optional fields
+        def strip_optional_fields(tool):
+            if isinstance(tool.inputSchema, dict):
+                props = tool.inputSchema.get("properties", {})
+                required = tool.inputSchema.get("required", [])
+                if isinstance(props, dict) and isinstance(required, list):
+                    required_set = set(required)
+                    tool.inputSchema["properties"] = {
+                        k: v for k, v in props.items() if k in required_set
+                    }
+            return tool
 
-    _COMPRESSED_TOOLS = [strip_optional_fields(tool) for tool in _ALL_TOOLS]
+        tools = [strip_optional_fields(tool) for tool in _ALL_TOOLS]
+
+    # BYOAPI: every tool accepts an optional `credentials` object — the caller's
+    # own provider keys, injected into the command env for that call only.
+    for _t in tools:
+        _schema = getattr(_t, "inputSchema", None)
+        if isinstance(_schema, dict):
+            _schema.setdefault("properties", {})["credentials"] = {
+                "type": "object",
+                "description": (
+                    "BYOAPI — your own provider credentials as env vars for this "
+                    "call only (never stored). E.g. {\"RUNPOD_API_KEY\": \"...\"}, "
+                    "{\"AWS_ACCESS_KEY_ID\": \"...\", \"AWS_SECRET_ACCESS_KEY\": \"...\"}, "
+                    "or the TERRADEV_<PROVIDER>_<KEY> vault form."
+                ),
+                "additionalProperties": {"type": "string"},
+            }
+    _COMPRESSED_TOOLS = tools
     return _COMPRESSED_TOOLS
 
 
@@ -368,8 +386,20 @@ async def handle_call_tool(name_or_request, arguments=None, **kwargs) -> CallToo
                     parts = tool_name.split(".", 1)
                     tool_name = parts[1]
 
-            # O(1) dispatch through the smart router
-            return await router.dispatch(tool_name, arguments, execute_terradev_command)
+            # BYOAPI: caller-supplied provider credentials for this call only.
+            _creds = (
+                arguments.pop("credentials", None)
+                if isinstance(arguments, dict)
+                else None
+            )
+            _creds_tok = _request_creds.set(_creds)
+            try:
+                # O(1) dispatch through the smart router
+                return await router.dispatch(
+                    tool_name, arguments, execute_terradev_command
+                )
+            finally:
+                _request_creds.reset(_creds_tok)
 
         except Exception as e:  # noqa: BLE001
             return CallToolResult(
@@ -543,6 +573,11 @@ TERRADEV_MCP_BEARER_TOKEN = os.getenv("TERRADEV_MCP_BEARER_TOKEN", "")
 # Canonical public base URL for OAuth metadata (e.g. "https://terradev-mcp.terradev.cloud").
 # Needed behind a TLS-terminating proxy — request.base_url would otherwise be http://internal.
 TERRADEV_MCP_PUBLIC_URL = os.getenv("TERRADEV_MCP_PUBLIC_URL", "")
+
+# When set, the MCP transport endpoints (/mcp, /sse, /messages) are public — no
+# bearer token. BYOAPI: callers pass their own provider credentials per call via
+# the `credentials` tool argument; the server holds none.
+_PUBLIC_TRANSPORT = os.getenv("TERRADEV_MCP_PUBLIC", "").lower() in ("1", "true", "yes")
 
 # Comma-separated list of exact allowed redirect URIs for OAuth.
 # Example: "https://claude.ai/oauth/callback,http://localhost:3000/callback"
@@ -917,6 +952,33 @@ _PUBLIC_PATHS = frozenset(
     ]
 )
 
+# MCP transport endpoints — public when _PUBLIC_TRANSPORT (BYOAPI) is set.
+_TRANSPORT_PATHS = frozenset(["/mcp", "/sse", "/messages"])
+
+# Simple per-IP sliding-window rate limit for the public transport.
+_RATE_LIMIT = int(os.getenv("TERRADEV_MCP_RATE_LIMIT", "120"))  # requests/min/IP
+_RATE_WINDOW = 60.0
+_rate_hits: Dict[str, List[float]] = {}
+
+
+def _rate_limited(scope) -> bool:
+    """True if the client IP has exceeded _RATE_LIMIT requests in the window."""
+    headers = {k.decode(): v.decode() for k, v in scope.get("headers", [])}
+    ip = (
+        headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (scope.get("client") or ("?", 0))[0]
+    )
+    now = time.time()
+    hits = _rate_hits.setdefault(ip, [])
+    while hits and now - hits[0] > _RATE_WINDOW:
+        hits.pop(0)
+    if len(hits) >= _RATE_LIMIT:
+        return True
+    hits.append(now)
+    if len(_rate_hits) > 50_000:  # bound memory
+        _rate_hits.clear()
+    return False
+
 
 def _unauthorized(scope, path: str) -> JSONResponse:
     """401 with an RFC 9728 resource_metadata pointer for OAuth discovery."""
@@ -946,6 +1008,15 @@ class OAuthBearerMiddleware:
 
         # Public routes pass through (all /.well-known/ discovery docs are public)
         if path in _PUBLIC_PATHS or path.startswith("/.well-known/"):
+            await self.app(scope, receive, send)
+            return
+
+        # Public BYOAPI transport: no auth, but rate-limited per client IP.
+        if _PUBLIC_TRANSPORT and path.rstrip("/") in _TRANSPORT_PATHS:
+            if _rate_limited(scope):
+                response = JSONResponse({"error": "rate_limited"}, status_code=429)
+                await response(scope, receive, send)
+                return
             await self.app(scope, receive, send)
             return
 
@@ -1217,7 +1288,11 @@ def main():
     if args.transport == "stdio":
         asyncio.run(run_stdio())
     else:
-        if not TERRADEV_MCP_BEARER_TOKEN and not args.allow_unauthenticated:
+        if (
+            not TERRADEV_MCP_BEARER_TOKEN
+            and not args.allow_unauthenticated
+            and not _PUBLIC_TRANSPORT
+        ):
             logger.error(
                 "TERRADEV_MCP_BEARER_TOKEN is not set — refusing to start a "
                 "remote transport without authentication. Set the env var, or "
@@ -1226,9 +1301,8 @@ def main():
             sys.exit(1)
         if not TERRADEV_MCP_BEARER_TOKEN:
             logger.warning(
-                "TERRADEV_MCP_BEARER_TOKEN is not set and --allow-unauthenticated "
-                "was passed — endpoint is effectively PUBLIC (any client can "
-                "self-authorize via /authorize). Do not expose this port."
+                "TERRADEV_MCP_BEARER_TOKEN is not set — endpoint is PUBLIC. "
+                "BYOAPI: callers supply their own provider credentials per call."
             )
         app = create_sse_app()
         logger.info(
