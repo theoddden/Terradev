@@ -949,6 +949,7 @@ _PUBLIC_PATHS = frozenset(
         "/authorize",
         "/token",
         "/register",
+        "/mcp/.well-known/owners.json",
     ]
 )
 
@@ -1054,6 +1055,72 @@ class OAuthBearerMiddleware:
         logger.warning("Auth rejected for %s %s (invalid token)", method, path)
         response = _unauthorized(scope, path)
         await response(scope, receive, send)
+
+
+# ---------------------------------------------------------------------------
+# Registry discovery: server card (Smithery) + ownership claim (VerifyMCP)
+# ---------------------------------------------------------------------------
+
+# VerifyMCP account addresses allowed to claim this server. Comma-separated;
+# must match the email on the VerifyMCP account exactly (after lowercasing).
+_TERRADEV_MCP_OWNERS = [
+    e.strip()
+    for e in os.getenv("TERRADEV_MCP_OWNERS", "admin@terradev.cloud").split(",")
+    if e.strip()
+]
+
+
+async def mcp_server_card(request: Request) -> JSONResponse:
+    """Static MCP server card (SEP-1649 / Smithery static card).
+
+    Served at /.well-known/mcp/server-card.json so registry scanners can read
+    server metadata + capabilities without completing an authenticated scan.
+    """
+    tools = _get_compressed_tools() or []
+    card = {
+        "serverInfo": {
+            "name": "terradev-mcp",
+            "title": "Terradev MCP",
+            "version": "2.0.1",
+            "description": (
+                "Terradev — multi-cloud GPU/compute provisioning and ML infra "
+                "tools. BYOAPI: callers pass their own provider credentials per "
+                "call via the `credentials` argument; the server holds none."
+            ),
+        },
+        "authentication": {
+            "required": not _PUBLIC_TRANSPORT,
+            "schemes": [] if _PUBLIC_TRANSPORT else ["oauth2"],
+        },
+        "tools": [
+            {
+                "name": getattr(t, "name", ""),
+                "description": getattr(t, "description", "") or "",
+                "inputSchema": getattr(t, "inputSchema", {}) or {},
+            }
+            for t in tools
+        ],
+        "resources": [],
+        "prompts": [],
+    }
+    return JSONResponse(
+        card,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
+async def mcp_owners(request: Request) -> JSONResponse:
+    """VerifyMCP ownership claim — host-level and path-level owners.json."""
+    return JSONResponse(
+        {"owners": _TERRADEV_MCP_OWNERS},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1201,6 +1268,13 @@ def create_sse_app() -> "Starlette":
             ),
             Route("/register", endpoint=oauth_register, methods=["POST"]),
             Route("/token", endpoint=oauth_token, methods=["POST"]),
+            # Registry discovery (public)
+            Route(
+                "/.well-known/mcp/server-card.json",
+                endpoint=mcp_server_card,
+            ),
+            Route("/.well-known/owners.json", endpoint=mcp_owners),
+            Route("/mcp/.well-known/owners.json", endpoint=mcp_owners),
             # MCP endpoints
             Route("/health", endpoint=health),
             Route("/sse", endpoint=sse_handler),
